@@ -1,159 +1,126 @@
-# Turborepo starter
+# SaaS eCommerce MVP - Fase 1
 
-This Turborepo starter is maintained by the Turborepo core team.
+Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al Cono Sur.
 
-## Using this example
+## Estado actual (Semana 1 - avance)
 
-Run the following command:
+✅ **Completado hasta ahora**:
+- Estructura monorepo con Turborepo (apps: `storefront`, `admin`, `superadmin`).
+- Servicios Docker locales: PostgreSQL 16, Redis 7, MinIO (almacenamiento), MailHog (email).
+- Variables de entorno base en `.env.local`.
+- Scripts raíz agregados (ver más abajo).
+- Dependencias compartidas instaladas (Drizzle, Auth.js, Redis, MinIO, etc.).
+- Pendiente: configuración de Drizzle ORM, schema de DB y migraciones.
 
-```sh
-npx create-turbo@latest
+## Requisitos previos
+
+- Node.js 20+ y pnpm
+- Docker Desktop (con WSL2)
+- Git
+
+## Primeros pasos (para tu compañero)
+
+### 1. Clonar el repositorio
+
+```bash
+git clone <url-del-repo>
+cd saas-ecommerce
 ```
 
-## What's inside?
+### 2. Configurar variables de entorno
 
-This Turborepo includes the following packages/apps:
+Copia el archivo de ejemplo:
 
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```bash
+cp .env.local.example .env.local
 ```
 
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+### 3. Levantar servicios Docker
+```bash
+docker-compose up -d
+```
+### 4. Instalar dependencias
+```bash
+pnpm install
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+### 5. (Próximamente) Configurar base de datos
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+Una vez que Drizzle esté configurado:
+```bash
+pnpm db:generate
+pnpm db:migrate
+pnpm db:seed
+```
+### 6. Ejecutar en desarrollo
 
-```sh
-turbo build --filter=docs
+```bash
+pnpm dev
+```
+Storefront: http://localhost:3000
+
+Admin: http://localhost:3001
+
+Superadmin: http://localhost:3002
+
+### Scripts disponibles (en package.json raíz)
+
+|Script|Descripción|
+|:-|:-|
+|pnpm dev|Levanta todas las apps en modo desarrollo|
+|pnpm db:generate|Genera migraciones desde el schema Drizzle|
+|pnpm db:migrate|Ejecuta migraciones pendientes|
+|pnpm db:seed|(Próximamente) Llena la DB con datos de prueba|
+|pnpm setup|Ejecuta install, levanta Docker, genera y migra (pendiente de afinar)|
+
+### Variables de entorno (.env.local)
+```bash
+# PostgreSQL local
+DATABASE_URL=postgresql://saas:saas123@localhost:5432/saas_ecommerce
+
+# Redis local
+REDIS_URL=redis://localhost:6379
+
+# Auth (Generado con https://numbergenerator.org/random-32-digit-number-generator)
+AUTH_SECRET=02729723375753422536102479576611
+
+# MinIO
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_ACCESS_KEY=C03NSVQ6UYKJAR5NZ34T
+MINIO_SECRET_KEY=HTKZk97sQhYObHBXHcNZviOT7S72NBjx595ja5YO
+MINIO_BUCKET=saas-media
+MINIO_USE_SSL=false
+
+# Email (MailHog)
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_FROM=noreply@saas.local
 ```
 
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+### Estructura del proyecto
+```text
+saas-ecommerce/
+├── apps/
+│   ├── storefront/     # Tienda pública (Next.js)
+│   ├── admin/          # Panel del comercio (Next.js)
+│   └── superadmin/     # Panel SaaS interno (Next.js)
+├── packages/
+│   ├── db/             # Schema Drizzle, migrations, client
+│   ├── auth/           # Configuración compartida de Auth.js
+│   ├── commerce/       # Lógica de negocio (carrito, órdenes)
+│   ├── ui/             # Componentes comunes (shadcn/ui)
+│   └── config/         # Configs compartidas (ESLint, TS, Tailwind)
+├── docker-compose.yml
+├── .env.local
+├── turbo.json
+└── package.json
 ```
 
-### Develop
+### Próximos pasos (después de este commit)
+Configurar Drizzle ORM y crear schema inicial (tenants, products, variants, orders, customers).
 
-To develop all apps and packages, run the following command:
+Implementar middleware multi-tenant con resolución de subdominios.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+Autenticación con NextAuth (Auth.js) para admin y superadmin.
 
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
