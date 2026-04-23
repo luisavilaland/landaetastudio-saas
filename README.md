@@ -8,9 +8,11 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Estructura monorepo con Turborepo (apps: `storefront`, `admin`, `superadmin`).
 - Servicios Docker locales: PostgreSQL 16, Redis 7, MinIO, MailHog.
 - Drizzle ORM configurado con todas las tablas (camelCase).
-- Autenticación con NextAuth v5 (Credentials provider).
-- Login page y rutas protegidas.
+- Autenticación con NextAuth v5 (Credentials provider) en admin y superadmin.
+- Login pages y rutas protegidas.
 - Middleware multi-tenant con resolución de subdominios.
+- CRUD de tenants en superadmin (API + UI).
+- Logout functionality.
 - Carga de variables de entorno desde la raíz del monorepo.
 
 🔄 **En desarrollo:**

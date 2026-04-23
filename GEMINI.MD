@@ -24,14 +24,13 @@ This document provides concise, high-signal information for AI agents working in
 - Docker Compose services: PostgreSQL 16, Redis 7, MinIO, MailHog.
 - `.env.local` with local credentials.
 - Drizzle ORM with all tables (camelCase columns).
-- Authentication with NextAuth v5 (Credentials provider) in admin and superadmin.
-- Login pages and protected routes in both apps.
+- Authentication with NextAuth v5 (Credentials provider).
+- Login page and protected routes.
 - Multi-tenant middleware via proxy.ts.
 - Env loading via dotenv in next.config.ts.
-- Superadmin CRUD for tenants (API + UI).
-- Logout functionality.
 
 🔄 **Pending:**
+- Superadmin with Auth.js.
 - RLS policies.
 - Product catalog & admin panel.
 - Checkout & MercadoPago.
@@ -55,7 +54,6 @@ pnpm install
 DATABASE_URL=postgresql://saas:saas123@localhost:5432/saas_ecommerce
 REDIS_URL=redis://localhost:6379
 AUTH_SECRET=02729723375753422536102479576611
-NEXTAUTH_URL=http://localhost:3001
 MINIO_ENDPOINT=localhost
 MINIO_PORT=9000
 MINIO_ACCESS_KEY=minioadmin
@@ -106,24 +104,6 @@ saas-ecommerce/
 │   │   │   └── page.tsx
 │   │   └── components/auth/session-provider.tsx
 │   └── superadmin/
-│       ├── lib/auth.ts          # NextAuth config
-│       ├── components/
-│       │   ├── tenant-form.tsx
-│       │   ├── logout-button.tsx
-│       │   └── auth/session-provider.tsx
-│       └── app/
-│           ├── api/
-│           │   └── tenants/
-│           │       ├── route.ts         # GET, POST
-│           │       └── [id]/route.ts    # GET, PUT, DELETE
-│           ├── login/page.tsx
-│           ├── (dashboard)/
-│           │   ├── layout.tsx          # Protected layout
-│           │   ├── tenants/
-│           │   │   ├── page.tsx        # List
-│           │   │   ├── new/page.tsx    # Create
-│           │   │   └── [id]/edit/page.tsx  # Edit
-│           └── page.tsx               # Redirects to /tenants
 ├── packages/
 │   └── db/
 │       ├── drizzle.config.ts
@@ -143,16 +123,6 @@ saas-ecommerce/
 - **Password:** 123456
 - **Tenant:** tienda1 (id: 11111111-1111-1111-1111-111111111111)
 
-## API Endpoints (Superadmin)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/tenants | List all tenants |
-| POST | /api/tenants | Create tenant |
-| GET | /api/tenants/[id] | Get tenant by ID |
-| PUT | /api/tenants/[id] | Update tenant |
-| DELETE | /api/tenants/[id] | Delete tenant |
-
 ## Important Notes
 
 - DO NOT deploy to cloud until MVP works 100% locally.
@@ -162,4 +132,4 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 23, 2026 – Superadmin tenants CRUD, logout button, protected routes.
+Last updated: April 23, 2026 – Authentication working, login page, protected dashboard.
