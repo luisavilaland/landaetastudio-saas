@@ -20,8 +20,10 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Índices en tenantId en todas las tablas de negocio.
 - Subida de imágenes a MinIO con FormData.
 - Paquete `@repo/storage` para integración con MinIO.
+- Storefront: catálogo de productos, página de detalle, navbar, breadcrumbs, página de carrito placeholder.
 
 🔄 **En desarrollo:**
+- Carrito funcional (Redis + cookies).
 - Checkout y MercadoPago.
 - Políticas RLS.
 - Normalizar slug en create/edit.

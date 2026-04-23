@@ -37,9 +37,12 @@ This document provides concise, high-signal information for AI agents working in
 - TenantId indexes on all business tables for query performance.
 - Product images upload to MinIO with FormData support.
 - Packages: `@repo/storage` for MinIO integration.
+- Storefront: catalog page with products grid, product detail page, breadcrumbs, navbar.
+- Storefront cart placeholder page.
 
 🔄 **Pending (see priorities below):**
 - RLS policies (Row Level Security).
+- Cart functionality (Redis + cookies).
 - Checkout & MercadoPago.
 - FK constraints in database.
 - Normalize slug on create/edit.
