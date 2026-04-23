@@ -86,6 +86,7 @@ export async function PUT(
     const price = parseInt(body.get("price") as string, 10);
     const stock = parseInt(body.get("stock") as string, 10);
     const image = body.get("image") as File | null;
+    const removeImage = body.get("removeImage") === "true";
 
     if (!name || !slug || isNaN(price) || isNaN(stock)) {
       return NextResponse.json(
@@ -131,10 +132,18 @@ export async function PUT(
     let imageUrl = product[0].imageUrl;
 
     if (image && image.size > 0) {
+      if (product[0].imageUrl) {
+        await deleteImage(product[0].imageUrl);
+      }
       const buffer = Buffer.from(await image.arrayBuffer());
       const ext = image.name.split(".").pop() || "png";
-      imageUrl = await uploadImage(buffer, `${slug}.${ext}`, image.type);
+      imageUrl = await uploadImage(buffer, `products/${Date.now()}-${slug}.${ext}`, image.type);
+    } else if (removeImage && product[0].imageUrl) {
+      await deleteImage(product[0].imageUrl);
+      imageUrl = null;
     }
+
+    const metadata = product[0].metadata;
 
     await db.transaction(async (tx) => {
       await tx

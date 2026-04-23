@@ -18,9 +18,10 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Validación backend: price > 0, stock >= 0, SKU regeneration on slug update.
 - Índices de base de datos: unique (tenantId, slug) para products, (tenantId, email) para customers, (tenantId, sku) para variants.
 - Índices en tenantId en todas las tablas de negocio.
+- Subida de imágenes a MinIO con FormData.
+- Paquete `@repo/storage` para integración con MinIO.
 
 🔄 **En desarrollo:**
-- Imágenes de productos (MinIO).
 - Checkout y MercadoPago.
 - Políticas RLS.
 - Normalizar slug en create/edit.
@@ -118,7 +119,8 @@ saas-ecommerce/
 │   ├── admin/          # Panel del comercio (Next.js)
 │   └── superadmin/     # Panel SaaS interno (Next.js)
 ├── packages/
-│   └── db/             # Schema Drizzle, migrations, client
+│   ├── db/             # Schema Drizzle, migrations, client
+│   └── storage/        # MinIO client for image upload
 ├── docker-compose.yml
 ├── .env.local
 └── turbo.json

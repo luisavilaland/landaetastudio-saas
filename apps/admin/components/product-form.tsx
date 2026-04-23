@@ -25,8 +25,9 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [imagePreview, setImagePreview] = useState(initialProduct?.imageUrl || "");
+  const [imagePreview, setImagePreview] = useState<string | null>(initialProduct?.imageUrl || null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
 
   const [form, setForm] = useState({
     name: initialProduct?.name || "",
@@ -59,11 +60,20 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setRemoveImage(false);
+      const objectUrl = URL.createObjectURL(file);
+      setImagePreview(objectUrl);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    if (removeImage) {
+      setRemoveImage(false);
+      setImagePreview(initialProduct?.imageUrl || null);
+    } else {
+      setRemoveImage(true);
+      setImagePreview(null);
+      setImageFile(null);
     }
   };
 
@@ -90,6 +100,9 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
       formData.append("stock", form.stock);
       if (imageFile) {
         formData.append("image", imageFile);
+      }
+      if (removeImage) {
+        formData.append("removeImage", "true");
       }
 
       const res = await fetch(url, {
@@ -178,16 +191,41 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
           <input
             id="image"
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
             onChange={handleImageChange}
             className="mt-1 block w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200"
           />
           {imagePreview && (
-            <img
-              src={imagePreview}
-              alt="Preview"
-              className="mt-2 w-32 h-32 object-cover rounded-md"
-            />
+            <div className="mt-2 relative inline-block">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-32 h-32 object-cover rounded-md"
+              />
+              {mode === "edit" && !imageFile && (
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
+          {mode === "edit" && initialProduct?.imageUrl && !imagePreview && (
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="removeImage"
+                checked={removeImage}
+                onChange={handleRemoveImage}
+                className="rounded border-zinc-300"
+              />
+              <label htmlFor="removeImage" className="text-sm text-zinc-600">
+                Quitar imagen
+              </label>
+            </div>
           )}
         </div>
 

@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     if (image && image.size > 0) {
       const buffer = Buffer.from(await image.arrayBuffer());
       const ext = image.name.split(".").pop() || "png";
-      imageUrl = await uploadImage(buffer, `${slug}.${ext}`, image.type);
+      imageUrl = await uploadImage(buffer, `products/${Date.now()}-${slug}.${ext}`, image.type);
     }
 
     const newProduct = await db.transaction(async (tx) => {

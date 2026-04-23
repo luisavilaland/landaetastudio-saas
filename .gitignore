@@ -32,6 +32,10 @@ Thumbs.db
 # Drizzle migrations (generated locally)
 packages/db/migrations/*.sql
 
+# Drizzle snapshots (generated locally)
+packages/db/migrations/meta/*.json
+!packages/db/migrations/meta/_journal.json
+
 # Temporary files
 *.tmp
 cookies.txt

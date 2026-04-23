@@ -13,6 +13,7 @@ This document provides concise, high-signal information for AI agents working in
   - `superadmin` – Panel SaaS interno (gestión de tenants, planes, etc.).
 - **Shared Packages (`packages/`):**
   - `db` – Drizzle ORM schema, migrations, client.
+  - `storage` – MinIO client for image upload.
   - `commerce` – Business logic (cart, orders, pricing).
   - `ui` – Shared components (shadcn/ui).
   - `config` – Shared ESLint, TypeScript, Tailwind configs.
@@ -34,16 +35,25 @@ This document provides concise, high-signal information for AI agents working in
 - Backend validation: price > 0, stock >= 0, SKU regeneration on slug update.
 - Database indexes: unique (tenantId, slug) for products, (tenantId, email) for customers, (tenantId, sku) for variants.
 - TenantId indexes on all business tables for query performance.
+- Product images upload to MinIO with FormData support.
+- Packages: `@repo/storage` for MinIO integration.
 
 🔄 **Pending (see priorities below):**
 - RLS policies (Row Level Security).
-- Product images (MinIO).
 - Checkout & MercadoPago.
 - FK constraints in database.
 - Normalize slug on create/edit.
 - Prevent delete when product has orders.
 
-## Development Setup (Local Only)
+## Shared Packages (`packages/`)
+
+| Package | Description |
+|---------|-------------|
+| `db` | Drizzle ORM schema, migrations, client. |
+| `storage` | MinIO client for image upload (uploadImage, deleteImage, getPublicUrl). |
+| `commerce` | Business logic (cart, orders, pricing). |
+| `ui` | Shared components (shadcn/ui). |
+| `config` | Shared ESLint, TypeScript, Tailwind configs. |
 
 ### Prerequisites
 - Node.js 20+ and pnpm
@@ -134,7 +144,8 @@ saas-ecommerce/
 │           ├── (dashboard)/tenants/
 │           └── page.tsx
 ├── packages/
-│   └── db/
+│   ├── db/             # Drizzle schema and migrations
+│   └── storage/        # MinIO client for image upload
 ├── docker-compose.yml
 ├── .env.local
 ├── pnpm-workspace.yaml
@@ -176,7 +187,7 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 23, 2026 – Admin products CRUD, indexes, validation fixes.
+Last updated: April 23, 2026 – Product images upload, storage package, FormData support.
 
 ## Production Priorities
 

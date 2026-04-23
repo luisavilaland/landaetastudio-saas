@@ -10,7 +10,7 @@ const useSSL = process.env.MINIO_USE_SSL === "true";
 const protocol = useSSL ? "https" : "http";
 
 export const minioClient = new Client({
-  endpoint,
+  endPoint: endpoint,
   port,
   useSSL,
   accessKey,
@@ -27,9 +27,9 @@ export async function uploadImage(
   fileName: string,
   contentType: string
 ): Promise<string> {
-  const uniqueName = `${Date.now()}-${fileName}`;
+  const uniqueName = `products/${Date.now()}-${fileName}`;
 
-  await minioClient.putObject(bucket, uniqueName, file, {
+  await minioClient.putObject(bucket, uniqueName, file, file.size, {
     "Content-Type": contentType,
   });
 
