@@ -8,8 +8,11 @@
     "start": "next start",
     "lint": "eslint"
   },
-  "dependencies": {
+"dependencies": {
+    "@repo/db": "workspace:*",
+    "bcryptjs": "^3.0.3",
     "next": "16.2.4",
+    "next-auth": "5.0.0-beta.31",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },

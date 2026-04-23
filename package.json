@@ -4,11 +4,12 @@
   "scripts": {
     "dev": "turbo dev",
     "db:generate": "cd packages/db && drizzle-kit generate",
-    "db:migrate": "cd packages/db && drizzle-kit migrate",
+    "db:migrate": "cd packages/db && drizzle-kit up",
     "db:seed": "tsx packages/db/seed.ts",
     "setup": "pnpm install && docker-compose up -d && pnpm db:generate && pnpm db:migrate && pnpm db:seed"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/ioredis": "^5.0.0",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.0",
@@ -23,14 +24,15 @@
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
-    "@neondatabase/serverless": "^1.1.0",
-    "drizzle-kit": "^0.31.10",
-    "drizzle-orm": "^0.45.2",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.0",
+    "drizzle-orm": "^0.45.0",
     "ioredis": "^5.10.1",
     "minio": "^8.0.7",
     "next-auth": "5.0.0-beta.31",
     "nodemailer": "^8.0.5",
+    "postgres": "^3.4.9",
     "zod": "^4.3.6"
   }
-  
 }

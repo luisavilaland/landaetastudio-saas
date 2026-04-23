@@ -28,3 +28,6 @@ Thumbs.db
 
 # Turborepo
 .turbo/
+
+# Drizzle migrations (generated locally)
+packages/db/migrations/*.sql
