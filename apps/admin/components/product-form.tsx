@@ -26,6 +26,7 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [imagePreview, setImagePreview] = useState(initialProduct?.imageUrl || "");
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const [form, setForm] = useState({
     name: initialProduct?.name || "",
@@ -57,6 +58,7 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onload = () => {
         setImagePreview(reader.result as string);
@@ -79,18 +81,20 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
           : "/api/products";
       const method = mode === "edit" ? "PUT" : "POST";
 
+      const formData = new FormData();
+      formData.append("name", form.name);
+      formData.append("slug", form.slug);
+      formData.append("description", form.description || "");
+      formData.append("status", form.status);
+      formData.append("price", priceInCents.toString());
+      formData.append("stock", form.stock);
+      if (imageFile) {
+        formData.append("image", imageFile);
+      }
+
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          slug: form.slug,
-          description: form.description || null,
-          image: imagePreview || null,
-          status: form.status,
-          price: priceInCents,
-          stock: Number(form.stock),
-        }),
+        body: formData,
       });
 
       if (!res.ok) {

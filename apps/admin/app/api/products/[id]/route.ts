@@ -78,10 +78,16 @@ export async function PUT(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const body = await request.json();
-    const { name, slug, description, status, price, stock, metadata, image } = body;
+    const body = await request.formData();
+    const name = body.get("name") as string;
+    const slug = body.get("slug") as string;
+    const description = (body.get("description") as string) || null;
+    const status = (body.get("status") as string) || null;
+    const price = parseInt(body.get("price") as string, 10);
+    const stock = parseInt(body.get("stock") as string, 10);
+    const image = body.get("image") as File | null;
 
-    if (!name || !slug || price === undefined || stock === undefined) {
+    if (!name || !slug || isNaN(price) || isNaN(stock)) {
       return NextResponse.json(
         { error: "Name, slug, price and stock are required" },
         { status: 400 }
@@ -124,11 +130,10 @@ export async function PUT(
 
     let imageUrl = product[0].imageUrl;
 
-    if (image && image.startsWith("data:image")) {
-      const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
-      const buffer = Buffer.from(base64Data, "base64");
-      const ext = image.match(/^data:image\/(\w+);base64,/)?.[1] || "png";
-      imageUrl = await uploadImage(buffer, `${slug}.${ext}`, `image/${ext}`);
+    if (image && image.size > 0) {
+      const buffer = Buffer.from(await image.arrayBuffer());
+      const ext = image.name.split(".").pop() || "png";
+      imageUrl = await uploadImage(buffer, `${slug}.${ext}`, image.type);
     }
 
     await db.transaction(async (tx) => {

@@ -15,6 +15,7 @@ type Product = {
   id: string;
   name: string;
   slug: string;
+  imageUrl: string | null;
   description: string | null;
   status: string;
   createdAt: Date;
@@ -65,6 +66,7 @@ export function ProductsTable({ initialProducts }: { initialProducts: Product[] 
         <table className="w-full">
           <thead className="bg-zinc-100">
             <tr>
+              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Imagen</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Nombre</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Slug</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Estado</th>
@@ -77,13 +79,26 @@ export function ProductsTable({ initialProducts }: { initialProducts: Product[] 
           <tbody className="divide-y divide-zinc-200">
             {products.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
                   No hay productos. Crea el primero.
                 </td>
               </tr>
             ) : (
               products.map((product) => (
                 <tr key={product.id} className="hover:bg-zinc-50">
+                  <td className="px-4 py-3 text-sm">
+                    {product.imageUrl ? (
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="w-12 h-12 object-cover rounded-md"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-zinc-100 rounded-md flex items-center justify-center text-zinc-400 text-xs">
+                        Sin img
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm">{product.name}</td>
                   <td className="px-4 py-3 text-sm">{product.slug}</td>
                   <td className="px-4 py-3 text-sm">

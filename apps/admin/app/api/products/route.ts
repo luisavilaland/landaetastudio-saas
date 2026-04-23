@@ -31,10 +31,16 @@ export async function POST(request: NextRequest) {
 
     const tenantId = session.user?.tenantId as string;
 
-    const body = await request.json();
-    const { name, slug, description, status, price, stock, metadata, image } = body;
+    const formData = await request.formData();
+    const name = formData.get("name") as string;
+    const slug = formData.get("slug") as string;
+    const description = (formData.get("description") as string) || null;
+    const status = (formData.get("status") as string) || "draft";
+    const price = parseInt(formData.get("price") as string, 10);
+    const stock = parseInt(formData.get("stock") as string, 10);
+    const image = formData.get("image") as File | null;
 
-    if (!name || !slug || price === undefined || stock === undefined) {
+    if (!name || !slug || isNaN(price) || isNaN(stock)) {
       return NextResponse.json(
         { error: "Name, slug, price and stock are required" },
         { status: 400 }
@@ -77,11 +83,10 @@ export async function POST(request: NextRequest) {
 
     let imageUrl: string | null = null;
 
-    if (image) {
-      const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
-      const buffer = Buffer.from(base64Data, "base64");
-      const ext = image.match(/^data:image\/(\w+);base64,/)?.[1] || "png";
-      imageUrl = await uploadImage(buffer, `${slug}.${ext}`, `image/${ext}`);
+    if (image && image.size > 0) {
+      const buffer = Buffer.from(await image.arrayBuffer());
+      const ext = image.name.split(".").pop() || "png";
+      imageUrl = await uploadImage(buffer, `${slug}.${ext}`, image.type);
     }
 
     const newProduct = await db.transaction(async (tx) => {
@@ -91,10 +96,10 @@ export async function POST(request: NextRequest) {
           tenantId,
           name,
           slug,
-          description: description || null,
+          description,
           imageUrl,
-          status: status || "draft",
-          metadata: metadata || {},
+          status,
+          metadata: {},
           createdAt: now,
           updatedAt: now,
         })
