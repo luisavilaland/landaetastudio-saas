@@ -19,6 +19,7 @@ export const dbProducts = pgTable("products", {
   name: text("name").notNull(),
   slug: text("slug").notNull(),
   description: text("description"),
+  imageUrl: text("imageUrl"),
   status: text("status").default("draft"),
   metadata: jsonb("metadata").default({}),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

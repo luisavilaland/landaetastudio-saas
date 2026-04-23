@@ -8,6 +8,7 @@ type Product = {
   name?: string;
   slug?: string;
   description?: string | null;
+  imageUrl?: string | null;
   status?: string;
   variant?: {
     price: number;
@@ -24,6 +25,7 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [imagePreview, setImagePreview] = useState(initialProduct?.imageUrl || "");
 
   const [form, setForm] = useState({
     name: initialProduct?.name || "",
@@ -52,6 +54,17 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
     }));
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -73,6 +86,7 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
           name: form.name,
           slug: form.slug,
           description: form.description || null,
+          image: imagePreview || null,
           status: form.status,
           price: priceInCents,
           stock: Number(form.stock),
@@ -151,6 +165,26 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
             rows={3}
             placeholder="Descripción del producto..."
           />
+        </div>
+
+        <div>
+          <label htmlFor="image" className="block text-sm font-medium text-zinc-700">
+            Imagen
+          </label>
+          <input
+            id="image"
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            className="mt-1 block w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200"
+          />
+          {imagePreview && (
+            <img
+              src={imagePreview}
+              alt="Preview"
+              className="mt-2 w-32 h-32 object-cover rounded-md"
+            />
+          )}
         </div>
 
         <div>

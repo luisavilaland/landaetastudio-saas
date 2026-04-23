@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, dbProducts, dbProductVariants } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
+import { uploadImage, deleteImage } from "@repo/storage";
 
 type Params = Promise<{ id: string }>;
 
@@ -78,7 +79,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, slug, description, status, price, stock, metadata } = body;
+    const { name, slug, description, status, price, stock, metadata, image } = body;
 
     if (!name || !slug || price === undefined || stock === undefined) {
       return NextResponse.json(
@@ -121,6 +122,15 @@ export async function PUT(
     const now = new Date();
     const newSku = slug.replace(/\s+/g, "-").toLowerCase();
 
+    let imageUrl = product[0].imageUrl;
+
+    if (image && image.startsWith("data:image")) {
+      const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      const ext = image.match(/^data:image\/(\w+);base64,/)?.[1] || "png";
+      imageUrl = await uploadImage(buffer, `${slug}.${ext}`, `image/${ext}`);
+    }
+
     await db.transaction(async (tx) => {
       await tx
         .update(dbProducts)
@@ -128,6 +138,7 @@ export async function PUT(
           name,
           slug,
           description: description || product[0].description,
+          imageUrl,
           status: status || product[0].status,
           metadata: metadata || product[0].metadata,
           updatedAt: now,

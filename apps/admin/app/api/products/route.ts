@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, dbProducts, dbProductVariants } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
+import { uploadImage } from "@repo/storage";
 
 export async function GET() {
   const session = await auth();
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
     const tenantId = session.user?.tenantId as string;
 
     const body = await request.json();
-    const { name, slug, description, status, price, stock, metadata } = body;
+    const { name, slug, description, status, price, stock, metadata, image } = body;
 
     if (!name || !slug || price === undefined || stock === undefined) {
       return NextResponse.json(
@@ -74,6 +75,15 @@ export async function POST(request: NextRequest) {
 
     const now = new Date();
 
+    let imageUrl: string | null = null;
+
+    if (image) {
+      const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      const ext = image.match(/^data:image\/(\w+);base64,/)?.[1] || "png";
+      imageUrl = await uploadImage(buffer, `${slug}.${ext}`, `image/${ext}`);
+    }
+
     const newProduct = await db.transaction(async (tx) => {
       const [product] = await tx
         .insert(dbProducts)
@@ -82,6 +92,7 @@ export async function POST(request: NextRequest) {
           name,
           slug,
           description: description || null,
+          imageUrl,
           status: status || "draft",
           metadata: metadata || {},
           createdAt: now,
