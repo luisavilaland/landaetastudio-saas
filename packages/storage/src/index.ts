@@ -7,6 +7,8 @@ const secretKey = process.env.MINIO_SECRET_KEY || "minioadmin";
 const bucket = process.env.MINIO_BUCKET || "saas-media";
 const useSSL = process.env.MINIO_USE_SSL === "true";
 
+const protocol = useSSL ? "https" : "http";
+
 export const minioClient = new Client({
   endpoint,
   port,
@@ -14,6 +16,11 @@ export const minioClient = new Client({
   accessKey,
   secretKey,
 });
+
+export function getPublicUrl(fileName: string): string {
+  const baseUrl = `${protocol}://${endpoint}:${port}/${bucket}`;
+  return `${baseUrl}/${fileName}`;
+}
 
 export async function uploadImage(
   file: Buffer,
@@ -26,9 +33,12 @@ export async function uploadImage(
     "Content-Type": contentType,
   });
 
-  return `${endpoint}:${port}/${bucket}/${uniqueName}`;
+  return getPublicUrl(uniqueName);
 }
 
 export async function deleteImage(fileName: string): Promise<void> {
-  await minioClient.removeObject(bucket, fileName);
+  const file = fileName.split("/").pop();
+  if (file) {
+    await minioClient.removeObject(bucket, file);
+  }
 }
