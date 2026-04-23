@@ -12,11 +12,12 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Login pages y rutas protegidas.
 - Middleware multi-tenant con resolución de subdominios.
 - CRUD de tenants en superadmin (API + UI).
+- CRUD de productos en admin (API + UI).
 - Logout functionality.
 - Carga de variables de entorno desde la raíz del monorepo.
 
 🔄 **En desarrollo:**
-- Panel de productos y catálogo.
+- Imágenes de productos (MinIO).
 - Checkout y MercadoPago.
 
 ## Requisitos previos

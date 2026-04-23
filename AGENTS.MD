@@ -30,10 +30,11 @@ This document provides concise, high-signal information for AI agents working in
 - Env loading via dotenv in next.config.ts.
 - Superadmin CRUD for tenants (API + UI).
 - Logout functionality.
+- Admin Products CRUD (API + UI): create, read, update, delete.
 
 🔄 **Pending:**
 - RLS policies.
-- Product catalog & admin panel.
+- Product images (MinIO).
 - Checkout & MercadoPago.
 
 ## Development Setup (Local Only)
@@ -98,44 +99,51 @@ saas-ecommerce/
 │   ├── storefront/
 │   │   └── proxy.ts              # Multi-tenant middleware
 │   ├── admin/
-│   │   ├── lib/auth.ts          # NextAuth config
-│   │   ├── app/
-│   │   │   ├── api/auth/[...nextauth]/route.ts
-│   │   │   ├── login/page.tsx
-│   │   │   ├── dashboard/layout.tsx
-│   │   │   └── page.tsx
-│   │   └── components/auth/session-provider.tsx
+│   │   ├── lib/auth.ts           # NextAuth config
+│   │   ├── components/
+│   │   │   ├── product-form.tsx
+│   │   │   └── auth/session-provider.tsx
+│   │   └── app/
+│   │       ├── api/
+│   │       │   ├── auth/[...nextauth]/route.ts
+│   │       │   └── products/
+│   │       │       ├── route.ts        # GET, POST
+│   │       │       └── [id]/route.ts # GET, PUT, DELETE
+│   │       ├── login/page.tsx
+│   │       ├── dashboard/layout.tsx
+│   │       ├── products/
+│   │       │   ├── page.tsx         # List
+│   │       │   ├── new/page.tsx      # Create
+│   │       │   └── [id]/edit/page.tsx # Edit
+│   │       └── page.tsx
 │   └── superadmin/
-│       ├── lib/auth.ts          # NextAuth config
+│       ├── lib/auth.ts           # NextAuth config
 │       ├── components/
 │       │   ├── tenant-form.tsx
 │       │   ├── logout-button.tsx
 │       │   └── auth/session-provider.tsx
 │       └── app/
-│           ├── api/
-│           │   └── tenants/
-│           │       ├── route.ts         # GET, POST
-│           │       └── [id]/route.ts    # GET, PUT, DELETE
+│           ├── api/tenants/
 │           ├── login/page.tsx
-│           ├── (dashboard)/
-│           │   ├── layout.tsx          # Protected layout
-│           │   ├── tenants/
-│           │   │   ├── page.tsx        # List
-│           │   │   ├── new/page.tsx    # Create
-│           │   │   └── [id]/edit/page.tsx  # Edit
-│           └── page.tsx               # Redirects to /tenants
+│           ├── (dashboard)/tenants/
+│           └── page.tsx
 ├── packages/
 │   └── db/
-│       ├── drizzle.config.ts
-│       ├── migrations/
-│       └── src/
-│           ├── index.ts        # Drizzle client
-│           └── schema.ts      # All tables (camelCase)
 ├── docker-compose.yml
 ├── .env.local
 ├── pnpm-workspace.yaml
 └── turbo.json
 ```
+
+## API Endpoints (Admin Products)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/products | List all products |
+| POST | /api/products | Create product |
+| GET | /api/products/[id] | Get product |
+| PUT | /api/products/[id] | Update product |
+| DELETE | /api/products/[id] | Delete product |
 
 ## Test Users
 
@@ -162,4 +170,4 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 23, 2026 – Superadmin tenants CRUD, logout button, protected routes.
+Last updated: April 23, 2026 – Admin products CRUD, protected routes.
