@@ -3,10 +3,10 @@ import { auth } from "@/lib/auth";
 import LogoutButton from "@/components/logout-button";
 import type { ReactNode } from "react";
 
-export default async function DashboardLayout({
+export default async function ProductsLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const session = await auth();
 

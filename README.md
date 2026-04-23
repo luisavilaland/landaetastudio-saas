@@ -15,10 +15,16 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - CRUD de productos en admin (API + UI).
 - Logout functionality.
 - Carga de variables de entorno desde la raíz del monorepo.
+- Validación backend: price > 0, stock >= 0, SKU regeneration on slug update.
+- Índices de base de datos: unique (tenantId, slug) para products, (tenantId, email) para customers, (tenantId, sku) para variants.
+- Índices en tenantId en todas las tablas de negocio.
 
 🔄 **En desarrollo:**
 - Imágenes de productos (MinIO).
 - Checkout y MercadoPago.
+- Políticas RLS.
+- Normalizar slug en create/edit.
+- Prevenir eliminación si el producto tiene pedidos.
 
 ## Requisitos previos
 
@@ -64,6 +70,36 @@ pnpm dev
 
 - **Email:** admin@tienda1.com
 - **Password:** 123456
+- **Tenant:** tienda1 (id: 11111111-1111-1111-1111-111111111111)
+
+## Prioridades para Producción
+
+### 🔴 Alta prioridad (crítico antes de producción)
+
+| # | Tarea |
+|---|-------|
+| 1 | **RLS** - Habilitar políticas de fila por tenant |
+| 2 | **AUTH_SECRET** - Validar que exista en prod, eliminar fallback |
+| 3 | **CSRF** - Habilitar en producción |
+| 4 | **NEXTAUTH_URL** - Usar variable de entorno en prod |
+
+### 🟡 Media prioridad
+
+| # | Tarea |
+|---|-------|
+| 5 | FK constraints en base de datos |
+| 6 | Normalizar slug en create/edit |
+| 7 | Prevenir eliminación si hay order_items |
+| 8 | Mejorar UI de errores 409 |
+
+### 🟢 Baja prioridad
+
+| # | Tarea |
+|---|-------|
+| 9 | Extraer auth duplicado a paquete compartido |
+| 10 | dotenv repetido en next.config.ts |
+| 11 | Eliminar SVGs por defecto |
+| 12 | ProductsTable con Server Actions |
 
 ## Scripts
 

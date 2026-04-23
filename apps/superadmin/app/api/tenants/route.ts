@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbTenants } from "@repo/db";
+import { auth } from "@/lib/auth";
 import { desc, eq } from "drizzle-orm";
 
 export async function GET() {
+  const session = await auth();
+
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const tenants = await db
     .select()
     .from(dbTenants)
@@ -13,6 +20,12 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { slug, name, plan, status } = body;
 

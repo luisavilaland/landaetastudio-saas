@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbTenants } from "@repo/db";
+import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 
 type Params = Promise<{ id: string }>;
@@ -8,6 +9,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Params }
 ) {
+  const session = await auth();
+
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
 
   const tenant = await db
@@ -30,9 +37,14 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Params }
 ) {
-  const { id } = await params;
-
   try {
+    const session = await auth();
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
     const body = await request.json();
     const { name, plan, status, slug } = body;
 
@@ -90,22 +102,36 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Params }
 ) {
-  const { id } = await params;
+  try {
+    const session = await auth();
 
-  const existing = await db
-    .select()
-    .from(dbTenants)
-    .where(eq(dbTenants.id, id))
-    .limit(1);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  if (existing.length === 0) {
+    const { id } = await params;
+
+    const existing = await db
+      .select()
+      .from(dbTenants)
+      .where(eq(dbTenants.id, id))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return NextResponse.json(
+        { error: "Tenant not found" },
+        { status: 404 }
+      );
+    }
+
+    await db.delete(dbTenants).where(eq(dbTenants.id, id));
+
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error("Error deleting tenant:", error);
     return NextResponse.json(
-      { error: "Tenant not found" },
-      { status: 404 }
+      { error: "Failed to delete tenant" },
+      { status: 500 }
     );
   }
-
-  await db.delete(dbTenants).where(eq(dbTenants.id, id));
-
-  return new NextResponse(null, { status: 204 });
 }

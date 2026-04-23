@@ -1,4 +1,5 @@
-import { pgTable, uuid, text, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, jsonb, timestamp, uniqueIndex, index, foreignKey } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 
 export const dbTenants = pgTable("tenants", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -22,6 +23,11 @@ export const dbProducts = pgTable("products", {
   metadata: jsonb("metadata").default({}),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => {
+  return {
+    tenantSlugUnique: uniqueIndex("products_tenant_slug_idx").on(table.tenantId, table.slug),
+    tenantIdIdx: index("products_tenant_id_idx").on(table.tenantId),
+  };
 });
 
 export const dbProductVariants = pgTable("product_variants", {
@@ -34,6 +40,11 @@ export const dbProductVariants = pgTable("product_variants", {
   options: jsonb("options").default({}),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => {
+  return {
+    tenantSkuUnique: uniqueIndex("product_variants_tenant_sku_idx").on(table.tenantId, table.sku),
+    tenantIdIdx: index("product_variants_tenant_id_idx").on(table.tenantId),
+  };
 });
 
 export const dbCustomers = pgTable("customers", {
@@ -45,6 +56,11 @@ export const dbCustomers = pgTable("customers", {
   phone: text("phone"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => {
+  return {
+    tenantEmailUnique: uniqueIndex("customers_tenant_email_idx").on(table.tenantId, table.email),
+    tenantIdIdx: index("customers_tenant_id_idx").on(table.tenantId),
+  };
 });
 
 export const dbOrders = pgTable("orders", {
@@ -57,6 +73,10 @@ export const dbOrders = pgTable("orders", {
   metadata: jsonb("metadata").default({}),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => {
+  return {
+    tenantIdIdx: index("orders_tenant_id_idx").on(table.tenantId),
+  };
 });
 
 export const dbOrderItems = pgTable("order_items", {
@@ -66,6 +86,11 @@ export const dbOrderItems = pgTable("order_items", {
   quantity: integer("quantity").notNull(),
   unitPrice: integer("unitPrice").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => {
+  return {
+    orderIdIdx: index("order_items_order_id_idx").on(table.orderId),
+    productVariantIdIdx: index("order_items_product_variant_id_idx").on(table.productVariantId),
+  };
 });
 
 export type Tenant = typeof dbTenants.$inferSelect;

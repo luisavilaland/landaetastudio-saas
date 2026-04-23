@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbProducts, dbProductVariants } from "@repo/db";
 import { auth } from "@/lib/auth";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 export async function GET() {
   const session = await auth();
@@ -40,10 +40,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (price <= 0) {
+      return NextResponse.json(
+        { error: "Price must be greater than 0" },
+        { status: 400 }
+      );
+    }
+
+    if (stock < 0) {
+      return NextResponse.json(
+        { error: "Stock cannot be negative" },
+        { status: 400 }
+      );
+    }
+
     const existingSlug = await db
       .select()
       .from(dbProducts)
-      .where(eq(dbProducts.slug, slug))
+      .where(
+        and(
+          eq(dbProducts.slug, slug),
+          eq(dbProducts.tenantId, tenantId)
+        )
+      )
       .limit(1);
 
     if (existingSlug.length > 0) {

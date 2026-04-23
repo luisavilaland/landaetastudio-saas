@@ -29,13 +29,19 @@ This document provides concise, high-signal information for AI agents working in
 - Multi-tenant middleware via proxy.ts.
 - Env loading via dotenv in next.config.ts.
 - Superadmin CRUD for tenants (API + UI).
-- Logout functionality.
+- Logout functionality in admin and superadmin.
 - Admin Products CRUD (API + UI): create, read, update, delete.
+- Backend validation: price > 0, stock >= 0, SKU regeneration on slug update.
+- Database indexes: unique (tenantId, slug) for products, (tenantId, email) for customers, (tenantId, sku) for variants.
+- TenantId indexes on all business tables for query performance.
 
-🔄 **Pending:**
-- RLS policies.
+🔄 **Pending (see priorities below):**
+- RLS policies (Row Level Security).
 - Product images (MinIO).
 - Checkout & MercadoPago.
+- FK constraints in database.
+- Normalize slug on create/edit.
+- Prevent delete when product has orders.
 
 ## Development Setup (Local Only)
 
@@ -170,4 +176,33 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 23, 2026 – Admin products CRUD, protected routes.
+Last updated: April 23, 2026 – Admin products CRUD, indexes, validation fixes.
+
+## Production Priorities
+
+### 🔴 High Priority (Critical before production)
+
+| # | Task | Status | Action |
+|---|------|--------|--------|
+| 1 | **RLS** | Not enabled | Enable Row Level Security policies per tenant |
+| 2 | **AUTH_SECRET** | Has fallback | Validate env var exists in prod, remove default |
+| 3 | **CSRF** | Disabled in admin | Enable CSRF in production |
+| 4 | **NEXTAUTH_URL** | Hardcoded local | Use env var in production |
+
+### 🟡 Medium Priority (Important)
+
+| # | Task | Status | Action |
+|---|------|--------|--------|
+| 5 | **FK constraints** | Not in DB | Add FK or rely on app logic |
+| 6 | **Normalize slug** | Accepts any format | Normalize on create/edit |
+| 7 | **Delete protection** | No check | Prevent if product has order_items |
+| 8 | **409 error UI** | Generic message | Improve error display |
+
+### 🟢 Low Priority (Enhancements)
+
+| # | Task | Notes |
+|---|------|-------|
+| 9 | Auth duplicated | admin/lib/auth.ts ≈ superadmin/lib/auth.ts → shared package |
+| 10 | dotenv repeated | 3x in next.config.ts → packages/config |
+| 11 | Default SVGs | vercel.svg, etc. → remove if unused |
+| 12 | ProductsTable client | Could use Server Actions |

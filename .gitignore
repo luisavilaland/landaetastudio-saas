@@ -31,3 +31,8 @@ Thumbs.db
 
 # Drizzle migrations (generated locally)
 packages/db/migrations/*.sql
+
+# Temporary files
+*.tmp
+cookies.txt
+admin-cookies.txt
