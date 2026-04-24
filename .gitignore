@@ -25,6 +25,8 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # Turborepo
 .turbo/
@@ -38,5 +40,9 @@ packages/db/migrations/meta/*.json
 
 # Temporary files
 *.tmp
+*.temp
+
+# Testing / debug cookies (never commit)
 cookies.txt
 admin-cookies.txt
+*cookies*.txt

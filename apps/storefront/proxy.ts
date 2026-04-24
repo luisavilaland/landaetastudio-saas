@@ -5,9 +5,31 @@ export const config = {
   matcher: '/:path*',
 };
 
+const CART_COOKIE_NAME = 'cart_session_id';
+
+function getOrCreateSessionId(request: NextRequest, response: NextResponse): string {
+  const cookie = request.cookies.get(CART_COOKIE_NAME);
+  if (cookie?.value) {
+    return cookie.value;
+  }
+
+  const newSessionId = crypto.randomUUID();
+  response.cookies.set({
+    name: CART_COOKIE_NAME,
+    value: newSessionId,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+    path: '/',
+  });
+
+  return newSessionId;
+}
+
 export function proxy(request: NextRequest) {
   const hostname = (request.headers.get('host') ?? '').replace(/:\d+$/, '');
-  
+
   console.log('[Middleware] Hostname:', hostname);
 
   let tenantSlug = 'default';
@@ -18,10 +40,6 @@ export function proxy(request: NextRequest) {
 
   console.log('[Middleware] Tenant Slug:', tenantSlug);
 
-  if (tenantSlug === 'default') {
-    return NextResponse.next();
-  }
-
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-tenant-slug', tenantSlug);
 
@@ -30,6 +48,9 @@ export function proxy(request: NextRequest) {
   });
 
   response.headers.set('x-tenant-slug', tenantSlug);
+
+  const sessionId = getOrCreateSessionId(request, response);
+  response.headers.set('x-cart-session-id', sessionId);
 
   return response;
 }

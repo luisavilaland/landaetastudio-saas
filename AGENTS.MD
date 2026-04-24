@@ -1,11 +1,11 @@
-# AGENT GUIDANCE for saas-ecommerce
+# Agent Guidance for saas-ecommerce
 
 This document provides concise, high-signal information for AI agents working in this repository.
 
 ## Project Overview
 
 - **Product:** SaaS eCommerce B2C/B2B targeting Uruguay/Cono Sur (PyMEs). Competitor reference: Fenicio.
-- **Architecture:** Headless, API-first, multi-tenant moderno.
+- **Architecture:** Headless, API-first, multi-tenant.
 - **Monorepo:** pnpm workspaces + Turborepo.
 - **Applications (`apps/`):**
   - `storefront` – Tienda pública (Next.js, App Router).
@@ -14,9 +14,6 @@ This document provides concise, high-signal information for AI agents working in
 - **Shared Packages (`packages/`):**
   - `db` – Drizzle ORM schema, migrations, client.
   - `storage` – MinIO client for image upload.
-  - `commerce` – Business logic (cart, orders, pricing).
-  - `ui` – Shared components (shadcn/ui).
-  - `config` – Shared ESLint, TypeScript, Tailwind configs.
 
 ## Current Status
 
@@ -27,36 +24,34 @@ This document provides concise, high-signal information for AI agents working in
 - Drizzle ORM with all tables (camelCase columns).
 - Authentication with NextAuth v5 (Credentials provider) in admin and superadmin.
 - Login pages and protected routes in both apps.
-- Multi-tenant middleware via proxy.ts.
-- Env loading via dotenv in next.config.ts.
+- Multi-tenant middleware via proxy.ts (header-based).
 - Superadmin CRUD for tenants (API + UI).
-- Logout functionality in admin and superadmin.
 - Admin Products CRUD (API + UI): create, read, update, delete.
 - Backend validation: price > 0, stock >= 0, SKU regeneration on slug update.
 - Database indexes: unique (tenantId, slug) for products, (tenantId, email) for customers, (tenantId, sku) for variants.
 - TenantId indexes on all business tables for query performance.
 - Product images upload to MinIO with FormData support.
-- Packages: `@repo/storage` for MinIO integration.
-- Storefront: catalog page with products grid, product detail page, breadcrumbs, navbar.
-- Storefront cart placeholder page.
+- Package `@repo/storage` for MinIO integration.
+- Storefront: catalog page, product detail page, navbar, breadcrumbs.
+- **Cart functionality working:** Redis + cookie session (cart_session_id), 7-day TTL, anonymous users.
+- Full Cart API: GET/POST/PUT/DELETE with stock validation.
 
 🔄 **Pending (see priorities below):**
 - RLS policies (Row Level Security).
-- Cart functionality (Redis + cookies).
 - Checkout & MercadoPago.
 - FK constraints in database.
 - Normalize slug on create/edit.
 - Prevent delete when product has orders.
 
-## Shared Packages (`packages/`)
+## Packages (`packages/`)
 
-| Package | Description |
-|---------|-------------|
-| `db` | Drizzle ORM schema, migrations, client. |
-| `storage` | MinIO client for image upload (uploadImage, deleteImage, getPublicUrl). |
-| `commerce` | Business logic (cart, orders, pricing). |
-| `ui` | Shared components (shadcn/ui). |
-| `config` | Shared ESLint, TypeScript, Tailwind configs. |
+| Package | Status | Description |
+|---------|--------|-------------|
+| `db` | ✅ Done | Drizzle ORM schema, migrations, client. |
+| `storage` | ✅ Done | MinIO client (uploadImage, deleteImage, getPublicUrl). |
+| `commerce` | ❌ Missing | Business logic (cart, orders, pricing). |
+| `ui` | ❌ Missing | Shared components (shadcn/ui). |
+| `config` | ❌ Missing | Shared ESLint, TypeScript, Tailwind configs. |
 
 ### Prerequisites
 - Node.js 20+ and pnpm
@@ -68,13 +63,15 @@ This document provides concise, high-signal information for AI agents working in
 cp .env.local.example .env.local
 docker-compose up -d
 pnpm install
+pnpm db:generate
+pnpm db:migrate
 ```
 
 ### Environment Variables (.env.local)
 ```
 DATABASE_URL=postgresql://saas:saas123@localhost:5432/saas_ecommerce
 REDIS_URL=redis://localhost:6379
-AUTH_SECRET=02729723375753422536102479576611
+AUTH_SECRET=<generate-with-openssl-rand-base64-32>
 NEXTAUTH_URL=http://localhost:3001
 MINIO_ENDPOINT=localhost
 MINIO_PORT=9000
@@ -97,14 +94,15 @@ pnpm dev
 
 ### Database Commands
 ```bash
-pnpm db:generate  # Generate migrations
-pnpm db:migrate   # Apply migrations
+pnpm db:generate  # Generate migrations from schema
+pnpm db:migrate   # Apply pending migrations
 ```
 
 ## Architecture Decisions
 
 - **Multi-tenant:** Single DB with `tenantId` column on all tables.
 - **Tenant resolution:** Middleware extracts from subdomain (lvh.me), injects `x-tenant-slug` header.
+- **Cart session:** Cookie `cart_session_id` (httpOnly, 30-day TTL) + Redis (7-day TTL).
 - **Pricing:** Always cents (integer) – never floats.
 - **Dates:** Always UTC.
 - **Auth:** NextAuth v5 with JWT strategy, tenantId in token claims.
@@ -116,7 +114,22 @@ pnpm db:migrate   # Apply migrations
 saas-ecommerce/
 ├── apps/
 │   ├── storefront/
-│   │   └── proxy.ts              # Multi-tenant middleware
+│   │   ├── proxy.ts              # Multi-tenant + cart-session middleware
+│   │   ├── lib/
+│   │   │   ├── redis.ts          # Redis client (ioredis)
+│   │   │   ├── cart.ts          # Cart utilities (getCart, removeFromCart)
+│   │   │   ├── products.ts      # Product queries
+│   │   │   └── tenant.ts        # Tenant utilities
+│   │   ├── app/
+│   │   │   ├── api/cart/route.ts  # Cart API (GET, POST, PUT, DELETE)
+│   │   │   ├── cart/page.tsx      # Cart page
+│   │   │   └── products/[slug]/page.tsx  # Product detail
+│   │   └── components/
+│   │       ├── add-to-cart-button.tsx
+│   │       ├── cart-list.tsx
+│   │       ├── navbar.tsx
+│   │       ├── product-card.tsx
+│   │       └── breadcrumbs.tsx
 │   ├── admin/
 │   │   ├── lib/auth.ts           # NextAuth config
 │   │   ├── components/
@@ -130,11 +143,10 @@ saas-ecommerce/
 │   │       │       └── [id]/route.ts # GET, PUT, DELETE
 │   │       ├── login/page.tsx
 │   │       ├── dashboard/layout.tsx
-│   │       ├── products/
-│   │       │   ├── page.tsx         # List
-│   │       │   ├── new/page.tsx      # Create
-│   │       │   └── [id]/edit/page.tsx # Edit
-│   │       └── page.tsx
+│   │       └── products/
+│   │           ├── page.tsx         # List
+│   │           ├── new/page.tsx      # Create
+│   │           └── [id]/edit/page.tsx # Edit
 │   └── superadmin/
 │       ├── lib/auth.ts           # NextAuth config
 │       ├── components/
@@ -142,13 +154,21 @@ saas-ecommerce/
 │       │   ├── logout-button.tsx
 │       │   └── auth/session-provider.tsx
 │       └── app/
-│           ├── api/tenants/
+│           ├── api/
+│           │   ├── auth/[...nextauth]/route.ts
+│           │   └── tenants/
+│           │       ├── route.ts        # GET, POST
+│           │       └── [id]/route.ts # GET, PUT, DELETE
 │           ├── login/page.tsx
-│           ├── (dashboard)/tenants/
-│           └── page.tsx
+│           └── (dashboard)/
+│               ├── layout.tsx
+│               └── tenants/
+│                   ├── page.tsx         # List
+│                   ├── new/page.tsx     # Create
+│                   └── [id]/edit/page.tsx  # Edit
 ├── packages/
-│   ├── db/             # Drizzle schema and migrations
-│   └── storage/        # MinIO client for image upload
+│   ├── db/             # Drizzle schema, migrations, client
+│   └── storage/        # MinIO client
 ├── docker-compose.yml
 ├── .env.local
 ├── pnpm-workspace.yaml
@@ -159,11 +179,20 @@ saas-ecommerce/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | /api/products | List all products |
-| POST | /api/products | Create product |
-| GET | /api/products/[id] | Get product |
-| PUT | /api/products/[id] | Update product |
-| DELETE | /api/products/[id] | Delete product |
+| GET | /api/products | List all products (by tenantId) |
+| POST | /api/products | Create product + default variant |
+| GET | /api/products/[id] | Get product by ID |
+| PUT | /api/products/[id] | Update product + variant |
+| DELETE | /api/products/[id] | Delete product + variants |
+
+## API Endpoints (Storefront Cart)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/cart | Get cart items (enriched with product data) |
+| POST | /api/cart | Add item (productId, variantId, quantity) |
+| PUT | /api/cart | Update item quantity |
+| DELETE | /api/cart | Remove item or clear cart |
 
 ## Test Users
 
@@ -171,7 +200,7 @@ saas-ecommerce/
 - **Password:** 123456
 - **Tenant:** tienda1 (id: 11111111-1111-1111-1111-111111111111)
 
-## API Endpoints (Superadmin)
+## API Endpoints (Superadmin Tenants)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -184,13 +213,15 @@ saas-ecommerce/
 ## Important Notes
 
 - DO NOT deploy to cloud until MVP works 100% locally.
-- Use lvh.me for subdomain testing: tenant1.lvh.me:3000
+- Use lvh.me for subdomain testing: `tenant1.lvh.me:3000`
 - Migrations are immutable – generate new ones for changes.
 - Keep schema columns in camelCase to match DB.
+- Cart works for anonymous users (no auth required).
+- `dotenv` is loaded in each `next.config.ts` for dev convenience.
 
 ---
 
-Last updated: April 23, 2026 – Product images upload, storage package, FormData support.
+Last updated: April 24, 2026 – Cart fully working (Redis + cookie session, full API).
 
 ## Production Priorities
 
@@ -200,7 +231,7 @@ Last updated: April 23, 2026 – Product images upload, storage package, FormDat
 |---|------|--------|--------|
 | 1 | **RLS** | Not enabled | Enable Row Level Security policies per tenant |
 | 2 | **AUTH_SECRET** | Has fallback | Validate env var exists in prod, remove default |
-| 3 | **CSRF** | Disabled in admin | Enable CSRF in production |
+| 3 | **CSRF** | Disabled in admin/superadmin | Enable CSRF in production |
 | 4 | **NEXTAUTH_URL** | Hardcoded local | Use env var in production |
 
 ### 🟡 Medium Priority (Important)
@@ -220,3 +251,4 @@ Last updated: April 23, 2026 – Product images upload, storage package, FormDat
 | 10 | dotenv repeated | 3x in next.config.ts → packages/config |
 | 11 | Default SVGs | vercel.svg, etc. → remove if unused |
 | 12 | ProductsTable client | Could use Server Actions |
+| 13 | Missing packages | commerce, ui, config not yet created |

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { db, dbTenants } from "@repo/db";
 import { eq } from "drizzle-orm";
 import { getProductBySlug } from "@/lib/products";
+import { AddToCartButton } from "@/components/add-to-cart-button";
 
 export const dynamic = "force-dynamic";
 
@@ -159,16 +160,10 @@ export default async function ProductPage({ params }: PageProps) {
           )}
 
           <div className="mt-auto pt-6">
-            <Link
-              href={inStock ? "/cart" : "#"}
-              className={`w-full block text-center px-6 py-3 font-medium rounded-lg ${
-                inStock
-                  ? "bg-zinc-900 text-white hover:bg-zinc-800"
-                  : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
-              }`}
-            >
-              {inStock ? "Agregar al carrito" : "Agotado"}
-            </Link>
+            <AddToCartButton
+              variantId={product.variant?.id ?? ""}
+              inStock={inStock}
+            />
           </div>
         </div>
       </div>
