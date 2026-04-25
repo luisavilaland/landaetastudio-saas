@@ -242,7 +242,7 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 25, 2026 – Checkout + MercadoPago implementation (pending test account config).
+Last updated: April 25, 2026 – MercadoPago sandbox + back_urls with NEXT_PUBLIC_BASE_URL.
 
 ## Production Priorities
 
