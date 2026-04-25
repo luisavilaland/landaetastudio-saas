@@ -97,7 +97,32 @@ pnpm dev
 ### Database Commands
 ```bash
 pnpm db:generate  # Generate migrations from schema
-pnpm db:migrate   # Apply pending migrations
+pnpm db:migrate  # Apply pending migrations
+pnpm db:seed     # Seed database with test data
+```
+
+### Debugging
+
+**Connect to PostgreSQL (Docker):**
+```bash
+docker exec -it saas-postgres psql -U saas -d saas_ecommerce
+```
+
+**Check tables:**
+```sql
+SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';
+```
+
+**Check data:**
+```sql
+SELECT * FROM tenants;
+SELECT * FROM products;
+SELECT * FROM admin_users;
+```
+
+**Reset database:**
+```bash
+pnpm db:seed  # Re-runs seed script to reset all data
 ```
 
 ## Architecture Decisions
@@ -242,7 +267,7 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 25, 2026 – FK constraints, NextAuth types, Redis tenant cache.
+Last updated: April 25, 2026 – Seed script, FK constraints, Redis cache, NextAuth types. Debug & seed docs added.
 
 ## Production Priorities
 

@@ -7,10 +7,12 @@
   },
   "types": "./src/index.ts",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.39.3",
     "postgres": "^3.4.7"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/pg": "^8.11.11"
   }
 }
