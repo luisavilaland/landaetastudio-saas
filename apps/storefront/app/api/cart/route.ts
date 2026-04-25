@@ -297,7 +297,7 @@ export async function GET() {
       .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
       .where(
         variantIds.length > 0
-          ? eq(dbProductVariants.id, variantIds[0])
+          ? inArray(dbProductVariants.id, variantIds)
           : undefined
       );
 

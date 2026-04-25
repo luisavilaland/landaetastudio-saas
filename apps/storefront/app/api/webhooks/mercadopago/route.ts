@@ -49,6 +49,18 @@ export async function POST(request: NextRequest) {
         .where(eq(dbOrders.id, orderId))
         .limit(1);
 
+      if (!order) {
+        console.log(`[Webhook MP] Order ${orderId} not found`);
+        return NextResponse.json({ received: true });
+      }
+
+      // Check if payment already processed (prevent duplicate)
+      const metadata = order.metadata as { paymentId?: string } | undefined;
+      if (metadata?.paymentId) {
+        console.log(`[Webhook MP] Payment ${paymentId} already processed for order ${orderId}`);
+        return NextResponse.json({ received: true });
+      }
+
       await db
         .update(dbOrders)
         .set({
@@ -73,6 +85,17 @@ export async function POST(request: NextRequest) {
         );
       }
     } else if (newStatus) {
+      const [order] = await db
+        .select()
+        .from(dbOrders)
+        .where(eq(dbOrders.id, orderId))
+        .limit(1);
+
+      if (!order) {
+        console.log(`[Webhook MP] Order ${orderId} not found`);
+        return NextResponse.json({ received: true });
+      }
+
       await db
         .update(dbOrders)
         .set({

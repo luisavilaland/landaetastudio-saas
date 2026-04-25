@@ -88,7 +88,7 @@ export function TenantsTable({ initialTenants }: { initialTenants: Tenant[] }) {
                   <td className="px-4 py-3 text-sm">{formatDate(tenant.createdAt)}</td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => router.push(`/tenants/${tenant.id}`)}
+                      onClick={() => router.push(`/tenants/${tenant.id}/edit`)}
                       className="px-3 py-1 text-sm text-zinc-600 hover:text-zinc-900 mr-2"
                     >
                       Editar

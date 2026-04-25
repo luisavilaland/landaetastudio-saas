@@ -88,6 +88,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate all variants belong to the same tenant
+    const tenantIds = new Set(variants.map((v) => v.tenantId));
+    if (tenantIds.size > 1) {
+      return NextResponse.json(
+        { error: "Items de diferentes tenants no permitidos" },
+        { status: 400 }
+      );
+    }
+
     const tenantId = variants[0]?.tenantId;
     if (!tenantId) {
       return NextResponse.json(

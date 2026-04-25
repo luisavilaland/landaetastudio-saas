@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbProducts, dbProductVariants } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbOrderItems } from "@repo/db";
 import { auth } from "@/lib/auth";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { uploadImage, deleteImage } from "@repo/storage";
 
 type Params = Promise<{ id: string }>;
@@ -218,6 +218,28 @@ export async function DELETE(
 
     if (product[0].tenantId !== tenantId) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Check for associated order_items before delete
+    const variants = await db
+      .select({ id: dbProductVariants.id })
+      .from(dbProductVariants)
+      .where(eq(dbProductVariants.productId, id));
+
+    const variantIds = variants.map((v) => v.id);
+    if (variantIds.length > 0) {
+      const orderItems = await db
+        .select()
+        .from(dbOrderItems)
+        .where(inArray(dbOrderItems.productVariantId, variantIds))
+        .limit(1);
+
+      if (orderItems.length > 0) {
+        return NextResponse.json(
+          { error: "Producto tiene órdenes asociadas" },
+          { status: 409 }
+        );
+      }
     }
 
     await db.transaction(async (tx) => {

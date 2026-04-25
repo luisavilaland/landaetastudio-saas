@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbOrders, dbOrderItems, dbProducts, dbProductVariants } from "@repo/db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { Preference, MercadoPagoConfig } from "mercadopago";
 
 export async function POST(request: NextRequest) {
@@ -59,13 +59,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get all variants (fixed bug: was only getting variantIds[0])
     const variants = await db
       .select({
         id: dbProductVariants.id,
         productId: dbProductVariants.productId,
       })
       .from(dbProductVariants)
-      .where(eq(dbProductVariants.id, variantIds[0]));
+      .where(inArray(dbProductVariants.id, variantIds));
 
     if (variants.length === 0) {
       return NextResponse.json(
@@ -74,23 +75,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const productId = variants[0].productId;
-    const [product] = await db
+    // Get unique product IDs and fetch all products
+    const productIds = [...new Set(variants.map((v) => v.productId))];
+    const products = await db
       .select({
         id: dbProducts.id,
         name: dbProducts.name,
       })
       .from(dbProducts)
-      .where(eq(dbProducts.id, productId))
-      .limit(1);
+      .where(inArray(dbProducts.id, productIds));
 
-    const items = orderItems.map((item, index) => ({
-      id: String(index),
-      title: product?.name || "Producto",
-      quantity: item.quantity,
-      unit_price: item.unitPrice,
-      currency_id: "UYU",
-    }));
+    // Create product map for quick lookup
+    const productMap = new Map(products.map((p) => [p.id, p.name]));
+
+    // Create variant -> product mapping
+    const variantProductMap = new Map(variants.map((v) => [v.id, v.productId]));
+
+    // Build items with correct product names
+    const items = orderItems.map((item, index) => {
+      const variantId = item.productVariantId;
+      const productId = variantProductMap.get(variantId);
+      const productName = productId ? (productMap.get(productId) || "Producto") : "Producto";
+
+      return {
+        id: String(index),
+        title: productName,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        currency_id: "UYU",
+      };
+    });
 
     const baseUrl = process.env.NEXTAUTH_URL?.replace(":3001", ":3000") || "http://localhost:3000";
 

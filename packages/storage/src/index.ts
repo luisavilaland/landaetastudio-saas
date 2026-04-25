@@ -37,8 +37,7 @@ export async function uploadImage(
 }
 
 export async function deleteImage(fileName: string): Promise<void> {
-  const file = fileName.split("/").pop();
-  if (file) {
-    await minioClient.removeObject(bucket, file);
+  if (fileName) {
+    await minioClient.removeObject(bucket, fileName);
   }
 }

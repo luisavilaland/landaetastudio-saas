@@ -15,26 +15,54 @@ export default async function ProductsPage() {
 
   const tenantId = session.user?.tenantId as string;
 
-  const products = await db
-    .select()
+  // Single query with JOIN instead of N+1 queries
+  const productsRaw = await db
+    .select({
+      id: dbProducts.id,
+      name: dbProducts.name,
+      slug: dbProducts.slug,
+      description: dbProducts.description,
+      imageUrl: dbProducts.imageUrl,
+      status: dbProducts.status,
+      createdAt: dbProducts.createdAt,
+      updatedAt: dbProducts.updatedAt,
+      variantId: dbProductVariants.id,
+      variantSku: dbProductVariants.sku,
+      variantPrice: dbProductVariants.price,
+      variantStock: dbProductVariants.stock,
+    })
     .from(dbProducts)
+    .leftJoin(dbProductVariants, eq(dbProducts.id, dbProductVariants.productId))
     .where(eq(dbProducts.tenantId, tenantId))
     .orderBy(desc(dbProducts.createdAt));
 
-  const productsWithVariants = await Promise.all(
-    products.map(async (product) => {
-      const variants = await db
-        .select()
-        .from(dbProductVariants)
-        .where(eq(dbProductVariants.productId, product.id))
-        .limit(1);
-
-      return {
-        ...product,
-        variant: variants[0] || null,
+  // Group by product ID and nest variant
+  const productMap = new Map();
+  for (const row of productsRaw) {
+    if (!productMap.has(row.id)) {
+      productMap.set(row.id, {
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        imageUrl: row.imageUrl,
+        description: row.description,
+        status: row.status,
+        createdAt: row.createdAt,
+        variant: undefined,
+      });
+    }
+    if (row.variantId) {
+      (productMap.get(row.id) as any).variant = {
+        id: row.variantId,
+        sku: row.variantSku || "",
+        price: row.variantPrice || 0,
+        stock: row.variantStock || 0,
+        options: {},
       };
-    })
-  );
+    }
+  }
+
+  const productsWithVariants = Array.from(productMap.values());
 
   return <ProductsTable initialProducts={productsWithVariants} />;
 }

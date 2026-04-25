@@ -13,9 +13,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
-        const user = await db.select().from(dbCustomers).where(eq(dbCustomers.email, credentials.email)).limit(1);
+        const email = credentials.email as string;
+        const password = credentials.password as string;
+        const user = await db.select().from(dbCustomers).where(eq(dbCustomers.email, email)).limit(1);
         if (user.length === 0) return null;
-        const isValid = await bcrypt.compare(credentials.password, user[0].password);
+        const isValid = await bcrypt.compare(password, user[0].password);
         if (!isValid) return null;
         return { id: user[0].id, email: user[0].email, name: user[0].name, tenantId: user[0].tenantId };
       }
@@ -23,15 +25,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user) { token.id = user.id; token.tenantId = user.tenantId; }
+      if (user) { token.id = user.id; token.tenantId = (user as any).tenantId; }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) { session.user.id = token.id; session.user.tenantId = token.tenantId; }
+      if (session.user) { 
+        (session.user as any).id = token.id as string; 
+        (session.user as any).tenantId = token.tenantId as string; 
+      }
       return session;
     }
   },
   pages: { signIn: "/login" },
   session: { strategy: "jwt" },
-  secret: process.env.AUTH_SECRET || "dev-secret-key-12345678901234567890",
+  secret: process.env.AUTH_SECRET,
 });
