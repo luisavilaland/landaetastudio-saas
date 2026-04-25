@@ -46,3 +46,6 @@ packages/db/migrations/meta/*.json
 cookies.txt
 admin-cookies.txt
 *cookies*.txt
+
+# ngrok (if installed)
+ngrok.yml

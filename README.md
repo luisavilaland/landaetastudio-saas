@@ -21,10 +21,11 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Paquete `@repo/storage` para integración con MinIO.
 - Storefront: catálogo, página de detalle, navbar, breadcrumbs.
 - **Carrito funcional:** Redis + cookie session, 7-day TTL, usuarios anónimos.
-- Full Cart API: GET/POST/PUT/DELETE con validación de stock.
+- **Checkout:** Flujo completo con MercadoPago.
+- **Webhook:** Actualiza orden según notificación de pago.
+- **Email:** Confirmación de orden con nodemailer.
 
 🔄 **En desarrollo:**
-- Checkout y MercadoPago.
 - Políticas RLS.
 - Normalizar slug en create/edit.
 - Prevenir eliminación si el producto tiene pedidos.
@@ -116,6 +117,7 @@ saas-ecommerce/
 - **Cache/Carrito:** Redis 7
 - **Storage:** MinIO (S3-compatible)
 - **Email:** MailHog (dev) / Resend (prod)
+- **Pagos:** MercadoPago (Checkout Pro)
 - **Monorepo:** Turborepo + pnpm
 
 ## API Endpoints
@@ -137,6 +139,13 @@ saas-ecommerce/
 |PUT|/api/cart|Actualizar cantidad|
 |DELETE|/api/cart|Eliminar item o vaciar|
 
+### Storefront Checkout
+
+|Method|Endpoint|Descripción|
+|:-:|-|/api/checkout|Crear orden desde carrito|
+|POST|/api/checkout/preference|Crear preferencia de pago MP|
+|POST|/api/webhooks/mercadopago|Notificación de pago|
+
 ### Superadmin Tenants
 
 |Method|Endpoint|Descripción|
@@ -145,6 +154,28 @@ saas-ecommerce/
 |GET|/api/tenants/[id]|Obtener tenant|
 |PUT|/api/tenants/[id]|Actualizar tenant|
 |DELETE|/api/tenants/[id]|Eliminar tenant|
+
+## MercadoPago - Configuración
+
+### Variables de entorno
+
+```env
+MERCADOPAGO_ACCESS_TOKEN=TEST-xxxx
+```
+
+### Webhook
+
+Para recibir notificaciones de pago en desarrollo:
+1. Usar ngrok: `ngrok http 3000`
+2. Configurar URL en MP Developer Dashboard: `https://tu-subdomain.ngrok.io/api/webhooks/mercadopago`
+
+### Estados de orden
+
+| Estado | Descripción |
+|--------|-------------|
+| `pending_payment` | Orden creada, esperando pago |
+| `confirmed` | Pago aprobado |
+| `payment_failed` | Pago rechazado/cancelado |
 
 ## Prioridades para Producción
 
@@ -164,7 +195,7 @@ saas-ecommerce/
 | 5 | FK constraints en base de datos |
 | 6 | Normalizar slug en create/edit |
 | 7 | Prevenir eliminación si hay order_items |
-| 8 |Mejorar UI de errores 409 |
+| 8 | Mejorar UI de errores 409 |
 
 ### 🟢 Baja prioridad
 
@@ -182,3 +213,4 @@ saas-ecommerce/
 - Las migraciones son immutables – generar nuevas para cambios.
 - Prices siempre en centavos (integer), nunca floats.
 - Cart funciona sin autenticación (usuarios anónimos).
+- Checkout requiere email para enviar confirmación.

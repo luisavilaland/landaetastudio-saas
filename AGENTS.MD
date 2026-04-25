@@ -33,12 +33,13 @@ This document provides concise, high-signal information for AI agents working in
 - Product images upload to MinIO with FormData support.
 - Package `@repo/storage` for MinIO integration.
 - Storefront: catalog page, product detail page, navbar, breadcrumbs.
-- **Cart functionality working:** Redis + cookie session (cart_session_id), 7-day TTL, anonymous users.
-- Full Cart API: GET/POST/PUT/DELETE with stock validation.
+- **Cart functionality:** Redis + cookie session (cart_session_id), 7-day TTL, anonymous users.
+- **Checkout:** Full flow with MercadoPago integration.
+- **Webhook:** Updates order status on payment notification.
+- **Email:** Confirmation email on successful payment.
 
 🔄 **Pending (see priorities below):**
 - RLS policies (Row Level Security).
-- Checkout & MercadoPago.
 - FK constraints in database.
 - Normalize slug on create/edit.
 - Prevent delete when product has orders.
@@ -82,6 +83,7 @@ MINIO_USE_SSL=false
 SMTP_HOST=localhost
 SMTP_PORT=1025
 SMTP_FROM=noreply@saas.local
+MERCADOPAGO_ACCESS_TOKEN=TEST-xxxx
 ```
 
 ### Running Development Servers
@@ -108,6 +110,7 @@ pnpm db:migrate   # Apply pending migrations
 - **Auth:** NextAuth v5 with JWT strategy, tenantId in token claims.
 - **Image storage:** Local MinIO (dev), Cloudflare R2 (prod).
 - **Email:** Local MailHog (dev), Resend (prod).
+- **Payments:** MercadoPago (Checkout Pro).
 
 ## Key Files and Directories
 ```
@@ -118,11 +121,20 @@ saas-ecommerce/
 │   │   ├── lib/
 │   │   │   ├── redis.ts          # Redis client (ioredis)
 │   │   │   ├── cart.ts          # Cart utilities (getCart, removeFromCart)
+│   │   │   ├── email.ts         # Email notifications
 │   │   │   ├── products.ts      # Product queries
 │   │   │   └── tenant.ts        # Tenant utilities
 │   │   ├── app/
-│   │   │   ├── api/cart/route.ts  # Cart API (GET, POST, PUT, DELETE)
+│   │   │   ├── api/
+│   │   │   │   ├── cart/route.ts    # Cart API (GET, POST, PUT, DELETE)
+│   │   │   │   ├── checkout/route.ts    # Create order
+│   │   │   │   ├── checkout/preference/route.ts  # MP preference
+│   │   │   │   └── webhooks/mercadopago/route.ts  # MP webhook
 │   │   │   ├── cart/page.tsx      # Cart page
+│   │   │   ├── checkout/page.tsx  # Checkout form
+│   │   │   ├── checkout/success/page.tsx
+│   │   │   ├── checkout/failure/page.tsx
+│   │   │   ├── checkout/pending/page.tsx
 │   │   │   └── products/[slug]/page.tsx  # Product detail
 │   │   └── components/
 │   │       ├── add-to-cart-button.tsx
@@ -194,6 +206,14 @@ saas-ecommerce/
 | PUT | /api/cart | Update item quantity |
 | DELETE | /api/cart | Remove item or clear cart |
 
+## API Endpoints (Storefront Checkout)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /api/checkout | Create order from cart |
+| POST | /api/checkout/preference | Create MP payment preference |
+| POST | /api/webhooks/mercadopago | MP payment notification |
+
 ## Test Users
 
 - **Email:** admin@tienda1.com
@@ -218,10 +238,11 @@ saas-ecommerce/
 - Keep schema columns in camelCase to match DB.
 - Cart works for anonymous users (no auth required).
 - `dotenv` is loaded in each `next.config.ts` for dev convenience.
+- For MP webhook in development: use ngrok or polling on success page.
 
 ---
 
-Last updated: April 24, 2026 – Cart fully working (Redis + cookie session, full API).
+Last updated: April 24, 2026 – Checkout + MercadoPago fully implemented.
 
 ## Production Priorities
 
