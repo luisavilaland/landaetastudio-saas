@@ -64,6 +64,20 @@ export const dbCustomers = pgTable("customers", {
   };
 });
 
+export const dbAdminUsers = pgTable("admin_users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").unique().notNull(),
+  password: text("password").notNull(),
+  role: text("role").notNull().default("admin"),
+  tenantId: uuid("tenantId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => {
+  return {
+    tenantIdIdx: index("admin_users_tenant_id_idx").on(table.tenantId),
+  };
+});
+
 export const dbOrders = pgTable("orders", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: uuid("tenantId").notNull(),
@@ -109,3 +123,5 @@ export type Order = typeof dbOrders.$inferSelect;
 export type NewOrder = typeof dbOrders.$inferInsert;
 export type OrderItem = typeof dbOrderItems.$inferSelect;
 export type NewOrderItem = typeof dbOrderItems.$inferInsert;
+export type AdminUser = typeof dbAdminUsers.$inferSelect;
+export type NewAdminUser = typeof dbAdminUsers.$inferInsert;

@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { db, dbCustomers } from "@repo/db";
+import { db, dbAdminUsers } from "@repo/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
@@ -15,23 +15,45 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!credentials?.email || !credentials?.password) return null;
         const email = credentials.email as string;
         const password = credentials.password as string;
-        const user = await db.select().from(dbCustomers).where(eq(dbCustomers.email, email)).limit(1);
-        if (user.length === 0) return null;
-        const isValid = await bcrypt.compare(password, user[0].password);
+        
+        const [user] = await db
+          .select()
+          .from(dbAdminUsers)
+          .where(eq(dbAdminUsers.email, email))
+          .limit(1);
+        
+        if (!user) return null;
+        
+        const isValid = await bcrypt.compare(password, user.password);
         if (!isValid) return null;
-        return { id: user[0].id, email: user[0].email, name: user[0].name, tenantId: user[0].tenantId };
+        
+        if (user.role !== "admin" && user.role !== "superadmin") {
+          return null;
+        }
+        
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          tenantId: user.tenantId
+        };
       }
     })
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user) { token.id = user.id; token.tenantId = (user as any).tenantId; }
+      if (user) {
+        token.id = user.id;
+        token.tenantId = (user as any).tenantId;
+        token.role = (user as any).role;
+      }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) { 
-        (session.user as any).id = token.id as string; 
-        (session.user as any).tenantId = token.tenantId as string; 
+      if (session.user) {
+        (session.user as any).id = token.id as string;
+        (session.user as any).tenantId = token.tenantId as string;
+        (session.user as any).role = token.role as string;
       }
       return session;
     }
