@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, dbOrders } from "@repo/db";
 import { eq } from "drizzle-orm";
 import { sendOrderConfirmationEmail } from "@/lib/email";
+import crypto from "crypto";
 
 type MPWebhookPayload = {
   type: string;
@@ -12,9 +13,53 @@ type MPWebhookPayload = {
   status?: string;
 };
 
+function verifySignature(
+  signature: string | null,
+  requestId: string | null,
+  rawBody: string,
+  secret: string
+): boolean {
+  if (!signature || !secret) {
+    console.log("[Webhook MP] Missing signature or secret");
+    return false;
+  }
+
+  const dataToSign = requestId ? `${rawBody}.${requestId}` : rawBody;
+  const expectedSignature = crypto
+    .createHmac("sha256", secret)
+    .update(dataToSign)
+    .digest("hex");
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as MPWebhookPayload;
+    const rawBody = await request.text();
+
+    const signature = request.headers.get("x-signature");
+    const requestId = request.headers.get("x-request-id");
+    const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    const bypassSignature = process.env.BYPASS_WEBHOOK_SIGNATURE === "true";
+    const isDevelopment = process.env.NODE_ENV === "development";
+
+    if (!bypassSignature && !isDevelopment) {
+      const isValid = verifySignature(signature, requestId, rawBody, webhookSecret || "");
+      if (!isValid) {
+        console.log("[Webhook MP] Invalid signature");
+        console.log("[Webhook MP] Expected signature from:", signature);
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    } else if (!webhookSecret && !bypassSignature) {
+      console.warn("[Webhook MP] WARNING: MERCADOPAGO_WEBHOOK_SECRET not configured");
+    } else if (isDevelopment || bypassSignature) {
+      console.log("[Webhook MP] Signature verification bypassed (dev mode)");
+    }
+
+    const body = JSON.parse(rawBody) as MPWebhookPayload;
 
     console.log("[Webhook MP] Received:", JSON.stringify(body));
 
