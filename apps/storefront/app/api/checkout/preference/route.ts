@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbOrders, dbOrderItems, dbProducts, dbProductVariants } from "@repo/db";
 import { eq, inArray } from "drizzle-orm";
-import { Preference, MercadoPagoConfig } from "mercadopago";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,11 +11,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    const mpConfig = new MercadoPagoConfig({
-      accessToken,
-    });
-    const mp = new Preference(mpConfig);
 
     const body = await request.json();
     const { orderId } = body;
@@ -106,10 +100,26 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const baseUrl = process.env.NEXTAUTH_URL?.replace(":3001", ":3000") || "http://localhost:3000";
+    const baseUrl = (process.env.NEXTAUTH_URL?.replace(":3001", ":3000") || "http://localhost:3000")
+      .replace(/^http:/, "https:")
+      .replace(/^localhost/, "five-mice-do.lvh.me");
+
+    console.log("[Preference] orderId:", orderId);
+    console.log("[Preference] items:", JSON.stringify(items));
+    console.log("[Preference] baseUrl:", baseUrl);
+    console.log("[Preference] accessToken:", accessToken?.substring(0, 20) + "...");
 
     const preference = {
       items,
+      payer: {
+        name: "Test",
+        surname: "User",
+        email: "test_user_uy@testuser.com",
+        identification: {
+          type: "CI",
+          number: "12345678",
+        },
+      },
       back_urls: {
         success: `${baseUrl}/checkout/success?order_id=${orderId}`,
         failure: `${baseUrl}/checkout/failure?order_id=${orderId}`,
@@ -119,15 +129,30 @@ export async function POST(request: NextRequest) {
       external_reference: orderId,
     };
 
-    const response = await mp.create({ body: preference });
+    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(preference),
+    });
+
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      console.error("[Preference] API Error:", responseData);
+      return NextResponse.json(responseData, { status: response.status });
+    }
 
     return NextResponse.json({
-      init_point: response.init_point,
+      init_point: responseData.init_point,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[Checkout Preference] Error:", error);
+    const mpError = error?.message || error?.error?.message || "Error al crear preferencia de pago";
     return NextResponse.json(
-      { error: "Error al crear preferencia de pago" },
+      { error: mpError, code: error?.error?.code || "UNKNOWN" },
       { status: 500 }
     );
   }

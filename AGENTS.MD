@@ -218,7 +218,7 @@ saas-ecommerce/
 
 - **Email:** admin@tienda1.com
 - **Password:** 123456
-- **Tenant:** tienda1 (id: 11111111-1111-1111-1111-111111111111)
+- **Tenant:** five-mice-do (id: 11111111-1111-1111-1111-111111111111)
 
 ## API Endpoints (Superadmin Tenants)
 
@@ -242,7 +242,7 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 24, 2026 – Checkout + MercadoPago fully implemented.
+Last updated: April 25, 2026 – Checkout + MercadoPago implementation (pending test account config).
 
 ## Production Priorities
 

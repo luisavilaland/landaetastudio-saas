@@ -81,7 +81,7 @@ tenant1.lvh.me:3000  # Tienda1 storefront
 
 - **Email:** admin@tienda1.com
 - **Password:** 123456
-- **Tenant:** tienda1 (id: 11111111-1111-1111-1111-111111111111)
+- **Tenant:** five-mice-do (id: 11111111-1111-1111-1111-111111111111)
 
 ## Estructura del proyecto
 

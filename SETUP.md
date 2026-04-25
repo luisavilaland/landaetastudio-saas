@@ -47,7 +47,7 @@ pnpm dev
 
 ## Credenciales de prueba
 
-### Admin (tienda1)
+### Admin (five-mice-do)
 - **Email:** admin@tienda1.com
 - **Password:** 123456
 

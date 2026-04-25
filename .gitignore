@@ -41,6 +41,7 @@ packages/db/migrations/meta/*.json
 # Temporary files
 *.tmp
 *.temp
+test-*.js
 
 # Testing / debug cookies (never commit)
 cookies.txt

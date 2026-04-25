@@ -72,7 +72,7 @@ export const dbOrders = pgTable("orders", {
   status: text("status").default("pending"),
   total: integer("total").notNull(),
   currency: text("currency").default("UYU"),
-  shippingDetails: jsonb("shippingDetails").default({}),
+  shippingDetails: jsonb("shippingdetails").default({}),
   metadata: jsonb("metadata").default({}),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
