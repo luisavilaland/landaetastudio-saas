@@ -22,13 +22,13 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Storefront: catálogo, página de detalle, navbar, breadcrumbs.
 - **Carrito funcional:** Redis + cookie session, 7-day TTL, usuarios anónimos.
 - **Checkout:** Flujo completo con MercadoPago.
-- **Webhook:** Actualiza orden según notificación de pago.
+- **Webhook:** Actualiza orden según notificación (con prevención de duplicados).
 - **Email:** Confirmación de orden con nodemailer.
+- **Fixes:** Bug inArray en cart/checkout, deleteImage, validación tenant, queries N+1, order_items check.
 
 🔄 **En desarrollo:**
 - Políticas RLS.
 - Normalizar slug en create/edit.
-- Prevenir eliminación si el producto tiene pedidos.
 
 ## Requisitos previos
 

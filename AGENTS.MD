@@ -35,14 +35,14 @@ This document provides concise, high-signal information for AI agents working in
 - Storefront: catalog page, product detail page, navbar, breadcrumbs.
 - **Cart functionality:** Redis + cookie session (cart_session_id), 7-day TTL, anonymous users.
 - **Checkout:** Full flow with MercadoPago integration.
-- **Webhook:** Updates order status on payment notification.
+- **Webhook:** Updates order status on payment notification (with duplicate prevention).
 - **Email:** Confirmation email on successful payment.
+- **Bug fixes:** inArray in cart/checkout, deleteImage path, tenant validation, N+1 queries, order_items check before delete.
 
 🔄 **Pending (see priorities below):**
 - RLS policies (Row Level Security).
 - FK constraints in database.
 - Normalize slug on create/edit.
-- Prevent delete when product has orders.
 
 ## Packages (`packages/`)
 
