@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redisClient } from "@/lib/redis";
+import { getTenantId } from "@/lib/tenant";
 import { db, dbOrders, dbOrderItems, dbProductVariants } from "@repo/db";
 import { eq, inArray } from "drizzle-orm";
 
@@ -88,7 +89,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate all variants belong to the same tenant
+    // Get tenantId from header x-tenant-slug
+    const headersList = await headers();
+    const tenantSlug = headersList.get("x-tenant-slug");
+    
+    if (!tenantSlug) {
+      return NextResponse.json(
+        { error: "Tenant no encontrado" },
+        { status: 400 }
+      );
+    }
+
+    const tenantIdFromSlug = await getTenantId(tenantSlug);
+    if (!tenantIdFromSlug) {
+      return NextResponse.json(
+        { error: `Tenant "${tenantSlug}" no válido` },
+        { status: 400 }
+      );
+    }
+
+    // Validate all variants belong to the same tenant as the slug
     const tenantIds = new Set(variants.map((v) => v.tenantId));
     if (tenantIds.size > 1) {
       return NextResponse.json(
@@ -97,8 +117,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tenantId = variants[0]?.tenantId;
-    if (!tenantId) {
+    // Verify the variants are from the correct tenant
+    const variantTenantId = variants[0]?.tenantId;
+    if (variantTenantId !== tenantIdFromSlug) {
+      return NextResponse.json(
+        { error: "El producto no pertenece a esta tienda" },
+        { status: 400 }
+      );
+    }
+
+    if (!variantTenantId) {
       return NextResponse.json(
         { error: "No se pudo determinar el tenant" },
         { status: 400 }
@@ -106,6 +134,9 @@ export async function POST(request: NextRequest) {
     }
 
     const shippingDetails: ShippingDetails = { name, email, phone, address };
+
+    // Use tenantIdFromSlug as the actual tenantId for the order
+    const orderTenantId = tenantIdFromSlug;
 
     const [order] = await db.transaction(async (tx) => {
       for (const item of cart.items) {
@@ -123,7 +154,7 @@ export async function POST(request: NextRequest) {
       const [newOrder] = await tx
         .insert(dbOrders)
         .values({
-          tenantId,
+          tenantId: orderTenantId,
           status: "pending_payment",
           total: 0,
           currency: "UYU",

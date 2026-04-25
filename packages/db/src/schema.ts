@@ -68,7 +68,7 @@ export const dbOrders = pgTable("orders", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: uuid("tenantId").notNull(),
   customerId: uuid("customerId"),
-  customerEmail: text("customerEmail"),
+  customerEmail: text("customeremail"),
   status: text("status").default("pending"),
   total: integer("total").notNull(),
   currency: text("currency").default("UYU"),
@@ -79,6 +79,7 @@ export const dbOrders = pgTable("orders", {
 }, (table) => {
   return {
     tenantIdIdx: index("orders_tenant_id_idx").on(table.tenantId),
+    customerEmailIdx: index("orders_customer_email_idx").on(table.customerEmail),
   };
 });
 
