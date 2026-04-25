@@ -139,6 +139,20 @@ export async function POST(request: NextRequest) {
     const orderTenantId = tenantIdFromSlug;
 
     const [order] = await db.transaction(async (tx) => {
+      // Calculate total from cart items
+      let transactionTotal = 0;
+      for (const item of cart.items) {
+        const variant = variantMap.get(item.variantId);
+        if (!variant || variant.price === null) {
+          throw new Error(`Precio no disponible para variante ${item.variantId}`);
+        }
+        transactionTotal += variant.price * item.quantity;
+      }
+
+      if (transactionTotal === 0) {
+        throw new Error("El total de la orden no puede ser 0");
+      }
+
       for (const item of cart.items) {
         const variant = variantMap.get(item.variantId);
         if (!variant) continue;
@@ -156,7 +170,7 @@ export async function POST(request: NextRequest) {
         .values({
           tenantId: orderTenantId,
           status: "pending_payment",
-          total: 0,
+          total: transactionTotal,
           currency: "UYU",
           customerEmail: email,
           shippingDetails,
@@ -178,24 +192,11 @@ export async function POST(request: NextRequest) {
       return [newOrder];
     });
 
-    let total = 0;
-    for (const item of cart.items) {
-      const variant = variantMap.get(item.variantId);
-      if (variant) {
-        total += variant.price * item.quantity;
-      }
-    }
-
-    await db
-      .update(dbOrders)
-      .set({ total })
-      .where(eq(dbOrders.id, order.id));
-
     await redisClient.del(`cart:${sessionId}`);
 
     return NextResponse.json({
       orderId: order.id,
-      total,
+      total: order.total,
       status: "pending_payment",
     });
   } catch (error) {

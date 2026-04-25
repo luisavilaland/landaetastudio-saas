@@ -10,14 +10,18 @@
   },
 "dependencies": {
     "@repo/db": "workspace:*",
+    "@repo/storage": "workspace:*",
+    "drizzle-orm": "^0.39.3",
     "ioredis": "^5.4.2",
     "next": "16.2.4",
+    "nodemailer": "^6.10.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^6.4.17",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

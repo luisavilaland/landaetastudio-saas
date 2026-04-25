@@ -35,6 +35,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const shippingDetails = order.shippingDetails as {
+      name?: string;
+      email?: string;
+      phone?: string;
+      address?: string;
+    } | null;
+
+    if (!shippingDetails || !shippingDetails.name || !shippingDetails.email) {
+      return NextResponse.json(
+        { error: "Datos de envío incompletos" },
+        { status: 400 }
+      );
+    }
+
+    const nameParts = shippingDetails.name.split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(" ") || firstName;
+
+    const payer: any = {
+      name: firstName,
+      surname: lastName,
+      email: shippingDetails.email,
+    };
+
+    if (shippingDetails.phone) {
+      payer.phone = {
+        number: shippingDetails.phone,
+      };
+    }
+
     const orderItems = await db
       .select({
         id: dbOrderItems.id,
@@ -53,7 +83,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get all variants (fixed bug: was only getting variantIds[0])
     const variants = await db
       .select({
         id: dbProductVariants.id,
@@ -69,7 +98,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get unique product IDs and fetch all products
     const productIds = [...new Set(variants.map((v) => v.productId))];
     const products = await db
       .select({
@@ -79,13 +107,9 @@ export async function POST(request: NextRequest) {
       .from(dbProducts)
       .where(inArray(dbProducts.id, productIds));
 
-    // Create product map for quick lookup
     const productMap = new Map(products.map((p) => [p.id, p.name]));
-
-    // Create variant -> product mapping
     const variantProductMap = new Map(variants.map((v) => [v.id, v.productId]));
 
-    // Build items with correct product names
     const items = orderItems.map((item, index) => {
       const variantId = item.productVariantId;
       const productId = variantProductMap.get(variantId);
@@ -100,14 +124,14 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    const baseUrl = process.env.STOREFRONT_URL;
 
     if (!baseUrl) {
       if (process.env.NODE_ENV === "development") {
-        console.warn("[Preference] WARNING: NEXT_PUBLIC_BASE_URL not set, using localhost fallback");
+        console.warn("[Preference] WARNING: STOREFRONT_URL not set, using localhost fallback");
       } else {
         return NextResponse.json(
-          { error: "NEXT_PUBLIC_BASE_URL no está configurada" },
+          { error: "STOREFRONT_URL no está configurada" },
           { status: 500 }
         );
       }
@@ -119,18 +143,11 @@ export async function POST(request: NextRequest) {
     console.log("[Preference] items:", JSON.stringify(items));
     console.log("[Preference] baseUrl:", fallbackBaseUrl);
     console.log("[Preference] accessToken:", accessToken?.substring(0, 20) + "...");
+    console.log("[Preference] payer:", payer);
 
     const preference = {
       items,
-      payer: {
-        name: "Test",
-        surname: "User",
-        email: "test_user_uy@testuser.com",
-        identification: {
-          type: "CI",
-          number: "12345678",
-        },
-      },
+      payer,
       back_urls: {
         success: `${fallbackBaseUrl}/checkout/success`,
         failure: `${fallbackBaseUrl}/checkout/failure`,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbOrders } from "@repo/db";
+import { db, dbOrders, dbOrderItems, dbProductVariants } from "@repo/db";
 import { eq } from "drizzle-orm";
 import { sendOrderConfirmationEmail } from "@/lib/email";
 import crypto from "crypto";
@@ -129,6 +129,64 @@ export async function POST(request: NextRequest) {
           shippingDetails.name || "Cliente"
         );
       }
+    } else if (newStatus === "payment_failed") {
+      const [order] = await db
+        .select()
+        .from(dbOrders)
+        .where(eq(dbOrders.id, orderId))
+        .limit(1);
+
+      if (!order) {
+        console.log(`[Webhook MP] Order ${orderId} not found`);
+        return NextResponse.json({ received: true });
+      }
+
+      // Check if already marked as payment_failed (prevent double restoration)
+      if (order.status === "payment_failed") {
+        console.log(`[Webhook MP] Order ${orderId} already failed, skipping restoration`);
+        return NextResponse.json({ received: true });
+      }
+
+      // Get order items to restore stock
+      const orderItems = await db
+        .select()
+        .from(dbOrderItems)
+        .where(eq(dbOrderItems.orderId, orderId));
+
+      // Restore stock for each item in a transaction-like manner
+      for (const item of orderItems) {
+        const [variant] = await db
+          .select({ stock: dbProductVariants.stock })
+          .from(dbProductVariants)
+          .where(eq(dbProductVariants.id, item.productVariantId))
+          .limit(1);
+
+        if (variant && variant.stock !== null) {
+          await db
+            .update(dbProductVariants)
+            .set({
+              stock: variant.stock + item.quantity,
+            })
+            .where(eq(dbProductVariants.id, item.productVariantId));
+
+          console.log(`[Webhook MP] Restored ${item.quantity} units to variant ${item.productVariantId}`);
+        }
+      }
+
+      await db
+        .update(dbOrders)
+        .set({
+          status: newStatus,
+          metadata: {
+            paymentId,
+            paymentStatus: body.status,
+            webhookReceivedAt: new Date().toISOString(),
+            stockRestored: true,
+          },
+        })
+        .where(eq(dbOrders.id, orderId));
+
+      console.log(`[Webhook MP] Order ${orderId} updated to ${newStatus} and stock restored`);
     } else if (newStatus) {
       const [order] = await db
         .select()
