@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbTenants } from "@repo/db";
 import { auth } from "@/lib/auth";
+import { redisClient } from "@/lib/redis";
 import { desc, eq } from "drizzle-orm";
+
+const TENANT_CACHE_PREFIX = "tenant:slug:";
 
 export async function GET() {
   const session = await auth();
@@ -58,6 +61,12 @@ export async function POST(request: NextRequest) {
         status: status || "active",
       })
       .returning();
+
+    try {
+      await redisClient.del(`${TENANT_CACHE_PREFIX}${slug}`);
+    } catch (e) {
+      console.error("[Cache] Failed to invalidate:", e);
+    }
 
     return NextResponse.json(newTenant[0], { status: 201 });
   } catch (error) {

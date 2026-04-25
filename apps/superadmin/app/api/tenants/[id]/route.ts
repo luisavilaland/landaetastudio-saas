@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbTenants } from "@repo/db";
 import { auth } from "@/lib/auth";
+import { redisClient } from "@/lib/redis";
 import { eq } from "drizzle-orm";
+
+const TENANT_CACHE_PREFIX = "tenant:slug:";
 
 type Params = Promise<{ id: string }>;
 
@@ -88,6 +91,14 @@ export async function PUT(
       .where(eq(dbTenants.id, id))
       .returning();
 
+    if (slug) {
+      try {
+        await redisClient.del(`${TENANT_CACHE_PREFIX}${slug}`);
+      } catch (e) {
+        console.error("[Cache] Failed to invalidate:", e);
+      }
+    }
+
     return NextResponse.json(updated[0]);
   } catch (error) {
     console.error("Error updating tenant:", error);
@@ -124,7 +135,14 @@ export async function DELETE(
       );
     }
 
+    const oldSlug = existing[0].slug;
     await db.delete(dbTenants).where(eq(dbTenants.id, id));
+
+    try {
+      await redisClient.del(`${TENANT_CACHE_PREFIX}${oldSlug}`);
+    } catch (e) {
+      console.error("[Cache] Failed to invalidate:", e);
+    }
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {

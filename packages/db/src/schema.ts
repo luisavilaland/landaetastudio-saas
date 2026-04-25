@@ -15,7 +15,7 @@ export const dbTenants = pgTable("tenants", {
 
 export const dbProducts = pgTable("products", {
   id: uuid("id").primaryKey().defaultRandom(),
-  tenantId: uuid("tenantId").notNull(),
+  tenantId: uuid("tenantId").notNull().references(() => dbTenants.id, { onDelete: "restrict" }),
   name: text("name").notNull(),
   slug: text("slug").notNull(),
   description: text("description"),
@@ -33,8 +33,8 @@ export const dbProducts = pgTable("products", {
 
 export const dbProductVariants = pgTable("product_variants", {
   id: uuid("id").primaryKey().defaultRandom(),
-  tenantId: uuid("tenantId").notNull(),
-  productId: uuid("productId").notNull(),
+  tenantId: uuid("tenantId").notNull().references(() => dbTenants.id, { onDelete: "restrict" }),
+  productId: uuid("productId").notNull().references(() => dbProducts.id, { onDelete: "cascade" }),
   sku: text("sku").notNull(),
   price: integer("price").notNull(),
   stock: integer("stock").default(0),
@@ -50,7 +50,7 @@ export const dbProductVariants = pgTable("product_variants", {
 
 export const dbCustomers = pgTable("customers", {
   id: uuid("id").primaryKey().defaultRandom(),
-  tenantId: uuid("tenantId").notNull(),
+  tenantId: uuid("tenantId").notNull().references(() => dbTenants.id, { onDelete: "restrict" }),
   email: text("email").notNull(),
   password: text("password").notNull(),
   name: text("name"),
@@ -69,7 +69,7 @@ export const dbAdminUsers = pgTable("admin_users", {
   email: text("email").unique().notNull(),
   password: text("password").notNull(),
   role: text("role").notNull().default("admin"),
-  tenantId: uuid("tenantId"),
+  tenantId: uuid("tenantId").references(() => dbTenants.id, { onDelete: "set null" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => {
@@ -80,8 +80,8 @@ export const dbAdminUsers = pgTable("admin_users", {
 
 export const dbOrders = pgTable("orders", {
   id: uuid("id").primaryKey().defaultRandom(),
-  tenantId: uuid("tenantId").notNull(),
-  customerId: uuid("customerId"),
+  tenantId: uuid("tenantId").notNull().references(() => dbTenants.id, { onDelete: "restrict" }),
+  customerId: uuid("customerId").references(() => dbCustomers.id, { onDelete: "set null" }),
   customerEmail: text("customeremail"),
   status: text("status").default("pending"),
   total: integer("total").notNull(),
@@ -99,8 +99,8 @@ export const dbOrders = pgTable("orders", {
 
 export const dbOrderItems = pgTable("order_items", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orderId: uuid("orderId").notNull(),
-  productVariantId: uuid("productVariantId").notNull(),
+  orderId: uuid("orderId").notNull().references(() => dbOrders.id, { onDelete: "cascade" }),
+  productVariantId: uuid("productVariantId").notNull().references(() => dbProductVariants.id, { onDelete: "restrict" }),
   quantity: integer("quantity").notNull(),
   unitPrice: integer("unitPrice").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
