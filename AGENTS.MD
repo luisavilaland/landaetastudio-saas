@@ -242,7 +242,7 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 25, 2026 – Webhook signature verification, middleware refactor, storage fixes.
+Last updated: April 25, 2026 – Real payer data, stock restoration, total in transaction, webhook fix.
 
 ## Production Priorities
 
