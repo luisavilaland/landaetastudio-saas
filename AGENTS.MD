@@ -242,7 +242,7 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 25, 2026 – Real payer data, stock restoration, total in transaction, webhook fix.
+Last updated: April 25, 2026 – FK constraints, NextAuth types, Redis tenant cache.
 
 ## Production Priorities
 
