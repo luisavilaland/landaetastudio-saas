@@ -100,13 +100,24 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const baseUrl = (process.env.NEXTAUTH_URL?.replace(":3001", ":3000") || "http://localhost:3000")
-      .replace(/^http:/, "https:")
-      .replace(/^localhost/, "five-mice-do.lvh.me");
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+
+    if (!baseUrl) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[Preference] WARNING: NEXT_PUBLIC_BASE_URL not set, using localhost fallback");
+      } else {
+        return NextResponse.json(
+          { error: "NEXT_PUBLIC_BASE_URL no está configurada" },
+          { status: 500 }
+        );
+      }
+    }
+
+    const fallbackBaseUrl = baseUrl || "http://localhost:3000";
 
     console.log("[Preference] orderId:", orderId);
     console.log("[Preference] items:", JSON.stringify(items));
-    console.log("[Preference] baseUrl:", baseUrl);
+    console.log("[Preference] baseUrl:", fallbackBaseUrl);
     console.log("[Preference] accessToken:", accessToken?.substring(0, 20) + "...");
 
     const preference = {
@@ -121,9 +132,9 @@ export async function POST(request: NextRequest) {
         },
       },
       back_urls: {
-        success: `${baseUrl}/checkout/success?order_id=${orderId}`,
-        failure: `${baseUrl}/checkout/failure?order_id=${orderId}`,
-        pending: `${baseUrl}/checkout/pending?order_id=${orderId}`,
+        success: `${fallbackBaseUrl}/checkout/success`,
+        failure: `${fallbackBaseUrl}/checkout/failure`,
+        pending: `${fallbackBaseUrl}/checkout/pending`,
       },
       auto_return: "approved",
       external_reference: orderId,
@@ -145,8 +156,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(responseData, { status: response.status });
     }
 
+    const useSandbox = process.env.MP_USE_SANDBOX === "true";
+
     return NextResponse.json({
-      init_point: responseData.init_point,
+      init_point: useSandbox ? responseData.sandbox_init_point : responseData.init_point,
     });
   } catch (error: any) {
     console.error("[Checkout Preference] Error:", error);
