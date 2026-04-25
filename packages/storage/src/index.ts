@@ -18,8 +18,7 @@ export const minioClient = new Client({
 });
 
 export function getPublicUrl(fileName: string): string {
-  const baseUrl = `${protocol}://${endpoint}:${port}/${bucket}`;
-  return `${baseUrl}/${fileName}`;
+  return `${protocol}://${endpoint}:${port}/${bucket}/${fileName}`;
 }
 
 export async function uploadImage(
@@ -27,7 +26,7 @@ export async function uploadImage(
   fileName: string,
   contentType: string
 ): Promise<string> {
-  const uniqueName = `products/${Date.now()}-${fileName}`;
+  const uniqueName = fileName;
 
   await minioClient.putObject(bucket, uniqueName, file, file.size, {
     "Content-Type": contentType,
