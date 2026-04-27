@@ -16,6 +16,7 @@ export const dbTenants = pgTable("tenants", {
 export const dbProducts = pgTable("products", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: uuid("tenantId").notNull().references(() => dbTenants.id, { onDelete: "restrict" }),
+  categoryId: uuid("categoryId").references(() => dbCategories.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   slug: text("slug").notNull(),
   description: text("description"),
@@ -123,5 +124,36 @@ export type Order = typeof dbOrders.$inferSelect;
 export type NewOrder = typeof dbOrders.$inferInsert;
 export type OrderItem = typeof dbOrderItems.$inferSelect;
 export type NewOrderItem = typeof dbOrderItems.$inferInsert;
+export const dbCategories = pgTable("categories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenantId").notNull().references(() => dbTenants.id, { onDelete: "restrict" }),
+  name: text("name").notNull(),
+  slug: text("slug").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => {
+  return {
+    tenantSlugUnique: uniqueIndex("categories_tenant_slug_idx").on(table.tenantId, table.slug),
+    tenantIdIdx: index("categories_tenant_id_idx").on(table.tenantId),
+  };
+});
+
+export const categoriesRelations = relations(dbCategories, ({ one, many }) => ({
+  tenant: one(dbTenants, {
+    fields: [dbCategories.tenantId],
+    references: [dbTenants.id],
+  }),
+  products: many(dbProducts),
+}));
+
+export const productsCategoriesRelations = relations(dbProducts, ({ one }) => ({
+  category: one(dbCategories, {
+    fields: [dbProducts.categoryId],
+    references: [dbCategories.id],
+  }),
+}));
+
+export type Category = typeof dbCategories.$inferSelect;
+export type NewCategory = typeof dbCategories.$inferInsert;
 export type AdminUser = typeof dbAdminUsers.$inferSelect;
 export type NewAdminUser = typeof dbAdminUsers.$inferInsert;

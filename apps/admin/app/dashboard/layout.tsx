@@ -22,6 +22,7 @@ export default async function DashboardLayout({
           <div className="flex items-center gap-4">
             <a href="/dashboard" className="text-sm text-zinc-600 hover:text-zinc-900">Dashboard</a>
             <a href="/products" className="text-sm text-zinc-600 hover:text-zinc-900">Productos</a>
+            <a href="/categorias" className="text-sm text-zinc-600 hover:text-zinc-900">Categorías</a>
             <a href="/orders" className="text-sm text-zinc-600 hover:text-zinc-900">Órdenes</a>
             <span className="text-sm text-zinc-600">{session.user?.email}</span>
             <LogoutButton />
