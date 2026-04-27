@@ -79,30 +79,51 @@ export async function PUT(
     }
 
     const body = await request.formData();
-    const name = body.get("name") as string;
-    const slug = body.get("slug") as string;
-    const description = (body.get("description") as string) || null;
-    const status = (body.get("status") as string) || null;
-    const price = parseInt(body.get("price") as string, 10);
-    const stock = parseInt(body.get("stock") as string, 10);
-    const image = body.get("image") as File | null;
-    const removeImage = body.get("removeImage") === "true";
+    const contentType = request.headers.get("content-type") || "";
 
-    if (!name || !slug || isNaN(price) || isNaN(stock)) {
+    let name: string | undefined;
+    let slug: string | undefined;
+    let description: string | null | undefined;
+    let status: string | null | undefined;
+    let price: number | undefined;
+    let stock: number | undefined;
+    let image: File | null | undefined;
+    let removeImage: boolean | undefined;
+
+    if (contentType.includes("application/json")) {
+      const json = await request.json();
+      name = json.name;
+      slug = json.slug;
+      description = json.description ?? null;
+      status = json.status ?? null;
+      price = json.price ? parseInt(json.price, 10) : undefined;
+      stock = json.stock !== undefined ? parseInt(json.stock, 10) : undefined;
+    } else {
+      name = body.get("name") as string;
+      slug = body.get("slug") as string;
+      description = (body.get("description") as string) || null;
+      status = (body.get("status") as string) || null;
+      price = parseInt(body.get("price") as string, 10);
+      stock = parseInt(body.get("stock") as string, 10);
+      image = body.get("image") as File | null;
+      removeImage = body.get("removeImage") === "true";
+    }
+
+    if (!name || !slug) {
       return NextResponse.json(
-        { error: "Name, slug, price and stock are required" },
+        { error: "Name and slug are required" },
         { status: 400 }
       );
     }
 
-    if (price <= 0) {
+    if (price !== undefined && price <= 0) {
       return NextResponse.json(
         { error: "Price must be greater than 0" },
         { status: 400 }
       );
     }
 
-    if (stock < 0) {
+    if (stock !== undefined && stock < 0) {
       return NextResponse.json(
         { error: "Stock cannot be negative" },
         { status: 400 }
@@ -145,29 +166,51 @@ export async function PUT(
 
     const metadata = product[0].metadata;
 
-    await db.transaction(async (tx) => {
-      await tx
-        .update(dbProducts)
-        .set({
-          name,
-          slug,
-          description: description || product[0].description,
-          imageUrl,
-          status: status || product[0].status,
-          metadata: metadata || product[0].metadata,
-          updatedAt: now,
-        })
-        .where(eq(dbProducts.id, id));
+    const updateProductFields: Record<string, unknown> = {
+      updatedAt: now,
+    };
+    if (name) updateProductFields.name = name;
+    if (slug) updateProductFields.slug = slug;
+    if (description !== undefined) updateProductFields.description = description;
+    if (status) updateProductFields.status = status;
+    if (metadata) updateProductFields.metadata = metadata;
 
-      await tx
-        .update(dbProductVariants)
-        .set({
-          sku: newSku,
-          price,
-          stock,
-          updatedAt: now,
-        })
-        .where(eq(dbProductVariants.productId, id));
+    if (image || removeImage !== undefined) {
+      if (image && image.size > 0) {
+        if (product[0].imageUrl) {
+          await deleteImage(product[0].imageUrl);
+        }
+        const buffer = Buffer.from(await image.arrayBuffer());
+        const ext = image.name.split(".").pop() || "png";
+        imageUrl = await uploadImage(buffer, `products/${Date.now()}-${slug}.${ext}`, image.type);
+      } else if (removeImage && product[0].imageUrl) {
+        await deleteImage(product[0].imageUrl);
+        imageUrl = null;
+      }
+      updateProductFields.imageUrl = imageUrl;
+    }
+
+    const updateVariantFields: Record<string, unknown> = {
+      updatedAt: now,
+    };
+    if (slug) updateVariantFields.sku = slug.replace(/\s+/g, "-").toLowerCase();
+    if (price !== undefined) updateVariantFields.price = price;
+    if (stock !== undefined) updateVariantFields.stock = stock;
+
+    await db.transaction(async (tx) => {
+      if (Object.keys(updateProductFields).length > 1) {
+        await tx
+          .update(dbProducts)
+          .set(updateProductFields)
+          .where(eq(dbProducts.id, id));
+      }
+
+      if (Object.keys(updateVariantFields).length > 1) {
+        await tx
+          .update(dbProductVariants)
+          .set(updateVariantFields)
+          .where(eq(dbProductVariants.productId, id));
+      }
     });
 
     const updatedProduct = await db
