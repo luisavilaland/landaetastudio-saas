@@ -181,6 +181,8 @@ curl -X POST https://mi-tienda-prxy.ayooub.me/api/webhooks/mercadopago \
   -d '{"type":"payment","data":{"id":"000000"}}'
 ```
 
+> **Nota:** La URL del túnel cambia cada vez que reinicias `npx dotunnel`, a menos que uses un plan pago con dominio fijo. Si el webhook deja de funcionar, verifica que el túnel esté activo y actualiza `STOREFRONT_URL` en tu `.env.local` con la nueva URL.
+
 ## Troubleshooting
 
 ### PostgreSQL no conecta
