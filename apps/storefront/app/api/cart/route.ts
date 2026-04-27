@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redisClient } from "@/lib/redis";
 import { db, dbProducts, dbProductVariants } from "@repo/db";
 import { inArray, eq } from "drizzle-orm";
+import { addCartItemSchema, updateCartItemSchema, deleteCartItemSchema } from "@repo/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -72,14 +73,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { variantId, quantity } = body;
+    const validation = addCartItemSchema.safeParse(body);
 
-    if (!variantId || typeof quantity !== "number" || quantity < 1) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "variantId y quantity son requeridos" },
+        { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
       );
     }
+
+    const { variantId, quantity } = validation.data;
 
     const variant = await db
       .select()
@@ -145,14 +148,16 @@ export async function PUT(request: NextRequest) {
     const cart = await getCart(sessionId);
 
     const body = await request.json();
-    const { variantId, quantity } = body;
+    const validation = updateCartItemSchema.safeParse(body);
 
-    if (!variantId || typeof quantity !== "number" || quantity < 0) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "variantId y quantity son requeridos" },
+        { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
       );
     }
+
+    const { variantId, quantity } = validation.data;
 
     if (quantity === 0) {
       cart.items = cart.items.filter((item) => item.variantId !== variantId);
@@ -218,18 +223,20 @@ export async function DELETE(request: NextRequest) {
     const cart = await getCart(sessionId);
 
     const body = await request.json();
-    const { variantId, clearAll } = body;
+    const validation = deleteCartItemSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: validation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { variantId, clearAll } = validation.data;
 
     if (clearAll) {
       await redisClient.del(`cart:${sessionId}`);
       return NextResponse.json({ items: [] });
-    }
-
-    if (!variantId) {
-      return NextResponse.json(
-        { error: "variantId es requerido" },
-        { status: 400 }
-      );
     }
 
     cart.items = cart.items.filter((item) => item.variantId !== variantId);

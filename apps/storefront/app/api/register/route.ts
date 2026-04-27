@@ -3,19 +3,21 @@ import { db, dbCustomers, dbTenants } from "@repo/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getTenantId } from "@/lib/tenant";
+import { registerSchema } from "@repo/validation";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, email, password } = body;
+    const validation = registerSchema.safeParse(body);
 
-    // Validate required fields
-    if (!name || !email || !password) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Name, email y password son requeridos" },
+        { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
       );
     }
+
+    const { name, email, password } = validation.data;
 
     // Get tenant from header
     const tenantSlug = request.headers.get("x-tenant-slug");

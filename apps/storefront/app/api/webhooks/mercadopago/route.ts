@@ -3,6 +3,7 @@ import { db, dbOrders, dbOrderItems, dbProductVariants } from "@repo/db";
 import { eq, sql } from "drizzle-orm";
 import { sendOrderConfirmationEmail } from "@/lib/email";
 import crypto from "crypto";
+import { webhookSchema } from "@repo/validation";
 
 type MPWebhookPayload = {
   type: string;
@@ -77,7 +78,15 @@ export async function POST(request: NextRequest) {
     }
 
     const rawBody = await request.text();
-    const body = JSON.parse(rawBody) as MPWebhookPayload;
+    const parsedBody = JSON.parse(rawBody);
+    const validation = webhookSchema.safeParse(parsedBody);
+
+    if (!validation.success) {
+      console.log("[Webhook MP] Invalid webhook payload:", validation.error.issues);
+      return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
+    }
+
+    const body = validation.data;
     console.log("[Webhook MP] Received webhook:", JSON.stringify(body));
 
     const paymentId = body.data?.id;

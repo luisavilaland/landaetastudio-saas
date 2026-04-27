@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, dbProducts, dbProductVariants } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
+import { variantsArraySchema } from "@repo/validation";
 
 export async function GET(
   request: NextRequest,
@@ -66,14 +67,16 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { variants } = body;
+    const validation = variantsArraySchema.safeParse(body);
 
-    if (!Array.isArray(variants) || variants.length === 0) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Variants array is required" },
+        { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
       );
     }
+
+    const { variants } = validation.data;
 
     const now = new Date();
 
@@ -88,7 +91,7 @@ export async function POST(
             sku?: string;
             price: number;
             stock: number;
-            options: Record<string, string>;
+            options?: Record<string, string>;
           },
           index: number
         ) => {

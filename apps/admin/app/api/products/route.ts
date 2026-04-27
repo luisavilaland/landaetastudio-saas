@@ -3,6 +3,7 @@ import { db, dbProducts, dbProductVariants, dbProductImages, dbCategories } from
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
 import { uploadImage } from "@repo/storage";
+import { createProductSchema } from "@repo/validation";
 
 export async function GET() {
   const session = await auth();
@@ -60,26 +61,24 @@ export async function POST(request: NextRequest) {
     const stock = parseInt(formData.get("stock") as string, 10);
     const image = formData.get("image") as File | null;
 
-    if (!name || !slug || isNaN(price) || isNaN(stock)) {
+    const validation = createProductSchema.safeParse({
+      name,
+      slug,
+      description,
+      status,
+      categoryId: categoryId || undefined,
+      price,
+      stock,
+    });
+
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Name, slug, price and stock are required" },
+        { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
       );
     }
 
-    if (price <= 0) {
-      return NextResponse.json(
-        { error: "Price must be greater than 0" },
-        { status: 400 }
-      );
-    }
-
-    if (stock < 0) {
-      return NextResponse.json(
-        { error: "Stock cannot be negative" },
-        { status: 400 }
-      );
-    }
+    const { price: validPrice, stock: validStock } = validation.data;
 
     if (categoryId) {
       const category = await db
@@ -148,8 +147,8 @@ export async function POST(request: NextRequest) {
           tenantId,
           productId: product.id,
           sku,
-          price,
-          stock,
+          price: validPrice,
+          stock: validStock,
           options: {},
           createdAt: now,
           updatedAt: now,

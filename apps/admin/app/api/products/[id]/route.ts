@@ -3,6 +3,7 @@ import { db, dbProducts, dbProductVariants, dbProductImages, dbOrderItems, dbCat
 import { auth } from "@/lib/auth";
 import { and, eq, inArray } from "drizzle-orm";
 import { uploadImage, deleteImage } from "@repo/storage";
+import { updateProductSchema } from "@repo/validation";
 
 type Params = Promise<{ id: string }>;
 
@@ -119,26 +120,25 @@ export async function PUT(
       removeImage = body.get("removeImage") === "true";
     }
 
-    if (!name || !slug) {
+    const validation = updateProductSchema.safeParse({
+      name,
+      slug,
+      description,
+      status,
+      categoryId: categoryId ?? undefined,
+      price,
+      stock,
+      removeImage,
+    });
+
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Name and slug are required" },
+        { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
       );
     }
 
-    if (price !== undefined && price <= 0) {
-      return NextResponse.json(
-        { error: "Price must be greater than 0" },
-        { status: 400 }
-      );
-    }
-
-    if (stock !== undefined && stock < 0) {
-      return NextResponse.json(
-        { error: "Stock cannot be negative" },
-        { status: 400 }
-      );
-    }
+    const { price: validPrice, stock: validStock } = validation.data;
 
     if (categoryId !== undefined && categoryId !== null) {
       const category = await db
@@ -154,7 +154,7 @@ export async function PUT(
       }
     }
 
-    if (slug !== product[0].slug) {
+    if (slug && slug !== product[0].slug) {
       const existingSlug = await db
         .select()
         .from(dbProducts)
@@ -219,8 +219,8 @@ export async function PUT(
       updatedAt: now,
     };
     if (slug) updateVariantFields.sku = slug.replace(/\s+/g, "-").toLowerCase();
-    if (price !== undefined) updateVariantFields.price = price;
-    if (stock !== undefined) updateVariantFields.stock = stock;
+    if (validPrice !== undefined) updateVariantFields.price = validPrice;
+    if (validStock !== undefined) updateVariantFields.stock = validStock;
 
     await db.transaction(async (tx) => {
       if (Object.keys(updateProductFields).length > 1) {

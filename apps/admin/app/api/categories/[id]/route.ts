@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, dbCategories, dbProducts } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
+import { updateCategorySchema } from "@repo/validation";
 
 export async function GET(
   request: NextRequest,
@@ -71,16 +72,26 @@ export async function PUT(
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
 
-    const { name, slug } = await request.json();
+    const body = await request.json();
+    const validation = updateCategorySchema.safeParse(body);
 
-    if (!name || !slug) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Name and slug are required" },
+        { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
       );
     }
 
-    if (slug !== existingCategory.slug) {
+    const { name, slug } = validation.data;
+
+    if (!name && !slug) {
+      return NextResponse.json(
+        { error: "At least one field must be provided" },
+        { status: 400 }
+      );
+    }
+
+    if (slug && slug !== existingCategory.slug) {
       const existingSlug = await db
         .select()
         .from(dbCategories)
@@ -120,14 +131,13 @@ export async function PUT(
     }
 
     const now = new Date();
+    const updateData: Record<string, unknown> = { updatedAt: now };
+    if (name) updateData.name = name;
+    if (slug) updateData.slug = slug;
 
     const [category] = await db
       .update(dbCategories)
-      .set({
-        name,
-        slug,
-        updatedAt: now,
-      })
+      .set(updateData)
       .where(
         and(
           eq(dbCategories.id, id),

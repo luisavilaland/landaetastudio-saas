@@ -3,6 +3,7 @@ import { db, dbTenants } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { redisClient } from "@/lib/redis";
 import { eq } from "drizzle-orm";
+import { updateTenantSchema } from "@repo/validation";
 
 const TENANT_CACHE_PREFIX = "tenant:slug:";
 
@@ -49,7 +50,16 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { name, plan, status, slug } = body;
+    const validation = updateTenantSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: validation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { name, plan, status, slug } = validation.data;
 
     const existing = await db
       .select()

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbOrders, dbOrderItems, dbProducts, dbProductVariants } from "@repo/db";
 import { eq, inArray } from "drizzle-orm";
+import { checkoutPreferenceSchema } from "@repo/validation";
 
 export const maxDuration = 30;
 
@@ -19,14 +20,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { orderId } = body;
+    const validation = checkoutPreferenceSchema.safeParse(body);
 
-    if (!orderId) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "orderId es requerido" },
+        { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
       );
     }
+
+    const { orderId } = validation.data;
 
     const [order] = await db
       .select()

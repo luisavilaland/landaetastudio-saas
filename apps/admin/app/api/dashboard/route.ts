@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, dbOrders, dbProductVariants, dbProducts } from "@repo/db";
 import { eq, sql, and, lte, gte, desc } from "drizzle-orm";
+import { dashboardQuerySchema } from "@repo/validation";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session) {
@@ -13,6 +14,19 @@ export async function GET() {
     const tenantId = session.user.tenantId;
     if (!tenantId) {
       return NextResponse.json({ error: "Tenant no encontrado" }, { status: 400 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const queryValidation = dashboardQuerySchema.safeParse({
+      startDate: searchParams.get("startDate"),
+      endDate: searchParams.get("endDate"),
+    });
+
+    if (!queryValidation.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: queryValidation.error.issues },
+        { status: 400 }
+      );
     }
 
     const now = new Date();

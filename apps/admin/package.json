@@ -9,9 +9,10 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
-"dependencies": {
+  "dependencies": {
     "@repo/db": "workspace:*",
     "@repo/storage": "workspace:*",
+    "@repo/validation": "workspace:*",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.39.3",
     "next": "16.2.4",

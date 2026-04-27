@@ -2,17 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, dbOrders, dbOrderItems, dbProductVariants, dbProducts } from "@repo/db";
 import { eq, inArray } from "drizzle-orm";
-
-const VALID_STATUSES = [
-  "pending_payment",
-  "confirmed",
-  "processing",
-  "shipped",
-  "delivered",
-  "cancelled",
-  "refunded",
-  "payment_failed",
-];
+import { updateOrderStatusSchema } from "@repo/validation";
 
 export async function GET(
   request: NextRequest,
@@ -123,14 +113,16 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { status } = body;
+    const validation = updateOrderStatusSchema.safeParse(body);
 
-    if (!status || !VALID_STATUSES.includes(status)) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: `Status inválido. Debe ser uno de: ${VALID_STATUSES.join(", ")}` },
+        { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
       );
     }
+
+    const { status } = validation.data;
 
     const [existingOrder] = await db
       .select({ id: dbOrders.id, tenantId: dbOrders.tenantId })

@@ -5,6 +5,7 @@ import { getTenantId } from "@/lib/tenant";
 import { auth } from "@/lib/auth";
 import { db, dbOrders, dbOrderItems, dbProductVariants } from "@repo/db";
 import { eq, inArray } from "drizzle-orm";
+import { createCheckoutSchema } from "@repo/validation";
 
 type CartItem = {
   variantId: string;
@@ -53,14 +54,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, name, phone, address } = body as ShippingDetails;
+    const validation = createCheckoutSchema.safeParse(body);
 
-    if (!email || !name || !phone || !address) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Faltan datos de envío: email, name, phone, address son requeridos" },
+        { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
       );
     }
+
+    const { email, name, phone, address } = validation.data;
 
     const variantIds = cart.items.map((item) => item.variantId);
     const variants = await db

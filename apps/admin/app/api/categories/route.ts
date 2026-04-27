@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, dbCategories } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq, asc } from "drizzle-orm";
+import { createCategorySchema } from "@repo/validation";
 
 export async function GET() {
   const session = await auth();
@@ -31,14 +32,17 @@ export async function POST(request: NextRequest) {
 
     const tenantId = session.user?.tenantId as string;
 
-    const { name, slug } = await request.json();
+    const body = await request.json();
+    const validation = createCategorySchema.safeParse(body);
 
-    if (!name || !slug) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Name and slug are required" },
+        { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
       );
     }
+
+    const { name, slug } = validation.data;
 
     const existingSlug = await db
       .select()
