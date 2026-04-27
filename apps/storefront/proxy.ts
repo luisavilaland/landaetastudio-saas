@@ -27,7 +27,7 @@ function getOrCreateSessionId(request: NextRequest, response: NextResponse): str
   return newSessionId;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const hostname = (request.headers.get('host') ?? '').replace(/:\d+$/, '');
 
   console.log('[Proxy] Hostname:', hostname);

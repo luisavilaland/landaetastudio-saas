@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
+import { SearchBar } from "./search-bar";
 
 type Category = {
   id: string;
@@ -24,6 +25,7 @@ export function Navbar({ tenantName, categories = [] }: NavbarProps) {
           {tenantName}
         </Link>
         <div className="flex items-center gap-6">
+          <SearchBar />
           <Link href="/" className="text-sm text-zinc-600 hover:text-zinc-900">
             Productos
           </Link>
