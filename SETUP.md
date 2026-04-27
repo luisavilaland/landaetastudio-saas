@@ -212,6 +212,10 @@ pnpm db:migrate
 
 ## Testing Conventions
 
+### Tarjetas de prueba MercadoPago
+
+> Próximamente: tarjetas de prueba para simular pagos aprobados y rechazados en el entorno de desarrollo de MercadoPago.
+
 ### Multi-tenant local
 
 ```bash
