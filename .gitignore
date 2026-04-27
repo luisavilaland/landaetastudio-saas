@@ -51,3 +51,13 @@ admin-cookies.txt
 
 # ngrok (if installed)
 ngrok.yml
+
+# Vercel
+.vercel/
+
+# Build info
+*.tsbuildinfo
+next-env.d.ts
+
+# Certificates
+*.pem
