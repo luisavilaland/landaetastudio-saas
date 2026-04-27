@@ -30,6 +30,12 @@ Si alguno de estos scripts no existe en la raíz, créalo en package.json con tu
 - build: `next build`
 - test: `vitest run`
 
+**Ubicación de los tests:**
+- Lógica de negocio: coloca el test en una carpeta `__tests__/` junto al módulo (ej. `packages/commerce/src/__tests__/cart.test.ts`).
+- Endpoints: `__tests__/` junto al archivo de ruta (ej. `apps/admin/app/api/products/__tests__/route.test.ts`).
+- Componentes: `__tests__/` junto al componente.
+- Tests end-to-end (opcional): en `e2e/` en la raíz.
+
 Si la tarea involucra migraciones: ejecutar pnpm db:generate y pnpm db:migrate y verificar que el seed pnpm db:seed no falle.
 
 Si la tarea es un endpoint nuevo: agregar test de integración con los casos de éxito, error 401/403, y validación de tenant.
