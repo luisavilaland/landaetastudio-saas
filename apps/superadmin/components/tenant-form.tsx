@@ -7,8 +7,10 @@ type Tenant = {
   id?: string;
   slug?: string;
   name?: string;
-  plan?: string;
-  status?: string;
+  plan?: string | null;
+  status?: string | null;
+  customDomain?: string | null;
+  settings?: unknown;
 };
 
 type Props = {

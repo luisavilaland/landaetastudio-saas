@@ -8,7 +8,7 @@ export default async function DashboardPage() {
     redirect("/api/auth/signin");
   }
 
-  const tenantId = (session.user as any)?.tenantId;
+  const tenantId = session.user?.tenantId;
 
   return (
     <div style={{ padding: "2rem" }}>

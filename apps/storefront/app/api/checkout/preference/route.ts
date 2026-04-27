@@ -63,6 +63,10 @@ export async function POST(request: NextRequest) {
       name: firstName,
       surname: lastName,
       email: shippingDetails.email,
+      identification: {
+        type: "CI",
+        number: "12345678",
+      },
     };
 
     if (shippingDetails.phone) {
@@ -145,6 +149,7 @@ export async function POST(request: NextRequest) {
     const preference = {
       items,
       payer,
+      binary_mode: true,
       back_urls: {
         success: `${baseUrl}/checkout/success`,
         failure: `${baseUrl}/checkout/failure`,
@@ -159,9 +164,9 @@ export async function POST(request: NextRequest) {
 
     console.time("MP-request");
 
-    let response: Response;
+    let apiResponse: Response;
     try {
-      response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+      apiResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -188,17 +193,26 @@ export async function POST(request: NextRequest) {
     clearTimeout(timeoutId);
     console.timeEnd("MP-request");
 
-    const responseData = await response.json();
+    const responseData = await apiResponse.json();
 
-    if (!response.ok) {
+    console.log("[Preference] Status:", apiResponse.status);
+    console.log("[Preference] Response data:", JSON.stringify(responseData, null, 2));
+
+    if (!apiResponse.ok) {
       console.error("[Preference] API Error:", responseData);
-      return NextResponse.json(responseData, { status: response.status });
+      return NextResponse.json(responseData, { status: apiResponse.status });
     }
 
-    const useSandbox = process.env.MP_USE_SANDBOX === "true";
+    const useSandbox = accessToken.startsWith("TEST-");
+    const initPoint = useSandbox ? responseData.sandbox_init_point : responseData.init_point;
+
+    console.log("[Preference] Preference ID:", responseData.id);
+    console.log("[Preference] Using sandbox:", useSandbox);
+    console.log("[Preference] --- CODIGO ACTUALIZADO: EXCLUSIONES ELIMINADAS ---");
+    console.log("[Preference] init_point:", initPoint);
 
     return NextResponse.json({
-      init_point: useSandbox ? responseData.sandbox_init_point : responseData.init_point,
+      init_point: initPoint,
     });
   } catch (error: any) {
     console.error("[Checkout Preference] Error:", error);

@@ -27,15 +27,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const isValid = await bcrypt.compare(password, user.password);
         if (!isValid) return null;
         
-        if (user.role !== "admin" && user.role !== "superadmin") {
+        if (user.role !== "admin") {
           return null;
         }
         
         return {
           id: user.id,
           email: user.email,
-          role: user.role,
-          tenantId: user.tenantId
+          role: user.role ?? "admin",
+          tenantId: user.tenantId ?? null
         };
       }
     })
@@ -44,16 +44,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.tenantId = user.tenantId;
-        token.role = user.role;
+        token.tenantId = user.tenantId ?? null;
+        token.role = user.role ?? "admin";
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id!;
-        session.user.tenantId = token.tenantId;
-        session.user.role = token.role;
+        session.user.id = token.id ?? "";
+        session.user.tenantId = token.tenantId ?? null;
+        session.user.role = token.role ?? "admin";
       }
       return session;
     }

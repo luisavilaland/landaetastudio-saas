@@ -9,10 +9,10 @@ type Product = {
   slug?: string;
   description?: string | null;
   imageUrl?: string | null;
-  status?: string;
+  status?: string | null;
   variant?: {
     price: number;
-    stock: number;
+    stock: number | null;
   } | null;
 };
 
@@ -35,7 +35,7 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
     description: initialProduct?.description || "",
     status: initialProduct?.status || "draft",
     price: initialProduct?.variant ? initialProduct.variant.price / 100 : "",
-    stock: initialProduct?.variant ? initialProduct.variant.stock : "",
+    stock: initialProduct?.variant?.stock ?? "",
   });
 
   const generateSlug = (name: string) => {
@@ -97,7 +97,7 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
       formData.append("description", form.description || "");
       formData.append("status", form.status);
       formData.append("price", priceInCents.toString());
-      formData.append("stock", form.stock);
+      formData.append("stock", form.stock?.toString() ?? "0");
       if (imageFile) {
         formData.append("image", imageFile);
       }

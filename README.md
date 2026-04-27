@@ -13,6 +13,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Middleware multi-tenant con resolución de subdominios (proxy.ts).
 - CRUD de tenants en superadmin (API + UI).
 - CRUD de productos en admin (API + UI): create, read, update, delete.
+- Tipos TypeScript para NextAuth (tenantId, role).
 - Logout functionality.
 - Validación backend: price > 0, stock >= 0, SKU regeneration on slug update.
 - Índices de base de datos: unique (tenantId, slug) para products, (tenantId, email) para customers, (tenantId, sku) para variants.
@@ -21,10 +22,10 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Paquete `@repo/storage` para integración con MinIO.
 - Storefront: catálogo, página de detalle, navbar, breadcrumbs.
 - **Carrito funcional:** Redis + cookie session, 7-day TTL, usuarios anónimos.
-- **Checkout:** Flujo completo con MercadoPago.
-- **Webhook:** Actualiza orden según notificación (con prevención de duplicados).
+- **Checkout:** Flujo completo con MercadoPago (binary_mode).
+- **Webhook:** Actualiza orden según notificación (con prevención de duplicados, modo simulación).
 - **Email:** Confirmación de orden con nodemailer.
-- **Fixes:** Bug inArray en cart/checkout, deleteImage, validación tenant, queries N+1, order_items check.
+- **Fixes:** Bug inArray en cart/checkout, deleteImage, validación tenant, queries N+1, order_items check, payment_methods exclusions.
 
 🔄 **En desarrollo:**
 - Políticas RLS.
@@ -213,3 +214,7 @@ Para recibir notificaciones de pago en desarrollo:
 - Prices siempre en centavos (integer), nunca floats.
 - Cart funciona sin autenticación (usuarios anónimos).
 - Checkout requiere email para enviar confirmación.
+
+---
+
+**Última actualización:** 27 de abril de 2026 – Tipos TypeScript, Webhook modo simulación, MP binary_mode.

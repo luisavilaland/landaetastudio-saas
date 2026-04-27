@@ -42,8 +42,11 @@ export default async function EditProductPage({ params }: Props) {
     name: product[0].name,
     slug: product[0].slug,
     description: product[0].description,
-    status: product[0].status,
-    variant: variant[0] || null,
+    status: product[0].status ?? "draft",
+    variant: variant[0] ? {
+      price: variant[0].price,
+      stock: variant[0].stock ?? 0,
+    } : null,
   };
 
   return <ProductForm initialProduct={initialProduct} mode="edit" />;

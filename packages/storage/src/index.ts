@@ -28,7 +28,7 @@ export async function uploadImage(
 ): Promise<string> {
   const uniqueName = fileName;
 
-  await minioClient.putObject(bucket, uniqueName, file, file.size, {
+  await minioClient.putObject(bucket, uniqueName, file, file.length, {
     "Content-Type": contentType,
   });
 
