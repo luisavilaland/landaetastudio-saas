@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, dbOrders, dbProductVariants, dbProducts } from "@repo/db";
 import { eq, sql, and, lte, gte, desc } from "drizzle-orm";

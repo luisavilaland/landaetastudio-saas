@@ -3,6 +3,7 @@ import { db, dbProducts, dbProductImages } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { uploadImage } from "@repo/storage";
+import { productImageSchema } from "@repo/validation";
 
 type Params = Promise<{ id: string }>;
 
@@ -38,6 +39,15 @@ export async function POST(
     const image = formData.get("image") as File | null;
     const alt = formData.get("alt") as string | null;
     const position = parseInt(formData.get("position") as string, 10) || 0;
+
+    const validation = productImageSchema.safeParse({ alt, position });
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: validation.error.issues },
+        { status: 400 }
+      );
+    }
 
     if (!image || image.size === 0) {
       return NextResponse.json({ error: "Image is required" }, { status: 400 });

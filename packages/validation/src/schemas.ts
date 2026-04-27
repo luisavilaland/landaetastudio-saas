@@ -25,7 +25,7 @@ export const variantSchema = z.object({
   sku: z.string().optional(),
   price: z.number().int().min(1),
   stock: z.number().int().min(0).default(0),
-  options: z.record(z.string()).optional(),
+  options: z.record(z.string(), z.string()).optional(),
 });
 
 export const variantsArraySchema = z.object({
@@ -104,4 +104,9 @@ export const webhookSchema = z.object({
   data: z.object({
     id: z.string(),
   }),
+});
+
+export const productImageSchema = z.object({
+  alt: z.string().optional(),
+  position: z.number().int().min(0).default(0),
 });

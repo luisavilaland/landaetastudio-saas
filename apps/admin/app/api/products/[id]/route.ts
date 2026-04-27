@@ -172,7 +172,8 @@ export async function PUT(
     }
 
     const now = new Date();
-    const newSku = slug.replace(/\s+/g, "-").toLowerCase();
+    const safeSlug = slug ?? product[0].slug;
+    const newSku = safeSlug.replace(/\s+/g, "-").toLowerCase();
 
     let imageUrl = product[0].imageUrl;
 
@@ -207,7 +208,7 @@ export async function PUT(
         }
         const buffer = Buffer.from(await image.arrayBuffer());
         const ext = image.name.split(".").pop() || "png";
-        imageUrl = await uploadImage(buffer, `products/${Date.now()}-${slug}.${ext}`, image.type);
+imageUrl = await uploadImage(buffer, `products/${Date.now()}-${safeSlug}.${ext}`, image.type);
       } else if (removeImage && product[0].imageUrl) {
         await deleteImage(product[0].imageUrl);
         imageUrl = null;
