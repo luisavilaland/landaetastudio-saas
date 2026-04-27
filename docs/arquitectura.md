@@ -16,6 +16,14 @@ Eliminamos los errores de redondeo propios de floats. Es una práctica estándar
 
 MinIO emula la API de S3, lo que nos permite probar subida de imágenes sin salir de localhost. MercadoPago es el gateway de pago más extendido en Uruguay y Argentina, y ofrece excelente sandbox para desarrollo.
 
+## ¿Por qué Redis para el carrito y no PostgreSQL?
+
+El carrito requiere lecturas/escrituras muy frecuentes y un TTL automático para清理 sesiones abandonadas. Redis ofrece latencia sub-milisegundo para operaciones clave-valor y expiración automática a los 7 días sin carga para PostgreSQL. Esto nos permite mantener la base de datos principal dedicada a datos transaccionales.
+
+## ¿Por qué no se usó MedusaJS?
+
+El blueprint original consideraba usar MedusaJS como librería de dominio. Durante la implementación, el equipo decidió que la lógica de carrito, órdenes y precios era lo suficientemente simple y específica como para no justificar una dependencia externa adicional. Se optó por implementarla directamente en TypeScript dentro de `packages/commerce` (por crear), manteniendo el control total y evitando el acoplamiento a un framework de eCommerce.
+
 ## Estructura de monorepo
 
 Separamos las apps en `storefront`, `admin` y `superadmin` porque cada una tiene su propio dominio de negocio y políticas de seguridad. Los paquetes compartidos (`db`, `storage` y proximamente `commerce`) evitan duplicar lógica de acceso a datos o reglas de negocio.
