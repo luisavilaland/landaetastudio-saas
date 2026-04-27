@@ -36,6 +36,11 @@ export function ProductCard({ product }: ProductCardProps) {
             Sin imagen
           </div>
         )}
+        {stock <= 0 && (
+          <span className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded">
+            Agotado
+          </span>
+        )}
       </div>
       <div className="p-4">
         <h3 className="font-medium text-zinc-900 group-hover:text-zinc-600">
@@ -45,7 +50,7 @@ export function ProductCard({ product }: ProductCardProps) {
           {formatPrice(price)}
         </p>
         <p className="mt-1 text-xs text-zinc-500">
-          {stock > 0 ? `${stock} disponibles` : "Sin stock"}
+          {stock <= 0 ? "Agotado" : `${stock} disponibles`}
         </p>
       </div>
     </Link>
