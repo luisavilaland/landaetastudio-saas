@@ -14,22 +14,21 @@
 
 ## Comandos obligatorios (Definition of Done)
 
-Antes de considerar cualquier tarea como finalizada, el código debe pasar:
+Antes de considerar cualquier tarea como finalizada, el código debe ejecutar sin errores:
 
 ```bash
-pnpm lint                # eslint + prettier configurados en la raíz
-pnpm typecheck           # tsc --noEmit en todas las apps y paquetes (verificar que existe el script raíz)
-pnpm build               # next build exitoso en las tres apps
-pnpm test                # vitest (correr todos los tests existentes)
+pnpm lint        # eslint + prettier
+pnpm typecheck   # tsc --noEmit en todas las apps y paquetes
+pnpm build       # next build en las tres apps
+pnpm test        # vitest (todos los tests existentes)
 ```
 
-Si el script typecheck no existe en la raíz, créalo con el siguiente contenido en package.json:
+Si alguno de estos scripts no existe en la raíz, créalo en package.json con turbo run <script> y verifica que cada app/package tenga definido el script correspondiente:
 
-```json
-"typecheck": "turbo run typecheck"
-```
-
-Y asegúrate de que cada package.json de las apps/packages tenga un script typecheck que ejecute `tsc --noEmit`.
+- lint: `eslint .` (o el que corresponda)
+- typecheck: `tsc --noEmit`
+- build: `next build`
+- test: `vitest run`
 
 Si la tarea involucra migraciones: ejecutar pnpm db:generate y pnpm db:migrate y verificar que el seed pnpm db:seed no falle.
 
