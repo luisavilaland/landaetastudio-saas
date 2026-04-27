@@ -2,6 +2,49 @@
 
 Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al Cono Sur.
 
+# Roadmap
+
+## Fase 1 – Autenticación y Órdenes ✅ (Completada)
+
+- Auth de admins separada
+- Registro y login de clientes en storefront
+- Panel de órdenes en admin (lista, detalle, cambio de estado)
+
+## Fase 2 – Dashboard y Stock ✅ (Completada)
+
+- Dashboard con métricas reales (ventas del mes, órdenes pendientes, stock bajo/agotado)
+- Gestión de stock con alertas visuales
+- Edición rápida de stock en tabla de admin
+- Badge "Agotado" en storefront y product-card
+- Lista de productos con stock bajo en dashboard (enlace a editar)
+
+## Fase 3 – Experiencia de Tienda Completa 🔄 (Pendiente)
+
+- Categorías de productos
+- Búsqueda en catálogo
+- Múltiples imágenes por producto
+- Múltiples variantes reales (talle, color)
+- Validación Zod en endpoints
+
+## Fase 4 – Autoservicio del Tenant 🔄 (Pendiente)
+
+- Configuración visual del tenant (logo, colores)
+- Dominio personalizado
+- Métodos de envío configurables
+- Página de perfil de tienda
+
+## Fase 5 – Producción 🔄 (Pendiente)
+
+- RLS policies (Row Level Security)
+- Validación de variables de entorno en producción
+- Logs estructurados
+- Resolver conflicto drizzle en @repo/auth
+- Normalizar slug on create/edit
+- CSRF protection
+- Authentication hardening
+
+---
+
 ## Estado actual
 
 ✅ **Completado:**
@@ -27,13 +70,14 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - **Email:** Confirmación de orden con nodemailer.
 - **Customer auth:** Registro y login de clientes en storefront.
 - **Admin orders:** Panel de gestión de órdenes con cambio de status.
+- **Admin dashboard:** Métricas (ventas, órdenes, stock), tabla de productos con stock bajo.
+- **Stock management:** Edición rápida de stock en tabla, badge "Agotado", alertas en dashboard.
 - **Fixes:** Bug inArray en cart/checkout, deleteImage, validación tenant, queries N+1, payment_methods exclusions.
 
 🔄 **En desarrollo:**
-- Dashboard con métricas.
-- Gestión de stock con alertas.
 - Políticas RLS.
 - Normalizar slug en create/edit.
+- CSRF protection.
 
 ## Requisitos previos
 
@@ -151,6 +195,20 @@ saas-ecommerce/
 |POST|/api/checkout/preference|Crear preferencia de pago MP|
 |POST|/api/webhooks/mercadopago|Notificación de pago|
 
+### Admin Dashboard
+
+| Method | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| GET | /api/dashboard | Métricas (ventas, órdenes, stock bajo) |
+
+### Admin Orders
+
+| Method | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| GET | /api/orders | Listar órdenes |
+| GET | /api/orders/[id] | Obtener orden |
+| PUT | /api/orders/[id] | Cambiar status |
+
 ### Superadmin Tenants
 
 |Method|Endpoint|Descripción|
@@ -198,8 +256,7 @@ Para recibir notificaciones de pago en desarrollo:
 | # | Tarea |
 |---|-------|
 | 5 | Normalizar slug en create/edit |
-| 6 | Prevenir eliminación si hay order_items |
-| 7 | Mejorar UI de errores 409 |
+| 6 | Mejorar UI de errores 409 |
 
 ### 🟢 Baja prioridad
 
@@ -221,4 +278,4 @@ Para recibir notificaciones de pago en desarrollo:
 
 ---
 
-**Última actualización:** 27 de abril de 2026 – Customer auth, Admin orders panel.
+**Última actualización:** 27 de abril de 2026 – Admin dashboard, stock management.
