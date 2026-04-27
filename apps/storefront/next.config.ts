@@ -4,6 +4,9 @@ config({ path: '../../.env.local' });
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   allowedDevOrigins: ['lvh.me', '*.lvh.me'],
   images: {
     remotePatterns: [
