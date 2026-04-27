@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbProducts, dbProductVariants, dbOrderItems, dbCategories } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbProductImages, dbOrderItems, dbCategories } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq, inArray } from "drizzle-orm";
 import { uploadImage, deleteImage } from "@repo/storage";
@@ -40,9 +40,16 @@ export async function GET(
       .where(eq(dbProductVariants.productId, id))
       .limit(1);
 
+    const images = await db
+      .select()
+      .from(dbProductImages)
+      .where(eq(dbProductImages.productId, id))
+      .orderBy(dbProductImages.position);
+
     return NextResponse.json({
       ...product[0],
       variant: variant[0] || null,
+      images,
     });
   } catch (error) {
     console.error("Error getting product:", error);

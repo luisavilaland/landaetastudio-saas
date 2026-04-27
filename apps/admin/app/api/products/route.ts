@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbProducts, dbProductVariants, dbCategories } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbProductImages, dbCategories } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
 import { uploadImage } from "@repo/storage";
@@ -18,7 +18,26 @@ export async function GET() {
     .from(dbProducts)
     .where(eq(dbProducts.tenantId, tenantId));
 
-  return NextResponse.json({ products });
+  const productIds = products.map((p) => p.id);
+
+  const images = await db
+    .select()
+    .from(dbProductImages)
+    .where(eq(dbProductImages.tenantId, tenantId))
+    .orderBy(dbProductImages.position);
+
+  const imagesByProduct = images.reduce((acc, img) => {
+    if (!acc[img.productId]) acc[img.productId] = [];
+    acc[img.productId].push(img);
+    return acc;
+  }, {} as Record<string, typeof images>);
+
+  const productsWithImages = products.map((product) => ({
+    ...product,
+    images: imagesByProduct[product.id] || [],
+  }));
+
+  return NextResponse.json({ products: productsWithImages });
 }
 
 export async function POST(request: NextRequest) {

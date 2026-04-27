@@ -1,5 +1,12 @@
-import { db, dbProducts, dbProductVariants, dbCategories } from "@repo/db";
-import { eq, desc, and, isNotNull } from "drizzle-orm";
+import { db, dbProducts, dbProductVariants, dbProductImages, dbCategories } from "@repo/db";
+import { eq, desc, and, isNotNull, inArray } from "drizzle-orm";
+
+export type ProductImage = {
+  id: string;
+  url: string;
+  alt: string | null;
+  position: number | null;
+};
 
 export type ProductWithVariant = {
   id: string;
@@ -18,6 +25,7 @@ export type ProductWithVariant = {
     stock: number | null;
     sku: string;
   } | null;
+  images: ProductImage[];
 };
 
 export async function getProducts(
@@ -74,6 +82,25 @@ export async function getProducts(
     .orderBy(desc(dbProducts.createdAt))
     .limit(limit);
 
+  const productIds = results.map((r) => r.id);
+
+  const images = await db
+    .select()
+    .from(dbProductImages)
+    .where(and(eq(dbProductImages.tenantId, tenantId), inArray(dbProductImages.productId, productIds)))
+    .orderBy(dbProductImages.position);
+
+  const imagesByProduct = images.reduce((acc, img) => {
+    if (!acc[img.productId]) acc[img.productId] = [];
+    acc[img.productId].push({
+      id: img.id,
+      url: img.url,
+      alt: img.alt,
+      position: img.position ?? 0,
+    });
+    return acc;
+  }, {} as Record<string, ProductImage[]>);
+
   return results.map((row) => ({
     id: row.id,
     name: row.name,
@@ -91,6 +118,7 @@ export async function getProducts(
       stock: row.variantStock,
       sku: row.variantSku,
     },
+    images: imagesByProduct[row.id] || [],
   }));
 }
 
@@ -132,6 +160,13 @@ export async function getProductBySlug(
   }
 
   const row = results[0];
+
+  const images = await db
+    .select()
+    .from(dbProductImages)
+    .where(eq(dbProductImages.productId, row.id))
+    .orderBy(dbProductImages.position);
+
   return {
     id: row.id,
     name: row.name,
@@ -149,5 +184,11 @@ export async function getProductBySlug(
       stock: row.variantStock,
       sku: row.variantSku,
     },
+    images: images.map((img) => ({
+      id: img.id,
+      url: img.url,
+      alt: img.alt,
+      position: img.position ?? 0,
+    })),
   };
 }

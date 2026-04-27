@@ -25,10 +25,25 @@ export const dbProducts = pgTable("products", {
   metadata: jsonb("metadata").default({}),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  }, (table) => {
+    return {
+      tenantSlugUnique: uniqueIndex("products_tenant_slug_idx").on(table.tenantId, table.slug),
+      tenantIdIdx: index("products_tenant_id_idx").on(table.tenantId),
+    };
+  });
+
+export const dbProductImages = pgTable("product_images", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  productId: uuid("productId").notNull().references(() => dbProducts.id, { onDelete: "cascade" }),
+  tenantId: uuid("tenantId").notNull().references(() => dbTenants.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  alt: text("alt"),
+  position: integer("position").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => {
   return {
-    tenantSlugUnique: uniqueIndex("products_tenant_slug_idx").on(table.tenantId, table.slug),
-    tenantIdIdx: index("products_tenant_id_idx").on(table.tenantId),
+    tenantIdIdx: index("product_images_tenant_id_idx").on(table.tenantId),
+    productIdIdx: index("product_images_product_id_idx").on(table.productId),
   };
 });
 
@@ -146,10 +161,22 @@ export const categoriesRelations = relations(dbCategories, ({ one, many }) => ({
   products: many(dbProducts),
 }));
 
-export const productsCategoriesRelations = relations(dbProducts, ({ one }) => ({
+export const productsCategoriesRelations = relations(dbProducts, ({ one, many }) => ({
   category: one(dbCategories, {
     fields: [dbProducts.categoryId],
     references: [dbCategories.id],
+  }),
+  images: many(dbProductImages),
+}));
+
+export const productImagesRelations = relations(dbProductImages, ({ one }) => ({
+  product: one(dbProducts, {
+    fields: [dbProductImages.productId],
+    references: [dbProducts.id],
+  }),
+  tenant: one(dbTenants, {
+    fields: [dbProductImages.tenantId],
+    references: [dbTenants.id],
   }),
 }));
 
@@ -157,3 +184,5 @@ export type Category = typeof dbCategories.$inferSelect;
 export type NewCategory = typeof dbCategories.$inferInsert;
 export type AdminUser = typeof dbAdminUsers.$inferSelect;
 export type NewAdminUser = typeof dbAdminUsers.$inferInsert;
+export type ProductImage = typeof dbProductImages.$inferSelect;
+export type NewProductImage = typeof dbProductImages.$inferInsert;

@@ -6,97 +6,80 @@ vi.mock("@repo/db", () => ({
   db: {
     select: vi.fn(),
   },
-  dbProducts: {
-    id: "id",
-    name: "name",
-    slug: "slug",
-    description: "description",
-    imageUrl: "imageUrl",
-    status: "status",
-    createdAt: "createdAt",
-    tenantId: "tenantId",
-    categoryId: "categoryId",
-  },
-  dbProductVariants: {
-    id: "variantId",
-    price: "variantPrice",
-    stock: "variantStock",
-    sku: "variantSku",
-    productId: "productId",
-  },
-  dbCategories: {
-    id: "categoryId",
-    name: "categoryName",
-    slug: "categorySlug",
-    tenantId: "tenantId",
-  },
+  dbProducts: {},
+  dbProductVariants: {},
+  dbProductImages: {},
+  dbCategories: {},
 }));
 
-const mockSelect = vi.mocked(dbModule.db).select;
-const mockSelectReturn = {
-  from: vi.fn().mockReturnThis(),
-  innerJoin: vi.fn().mockReturnThis(),
-  leftJoin: vi.fn().mockReturnThis(),
-  where: vi.fn().mockReturnThis(),
-  orderBy: vi.fn().mockReturnThis(),
-  limit: vi.fn().mockReturnThis(),
+const mockProduct = {
+  id: "product-1",
+  name: "Product 1",
+  slug: "product-1",
+  description: "Description 1",
+  imageUrl: "https://example.com/img1.jpg",
+  status: "active",
+  createdAt: new Date("2026-01-01"),
+  variantId: "variant-1",
+  variantPrice: 1999,
+  variantStock: 10,
+  variantSku: "product-1",
+  categoryId: "cat-1",
+  categoryName: "Category 1",
+  categorySlug: "category-1",
 };
 
-mockSelect.mockReturnValue(mockSelectReturn as any);
+const createQueryBuilder = (finalResult: any) => {
+  const builder: any = {};
 
-const mockProducts = [
-  {
-    id: "product-1",
-    name: "Product 1",
-    slug: "product-1",
-    description: "Description 1",
-    imageUrl: "https://example.com/img1.jpg",
-    status: "active",
-    createdAt: new Date("2026-01-01"),
-    variantId: "variant-1",
-    variantPrice: 1999,
-    variantStock: 10,
-    variantSku: "product-1",
-  },
-  {
-    id: "product-2",
-    name: "Product 2",
-    slug: "product-2",
-    description: "Description 2",
-    imageUrl: null,
-    status: "active",
-    createdAt: new Date("2026-01-02"),
-    variantId: "variant-2",
-    variantPrice: 2999,
-    variantStock: 5,
-    variantSku: "product-2",
-  },
-];
+  // Make the builder thenable - when awaited, resolve with finalResult
+  builder.then = (resolve: any, reject: any) => {
+    return Promise.resolve(finalResult).then(resolve, reject);
+  };
+
+  // All chainable methods return the same builder
+  const methods = ['from', 'innerJoin', 'leftJoin', 'where', 'orderBy', 'limit'];
+  methods.forEach(method => {
+    builder[method] = vi.fn().mockReturnValue(builder);
+  });
+
+  return builder;
+};
 
 describe("products lib", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.mocked(dbModule.db.select).mockReset();
   });
 
   describe("getProducts", () => {
     it("should return products for the specified tenant", async () => {
       const tenantId = "tenant-123";
-      mockSelectReturn.limit.mockResolvedValue(mockProducts);
+
+      const productsBuilder = createQueryBuilder([mockProduct]);
+      const imagesBuilder = createQueryBuilder([]);
+
+      vi.mocked(dbModule.db.select)
+        .mockReturnValueOnce(productsBuilder as any)
+        .mockReturnValueOnce(imagesBuilder as any);
 
       const result = await getProducts(tenantId);
 
-      expect(mockSelect).toHaveBeenCalled();
-      expect(mockSelectReturn.from).toHaveBeenCalled();
-      expect(mockSelectReturn.innerJoin).toHaveBeenCalled();
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(1);
       expect(result[0]).toHaveProperty("id");
       expect(result[0]).toHaveProperty("variant");
+      expect(result[0]).toHaveProperty("images");
     });
 
     it("should respect the limit parameter", async () => {
       const tenantId = "tenant-123";
       const limit = 1;
-      mockSelectReturn.limit.mockResolvedValue([mockProducts[0]]);
+
+      const productsBuilder = createQueryBuilder([mockProduct]);
+      const imagesBuilder = createQueryBuilder([]);
+
+      vi.mocked(dbModule.db.select)
+        .mockReturnValueOnce(productsBuilder as any)
+        .mockReturnValueOnce(imagesBuilder as any);
 
       const result = await getProducts(tenantId, limit);
 
@@ -105,18 +88,30 @@ describe("products lib", () => {
 
     it("should filter by tenantId in the query", async () => {
       const tenantId = "tenant-specific";
-      mockSelectReturn.limit.mockResolvedValue([]);
+
+      const productsBuilder = createQueryBuilder([]);
+      const imagesBuilder = createQueryBuilder([]);
+
+      vi.mocked(dbModule.db.select)
+        .mockReturnValueOnce(productsBuilder as any)
+        .mockReturnValueOnce(imagesBuilder as any);
 
       await getProducts(tenantId);
 
-      expect(mockSelectReturn.where).toHaveBeenCalled();
+      expect(productsBuilder.where).toHaveBeenCalled();
     });
   });
 
   describe("getProductBySlug", () => {
     it("should return null when no product found", async () => {
       const tenantId = "tenant-123";
-      mockSelectReturn.limit.mockResolvedValue([]);
+
+      const productsBuilder = createQueryBuilder([]);
+      const imagesBuilder = createQueryBuilder([]);
+
+      vi.mocked(dbModule.db.select)
+        .mockReturnValueOnce(productsBuilder as any)
+        .mockReturnValueOnce(imagesBuilder as any);
 
       const result = await getProductBySlug(tenantId, "nonexistent");
 
@@ -125,7 +120,13 @@ describe("products lib", () => {
 
     it("should return product with variant when found", async () => {
       const tenantId = "tenant-123";
-      mockSelectReturn.limit.mockResolvedValue([mockProducts[0]]);
+
+      const productsBuilder = createQueryBuilder([mockProduct]);
+      const imagesBuilder = createQueryBuilder([]);
+
+      vi.mocked(dbModule.db.select)
+        .mockReturnValueOnce(productsBuilder as any)
+        .mockReturnValueOnce(imagesBuilder as any);
 
       const result = await getProductBySlug(tenantId, "product-1");
 
@@ -133,15 +134,22 @@ describe("products lib", () => {
       expect(result?.id).toBe("product-1");
       expect(result?.variant).toBeDefined();
       expect(result?.variant?.price).toBe(1999);
+      expect(result?.images).toEqual([]);
     });
 
     it("should include tenantId and slug in query filters", async () => {
       const tenantId = "tenant-456";
-      mockSelectReturn.limit.mockResolvedValue([]);
+
+      const productsBuilder = createQueryBuilder([]);
+      const imagesBuilder = createQueryBuilder([]);
+
+      vi.mocked(dbModule.db.select)
+        .mockReturnValueOnce(productsBuilder as any)
+        .mockReturnValueOnce(imagesBuilder as any);
 
       await getProductBySlug(tenantId, "specific-slug");
 
-      expect(mockSelectReturn.where).toHaveBeenCalled();
+      expect(productsBuilder.where).toHaveBeenCalled();
     });
   });
 });

@@ -43,6 +43,13 @@
       "when": 1777319832342,
       "tag": "0005_fluffy_triathlon",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777321189414,
+      "tag": "0006_lumpy_sunspot",
+      "breakpoints": true
     }
   ]
 }
