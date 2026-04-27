@@ -5,6 +5,7 @@ import { db, dbTenants } from "@repo/db";
 import { eq } from "drizzle-orm";
 import { Navbar } from "@/components/navbar";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { SessionProvider } from "@/components/session-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -72,14 +73,16 @@ export default async function RootLayout({
   return (
     <html lang="es" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="min-h-screen flex flex-col bg-zinc-50">
-        <Navbar tenantName={tenantName} />
-        <Breadcrumbs />
-        <main className="flex-1">{children}</main>
-        <footer className="bg-zinc-100 border-t border-zinc-200 px-6 py-4 mt-auto">
-          <p className="text-center text-sm text-zinc-500">
-            &copy; {new Date().getFullYear()} {tenantName}
-          </p>
-        </footer>
+        <SessionProvider>
+          <Navbar tenantName={tenantName} />
+          <Breadcrumbs />
+          <main className="flex-1">{children}</main>
+          <footer className="bg-zinc-100 border-t border-zinc-200 px-6 py-4 mt-auto">
+            <p className="text-center text-sm text-zinc-500">
+              &copy; {new Date().getFullYear()} {tenantName}
+            </p>
+          </footer>
+        </SessionProvider>
       </body>
     </html>
   );

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
 import { redisClient } from "@/lib/redis";
 import { getTenantId } from "@/lib/tenant";
+import { auth } from "@/lib/auth";
 import { db, dbOrders, dbOrderItems, dbProductVariants } from "@repo/db";
 import { eq, inArray } from "drizzle-orm";
 
@@ -138,6 +139,15 @@ export async function POST(request: NextRequest) {
     // Use tenantIdFromSlug as the actual tenantId for the order
     const orderTenantId = tenantIdFromSlug;
 
+    // Get customer session if authenticated
+    let customerId: string | null = null;
+    try {
+      const session = await auth();
+      customerId = session?.user?.id || null;
+    } catch {
+      // No session, continue as guest
+    }
+
     const [order] = await db.transaction(async (tx) => {
       // Calculate total from cart items
       let transactionTotal = 0;
@@ -169,6 +179,7 @@ export async function POST(request: NextRequest) {
         .insert(dbOrders)
         .values({
           tenantId: orderTenantId,
+          customerId: customerId,
           status: "pending_payment",
           total: transactionTotal,
           currency: "UYU",

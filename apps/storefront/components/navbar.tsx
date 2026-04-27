@@ -1,10 +1,15 @@
+"use client";
+
 import Link from "next/link";
+import { useSession, signOut } from "next-auth/react";
 
 type NavbarProps = {
   tenantName: string;
 };
 
 export function Navbar({ tenantName }: NavbarProps) {
+  const { data: session, status } = useSession();
+
   return (
     <nav className="bg-white border-b border-zinc-200 px-6 py-4 shadow-sm">
       <div className="max-w-6xl mx-auto flex items-center justify-between">
@@ -34,6 +39,25 @@ export function Navbar({ tenantName }: NavbarProps) {
             </svg>
             Carrito
           </Link>
+          {status === "loading" ? (
+            <span className="text-sm text-zinc-400">...</span>
+          ) : session ? (
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-zinc-600">
+                {session.user?.name || session.user?.email}
+              </span>
+              <button
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="text-sm text-zinc-600 hover:text-zinc-900"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          ) : (
+            <Link href="/login" className="text-sm text-zinc-600 hover:text-zinc-900">
+              Iniciar sesión
+            </Link>
+          )}
         </div>
       </div>
     </nav>

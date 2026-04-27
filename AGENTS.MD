@@ -40,10 +40,15 @@ This document provides concise, high-signal information for AI agents working in
 - **Bug fixes:** inArray in cart/checkout, deleteImage path, tenant validation, N+1 queries, order_items check.
 - **TypeScript types:** NextAuth extended types (tenantId, role), Product/Tenant nullable fields.
 - **Webhook dev mode:** Simulation with paymentId 123456789 (approved) / 000000 (rejected).
+- **Customer auth:** /register, /login in storefront with NextAuthCredentials.
+- **Customer orders:** Checkout associates customerId from session.
+- **Admin orders:** `/api/orders`, `/api/orders/[id]`, orders page and detail.
 
 🔄 **Pending (see priorities below):**
 - RLS policies (Row Level Security).
 - Normalize slug on create/edit.
+- Dashboard with metrics.
+- Stock alerts.
 
 ## Packages (`packages/`)
 
@@ -268,7 +273,7 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 27, 2026 – TypeScript types (next-auth.d.ts), Webhook dev mode (paymentId simulation), MP binary_mode.
+Last updated: April 27, 2026 – Customer auth (register/login), Admin orders panel.
 
 ## Production Priorities
 

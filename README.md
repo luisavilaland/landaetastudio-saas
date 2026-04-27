@@ -25,9 +25,13 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - **Checkout:** Flujo completo con MercadoPago (binary_mode).
 - **Webhook:** Actualiza orden según notificación (con prevención de duplicados, modo simulación).
 - **Email:** Confirmación de orden con nodemailer.
-- **Fixes:** Bug inArray en cart/checkout, deleteImage, validación tenant, queries N+1, order_items check, payment_methods exclusions.
+- **Customer auth:** Registro y login de clientes en storefront.
+- **Admin orders:** Panel de gestión de órdenes con cambio de status.
+- **Fixes:** Bug inArray en cart/checkout, deleteImage, validación tenant, queries N+1, payment_methods exclusions.
 
 🔄 **En desarrollo:**
+- Dashboard con métricas.
+- Gestión de stock con alertas.
 - Políticas RLS.
 - Normalizar slug en create/edit.
 
@@ -217,4 +221,4 @@ Para recibir notificaciones de pago en desarrollo:
 
 ---
 
-**Última actualización:** 27 de abril de 2026 – Tipos TypeScript, Webhook modo simulación, MP binary_mode.
+**Última actualización:** 27 de abril de 2026 – Customer auth, Admin orders panel.
