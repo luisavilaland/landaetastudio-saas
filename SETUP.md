@@ -153,29 +153,29 @@ Te devolverá una URL pública (ej: `https://saas-ecommerce-prxy.ayooub.me`)
 npx dotunnel
 
 ? Enter the local port of the service to expose (e.g., 8000): 3000
-? Enter a name for the proxy (e.g., todo): mi-tienda
+? Enter a name for the proxy (e.g., todo): saasecommerce
 
 🌐 Forwarding to: http://localhost:3000
-🔗 Public URL:    https://mi-tienda-prxy.ayooub.me
+🔗 Public URL:    https://saasecommerce-prxy.ayooub.me
 ```
 
 ### Configurar STOREFRONT_URL en .env.local
 
 ```env
-STOREFRONT_URL=https://mi-tienda-prxy.ayooub.me
+STOREFRONT_URL=https://saasecommerce-prxy.ayooub.me
 ```
 
 ### Testing del Webhook en Desarrollo
 
 ```bash
 # Simular webhook aprobado (paymentId 123456789)
-curl -X POST https://mi-tienda-prxy.ayooub.me/api/webhooks/mercadopago \
+curl -X POST https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago \
   -H "Content-Type: application/json" \
   -H "x-test-order-id: <order-id>" \
   -d '{"type":"payment","data":{"id":"123456789"}}'
 
 # Simular webhook rechazado (paymentId 000000)
-curl -X POST https://mi-tienda-prxy.ayooub.me/api/webhooks/mercadopago \
+curl -X POST https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago \
   -H "Content-Type: application/json" \
   -H "x-test-order-id: <order-id>" \
   -d '{"type":"payment","data":{"id":"000000"}}'
