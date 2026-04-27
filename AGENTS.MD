@@ -15,6 +15,59 @@ This document provides concise, high-signal information for AI agents working in
   - `db` – Drizzle ORM schema, migrations, client.
   - `storage` – MinIO client for image upload.
 
+## Roadmap
+
+### ✅ Fase 1 – Autenticación y Órdenes (Completada)
+
+| Task | Status |
+|------|--------|
+| Auth de admins separada | ✅ |
+| Registro y login de clientes en storefront | ✅ |
+| Panel de órdenes en admin (lista, detalle, cambio de estado) | ✅ |
+
+### ✅ Fase 2 – Dashboard y Stock (Completada)
+
+| Task | Status |
+|------|--------|
+| Dashboard con métricas reales (ventas, pendientes, stock) | ✅ |
+| Gestión de stock con alertas visuales | ✅ |
+| Edición rápida de stock en tabla de admin | ✅ |
+| Badge "Agotado" en storefront | ✅ |
+| Lista de productos con stock bajo en dashboard | ✅ |
+
+### 🔄 Fase 3 – Experiencia de Tienda Completa (Pendiente)
+
+| Task | Status |
+|------|--------|
+| Categorías de productos | ❌ |
+| Búsqueda en catálogo | ❌ |
+| Múltiples imágenes por producto | ❌ |
+| Múltiples variantes reales (talle, color) | ❌ |
+| Validación Zod en endpoints | ❌ |
+
+### 🔄 Fase 4 – Autoservicio del Tenant (Pendiente)
+
+| Task | Status |
+|------|--------|
+| Configuración visual del tenant (logo, colors) | ❌ |
+| Dominio personalizado | ❌ |
+| Métodos de envío configurables | ❌ |
+| Página de perfil de tienda | ❌ |
+
+### 🔄 Fase 5 – Producción (Pendiente)
+
+| Task | Status |
+|------|--------|
+| RLS policies (Row Level Security) | ❌ |
+| Validación de variables de entorno en prod | ❌ |
+| Logs estructurados | ❌ |
+| Resolver conflicto drizzle en @repo/auth | ❌ |
+| Normalizar slug on create/edit | ❌ |
+| CSRF protection | ❌ |
+| Authentication hardening | ❌ |
+
+---
+
 ## Current Status
 
 ✅ **Completed:**
@@ -43,12 +96,9 @@ This document provides concise, high-signal information for AI agents working in
 - **Customer auth:** /register, /login in storefront with NextAuthCredentials.
 - **Customer orders:** Checkout associates customerId from session.
 - **Admin orders:** `/api/orders`, `/api/orders/[id]`, orders page and detail.
-
-🔄 **Pending (see priorities below):**
-- RLS policies (Row Level Security).
-- Normalize slug on create/edit.
-- Dashboard with metrics.
-- Stock alerts.
+- **Admin dashboard:** `/api/dashboard` con métricas (ventas, órdenes, stock), página con tarjetas y tablas.
+- **Stock management:** Edición rápida de stock en tabla de productos, badge "Agotado", stock bajo en storefront.
+- **Stock alerts:** Lista de productos con stock bajo en dashboard (enlace a editar).
 
 ## Packages (`packages/`)
 
@@ -225,8 +275,22 @@ saas-ecommerce/
 | GET | /api/products | List all products (by tenantId) |
 | POST | /api/products | Create product + default variant |
 | GET | /api/products/[id] | Get product by ID |
-| PUT | /api/products/[id] | Update product + variant |
+| PUT | /api/products/[id] | Update product + variant (JSON or FormData) |
 | DELETE | /api/products/[id] | Delete product + variants |
+
+## API Endpoints (Admin Dashboard)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/dashboard | Get metrics (revenue, orders, stock alerts) |
+
+## API Endpoints (Admin Orders)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/orders | List orders (by tenantId) |
+| GET | /api/orders/[id] | Get order by ID |
+| PUT | /api/orders/[id] | Update order status |
 
 ## API Endpoints (Storefront Cart)
 
@@ -273,9 +337,9 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 27, 2026 – Customer auth (register/login), Admin orders panel.
+Last updated: April 27, 2026 – Fase 2 complete: Dashboard + Stock management.
 
-## Production Priorities
+## Production Priorities (Fase 5)
 
 ### 🔴 High Priority (Critical before production)
 
@@ -291,7 +355,6 @@ Last updated: April 27, 2026 – Customer auth (register/login), Admin orders pa
 | # | Task | Status | Action |
 |---|------|--------|--------|
 | 5 | **Normalize slug** | Accepts any format | Normalize on create/edit |
-| 6 | **Delete protection** | No check | Prevent if product has order_items |
 | 7 | **409 error UI** | Generic message | Improve error display |
 
 ### 🟢 Low Priority (Enhancements)
