@@ -212,11 +212,6 @@ pnpm db:migrate
 
 ## Testing Conventions
 
-### Tarjetas de prueba MercadoPago
-
-- **Aprobada:** `5031 7557 3453 0604`
-- **Rechazada:** `4509 9535 6777 0071`
-
 ### Multi-tenant local
 
 ```bash
