@@ -78,3 +78,10 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Lógica de negocio actual en apps/storefront/lib y apps/admin/lib.
 - Plan de migración: cuando se cree packages/commerce (Fase 5), la lógica de carrito, órdenes, precios y descuentos se moverá progresivamente a ese paquete. Mientras tanto, mantenla en las libs de cada app, pero no dupliques lógica entre storefront y admin.
 - Cada app (storefront, admin, superadmin) solo expone UI y endpoints, la lógica pesa en paquetes.
+
+## Mantenimiento de la documentación
+
+- **AGENTS.md:** si durante una tarea descubres que una restricción, comando o convención importante no está documentada aquí, proponme añadirla al finalizar la tarea. Si es evidente (ej. se ha creado un script `pnpm storybook`), puedes actualizar este archivo directamente y notificármelo.
+- **README.md y SETUP.md:** si la tarea implica cambios que afectan al setup inicial, endpoints, usuarios de prueba, o cualquier información visible para desarrolladores humanos, sugiéreme los cambios necesarios. No los apliques sin mi confirmación.
+- **docs/arquitectura.md:** si la tarea introduce o modifica una decisión de arquitectura (nuevo servicio, cambio en la estrategia de datos, remplazo de una herramienta), sugiere actualizar este documento. No lo modifiques sin confirmación.
+- **.gitignore:** mantenlo actualizado sin preguntar si generas archivos temporales, artefactos de build o dependencias que no deban comitearse (ej. `.turbo`, `coverage/`, `test-results/`). Si tienes dudas, consulta.

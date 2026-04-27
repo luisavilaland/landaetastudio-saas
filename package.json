@@ -6,17 +6,25 @@
     "db:generate": "cd packages/db && drizzle-kit generate",
     "db:migrate": "cd packages/db && drizzle-kit up",
     "db:seed": "tsx packages/db/seed.ts",
-    "setup": "pnpm install && docker-compose up -d && pnpm db:generate && pnpm db:migrate && pnpm db:seed"
+    "setup": "pnpm install && docker-compose up -d && pnpm db:generate && pnpm db:migrate && pnpm db:seed",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "build": "turbo run build",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
     "@types/ioredis": "^5.0.0",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.0",
+    "@types/supertest": "^7.2.0",
+    "@vitejs/plugin-react": "^6.0.1",
     "prettier": "^3.7.4",
+    "supertest": "^7.2.2",
     "tsx": "^4.21.0",
     "turbo": "^2.9.6",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "^4.1.5"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {

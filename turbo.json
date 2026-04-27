@@ -9,6 +9,15 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "lint": {
+      "outputs": []
+    },
+    "typecheck": {
+      "outputs": []
+    },
+    "test": {
+      "outputs": []
     }
   }
 }
