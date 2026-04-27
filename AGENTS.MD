@@ -27,6 +27,8 @@ Si la tarea involucra migraciones: ejecutar pnpm db:generate y pnpm db:migrate y
 
 Si la tarea es un endpoint nuevo: agregar test de integración con los casos de éxito, error 401/403, y validación de tenant.
 
+Si la tarea incluye lógica de negocio nueva, se debe incluir al menos un test unitario o de integración.
+
 **Prioridad única (conflicto de diseño)**
 Si hay que elegir entre rendimiento y legibilidad, gana la legibilidad (código explícito). Pero si la legibilidad se usa para justificar una consulta N+1, gana el rendimiento: usa joins o carga eager.
 
