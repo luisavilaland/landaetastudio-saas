@@ -207,3 +207,7 @@ rm -rf packages/db/migrations
 pnpm db:generate
 pnpm db:migrate
 ```
+
+## Nota
+
+Última actualización: 27 de abril de 2026 – Admin dashboard, stock management.
