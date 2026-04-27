@@ -42,6 +42,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Normalizar slug on create/edit
 - CSRF protection
 - Authentication hardening
+- **Eliminar `ignoreBuildErrors: true`** de los `next.config.ts` de las apps que lo tengan. Una vez que el typecheck pase limpiamente, el build debe fallar si hay errores de tipo. Esto es crítico para detectar regresiones en CI/CD.
 
 ---
 
@@ -75,6 +76,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - **Fixes:** Bug inArray en cart/checkout, deleteImage, validación tenant, queries N+1, payment_methods exclusions.
 
 🔄 **En desarrollo:**
+- typecheck pasa correctamente (React 19.2.4 forzado con pnpm.overrides)
 - Políticas RLS.
 - Normalizar slug en create/edit.
 - CSRF protection.
