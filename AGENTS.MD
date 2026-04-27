@@ -37,7 +37,9 @@ This document provides concise, high-signal information for AI agents working in
 - **Checkout:** Full flow with MercadoPago integration.
 - **Webhook:** Updates order status on payment notification (with duplicate prevention).
 - **Email:** Confirmation email on successful payment.
-- **Bug fixes:** inArray in cart/checkout, deleteImage path, tenant validation, N+1 queries, order_items check before delete.
+- **Bug fixes:** inArray in cart/checkout, deleteImage path, tenant validation, N+1 queries, order_items check.
+- **TypeScript types:** NextAuth extended types (tenantId, role), Product/Tenant nullable fields.
+- **Webhook dev mode:** Simulation with paymentId 123456789 (approved) / 000000 (rejected).
 
 🔄 **Pending (see priorities below):**
 - RLS policies (Row Level Security).
@@ -266,7 +268,7 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 26, 2026 – MercadoPago timeout (30s), console.time logs, STOREFRONT_URL required.
+Last updated: April 27, 2026 – TypeScript types (next-auth.d.ts), Webhook dev mode (paymentId simulation), MP binary_mode.
 
 ## Production Priorities
 
