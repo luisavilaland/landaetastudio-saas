@@ -130,69 +130,55 @@ pnpm --filter admin dev      # http://localhost:3001
 pnpm --filter superadmin dev # http://localhost:3002
 ```
 
-## Tunnel para Webhooks (ngrok/cloudflared)
+## Tunnel para Webhooks (dotunnel)
 
-Para recibir webhooks de MercadoPago en desarrollo, necesitas exponer tu localhost públicamente.
+Para recibir webhooks de MercadoPago en desarrollo, necesitas exponer tu localhost públicamente usando `dotunnel`.
 
-### Opción 1: cloudflared (recomendado)
+### dotunnel (npx)
 
-1. Instalar cloudflared:
 ```bash
-# Windows (con Winget)
-winget install Cloudflare.cloudflared
-
-# O descargar desde https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/cloudflared-windows/
+npx dotunnel
 ```
 
-2. Crear túnel:
+Te pedirá:
+1. Puerto local (ej: 3000)
+2. Nombre para el proxy (ej: saas-ecommerce)
+
+Te devolverá una URL pública (ej: `https://saas-ecommerce-prxy.ayooub.me`)
+
+### Uso rápido
+
 ```bash
-cloudflared tunnel --url http://localhost:3000
+# Entrar puerto 3000
+npx dotunnel
+
+? Enter the local port of the service to expose (e.g., 8000): 3000
+? Enter a name for the proxy (e.g., todo): mi-tienda
+
+🌐 Forwarding to: http://localhost:3000
+🔗 Public URL:    https://mi-tienda-prxy.ayooub.me
 ```
-
-3. Obtener la URL pública (algo como `https://xxx.trycloudflare.com`)
-
-4. Configurar en MercadoPago Developer Dashboard:
-   - Ir a Tu app → Webhooks
-   - URL: `https://xxx.trycloudflare.com/api/webhooks/mercadopago`
-
-### Opción 2: ngrok
-
-1. Instalar ngrok:
-```bash
-winget install ngrok
-# O desde https://ngrok.com/download
-```
-
-2. Crear túnel:
-```bash
-ngrok http 3000
-```
-
-3. Obtener la URL HTTPS (algo como `https://abc123.ngrok.io`)
-
-4. Configurar en MercadoPago Developer Dashboard:
-   - URL: `https://abc123.ngrok.io/api/webhooks/mercadopago`
 
 ### Configurar STOREFRONT_URL en .env.local
 
-Actualizar la variable `STOREFRONT_URL` con la URL del túnel:
-
 ```env
-STOREFRONT_URL=https://xxx.trycloudflare.com
+STOREFRONT_URL=https://mi-tienda-prxy.ayooub.me
 ```
 
 ### Testing del Webhook en Desarrollo
 
-El webhook soporta modo simulación:
-- Payment ID `123456789` → Simula pago aprobado
-- Payment ID `000000` → Simula pago rechazado
-
 ```bash
-# Simular webhook aprobado
-curl -X POST http://localhost:3000/api/webhooks/mercadopago \
+# Simular webhook aprobado (paymentId 123456789)
+curl -X POST https://mi-tienda-prxy.ayooub.me/api/webhooks/mercadopago \
   -H "Content-Type: application/json" \
   -H "x-test-order-id: <order-id>" \
   -d '{"type":"payment","data":{"id":"123456789"}}'
+
+# Simular webhook rechazado (paymentId 000000)
+curl -X POST https://mi-tienda-prxy.ayooub.me/api/webhooks/mercadopago \
+  -H "Content-Type: application/json" \
+  -H "x-test-order-id: <order-id>" \
+  -d '{"type":"payment","data":{"id":"000000"}}'
 ```
 
 ## Troubleshooting
