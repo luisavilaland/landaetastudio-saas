@@ -58,6 +58,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - pnpm para gestión de dependencias y monorepo.
 - Turborepo: correr turbo run lint typecheck build para validación global.
 - Docker: solo levantar servicios con docker-compose up -d. El agente no debe modificar la configuración de contenedores.
+- **Git**: no ejecutar comandos git (commit, push, pull, etc.) a menos que se ordene explícitamente.
 
 ## Estructura mínima de referencia
 
