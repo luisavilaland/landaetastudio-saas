@@ -18,7 +18,7 @@ MinIO emula la API de S3, lo que nos permite probar subida de imágenes sin sali
 
 ## ¿Por qué Redis para el carrito y no PostgreSQL?
 
-El carrito requiere lecturas/escrituras muy frecuentes y un TTL automático para清理 sesiones abandonadas. Redis ofrece latencia sub-milisegundo para operaciones clave-valor y expiración automática a los 7 días sin carga para PostgreSQL. Esto nos permite mantener la base de datos principal dedicada a datos transaccionales.
+El carrito requiere lecturas/escrituras muy frecuentes y un TTL automático para limpiar sesiones abandonadas. Redis ofrece latencia sub-milisegundo para operaciones clave-valor y expiración automática a los 7 días sin carga para PostgreSQL. Esto nos permite mantener la base de datos principal dedicada a datos transaccionales.
 
 ## ¿Por qué no se usó MedusaJS?
 
