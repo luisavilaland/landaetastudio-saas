@@ -100,12 +100,17 @@ This document provides concise, high-signal information for AI agents working in
 - **Stock management:** Edición rápida de stock en tabla de productos, badge "Agotado", stock bajo en storefront.
 - **Stock alerts:** Lista de productos con stock bajo en dashboard (enlace a editar).
 
+### Not Built Yet (Future Phases)
+- **Storefront:** Customer auth (`/api/register`, lib/auth.ts, app/register, app/login), session-provider.
+- **Admin:** Orders pages (app/orders/page.tsx, app/orders/[id]/page.tsx).
+
 ## Packages (`packages/`)
 
 | Package | Status | Description |
 |---------|--------|-------------|
 | `db` | ✅ Done | Drizzle ORM schema, migrations, client. |
 | `storage` | ✅ Done | MinIO client (uploadImage, deleteImage, getPublicUrl). |
+| `auth` | 🟡 Partial | NextAuth shared config (created, pending drizzle version fix in Fase 5). |
 | `commerce` | ❌ Missing | Business logic (cart, orders, pricing). |
 | `ui` | ❌ Missing | Shared components (shadcn/ui). |
 | `config` | ❌ Missing | Shared ESLint, TypeScript, Tailwind configs. |
@@ -200,6 +205,7 @@ saas-ecommerce/
 │   ├── storefront/
 │   │   ├── proxy.ts              # Multi-tenant + cart-session middleware
 │   │   ├── lib/
+│   │   │   ├── auth.ts             # Customer NextAuth config
 │   │   │   ├── redis.ts          # Redis client (ioredis)
 │   │   │   ├── cart.ts          # Cart utilities (getCart, removeFromCart)
 │   │   │   ├── email.ts         # Email notifications
@@ -207,16 +213,20 @@ saas-ecommerce/
 │   │   │   └── tenant.ts        # Tenant utilities
 │   │   ├── app/
 │   │   │   ├── api/
-│   │   │   │   ├── cart/route.ts    # Cart API (GET, POST, PUT, DELETE)
+│   │   │   │   ├── auth/[...nextauth]/route.ts  # Customer auth
+│   │   │   │   ├── cart/route.ts    # Cart API
 │   │   │   │   ├── checkout/route.ts    # Create order
 │   │   │   │   ├── checkout/preference/route.ts  # MP preference
+│   │   │   │   ├── register/route.ts  # Customer registration
 │   │   │   │   └── webhooks/mercadopago/route.ts  # MP webhook
 │   │   │   ├── cart/page.tsx      # Cart page
 │   │   │   ├── checkout/page.tsx  # Checkout form
 │   │   │   ├── checkout/success/page.tsx
 │   │   │   ├── checkout/failure/page.tsx
 │   │   │   ├── checkout/pending/page.tsx
-│   │   │   └── products/[slug]/page.tsx  # Product detail
+│   │   │   ├── products/[slug]/page.tsx  # Product detail
+│   │   │   ├── register/page.tsx  # Customer register
+│   │   │   └── login/page.tsx      # Customer login
 │   │   └── components/
 │   │       ├── add-to-cart-button.tsx
 │   │       ├── cart-list.tsx
@@ -231,15 +241,24 @@ saas-ecommerce/
 │   │   └── app/
 │   │       ├── api/
 │   │       │   ├── auth/[...nextauth]/route.ts
+│   │       │   ├── dashboard/route.ts   # Dashboard metrics
+│   │       │   ├── orders/
+│   │       │   │   ├── route.ts        # GET, POST orders
+│   │       │   │   └── [id]/route.ts   # GET, PUT orders
 │   │       │   └── products/
 │   │       │       ├── route.ts        # GET, POST
-│   │       │       └── [id]/route.ts # GET, PUT, DELETE
+│   │       │       └── [id]/route.ts   # GET, PUT, DELETE
 │   │       ├── login/page.tsx
-│   │       ├── dashboard/layout.tsx
-│   │       └── products/
-│   │           ├── page.tsx         # List
-│   │           ├── new/page.tsx      # Create
-│   │           └── [id]/edit/page.tsx # Edit
+│   │       ├── dashboard/
+│   │       │   ├── layout.tsx
+│   │       │   └── page.tsx            # Dashboard with metrics
+│   │       ├── products/
+│   │       │   ├── page.tsx           # List
+│   │       │   ├── new/page.tsx        # Create
+│   │       │   └── [id]/edit/page.tsx  # Edit
+│   │       └── orders/
+│   │           ├── page.tsx           # Orders list
+│   │           └── [id]/page.tsx      # Order detail
 │   └── superadmin/
 │       ├── lib/auth.ts           # NextAuth config
 │       ├── components/
@@ -309,6 +328,13 @@ saas-ecommerce/
 | POST | /api/checkout/preference | Create MP payment preference |
 | POST | /api/webhooks/mercadopago | MP payment notification |
 
+## API Endpoints (Storefront Auth)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /api/register | Register new customer |
+| POST | /api/auth/[...nextauth] | NextAuth handler for customer login |
+
 ## Test Users
 
 - **Email:** admin@tienda1.com
@@ -334,6 +360,13 @@ saas-ecommerce/
 - Cart works for anonymous users (no auth required).
 - `dotenv` is loaded in each `next.config.ts` for dev convenience.
 - For MP webhook in development: use ngrok or polling on success page.
+
+## Testing Conventions
+
+- Use `lvh.me` subdomains for tenant resolution in local development.
+- Webhook simulation: POST to `/api/webhooks/mercadopago` with `x-test-order-id` header and `data.id` = `123456789` (approved) or `000000` (rejected).
+- Test cards: approved `5031 7557 3453 0604`, rejected `4509 9535 6777 0071`.
+- Test users: admin@tienda1.com / super@admin.com / customers registered via /register.
 
 ---
 
