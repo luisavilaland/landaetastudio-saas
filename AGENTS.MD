@@ -17,11 +17,19 @@
 Antes de considerar cualquier tarea como finalizada, el código debe pasar:
 
 ```bash
-pnpm lint        # eslint + prettier configurados en la raíz
-pnpm typecheck   # tsc --noEmit en cada app/package
-pnpm build       # next build exitoso en las tres apps
-pnpm test        # vitest (correr todos los tests existentes)
+pnpm lint                # eslint + prettier configurados en la raíz
+pnpm typecheck           # tsc --noEmit en todas las apps y paquetes (verificar que existe el script raíz)
+pnpm build               # next build exitoso en las tres apps
+pnpm test                # vitest (correr todos los tests existentes)
 ```
+
+Si el script typecheck no existe en la raíz, créalo con el siguiente contenido en package.json:
+
+```json
+"typecheck": "turbo run typecheck"
+```
+
+Y asegúrate de que cada package.json de las apps/packages tenga un script typecheck que ejecute `tsc --noEmit`.
 
 Si la tarea involucra migraciones: ejecutar pnpm db:generate y pnpm db:migrate y verificar que el seed pnpm db:seed no falle.
 
@@ -58,10 +66,10 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - pnpm para gestión de dependencias y monorepo.
 - Turborepo: correr turbo run lint typecheck build para validación global.
 - Docker: solo levantar servicios con docker-compose up -d. El agente no debe modificar la configuración de contenedores.
-- **Git**: no ejecutar comandos git (commit, push, pull, etc.) a menos que se ordene explícitamente.
+- **Git**: no ejecutes comandos git (commit, push, merge, rebase) a menos que el usuario los solicite explícitamente. Puedes mostrar los cambios sugeridos para que el usuario decida.
 
 ## Estructura mínima de referencia
 
-- Lógica de negocio en packages/db y packages/commerce (por crear).
-- Reglas de negocio compartidas van en packages/commerce.
+- Lógica de negocio actual en apps/storefront/lib y apps/admin/lib.
+- Plan de migración: cuando se cree packages/commerce (Fase 5), la lógica de carrito, órdenes, precios y descuentos se moverá progresivamente a ese paquete. Mientras tanto, mantenla en las libs de cada app, pero no dupliques lógica entre storefront y admin.
 - Cada app (storefront, admin, superadmin) solo expone UI y endpoints, la lógica pesa en paquetes.
