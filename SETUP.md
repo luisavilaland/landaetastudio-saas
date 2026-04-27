@@ -1,80 +1,158 @@
-# Setup Local — SaaS eCommerce
+# Setup - Configuración del Proyecto
 
-## Requisitos
+## Requisitos Previos
+
 - Node.js 20+
-- pnpm (`npm install -g pnpm`)
-- Docker Desktop
+- pnpm
+- Docker Desktop (con PostgreSQL, Redis, MinIO, MailHog)
 
-## Pasos para correr el proyecto
+## Inicialización Rápida
 
-### 1. Clonar e instalar
 ```bash
-git clone https://github.com/luisavilaland/landaetastudio-saas.git
-cd landaetastudio-saas
-cp .env.local.example .env.local
+# 1. Instalar dependencias
 pnpm install
-```
 
-### 2. Levantar servicios Docker
-```bash
-docker compose up -d
-```
+# 2. Levantar servicios Docker
+docker-compose up -d
 
-### 3. Configurar variables de entorno
-Editar `.env.local` con los valores correspondientes:
-- `DATABASE_URL` (PostgreSQL)
-- `MERCADOPAGO_ACCESS_TOKEN` (sandbox de MP)
-
-### 4. Migrar base de datos
-```bash
+# 3. Generar migraciones (si hay cambios en el schema)
 pnpm db:generate
+
+# 4. Aplicar migraciones
 pnpm db:migrate
+
+# 5. Ejecutar seed (limpia y crea datos de prueba)
+pnpm db:seed
 ```
 
-### 5. Levantar las apps
+## Comandos de Base de Datos
+
+| Comando | Descripción |
+|--------|-------------|
+| `pnpm db:generate` | Genera migraciones desde el schema |
+| `pnpm db:migrate` | Aplica migraciones pendientes |
+| `pnpm db:seed` | Limpia la BD y crea datos de prueba |
+
+## Limpiar Base de Datos Manualmente
+
+### Opción 1: Usando el seed (recomendado)
+
 ```bash
-pnpm dev
+pnpm db:seed
 ```
 
-## URLs locales
-| App | URL |
-|-----|-----|
-| Storefront | http://localhost:3000 |
-| Admin | http://localhost:3001 |
-| Superadmin | http://localhost:3002 |
-| MinIO Console | http://localhost:9001 |
-| MailHog | http://localhost:8025 |
+El seed automáticamente:
+- Limpia todas las tablas (TRUNCATE CASCADE)
+- Crea tenant por defecto
+- Crea admins y superadmin
+- Crea productos de ejemplo
+- Crea cliente de prueba
 
-## Credenciales de prueba
+### Opción 2: Directamente en PostgreSQL
 
-### Admin (five-mice-do)
+```bash
+# Conectar al contenedor
+docker exec -it saas-postgres psql -U saas -d saas_ecommerce
+
+# Dentro de PSQL, ejecutar:
+TRUNCATE TABLE order_items CASCADE;
+TRUNCATE TABLE orders CASCADE;
+TRUNCATE TABLE product_variants CASCADE;
+TRUNCATE TABLE products CASCADE;
+TRUNCATE TABLE customers CASCADE;
+TRUNCATE TABLE admin_users CASCADE;
+TRUNCATE TABLE tenants CASCADE;
+
+-- Verificar
+SELECT count(*) FROM tenants;
+SELECT count(*) FROM products;
+SELECT count(*) FROM admin_users;
+```
+
+## Datos de Prueba
+
+### admin
+
 - **Email:** admin@tienda1.com
 - **Password:** 123456
 
-### Base de datos (Docker)
-- **Usuario:** saas
-- **Contraseña:** saas123
-- **Base:** saas_ecommerce
+### superadmin
 
-## MercadoPago (sandbox)
+- **Email:** super@admin.com
+- **Password:** 123456
 
-Para probar pagos:
-1. Ir a https://www.mercadopago.com/developers/panel
-2. Crear credenciales sandbox
-3. Usar tarjetas de prueba:
-   - Mastercard: 5031 7557 3450 0604
-   - CVV: 123
-   - Vencimiento: cualquier fecha futura
+### Cliente
 
-## Estado del proyecto
+- **Email:** cliente@ejemplo.com
+- **Password:** 123456
 
-### ✅ Implementado
-- [x] Carrito de compras (Redis + cookies)
-- [x] Checkout con MercadoPago
-- [x] Webhook de pago
-- [x] Emails transaccionales (MailHog)
-- [x] FK constraints en base de datos
+### Tenant
 
-### ⏳ Pendiente
-- [ ] Row Level Security en PostgreSQL
-- [ ] Deploy a Vercel + Neon + Upstash
+- **Slug:** tienda1
+- **Nombre:** Tienda Demo
+
+## Variables de Entorno
+
+Crear `.env.local` basado en `.env.local.example`:
+
+```env
+DATABASE_URL=postgresql://saas:saas123@localhost:5432/saas_ecommerce
+REDIS_URL=redis://localhost:6379
+AUTH_SECRET=<generar-con-openssl-rand-base64-32>
+NEXTAUTH_URL=http://localhost:3001
+
+# MinIO
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin123
+MINIO_BUCKET=saas-media
+MINIO_USE_SSL=false
+
+# Email (MailHog)
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_FROM=noreply@saas.local
+
+# MercadoPago
+MERCADOPAGO_ACCESS_TOKEN=TEST-xxxx
+```
+
+## Desarrollo
+
+```bash
+# Levantar todas las apps
+pnpm dev
+
+# O单独
+pnpm --filter storefront dev  # http://localhost:3000
+pnpm --filter admin dev      # http://localhost:3001
+pnpm --filter superadmin dev # http://localhost:3002
+```
+
+## Troubleshooting
+
+### PostgreSQL no conecta
+
+```bash
+# Verificar que el contenedor está corriendo
+docker ps
+
+# Reiniciar contenedor
+docker restart saas-postgres
+```
+
+### Redis no conecta
+
+```bash
+docker restart saas-redis
+```
+
+### Error de migraciones
+
+```bash
+# Eliminar todas las migraciones y regenerate
+rm -rf packages/db/migrations
+pnpm db:generate
+pnpm db:migrate
+```
