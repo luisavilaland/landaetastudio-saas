@@ -1,9 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { ProductWithVariant } from "@/lib/products";
+import type { ProductWithVariants } from "@/lib/products";
 
 type ProductCardProps = {
-  product: ProductWithVariant;
+  product: ProductWithVariants;
 };
 
 function formatPrice(cents: number): string {
@@ -13,9 +13,14 @@ function formatPrice(cents: number): string {
   }).format(cents / 100);
 }
 
+function getFirstAvailableVariant(product: ProductWithVariants) {
+  return product.variants.find(v => (v.stock ?? 0) > 0) || product.variants[0];
+}
+
 export function ProductCard({ product }: ProductCardProps) {
-  const price = product.variant?.price ?? 0;
-  const stock = product.variant?.stock ?? 0;
+  const displayVariant = getFirstAvailableVariant(product);
+  const price = displayVariant?.price ?? 0;
+  const stock = displayVariant?.stock ?? 0;
 
   return (
     <Link

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { db, dbTenants } from "@repo/db";
 import { eq } from "drizzle-orm";
 import { getProductBySlug } from "@/lib/products";
-import { AddToCartButton } from "@/components/add-to-cart-button";
 import { ImageGallery } from "@/components/image-gallery";
+import { VariantSelector } from "@/components/variant-selector";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +42,7 @@ export async function generateMetadata({ params }: PageProps) {
   }
 
   if (!tenantId) {
-    return { title: "Tienda no encontrada" };
+    return { title: "Producto no encontrado" };
   }
 
   const product = await getProductBySlug(tenantId, slug);
@@ -55,6 +55,24 @@ export async function generateMetadata({ params }: PageProps) {
     title: product.name,
     description: product.description || product.name,
   };
+}
+
+function getAttributesFromVariants(variants: { options: Record<string, string> }[]) {
+  const attrMap = new Map<string, Set<string>>();
+
+  variants.forEach(v => {
+    Object.entries(v.options || {}).forEach(([key, value]) => {
+      if (!attrMap.has(key)) {
+        attrMap.set(key, new Set());
+      }
+      attrMap.get(key)!.add(value);
+    });
+  });
+
+  return Array.from(attrMap.entries()).map(([name, values]) => ({
+    name,
+    values: Array.from(values),
+  }));
 }
 
 export default async function ProductPage({ params }: PageProps) {
@@ -99,9 +117,11 @@ export default async function ProductPage({ params }: PageProps) {
     return notFound();
   }
 
-  const price = product.variant?.price ?? 0;
-  const stock = product.variant?.stock ?? 0;
-  const inStock = stock > 0;
+  const attributes = getAttributesFromVariants(product.variants);
+  const firstVariant = product.variants[0];
+  const defaultSelected = firstVariant
+    ? Object.fromEntries(Object.entries(firstVariant.options || {}))
+    : {};
 
   const allImages = product.images && product.images.length > 0
     ? product.images.map(img => ({ ...img, position: img.position ?? 0 }))
@@ -128,37 +148,11 @@ export default async function ProductPage({ params }: PageProps) {
             {product.name}
           </h1>
 
-          <p className="mt-4 text-3xl font-bold text-zinc-900">
-            {formatPrice(price)}
-          </p>
-
-          <div className="mt-4">
-            {inStock ? (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
-                En stock ({stock} disponibles)
-              </span>
-            ) : (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">
-                Agotado
-              </span>
-            )}
-          </div>
-
-          {product.description && (
-            <div className="mt-6">
-              <h2 className="text-sm font-medium text-zinc-700 mb-2">Descripción</h2>
-              <p className="text-zinc-600 whitespace-pre-line">
-                {product.description}
-              </p>
-            </div>
-          )}
-
-          <div className="mt-auto pt-6">
-            <AddToCartButton
-              variantId={product.variant?.id ?? ""}
-              inStock={inStock}
-            />
-          </div>
+          <VariantSelector
+            product={product}
+            attributes={attributes}
+            defaultSelected={defaultSelected}
+          />
         </div>
       </div>
     </div>

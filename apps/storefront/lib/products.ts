@@ -8,7 +8,15 @@ export type ProductImage = {
   position: number | null;
 };
 
-export type ProductWithVariant = {
+export type ProductVariant = {
+  id: string;
+  price: number;
+  stock: number | null;
+  sku: string;
+  options: Record<string, string>;
+};
+
+export type ProductWithVariants = {
   id: string;
   name: string;
   slug: string;
@@ -19,12 +27,7 @@ export type ProductWithVariant = {
   categoryId: string | null;
   categoryName: string | null;
   categorySlug: string | null;
-  variant: {
-    id: string;
-    price: number;
-    stock: number | null;
-    sku: string;
-  } | null;
+  variants: ProductVariant[];
   images: ProductImage[];
 };
 
@@ -32,7 +35,7 @@ export async function getProducts(
   tenantId: string,
   limit: number = 12,
   categorySlug?: string
-): Promise<ProductWithVariant[]> {
+): Promise<ProductWithVariants[]> {
   let categoryFilter = undefined;
   
   if (categorySlug) {
@@ -70,19 +73,31 @@ export async function getProducts(
       categoryId: dbProducts.categoryId,
       categoryName: dbCategories.name,
       categorySlug: dbCategories.slug,
-      variantId: dbProductVariants.id,
-      variantPrice: dbProductVariants.price,
-      variantStock: dbProductVariants.stock,
-      variantSku: dbProductVariants.sku,
     })
     .from(dbProducts)
-    .innerJoin(dbProductVariants, eq(dbProducts.id, dbProductVariants.productId))
     .leftJoin(dbCategories, eq(dbProducts.categoryId, dbCategories.id))
     .where(and(...conditions))
     .orderBy(desc(dbProducts.createdAt))
     .limit(limit);
 
   const productIds = results.map((r) => r.id);
+
+  const variants = await db
+    .select()
+    .from(dbProductVariants)
+    .where(and(eq(dbProductVariants.tenantId, tenantId), inArray(dbProductVariants.productId, productIds)));
+
+  const variantsByProduct = variants.reduce((acc, v) => {
+    if (!acc[v.productId]) acc[v.productId] = [];
+    acc[v.productId].push({
+      id: v.id,
+      price: v.price,
+      stock: v.stock,
+      sku: v.sku,
+      options: (v.options as Record<string, string>) || {},
+    });
+    return acc;
+  }, {} as Record<string, ProductVariant[]>);
 
   const images = await db
     .select()
@@ -112,12 +127,7 @@ export async function getProducts(
     categoryId: row.categoryId,
     categoryName: row.categoryName ?? null,
     categorySlug: row.categorySlug ?? null,
-    variant: {
-      id: row.variantId,
-      price: row.variantPrice,
-      stock: row.variantStock,
-      sku: row.variantSku,
-    },
+    variants: variantsByProduct[row.id] || [],
     images: imagesByProduct[row.id] || [],
   }));
 }
@@ -125,7 +135,7 @@ export async function getProducts(
 export async function getProductBySlug(
   tenantId: string,
   slug: string
-): Promise<ProductWithVariant | null> {
+): Promise<ProductWithVariants | null> {
   const results = await db
     .select({
       id: dbProducts.id,
@@ -138,13 +148,8 @@ export async function getProductBySlug(
       categoryId: dbProducts.categoryId,
       categoryName: dbCategories.name,
       categorySlug: dbCategories.slug,
-      variantId: dbProductVariants.id,
-      variantPrice: dbProductVariants.price,
-      variantStock: dbProductVariants.stock,
-      variantSku: dbProductVariants.sku,
     })
     .from(dbProducts)
-    .innerJoin(dbProductVariants, eq(dbProducts.id, dbProductVariants.productId))
     .leftJoin(dbCategories, eq(dbProducts.categoryId, dbCategories.id))
     .where(
       and(
@@ -160,6 +165,12 @@ export async function getProductBySlug(
   }
 
   const row = results[0];
+
+  const variants = await db
+    .select()
+    .from(dbProductVariants)
+    .where(eq(dbProductVariants.productId, row.id))
+    .orderBy(dbProductVariants.createdAt);
 
   const images = await db
     .select()
@@ -178,12 +189,13 @@ export async function getProductBySlug(
     categoryId: row.categoryId,
     categoryName: row.categoryName ?? null,
     categorySlug: row.categorySlug ?? null,
-    variant: {
-      id: row.variantId,
-      price: row.variantPrice,
-      stock: row.variantStock,
-      sku: row.variantSku,
-    },
+    variants: variants.map((v) => ({
+      id: v.id,
+      price: v.price,
+      stock: v.stock,
+      sku: v.sku,
+      options: (v.options as Record<string, string>) || {},
+    })),
     images: images.map((img) => ({
       id: img.id,
       url: img.url,

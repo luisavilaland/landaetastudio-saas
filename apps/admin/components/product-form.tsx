@@ -16,6 +16,14 @@ type ProductImage = {
   position: number;
 };
 
+type ProductVariant = {
+  id?: string;
+  sku: string;
+  price: number;
+  stock: number;
+  options: Record<string, string>;
+};
+
 type Product = {
   id?: string;
   name?: string;
@@ -28,6 +36,7 @@ type Product = {
     price: number;
     stock: number | null;
   } | null;
+  variants?: ProductVariant[];
 };
 
 type Props = {
@@ -56,6 +65,38 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
     price: initialProduct?.variant ? initialProduct.variant.price / 100 : "",
     stock: initialProduct?.variant?.stock ?? "",
   });
+
+  const [attributes, setAttributes] = useState<{ name: string; values: string[] }[]>(() => {
+    if (initialProduct?.variants && initialProduct.variants.length > 0) {
+      const firstVariant = initialProduct.variants[0];
+      if (firstVariant.options && Object.keys(firstVariant.options).length > 0) {
+        return Object.entries(firstVariant.options).map(([name, value]) => ({
+          name,
+          values: Array.from(
+            new Set(initialProduct.variants!.filter(v => v.options[name]).map(v => v.options[name]))
+          ),
+        }));
+      }
+    }
+    return [];
+  });
+
+  const [variants, setVariants] = useState<ProductVariant[]>(() => {
+    if (initialProduct?.variants && initialProduct.variants.length > 0) {
+      return initialProduct.variants.map(v => ({
+        id: v.id,
+        sku: v.sku,
+        price: v.price,
+        stock: v.stock,
+        options: v.options || {},
+      }));
+    }
+    return [];
+  });
+
+  const [showVariantsPanel, setShowVariantsPanel] = useState(
+    () => initialProduct?.variants ? initialProduct.variants.length > 0 : false
+  );
 
   useEffect(() => {
     if (mode === "edit" && initialProduct?.id) {
@@ -95,6 +136,76 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-]/g, "");
+  };
+
+  const addAttribute = () => {
+    setAttributes([...attributes, { name: "", values: [] }]);
+  };
+
+  const updateAttributeName = (index: number, name: string) => {
+    const newAttrs = [...attributes];
+    newAttrs[index].name = name;
+    setAttributes(newAttrs);
+  };
+
+  const addAttributeValue = (attrIndex: number, value: string) => {
+    if (!value.trim()) return;
+    const newAttrs = [...attributes];
+    if (!newAttrs[attrIndex].values.includes(value.trim())) {
+      newAttrs[attrIndex].values = [...newAttrs[attrIndex].values, value.trim()];
+    }
+    setAttributes(newAttrs);
+  };
+
+  const removeAttributeValue = (attrIndex: number, valueIndex: number) => {
+    const newAttrs = [...attributes];
+    newAttrs[attrIndex].values = newAttrs[attrIndex].values.filter((_, i) => i !== valueIndex);
+    setAttributes(newAttrs);
+  };
+
+  const removeAttribute = (index: number) => {
+    setAttributes(attributes.filter((_, i) => i !== index));
+  };
+
+  const generateCombinations = () => {
+    const validAttrs = attributes.filter(a => a.name && a.values.length > 0);
+    if (validAttrs.length === 0) return;
+
+    const cartesian = (arrays: string[][]): string[][] => {
+      return arrays.reduce((acc, curr) =>
+        acc.flatMap(a => curr.map(b => [...a, b])), [[]] as string[][]
+      );
+    };
+
+    const attrNames = validAttrs.map(a => a.name);
+    const attrValues = validAttrs.map(a => a.values);
+    const combinations = cartesian(attrValues);
+
+    const newVariants: ProductVariant[] = combinations.map((combo, index) => {
+      const options: Record<string, string> = {};
+      attrNames.forEach((name, i) => {
+        options[name] = combo[i];
+      });
+
+      return {
+        sku: `${form.slug}-${combo.join("-").toLowerCase()}-${index}`,
+        price: typeof form.price === "number" ? Math.round(form.price * 100) : 0,
+        stock: typeof form.stock === "number" ? form.stock : 0,
+        options,
+      };
+    });
+
+    setVariants(newVariants);
+  };
+
+  const updateVariant = (index: number, field: string, value: number) => {
+    const newVariants = [...variants];
+    (newVariants[index] as any)[field] = value;
+    setVariants(newVariants);
+  };
+
+  const removeVariant = (index: number) => {
+    setVariants(variants.filter((_, i) => i !== index));
   };
 
   const handleNewImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,9 +314,30 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
       }
 
       const savedProduct = await res.json();
+      const productId = savedProduct.id || initialProduct?.id;
 
       if (mode === "create" && newImageFiles.length > 0) {
-        await uploadNewImages(savedProduct.id);
+        await uploadNewImages(productId);
+      }
+
+      if (showVariantsPanel && variants.length > 0 && productId) {
+        const variantsRes = await fetch(`/api/products/${productId}/variants`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            variants: variants.map(({ sku, price, stock, options }) => ({
+              sku,
+              price: Math.round(price),
+              stock: Math.round(stock),
+              options,
+            })),
+          }),
+        });
+
+        if (!variantsRes.ok) {
+          const data = await variantsRes.json();
+          throw new Error(data.error || "Error saving variants");
+        }
       }
 
       router.push("/products");
@@ -424,6 +556,159 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
             placeholder="100"
           />
         </div>
+
+        <div className="pt-4 border-t border-zinc-200">
+          <button
+            type="button"
+            onClick={() => setShowVariantsPanel(!showVariantsPanel)}
+            className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
+          >
+            {showVariantsPanel ? "− Ocultar variantes" : "+ Configurar variantes"}
+          </button>
+        </div>
+
+        {showVariantsPanel && (
+          <div className="space-y-4 p-4 bg-zinc-50 rounded-md border border-zinc-200">
+            <h3 className="font-medium text-zinc-900">Atributos de variante</h3>
+
+            {attributes.map((attr, attrIndex) => (
+              <div key={attrIndex} className="space-y-2 p-3 bg-white rounded border">
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    placeholder="Nombre (ej. Talle)"
+                    value={attr.name}
+                    onChange={(e) => updateAttributeName(attrIndex, e.target.value)}
+                    className="flex-1 px-2 py-1 text-sm border border-zinc-300 rounded"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeAttribute(attrIndex)}
+                    className="text-red-500 hover:text-red-700 text-sm"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {attr.values.map((val, valIndex) => (
+                    <span
+                      key={valIndex}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-zinc-100 rounded text-sm"
+                    >
+                      {val}
+                      <button
+                        type="button"
+                        onClick={() => removeAttributeValue(attrIndex, valIndex)}
+                        className="text-zinc-500 hover:text-red-500"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Nuevo valor"
+                    className="flex-1 px-2 py-1 text-sm border border-zinc-300 rounded"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addAttributeValue(attrIndex, (e.target as HTMLInputElement).value);
+                        (e.target as HTMLInputElement).value = "";
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                      addAttributeValue(attrIndex, input.value);
+                      input.value = "";
+                    }}
+                    className="px-2 py-1 text-sm bg-zinc-200 rounded hover:bg-zinc-300"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={addAttribute}
+              className="text-sm text-zinc-600 hover:text-zinc-800"
+            >
+              + Agregar atributo
+            </button>
+
+            {attributes.length > 0 && (
+              <button
+                type="button"
+                onClick={generateCombinations}
+                className="ml-4 px-3 py-1 text-sm bg-zinc-900 text-white rounded hover:bg-zinc-800"
+              >
+                Generar combinaciones
+              </button>
+            )}
+
+            {variants.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-zinc-700">
+                  Variantes generadas ({variants.length})
+                </h4>
+                <div className="max-h-64 overflow-y-auto space-y-2">
+                  {variants.map((variant, index) => (
+                    <div key={index} className="p-2 bg-white rounded border text-sm">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <div className="font-medium">
+                            {Object.entries(variant.options || {}).map(
+                              ([k, v]) => `${k}: ${v}`
+                            ).join(", ") || "Sin atributos"}
+                          </div>
+                          <div className="text-xs text-zinc-500">{variant.sku}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeVariant(index)}
+                          className="text-red-500 hover:text-red-700 text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <div>
+                          <label className="text-xs text-zinc-500">Precio</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={variant.price / 100}
+                            onChange={(e) =>
+                              updateVariant(index, "price", Math.round(Number(e.target.value) * 100))
+                            }
+                            className="w-24 px-1 py-0.5 text-sm border border-zinc-300 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-zinc-500">Stock</label>
+                          <input
+                            type="number"
+                            value={variant.stock}
+                            onChange={(e) =>
+                              updateVariant(index, "stock", Math.round(Number(e.target.value)))
+                            }
+                            className="w-20 px-1 py-0.5 text-sm border border-zinc-300 rounded"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-3 pt-4">
           <button

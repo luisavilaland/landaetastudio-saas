@@ -31,30 +31,33 @@ export default async function EditProductPage({ params }: Props) {
     notFound();
   }
 
-  const variant = await db
-    .select()
-    .from(dbProductVariants)
-    .where(eq(dbProductVariants.productId, id))
-    .limit(1);
+   const variants = await db
+     .select()
+     .from(dbProductVariants)
+     .where(eq(dbProductVariants.productId, id))
+     .orderBy(dbProductVariants.createdAt);
 
-  const categories = await db
-    .select()
-    .from(dbCategories)
-    .where(eq(dbCategories.tenantId, tenantId))
-    .orderBy(dbCategories.name);
+   const categories = await db
+     .select()
+     .from(dbCategories)
+     .where(eq(dbCategories.tenantId, tenantId))
+     .orderBy(dbCategories.name);
 
-  const initialProduct = {
-    id: product[0].id,
-    name: product[0].name,
-    slug: product[0].slug,
-    description: product[0].description,
-    status: product[0].status ?? "draft",
-    categoryId: product[0].categoryId,
-    variant: variant[0] ? {
-      price: variant[0].price,
-      stock: variant[0].stock ?? 0,
-    } : null,
-  };
+   const initialProduct = {
+     id: product[0].id,
+     name: product[0].name,
+     slug: product[0].slug,
+     description: product[0].description,
+     status: product[0].status ?? "draft",
+     categoryId: product[0].categoryId,
+     variants: variants.map(v => ({
+       id: v.id,
+       sku: v.sku,
+       price: v.price,
+       stock: v.stock ?? 0,
+       options: v.options as Record<string, string> || {},
+     })),
+   };
 
-  return <ProductForm initialProduct={initialProduct} categories={categories} mode="edit" />;
+   return <ProductForm initialProduct={initialProduct} categories={categories} mode="edit" />;
 }
