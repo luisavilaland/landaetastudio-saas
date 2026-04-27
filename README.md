@@ -292,6 +292,7 @@ Para recibir notificaciones de pago en desarrollo:
 - [Decisiones de arquitectura](./docs/arquitectura.md) – Por qué elegimos cada tecnología.
 - [Guía de setup](./SETUP.md) – Configuración del proyecto y solución de problemas.
 - [Guía para agentes de IA](./AGENTS.md) – Políticas y comandos para asistentes de código.
+- [Prompts reutilizables](./PROMPTS.md) – Plantillas de prompts para agentes de IA.
 
 ---
 
