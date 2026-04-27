@@ -73,6 +73,7 @@ Para probar pagos:
 - [x] Checkout con MercadoPago
 - [x] Webhook de pago
 - [x] Emails transaccionales (MailHog)
+- [x] FK constraints en base de datos
 
 ### ⏳ Pendiente
 - [ ] Row Level Security en PostgreSQL

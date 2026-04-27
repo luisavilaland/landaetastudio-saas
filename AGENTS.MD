@@ -41,7 +41,6 @@ This document provides concise, high-signal information for AI agents working in
 
 🔄 **Pending (see priorities below):**
 - RLS policies (Row Level Security).
-- FK constraints in database.
 - Normalize slug on create/edit.
 
 ## Packages (`packages/`)
@@ -267,7 +266,7 @@ saas-ecommerce/
 
 ---
 
-Last updated: April 25, 2026 – Seed script, FK constraints, Redis cache, NextAuth types. Debug & seed docs added.
+Last updated: April 26, 2026 – MercadoPago timeout (30s), console.time logs, STOREFRONT_URL required.
 
 ## Production Priorities
 
@@ -284,17 +283,16 @@ Last updated: April 25, 2026 – Seed script, FK constraints, Redis cache, NextA
 
 | # | Task | Status | Action |
 |---|------|--------|--------|
-| 5 | **FK constraints** | Not in DB | Add FK or rely on app logic |
-| 6 | **Normalize slug** | Accepts any format | Normalize on create/edit |
-| 7 | **Delete protection** | No check | Prevent if product has order_items |
-| 8 | **409 error UI** | Generic message | Improve error display |
+| 5 | **Normalize slug** | Accepts any format | Normalize on create/edit |
+| 6 | **Delete protection** | No check | Prevent if product has order_items |
+| 7 | **409 error UI** | Generic message | Improve error display |
 
 ### 🟢 Low Priority (Enhancements)
 
 | # | Task | Notes |
 |---|------|-------|
-| 9 | Auth duplicated | admin/lib/auth.ts ≈ superadmin/lib/auth.ts → shared package |
-| 10 | dotenv repeated | 3x in next.config.ts → packages/config |
-| 11 | Default SVGs | vercel.svg, etc. → remove if unused |
-| 12 | ProductsTable client | Could use Server Actions |
-| 13 | Missing packages | commerce, ui, config not yet created |
+| 8 | Auth duplicated | admin/lib/auth.ts ≈ superadmin/lib/auth.ts → shared package |
+| 9 | dotenv repeated | 3x in next.config.ts → packages/config |
+| 10 | Default SVGs | vercel.svg, etc. → remove if unused |
+| 11 | ProductsTable client | Could use Server Actions |
+| 12 | Missing packages | commerce, ui, config not yet created |

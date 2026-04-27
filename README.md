@@ -192,19 +192,18 @@ Para recibir notificaciones de pago en desarrollo:
 
 | # | Tarea |
 |---|-------|
-| 5 | FK constraints en base de datos |
-| 6 | Normalizar slug en create/edit |
-| 7 | Prevenir eliminación si hay order_items |
-| 8 | Mejorar UI de errores 409 |
+| 5 | Normalizar slug en create/edit |
+| 6 | Prevenir eliminación si hay order_items |
+| 7 | Mejorar UI de errores 409 |
 
 ### 🟢 Baja prioridad
 
 | # | Tarea |
 |---|-------|
-| 9 | Extraer auth duplicado a paquete compartido |
-| 10 | dotenv repetido en next.config.ts |
-| 11 | Productos con Server Actions |
-| 12 | Paquetes faltantes: commerce, ui, config |
+| 8 | Extraer auth duplicado a paquete compartido |
+| 9 | dotenv repetido en next.config.ts |
+| 10 | Productos con Server Actions |
+| 11 | Paquetes faltantes: commerce, ui, config |
 
 ## Notas importantes
 

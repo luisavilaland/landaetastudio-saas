@@ -2,14 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, dbOrders, dbOrderItems, dbProducts, dbProductVariants } from "@repo/db";
 import { eq, inArray } from "drizzle-orm";
 
+export const maxDuration = 30;
+
 export async function POST(request: NextRequest) {
   try {
     const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-    if (!accessToken) {
+    if (!accessToken || accessToken.trim() === "") {
       return NextResponse.json(
         { error: "MercadoPago no configurado" },
         { status: 500 }
       );
+    }
+
+    if (!accessToken.startsWith("TEST-") && !accessToken.startsWith("APP_USR-")) {
+      console.warn("[Preference] Token format may be invalid:", accessToken.substring(0, 20) + "...");
     }
 
     const body = await request.json();
@@ -127,44 +133,60 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.STOREFRONT_URL;
 
     if (!baseUrl) {
-      if (process.env.NODE_ENV === "development") {
-        console.warn("[Preference] WARNING: STOREFRONT_URL not set, using localhost fallback");
-      } else {
-        return NextResponse.json(
-          { error: "STOREFRONT_URL no está configurada" },
-          { status: 500 }
-        );
-      }
+      throw new Error("STOREFRONT_URL no está configurada. Define la URL pública del tienda (ej: https://...loca.lt)");
     }
-
-    const fallbackBaseUrl = baseUrl || "http://localhost:3000";
 
     console.log("[Preference] orderId:", orderId);
     console.log("[Preference] items:", JSON.stringify(items));
-    console.log("[Preference] baseUrl:", fallbackBaseUrl);
-    console.log("[Preference] accessToken:", accessToken?.substring(0, 20) + "...");
+    console.log("[Preference] baseUrl:", baseUrl);
+    console.log("[Preference] accessToken:", accessToken.substring(0, 20) + "...");
     console.log("[Preference] payer:", payer);
 
     const preference = {
       items,
       payer,
       back_urls: {
-        success: `${fallbackBaseUrl}/checkout/success`,
-        failure: `${fallbackBaseUrl}/checkout/failure`,
-        pending: `${fallbackBaseUrl}/checkout/pending`,
+        success: `${baseUrl}/checkout/success`,
+        failure: `${baseUrl}/checkout/failure`,
+        pending: `${baseUrl}/checkout/pending`,
       },
       auto_return: "approved",
       external_reference: orderId,
     };
 
-    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(preference),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    console.time("MP-request");
+
+    let response: Response;
+    try {
+      response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          "User-Agent": "SaaS-eCommerce/1.0",
+        },
+        body: JSON.stringify(preference),
+        signal: controller.signal,
+      });
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      console.timeEnd("MP-request");
+      if (fetchError.name === "AbortError") {
+        console.error("[Preference] Timeout after 30s");
+        return NextResponse.json(
+          { error: "El servicio de pagos no está disponible temporalmente" },
+          { status: 503 }
+        );
+      }
+      console.error("[Preference] Fetch error:", fetchError.message);
+      throw fetchError;
+    }
+
+    clearTimeout(timeoutId);
+    console.timeEnd("MP-request");
 
     const responseData = await response.json();
 

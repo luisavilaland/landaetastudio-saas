@@ -12,6 +12,7 @@ out/
 .env.local
 .env*.local
 .env.production
+!.env.local.example
 
 # Logs
 *.log
@@ -32,7 +33,7 @@ Thumbs.db
 .turbo/
 
 # Drizzle migrations (generated locally)
-packages/db/migrations/*.sql
+packages/db/migrations/*
 
 # Drizzle snapshots (generated locally)
 packages/db/migrations/meta/*.json
