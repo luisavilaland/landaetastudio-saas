@@ -218,6 +218,13 @@ saas-ecommerce/
 |PUT|/api/tenants/[id]|Actualizar tenant|
 |DELETE|/api/tenants/[id]|Eliminar tenant|
 
+### Storefront Auth
+
+| Method | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| POST | /api/register | Registrar nuevo cliente |
+| POST | /api/auth/[...nextauth] | Login de cliente |
+
 ## MercadoPago - Configuración
 
 ### Variables de entorno

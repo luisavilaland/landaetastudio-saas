@@ -1,0 +1,27 @@
+# Decisiones de arquitectura – saas-ecommerce
+
+## ¿Por qué multi-tenant con columna tenantId?
+
+Usamos una única base de datos compartida con columna `tenantId` en todas las tablas de negocio. Esto simplifica la gestión de datos y las migraciones, y nos permite aislar a cada comercio mediante Row Level Security cuando pasemos a producción. La alternativa de bases de datos separadas por tenant añadiría complejidad operativa innecesaria para un MVP.
+
+## ¿Por qué NextAuth con JWT en lugar de sesiones de base de datos?
+
+Las sesiones de BD generan una consulta extra en cada petición. Con JWT, el token viaja en la cookie y contiene los claims necesarios (`tenantId`, `role`), lo que evita accesos constantes a la base de datos y simplifica la resolución multi-tenant en el middleware.
+
+## ¿Por qué precios en centavos (integer)?
+
+Eliminamos los errores de redondeo propios de floats. Es una práctica estándar en eCommerce. El frontend divide entre 100 solo para mostrar el precio formateado.
+
+## ¿Por qué MinIO local y MercadoPago?
+
+MinIO emula la API de S3, lo que nos permite probar subida de imágenes sin salir de localhost. MercadoPago es el gateway de pago más extendido en Uruguay y Argentina, y ofrece excelente sandbox para desarrollo.
+
+## Estructura de monorepo
+
+Separamos las apps en `storefront`, `admin` y `superadmin` porque cada una tiene su propio dominio de negocio y políticas de seguridad. Los paquetes compartidos (`db`, `storage` y proximamente `commerce`) evitan duplicar lógica de acceso a datos o reglas de negocio.
+
+## Convenciones clave
+
+- **Nombres en camelCase** para columnas y tablas en Drizzle, porque es el idioma que habla TypeScript. Drizzle maneja la traducción a snake_case en la BD si fuera necesario, pero mantenemos consistencia con el código.
+- **Migraciones inmutables**: una vez generadas, no se editan. Esto garantiza historial limpio y cero conflictos en equipo.
+- **Carrito anónimo en Redis**: permite a los clientes usar el carrito sin crear cuenta. La sesión expira a los 7 días; el TTL de Redis se encarga automáticamente de la limpieza.
