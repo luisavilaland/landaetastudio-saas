@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { db, dbCategories } from "@repo/db";
+import { eq } from "drizzle-orm";
 import { ProductForm } from "@/components/product-form";
 
 export default async function NewProductPage() {
@@ -9,5 +11,13 @@ export default async function NewProductPage() {
     redirect("/login");
   }
 
-  return <ProductForm mode="create" />;
+  const tenantId = session.user?.tenantId as string;
+
+  const categories = await db
+    .select()
+    .from(dbCategories)
+    .where(eq(dbCategories.tenantId, tenantId))
+    .orderBy(dbCategories.name);
+
+  return <ProductForm categories={categories} mode="create" />;
 }

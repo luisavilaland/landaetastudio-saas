@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbProducts, dbProductVariants } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbCategories } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
 import { uploadImage } from "@repo/storage";
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
     const slug = formData.get("slug") as string;
     const description = (formData.get("description") as string) || null;
     const status = (formData.get("status") as string) || "draft";
+    const categoryId = (formData.get("categoryId") as string) || null;
     const price = parseInt(formData.get("price") as string, 10);
     const stock = parseInt(formData.get("stock") as string, 10);
     const image = formData.get("image") as File | null;
@@ -59,6 +60,20 @@ export async function POST(request: NextRequest) {
         { error: "Stock cannot be negative" },
         { status: 400 }
       );
+    }
+
+    if (categoryId) {
+      const category = await db
+        .select()
+        .from(dbCategories)
+        .where(eq(dbCategories.id, categoryId))
+        .limit(1);
+      if (category.length === 0 || category[0].tenantId !== tenantId) {
+        return NextResponse.json(
+          { error: "Invalid category" },
+          { status: 400 }
+        );
+      }
     }
 
     const existingSlug = await db
@@ -99,6 +114,7 @@ export async function POST(request: NextRequest) {
           description,
           imageUrl,
           status,
+          categoryId: categoryId || null,
           metadata: {},
           createdAt: now,
           updatedAt: now,

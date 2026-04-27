@@ -19,6 +19,7 @@ type Product = {
   description: string | null;
   status: string;
   createdAt: Date;
+  categoryName: string | null;
   variant?: ProductVariant;
 };
 
@@ -190,6 +191,7 @@ export function ProductsTable({ initialProducts }: { initialProducts: Product[] 
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Imagen</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Nombre</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Categoría</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Slug</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Estado</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Precio</th>
@@ -222,6 +224,7 @@ export function ProductsTable({ initialProducts }: { initialProducts: Product[] 
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm">{product.name}</td>
+                  <td className="px-4 py-3 text-sm">{product.categoryName || "-"}</td>
                   <td className="px-4 py-3 text-sm">{product.slug}</td>
                   <td className="px-4 py-3 text-sm">
                     <span

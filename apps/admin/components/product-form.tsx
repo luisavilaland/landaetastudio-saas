@@ -3,6 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 type Product = {
   id?: string;
   name?: string;
@@ -10,6 +16,7 @@ type Product = {
   description?: string | null;
   imageUrl?: string | null;
   status?: string | null;
+  categoryId?: string | null;
   variant?: {
     price: number;
     stock: number | null;
@@ -18,10 +25,11 @@ type Product = {
 
 type Props = {
   initialProduct?: Product;
+  categories?: Category[];
   mode?: "create" | "edit";
 };
 
-export function ProductForm({ initialProduct, mode = "create" }: Props) {
+export function ProductForm({ initialProduct, categories = [], mode = "create" }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -34,6 +42,7 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
     slug: initialProduct?.slug || "",
     description: initialProduct?.description || "",
     status: initialProduct?.status || "draft",
+    categoryId: initialProduct?.categoryId || "",
     price: initialProduct?.variant ? initialProduct.variant.price / 100 : "",
     stock: initialProduct?.variant?.stock ?? "",
   });
@@ -96,6 +105,9 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
       formData.append("slug", form.slug);
       formData.append("description", form.description || "");
       formData.append("status", form.status);
+      if (form.categoryId) {
+        formData.append("categoryId", form.categoryId);
+      }
       formData.append("price", priceInCents.toString());
       formData.append("stock", form.stock?.toString() ?? "0");
       if (imageFile) {
@@ -244,6 +256,27 @@ export function ProductForm({ initialProduct, mode = "create" }: Props) {
             <option value="archived">Archivado</option>
           </select>
         </div>
+
+        {categories.length > 0 && (
+          <div>
+            <label htmlFor="categoryId" className="block text-sm font-medium text-zinc-700">
+              Categoría
+            </label>
+            <select
+              id="categoryId"
+              value={form.categoryId}
+              onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+              className="mt-1 block w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
+            >
+              <option value="">Sin categoría</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div>
           <label htmlFor="price" className="block text-sm font-medium text-zinc-700">

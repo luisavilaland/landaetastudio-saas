@@ -15,6 +15,7 @@ vi.mock("@repo/db", () => ({
     status: "status",
     createdAt: "createdAt",
     tenantId: "tenantId",
+    categoryId: "categoryId",
   },
   dbProductVariants: {
     id: "variantId",
@@ -23,12 +24,19 @@ vi.mock("@repo/db", () => ({
     sku: "variantSku",
     productId: "productId",
   },
+  dbCategories: {
+    id: "categoryId",
+    name: "categoryName",
+    slug: "categorySlug",
+    tenantId: "tenantId",
+  },
 }));
 
 const mockSelect = vi.mocked(dbModule.db).select;
 const mockSelectReturn = {
   from: vi.fn().mockReturnThis(),
   innerJoin: vi.fn().mockReturnThis(),
+  leftJoin: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
   orderBy: vi.fn().mockReturnThis(),
   limit: vi.fn().mockReturnThis(),

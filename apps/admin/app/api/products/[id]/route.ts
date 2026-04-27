@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbProducts, dbProductVariants, dbOrderItems } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbOrderItems, dbCategories } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq, inArray } from "drizzle-orm";
 import { uploadImage, deleteImage } from "@repo/storage";
@@ -85,6 +85,7 @@ export async function PUT(
     let slug: string | undefined;
     let description: string | null | undefined;
     let status: string | null | undefined;
+    let categoryId: string | null | undefined;
     let price: number | undefined;
     let stock: number | undefined;
     let image: File | null | undefined;
@@ -96,6 +97,7 @@ export async function PUT(
       slug = json.slug;
       description = json.description ?? null;
       status = json.status ?? null;
+      categoryId = json.categoryId ?? null;
       price = json.price ? parseInt(json.price, 10) : undefined;
       stock = json.stock !== undefined ? parseInt(json.stock, 10) : undefined;
     } else {
@@ -103,6 +105,7 @@ export async function PUT(
       slug = body.get("slug") as string;
       description = (body.get("description") as string) || null;
       status = (body.get("status") as string) || null;
+      categoryId = (body.get("categoryId") as string) || null;
       price = parseInt(body.get("price") as string, 10);
       stock = parseInt(body.get("stock") as string, 10);
       image = body.get("image") as File | null;
@@ -128,6 +131,20 @@ export async function PUT(
         { error: "Stock cannot be negative" },
         { status: 400 }
       );
+    }
+
+    if (categoryId !== undefined && categoryId !== null) {
+      const category = await db
+        .select()
+        .from(dbCategories)
+        .where(eq(dbCategories.id, categoryId))
+        .limit(1);
+      if (category.length === 0 || category[0].tenantId !== tenantId) {
+        return NextResponse.json(
+          { error: "Invalid category" },
+          { status: 400 }
+        );
+      }
     }
 
     if (slug !== product[0].slug) {
@@ -173,6 +190,7 @@ export async function PUT(
     if (slug) updateProductFields.slug = slug;
     if (description !== undefined) updateProductFields.description = description;
     if (status) updateProductFields.status = status;
+    if (categoryId !== undefined) updateProductFields.categoryId = categoryId || null;
     if (metadata) updateProductFields.metadata = metadata;
 
     if (image || removeImage !== undefined) {

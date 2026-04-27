@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { db, dbProducts, dbProductVariants } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbCategories } from "@repo/db";
 import { eq } from "drizzle-orm";
 import { ProductForm } from "@/components/product-form";
 
@@ -37,17 +37,24 @@ export default async function EditProductPage({ params }: Props) {
     .where(eq(dbProductVariants.productId, id))
     .limit(1);
 
+  const categories = await db
+    .select()
+    .from(dbCategories)
+    .where(eq(dbCategories.tenantId, tenantId))
+    .orderBy(dbCategories.name);
+
   const initialProduct = {
     id: product[0].id,
     name: product[0].name,
     slug: product[0].slug,
     description: product[0].description,
     status: product[0].status ?? "draft",
+    categoryId: product[0].categoryId,
     variant: variant[0] ? {
       price: variant[0].price,
       stock: variant[0].stock ?? 0,
     } : null,
   };
 
-  return <ProductForm initialProduct={initialProduct} mode="edit" />;
+  return <ProductForm initialProduct={initialProduct} categories={categories} mode="edit" />;
 }

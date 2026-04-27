@@ -1,4 +1,4 @@
-import { db, dbProducts, dbProductVariants } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbCategories } from "@repo/db";
 import { eq, desc, and, isNotNull } from "drizzle-orm";
 
 export type ProductWithVariant = {
@@ -9,6 +9,9 @@ export type ProductWithVariant = {
   imageUrl: string | null;
   status: string | null;
   createdAt: Date;
+  categoryId: string | null;
+  categoryName: string | null;
+  categorySlug: string | null;
   variant: {
     id: string;
     price: number;
@@ -19,8 +22,34 @@ export type ProductWithVariant = {
 
 export async function getProducts(
   tenantId: string,
-  limit: number = 12
+  limit: number = 12,
+  categorySlug?: string
 ): Promise<ProductWithVariant[]> {
+  let categoryFilter = undefined;
+  
+  if (categorySlug) {
+    const categoryResult = await db
+      .select({ id: dbCategories.id })
+      .from(dbCategories)
+      .where(and(eq(dbCategories.tenantId, tenantId), eq(dbCategories.slug, categorySlug)))
+      .limit(1);
+    
+    if (categoryResult.length > 0) {
+      categoryFilter = categoryResult[0].id;
+    } else {
+      return [];
+    }
+  }
+
+  const conditions = [
+    eq(dbProducts.tenantId, tenantId),
+    eq(dbProducts.status, "active"),
+  ];
+
+  if (categoryFilter) {
+    conditions.push(eq(dbProducts.categoryId, categoryFilter));
+  }
+
   const results = await db
     .select({
       id: dbProducts.id,
@@ -30,6 +59,9 @@ export async function getProducts(
       imageUrl: dbProducts.imageUrl,
       status: dbProducts.status,
       createdAt: dbProducts.createdAt,
+      categoryId: dbProducts.categoryId,
+      categoryName: dbCategories.name,
+      categorySlug: dbCategories.slug,
       variantId: dbProductVariants.id,
       variantPrice: dbProductVariants.price,
       variantStock: dbProductVariants.stock,
@@ -37,7 +69,8 @@ export async function getProducts(
     })
     .from(dbProducts)
     .innerJoin(dbProductVariants, eq(dbProducts.id, dbProductVariants.productId))
-    .where(and(eq(dbProducts.tenantId, tenantId), eq(dbProducts.status, "active")))
+    .leftJoin(dbCategories, eq(dbProducts.categoryId, dbCategories.id))
+    .where(and(...conditions))
     .orderBy(desc(dbProducts.createdAt))
     .limit(limit);
 
@@ -49,6 +82,9 @@ export async function getProducts(
     imageUrl: row.imageUrl,
     status: row.status,
     createdAt: row.createdAt,
+    categoryId: row.categoryId,
+    categoryName: row.categoryName ?? null,
+    categorySlug: row.categorySlug ?? null,
     variant: {
       id: row.variantId,
       price: row.variantPrice,
@@ -71,6 +107,9 @@ export async function getProductBySlug(
       imageUrl: dbProducts.imageUrl,
       status: dbProducts.status,
       createdAt: dbProducts.createdAt,
+      categoryId: dbProducts.categoryId,
+      categoryName: dbCategories.name,
+      categorySlug: dbCategories.slug,
       variantId: dbProductVariants.id,
       variantPrice: dbProductVariants.price,
       variantStock: dbProductVariants.stock,
@@ -78,6 +117,7 @@ export async function getProductBySlug(
     })
     .from(dbProducts)
     .innerJoin(dbProductVariants, eq(dbProducts.id, dbProductVariants.productId))
+    .leftJoin(dbCategories, eq(dbProducts.categoryId, dbCategories.id))
     .where(
       and(
         eq(dbProducts.tenantId, tenantId),
@@ -100,6 +140,9 @@ export async function getProductBySlug(
     imageUrl: row.imageUrl,
     status: row.status,
     createdAt: row.createdAt,
+    categoryId: row.categoryId,
+    categoryName: row.categoryName ?? null,
+    categorySlug: row.categorySlug ?? null,
     variant: {
       id: row.variantId,
       price: row.variantPrice,

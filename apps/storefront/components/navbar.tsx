@@ -3,11 +3,18 @@
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 
-type NavbarProps = {
-  tenantName: string;
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
 };
 
-export function Navbar({ tenantName }: NavbarProps) {
+type NavbarProps = {
+  tenantName: string;
+  categories?: Category[];
+};
+
+export function Navbar({ tenantName, categories = [] }: NavbarProps) {
   const { data: session, status } = useSession();
 
   return (
@@ -20,6 +27,27 @@ export function Navbar({ tenantName }: NavbarProps) {
           <Link href="/" className="text-sm text-zinc-600 hover:text-zinc-900">
             Productos
           </Link>
+          {categories.length > 0 && (
+            <div className="relative group">
+              <button className="text-sm text-zinc-600 hover:text-zinc-900 flex items-center gap-1">
+                Categorías
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <div className="absolute top-full left-0 mt-1 bg-white border border-zinc-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 min-w-[160px]">
+                {categories.map((category) => (
+                  <Link
+                    key={category.id}
+                    href={`/categoria/${category.slug}`}
+                    className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                  >
+                    {category.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
           <Link
             href="/cart"
             className="text-sm text-zinc-600 hover:text-zinc-900 flex items-center gap-1"
