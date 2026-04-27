@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import Image from "next/image";
 import Link from "next/link";
 import { db, dbTenants } from "@repo/db";
 import { eq } from "drizzle-orm";
 import { getProductBySlug } from "@/lib/products";
 import { AddToCartButton } from "@/components/add-to-cart-button";
+import { ImageGallery } from "@/components/image-gallery";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +103,12 @@ export default async function ProductPage({ params }: PageProps) {
   const stock = product.variant?.stock ?? 0;
   const inStock = stock > 0;
 
+  const allImages = product.images && product.images.length > 0
+    ? product.images.map(img => ({ ...img, position: img.position ?? 0 }))
+    : product.imageUrl
+    ? [{ id: 'default', url: product.imageUrl, alt: product.name, position: 0 }]
+    : [];
+
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
       <Link
@@ -113,20 +119,8 @@ export default async function ProductPage({ params }: PageProps) {
       </Link>
 
       <div className="grid md:grid-cols-2 gap-8 mt-4">
-        <div className="bg-zinc-100 rounded-lg overflow-hidden aspect-square relative">
-          {product.imageUrl ? (
-            <Image
-              src={product.imageUrl}
-              alt={product.name}
-              fill
-              unoptimized={true}
-              className="object-cover"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-zinc-400">
-              Sin imagen
-            </div>
-          )}
+        <div>
+          <ImageGallery images={allImages} productName={product.name} />
         </div>
 
         <div className="flex flex-col">

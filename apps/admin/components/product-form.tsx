@@ -1,12 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 type Category = {
   id: string;
   name: string;
   slug: string;
+};
+
+type ProductImage = {
+  id: string;
+  url: string;
+  alt: string | null;
+  position: number;
 };
 
 type Product = {
@@ -33,9 +40,12 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [imagePreview, setImagePreview] = useState<string | null>(initialProduct?.imageUrl || null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [removeImage, setRemoveImage] = useState(false);
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const [imagesLoading, setImagesLoading] = useState(false);
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     name: initialProduct?.name || "",
@@ -47,13 +57,26 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
     stock: initialProduct?.variant?.stock ?? "",
   });
 
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "");
+  useEffect(() => {
+    if (mode === "edit" && initialProduct?.id) {
+      loadImages();
+    }
+  }, [mode, initialProduct?.id]);
+
+  const loadImages = async () => {
+    if (!initialProduct?.id) return;
+    setImagesLoading(true);
+    try {
+      const res = await fetch(`/api/products/${initialProduct.id}/images`);
+      if (res.ok) {
+        const data = await res.json();
+        setImages(data.images || []);
+      }
+    } catch (err) {
+      console.error("Error loading images:", err);
+    } finally {
+      setImagesLoading(false);
+    }
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,24 +88,82 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
     }));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      setRemoveImage(false);
-      const objectUrl = URL.createObjectURL(file);
-      setImagePreview(objectUrl);
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
+  };
+
+  const handleNewImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setNewImageFiles((prev) => [...prev, ...files]);
+
+    const previews = files.map((file) => URL.createObjectURL(file));
+    setNewImagePreviews((prev) => [...prev, ...previews]);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
-  const handleRemoveImage = () => {
-    if (removeImage) {
-      setRemoveImage(false);
-      setImagePreview(initialProduct?.imageUrl || null);
-    } else {
-      setRemoveImage(true);
-      setImagePreview(null);
-      setImageFile(null);
+  const removeNewImage = (index: number) => {
+    setNewImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setNewImagePreviews((prev) => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const removeExistingImage = async (imageId: string) => {
+    if (!confirm("¿Eliminar esta imagen?")) return;
+    if (!initialProduct?.id) return;
+
+    try {
+      const res = await fetch(`/api/products/${initialProduct.id}/images/${imageId}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setImages((prev) => prev.filter((img) => img.id !== imageId));
+      } else {
+        setError("Error al eliminar la imagen");
+      }
+    } catch {
+      setError("Error al eliminar la imagen");
+    }
+  };
+
+  const uploadNewImages = async (productId: string) => {
+    if (newImageFiles.length === 0) return;
+
+    setUploadingImages(true);
+    try {
+      for (const file of newImageFiles) {
+        const formData = new FormData();
+        formData.append("image", file);
+
+        const res = await fetch(`/api/products/${productId}/images`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          throw new Error("Error uploading image");
+        }
+      }
+
+      setNewImageFiles([]);
+      setNewImagePreviews([]);
+      await loadImages();
+    } catch {
+      throw new Error("Error al subir las imágenes");
+    } finally {
+      setUploadingImages(false);
     }
   };
 
@@ -110,12 +191,6 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
       }
       formData.append("price", priceInCents.toString());
       formData.append("stock", form.stock?.toString() ?? "0");
-      if (imageFile) {
-        formData.append("image", imageFile);
-      }
-      if (removeImage) {
-        formData.append("removeImage", "true");
-      }
 
       const res = await fetch(url, {
         method,
@@ -125,6 +200,12 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Error saving product");
+      }
+
+      const savedProduct = await res.json();
+
+      if (mode === "create" && newImageFiles.length > 0) {
+        await uploadNewImages(savedProduct.id);
       }
 
       router.push("/products");
@@ -197,48 +278,81 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
         </div>
 
         <div>
-          <label htmlFor="image" className="block text-sm font-medium text-zinc-700">
-            Imagen
+          <label className="block text-sm font-medium text-zinc-700 mb-2">
+            Imágenes del producto
           </label>
+
+          {mode === "edit" && imagesLoading && (
+            <p className="text-sm text-zinc-500">Cargando imágenes...</p>
+          )}
+
+          {mode === "edit" && !imagesLoading && images.length > 0 && (
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              {images.map((img) => (
+                <div key={img.id} className="relative group">
+                  <img
+                    src={img.url}
+                    alt={img.alt || "Product image"}
+                    className="w-full aspect-square object-cover rounded-md border border-zinc-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeExistingImage(img.id)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {newImagePreviews.length > 0 && (
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              {newImagePreviews.map((preview, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={preview}
+                    alt={`New image ${index + 1}`}
+                    className="w-full aspect-square object-cover rounded-md border border-zinc-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeNewImage(index)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <input
-            id="image"
+            ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            onChange={handleImageChange}
+            multiple
+            onChange={handleNewImageChange}
             className="mt-1 block w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200"
           />
-          {imagePreview && (
-            <div className="mt-2 relative inline-block">
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="w-32 h-32 object-cover rounded-md"
-              />
-              {mode === "edit" && !imageFile && (
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
-                >
-                  ×
-                </button>
-              )}
-            </div>
+
+          {mode === "edit" && newImageFiles.length > 0 && (
+            <button
+              type="button"
+              onClick={() => uploadNewImages(initialProduct?.id!)}
+              disabled={uploadingImages}
+              className="mt-2 px-3 py-1 text-sm bg-zinc-900 text-white rounded-md hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {uploadingImages ? "Subiendo..." : `Subir ${newImageFiles.length} imagen(es)`}
+            </button>
           )}
-          {mode === "edit" && initialProduct?.imageUrl && !imagePreview && (
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="removeImage"
-                checked={removeImage}
-                onChange={handleRemoveImage}
-                className="rounded border-zinc-300"
-              />
-              <label htmlFor="removeImage" className="text-sm text-zinc-600">
-                Quitar imagen
-              </label>
-            </div>
-          )}
+
+          <p className="mt-1 text-xs text-zinc-500">
+            {mode === "create"
+              ? "Las imágenes se subirán después de crear el producto"
+              : "Haz clic en 'Subir' para agregar las imágenes seleccionadas"}
+          </p>
         </div>
 
         <div>
