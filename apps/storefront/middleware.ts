@@ -30,7 +30,7 @@ function getOrCreateSessionId(request: NextRequest, response: NextResponse): str
 export function middleware(request: NextRequest) {
   const hostname = (request.headers.get('host') ?? '').replace(/:\d+$/, '');
 
-  console.log('[Middleware] Hostname:', hostname);
+  console.log('[Proxy] Hostname:', hostname);
 
   let tenantSlug = 'default';
 
@@ -38,7 +38,7 @@ export function middleware(request: NextRequest) {
     tenantSlug = hostname.split('.')[0];
   }
 
-  console.log('[Middleware] Tenant Slug:', tenantSlug);
+  console.log('[Proxy] Tenant Slug:', tenantSlug);
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-tenant-slug', tenantSlug);

@@ -30,6 +30,8 @@ Si alguno de estos scripts no existe en la raíz, créalo en package.json con tu
 - build: `next build`
 - test: `vitest run`
 
+⚠️ IMPORTANTE: ignoreBuildErrors DEBE ser false en next.config.ts. El build debe fallar si hay errores de tipo. Esto es crítico para detectar regresiones en CI/CD. Nunca usar `ignoreBuildErrors: true`.
+
 **Ubicación de los tests:**
 - Lógica de negocio: coloca el test en una carpeta `__tests__/` junto al módulo (ej. `packages/commerce/src/__tests__/cart.test.ts`).
 - Endpoints: `__tests__/` junto al archivo de ruta (ej. `apps/admin/app/api/products/__tests__/route.test.ts`).
@@ -77,7 +79,8 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 
 - Lógica de negocio actual en apps/storefront/lib y apps/admin/lib.
 - Plan de migración: cuando se cree packages/commerce (Fase 5), la lógica de carrito, órdenes, precios y descuentos se moverá progresivamente a ese paquete. Mientras tanto, mantenla en las libs de cada app, pero no dupliques lógica entre storefront y admin.
-- Cada app (storefront, admin, superadmin) solo expone UI y endpoints, la lógica pesa en paquetes.
+- Cada app (storefront, admin, superadmin) solo expone UI y endpoints, la lógica的重さ en paquetes.
+- Paquetes actuales: `@repo/db`, `@repo/storage`, `@repo/auth`.
 
 ## Mantenimiento de la documentación
 

@@ -143,6 +143,7 @@ saas-ecommerce/
 │   ├── admin/          # Panel del comercio (Next.js)
 │   └── superadmin/     # Panel SaaS interno (Next.js)
 ├── packages/
+│   ├── auth/           # NextAuth v5 para admin y superadmin
 │   ├── db/             # Schema Drizzle, migrations, client
 │   └── storage/        # MinIO client for image upload
 ├── docker-compose.yml
