@@ -245,7 +245,11 @@ Para recibir notificaciones de pago en desarrollo:
 |--------|-------------|
 | `pending_payment` | Orden creada, esperando pago |
 | `confirmed` | Pago aprobado |
-| `payment_failed` | Pago rechazado/cancelado |
+| `processing` | Pago confirmado, preparando envío |
+| `shipped` | Enviado al cliente |
+| `delivered` | Entregado al cliente |
+| `cancelled` | Cancelada (antes de envío) |
+| `refunded` | Devuelta/reembolsada |
 
 ## Prioridades para Producción
 
@@ -282,6 +286,12 @@ Para recibir notificaciones de pago en desarrollo:
 - Prices siempre en centavos (integer), nunca floats.
 - Cart funciona sin autenticación (usuarios anónimos).
 - Checkout requiere email para enviar confirmación.
+
+## Documentación adicional
+
+- [Decisiones de arquitectura](./docs/arquitectura.md) – Por qué elegimos cada tecnología.
+- [Guía de setup](./SETUP.md) – Configuración del proyecto y solución de problemas.
+- [Guía para agentes de IA](./AGENTS.md) – Políticas y comandos para asistentes de código.
 
 ---
 
