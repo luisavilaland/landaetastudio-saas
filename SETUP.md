@@ -124,7 +124,7 @@ MERCADOPAGO_ACCESS_TOKEN=TEST-xxxx
 # Levantar todas las apps
 pnpm dev
 
-# O单独
+# Opcional: levantar solo una app
 pnpm --filter storefront dev  # http://localhost:3000
 pnpm --filter admin dev      # http://localhost:3001
 pnpm --filter superadmin dev # http://localhost:3002
