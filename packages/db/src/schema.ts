@@ -182,7 +182,27 @@ export const productImagesRelations = relations(dbProductImages, ({ one }) => ({
 
 export type Category = typeof dbCategories.$inferSelect;
 export type NewCategory = typeof dbCategories.$inferInsert;
+export const dbShippingMethods = pgTable("shipping_methods", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenantId").notNull().references(() => dbTenants.id, { onDelete: "restrict" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  price: integer("price").notNull(),
+  freeShippingThreshold: integer("freeShippingThreshold"),
+  estimatedDaysMin: integer("estimatedDaysMin"),
+  estimatedDaysMax: integer("estimatedDaysMax"),
+  isActive: text("isActive").default("true"),
+  sortOrder: integer("sortOrder").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (table) => {
+  return {
+    tenantIdIdx: index("shipping_methods_tenant_id_idx").on(table.tenantId),
+  };
+});
 export type AdminUser = typeof dbAdminUsers.$inferSelect;
 export type NewAdminUser = typeof dbAdminUsers.$inferInsert;
 export type ProductImage = typeof dbProductImages.$inferSelect;
 export type NewProductImage = typeof dbProductImages.$inferInsert;
+export type ShippingMethod = typeof dbShippingMethods.$inferSelect;
+export type NewShippingMethod = typeof dbShippingMethods.$inferInsert;

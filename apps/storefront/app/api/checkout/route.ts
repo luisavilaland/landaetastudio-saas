@@ -3,8 +3,8 @@ import { cookies, headers } from "next/headers";
 import { redisClient } from "@/lib/redis";
 import { getTenantId } from "@/lib/tenant";
 import { auth } from "@/lib/auth";
-import { db, dbOrders, dbOrderItems, dbProductVariants } from "@repo/db";
-import { eq, inArray } from "drizzle-orm";
+import { db, dbOrders, dbOrderItems, dbProductVariants, dbShippingMethods } from "@repo/db";
+import { eq, inArray, and } from "drizzle-orm";
 import { createCheckoutSchema } from "@repo/validation";
 
 type CartItem = {
@@ -23,6 +23,9 @@ type ShippingDetails = {
   email: string;
   phone: string;
   address: string;
+  methodId?: string;
+  methodName?: string;
+  shippingCost?: number;
 };
 
 export async function POST(request: NextRequest) {
@@ -63,7 +66,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, name, phone, address } = validation.data;
+    const { email, name, phone, address, shippingMethodId } = validation.data;
 
     const variantIds = cart.items.map((item) => item.variantId);
     const variants = await db
@@ -93,7 +96,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-     const tenantIdFromSlug = await getTenantId();
+    let cartTotal = 0;
+    for (const item of cart.items) {
+      const variant = variantMap.get(item.variantId);
+      if (!variant || variant.price === null) {
+        continue;
+      }
+      cartTotal += variant.price * item.quantity;
+    }
+
+    if (cartTotal === 0) {
+      return NextResponse.json(
+        { error: "El total del carrito no puede ser 0" },
+        { status: 400 }
+      );
+    }
+
+    const tenantIdFromSlug = await getTenantId();
     if (!tenantIdFromSlug) {
       return NextResponse.json(
         { error: "Tenant no válido" },
@@ -128,6 +147,43 @@ export async function POST(request: NextRequest) {
 
     const shippingDetails: ShippingDetails = { name, email, phone, address };
 
+    let shippingCost = 0;
+    let methodName: string | undefined;
+
+    if (shippingMethodId) {
+      const [method] = await db
+        .select()
+        .from(dbShippingMethods)
+        .where(
+          and(
+            eq(dbShippingMethods.id, shippingMethodId),
+            eq(dbShippingMethods.tenantId, variantTenantId)
+          )
+        )
+        .limit(1);
+
+      if (!method || method.isActive !== "true") {
+        return NextResponse.json(
+          { error: "Método de envío inválido o inactivo" },
+          { status: 400 }
+        );
+      }
+
+      if (
+        method.freeShippingThreshold &&
+        cartTotal >= method.freeShippingThreshold
+      ) {
+        shippingCost = 0;
+      } else {
+        shippingCost = method.price;
+      }
+
+      methodName = method.name;
+      shippingDetails.methodId = shippingMethodId;
+      shippingDetails.methodName = methodName;
+      shippingDetails.shippingCost = shippingCost;
+    }
+
     // Use tenantIdFromSlug as the actual tenantId for the order
     const orderTenantId = tenantIdFromSlug;
 
@@ -141,19 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
     const [order] = await db.transaction(async (tx) => {
-      // Calculate total from cart items
-      let transactionTotal = 0;
-      for (const item of cart.items) {
-        const variant = variantMap.get(item.variantId);
-        if (!variant || variant.price === null) {
-          throw new Error(`Precio no disponible para variante ${item.variantId}`);
-        }
-        transactionTotal += variant.price * item.quantity;
-      }
-
-      if (transactionTotal === 0) {
-        throw new Error("El total de la orden no puede ser 0");
-      }
+      const orderTotal = cartTotal + shippingCost;
 
       for (const item of cart.items) {
         const variant = variantMap.get(item.variantId);
@@ -173,7 +217,7 @@ export async function POST(request: NextRequest) {
           tenantId: orderTenantId,
           customerId: customerId,
           status: "pending_payment",
-          total: transactionTotal,
+          total: orderTotal,
           currency: "UYU",
           customerEmail: email,
           shippingDetails,

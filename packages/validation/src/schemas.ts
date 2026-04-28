@@ -74,6 +74,7 @@ export const shippingDetailsSchema = z.object({
   email: z.string().email(),
   phone: z.string().min(1),
   address: z.string().min(1),
+  shippingMethodId: z.string().min(1).optional(),
 });
 
 export const createCheckoutSchema = shippingDetailsSchema;
@@ -114,3 +115,16 @@ export const productImageSchema = z.object({
   alt: z.string().optional(),
   position: z.number().int().min(0).default(0),
 });
+
+export const createShippingMethodSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().nullable().optional(),
+  price: z.number().int().min(0),
+  freeShippingThreshold: z.number().int().min(0).nullable().optional(),
+  estimatedDaysMin: z.number().int().min(0).nullable().optional(),
+  estimatedDaysMax: z.number().int().min(0).nullable().optional(),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().int().min(0).default(0),
+});
+
+export const updateShippingMethodSchema = createShippingMethodSchema.partial();
