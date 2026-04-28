@@ -21,10 +21,12 @@ export default async function DashboardLayout({
           <h1 className="text-xl font-semibold text-zinc-900">Admin</h1>
           <div className="flex items-center gap-4">
             <a href="/dashboard" className="text-sm text-zinc-600 hover:text-zinc-900">Dashboard</a>
-            <a href="/products" className="text-sm text-zinc-600 hover:text-zinc-900">Productos</a>
-            <a href="/categorias" className="text-sm text-zinc-600 hover:text-zinc-900">Categorías</a>
-            <a href="/orders" className="text-sm text-zinc-600 hover:text-zinc-900">Órdenes</a>
-            <a href="/shipping" className="text-sm text-zinc-600 hover:text-zinc-900">Envíos</a>
+             <a href="/products" className="text-sm text-zinc-600 hover:text-zinc-900">Productos</a>
+             <a href="/categorias" className="text-sm text-zinc-600 hover:text-zinc-900">Categorías</a>
+             <a href="/orders" className="text-sm text-zinc-600 hover:text-zinc-900">Órdenes</a>
+             <a href="/shipping" className="text-sm text-zinc-600 hover:text-zinc-900">Envíos</a>
+             <a href="/store/settings" className="text-sm text-zinc-600 hover:text-zinc-900">Configuración</a>
+             <a href="/store/domain" className="text-sm text-zinc-600 hover:text-zinc-900">Dominio</a>
             <span className="text-sm text-zinc-600">{session.user?.email}</span>
             <LogoutButton />
           </div>

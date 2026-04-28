@@ -59,7 +59,7 @@ export async function PUT(
       );
     }
 
-    const { name, plan, status, slug } = validation.data;
+    const { name, plan, status, slug, customDomain } = validation.data;
 
     const existing = await db
       .select()
@@ -89,6 +89,21 @@ export async function PUT(
       }
     }
 
+    if (customDomain && customDomain !== existing[0].customDomain) {
+      const domainExists = await db
+        .select()
+        .from(dbTenants)
+        .where(eq(dbTenants.customDomain, customDomain))
+        .limit(1);
+
+      if (domainExists.length > 0) {
+        return NextResponse.json(
+          { error: "Custom domain already in use" },
+          { status: 409 }
+        );
+      }
+    }
+
     const updated = await db
       .update(dbTenants)
       .set({
@@ -96,6 +111,7 @@ export async function PUT(
         plan: plan ?? existing[0].plan,
         status: status ?? existing[0].status,
         slug: slug ?? existing[0].slug,
+        customDomain: customDomain !== undefined ? customDomain : existing[0].customDomain,
         updatedAt: new Date(),
       })
       .where(eq(dbTenants.id, id))
@@ -106,6 +122,19 @@ export async function PUT(
         await redisClient.del(`${TENANT_CACHE_PREFIX}${slug}`);
       } catch (e) {
         console.error("[Cache] Failed to invalidate:", e);
+      }
+    }
+
+    if (customDomain !== undefined) {
+      try {
+        if (existing[0].customDomain) {
+          await redisClient.del(`domain:${existing[0].customDomain}`);
+        }
+        if (customDomain) {
+          await redisClient.setex(`domain:${customDomain}`, 3600, updated[0].slug);
+        }
+      } catch (e) {
+        console.error("[Cache] Failed to update domain cache:", e);
       }
     }
 

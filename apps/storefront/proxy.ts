@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { db } from '@repo/db';
+import { dbTenants } from '@repo/db';
+import { eq } from 'drizzle-orm';
 
 export const config = {
   matcher: '/:path*',
@@ -27,7 +30,7 @@ function getOrCreateSessionId(request: NextRequest, response: NextResponse): str
   return newSessionId;
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const hostname = (request.headers.get('host') ?? '').replace(/:\d+$/, '');
   const headerTenantSlug = request.headers.get('x-tenant-slug');
@@ -44,9 +47,31 @@ export function proxy(request: NextRequest) {
   if (headerTenantSlug && headerTenantSlug.trim() !== '') {
     tenantSlug = headerTenantSlug.trim();
   }
-  // Si no viene en el header, intentar resolver desde subdominio
+  // Si no viene en el header, intentar resolver desde custom domain
   else if (hostname && hostname.includes('.') && !hostname.startsWith('localhost')) {
-    tenantSlug = hostname.split('.')[0];
+    // Primero verificar si el hostname coincide con un customDomain
+    try {
+      // TODO: Redis cache para dominios personalizados (Fase 5)
+      // const cached = await redisClient.get(`domain:${hostname}`);
+      // if (cached) { tenantSlug = cached; }
+      const tenant = await db
+        .select({ slug: dbTenants.slug })
+        .from(dbTenants)
+        .where(eq(dbTenants.customDomain, hostname))
+        .limit(1);
+
+      if (tenant.length > 0) {
+        tenantSlug = tenant[0].slug;
+        console.log('[Proxy] Resolved by customDomain:', hostname, '->', tenantSlug);
+      }
+    } catch (error) {
+      console.error('[Proxy] Error resolving custom domain:', error);
+    }
+
+    // Si no se resolvió por customDomain, intentar por subdominio
+    if (!tenantSlug) {
+      tenantSlug = hostname.split('.')[0];
+    }
   }
   // Si no, intentar desde cookie (para after logout redirect)
   else {
@@ -56,7 +81,7 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  // Si no se pudo resolver el tenant y no es ruta pública, devolver 400
+  // Si no se pudo resolver el tenant y no es ruta pública, devolver 404
   if (!tenantSlug) {
     if (isPublicPath) {
       console.log('[Proxy] Ruta pública sin tenant, continuando sin slug');
@@ -68,7 +93,7 @@ export function proxy(request: NextRequest) {
     console.log('[Proxy] No se pudo resolver tenant slug');
     return new NextResponse(
       JSON.stringify({ error: 'Tenant no encontrado. Usa header x-tenant-slug o subdominio.' }),
-      { status: 400, headers: { 'content-type': 'application/json' } }
+      { status: 404, headers: { 'content-type': 'application/json' } }
     );
   }
 

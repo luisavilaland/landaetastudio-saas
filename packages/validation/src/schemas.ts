@@ -91,11 +91,20 @@ export const createTenantSchema = z.object({
   status: z.string().min(1),
 });
 
+export const customDomainSchema = z.string().optional().transform((val) => {
+  if (val === undefined || val === null || val.trim() === '') return undefined;
+  return val.trim();
+}).refine(
+  (val) => !val || /^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(val),
+  { message: "Dominio inválido. Usa formato ej. mitienda.com (sin http:// ni paths)" }
+);
+
 export const updateTenantSchema = z.object({
   slug: z.string().min(1).max(255).optional(),
   name: z.string().min(1).max(255).optional(),
   plan: z.string().min(1).optional(),
   status: z.string().min(1).optional(),
+  customDomain: customDomainSchema.optional(),
 });
 
 export const registerSchema = z.object({
