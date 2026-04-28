@@ -48,6 +48,7 @@ test-*.js
 cookies.txt
 admin-cookies.txt
 *cookies*.txt
+test-output.txt
 
 # ngrok (if installed)
 ngrok.yml
