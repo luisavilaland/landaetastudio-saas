@@ -80,7 +80,8 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Lógica de negocio actual en apps/storefront/lib y apps/admin/lib.
 - Plan de migración: cuando se cree packages/commerce (Fase 5), la lógica de carrito, órdenes, precios y descuentos se moverá progresivamente a ese paquete. Mientras tanto, mantenla en las libs de cada app, pero no dupliques lógica entre storefront y admin.
 - Cada app (storefront, admin, superadmin) solo expone UI y endpoints, la lógica pesada en paquetes.
-- Paquetes actuales: `@repo/db`, `@repo/storage`, `@repo/auth`.
+- Paquetes actuales: `@repo/db`, `@repo/storage`, `@repo/auth`, `@repo/validation` – Validación Zod compartida para toda la API.
+- **Deuda técnica actual**: la lógica de carrito/órdenes está duplicada en `apps/storefront/lib` y `apps/admin/lib`. Durante la Fase 4, no se debe duplicar más lógica. Nueva lógica compartida (ej. cálculo de envío) debe ir en un solo lugar consensuado o en `packages/commerce` si procede.
 
 ## Mantenimiento de la documentación
 
