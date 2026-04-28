@@ -116,20 +116,24 @@ export async function getProducts(
     return acc;
   }, {} as Record<string, ProductImage[]>);
 
-  return results.map((row) => ({
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    description: row.description,
-    imageUrl: row.imageUrl,
-    status: row.status,
-    createdAt: row.createdAt,
-    categoryId: row.categoryId,
-    categoryName: row.categoryName ?? null,
-    categorySlug: row.categorySlug ?? null,
-    variants: variantsByProduct[row.id] || [],
-    images: imagesByProduct[row.id] || [],
-  }));
+  return results.map((row) => {
+    const productImages = imagesByProduct[row.id] || [];
+    const firstImageUrl = productImages.length > 0 ? productImages[0].url : row.imageUrl;
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      description: row.description,
+      imageUrl: firstImageUrl,
+      status: row.status,
+      createdAt: row.createdAt,
+      categoryId: row.categoryId,
+      categoryName: row.categoryName ?? null,
+      categorySlug: row.categorySlug ?? null,
+      variants: variantsByProduct[row.id] || [],
+      images: productImages,
+    };
+  });
 }
 
 export async function getProductBySlug(

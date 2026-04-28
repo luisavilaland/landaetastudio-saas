@@ -85,7 +85,7 @@ export function CategoriesTable({ initialCategories }: { initialCategories: Cate
         setCategories((prev) =>
           prev.map((c) =>
             c.id === editingCategory.id
-              ? { ...c, ...formData }
+              ? data.category
               : c
           )
         );

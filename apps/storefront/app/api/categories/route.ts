@@ -4,9 +4,7 @@ import { getTenantId } from "@/lib/tenant";
 import { eq, and } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
-  const tenantSlug = request.headers.get("x-tenant-slug") || "default";
-
-  const tenantId = await getTenantId(tenantSlug);
+  const tenantId = await getTenantId();
   if (!tenantId) {
     return NextResponse.json({ categories: [] });
   }

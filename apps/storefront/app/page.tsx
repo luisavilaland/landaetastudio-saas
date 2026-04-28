@@ -1,32 +1,22 @@
 import { headers } from "next/headers";
-import { db, dbTenants } from "@repo/db";
-import { eq } from "drizzle-orm";
 import { getProducts } from "@/lib/products";
 import { ProductCard } from "@/components/product-card";
+import { getTenantId } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+interface HomePageProps {
+  searchParams: Promise<{ category?: string }>;
+}
+
+export default async function HomePage({ searchParams }: HomePageProps) {
   const headersList = await headers();
   const tenantSlug = headersList.get("x-tenant-slug") || "default";
+  const { category: categorySlug } = await searchParams;
 
-  let tenantId: string | null = null;
+  const resolvedTenantSlug = await getTenantId();
 
-  try {
-    const tenant = await db
-      .select({ id: dbTenants.id })
-      .from(dbTenants)
-      .where(eq(dbTenants.slug, tenantSlug))
-      .limit(1);
-
-    if (tenant.length > 0) {
-      tenantId = tenant[0].id;
-    }
-  } catch {
-    // ignore
-  }
-
-  if (!tenantId) {
+  if (!resolvedTenantSlug) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
@@ -34,14 +24,14 @@ export default async function HomePage() {
             Tienda no encontrada
           </h1>
           <p className="mt-2 text-zinc-500">
-            El subdomain &quot;{tenantSlug}&quot; no existe.
+            El subdominio "{tenantSlug}" no existe.
           </p>
         </div>
       </div>
     );
   }
 
-  const products = await getProducts(tenantId, 12);
+  const products = await getProducts(resolvedTenantSlug, 12, categorySlug);
 
   if (products.length === 0) {
     return (

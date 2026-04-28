@@ -4,13 +4,12 @@ import { getTenantId } from "@/lib/tenant";
 import { eq, and, or, ilike, sql, desc } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
-  const tenantSlug = request.headers.get("x-tenant-slug") || "default";
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q") || "";
   const limit = Math.min(parseInt(searchParams.get("limit") || "10"), 50);
   const offset = parseInt(searchParams.get("offset") || "0");
 
-  const tenantId = await getTenantId(tenantSlug);
+  const tenantId = await getTenantId();
   if (!tenantId) {
     return NextResponse.json({ products: [], total: 0 });
   }

@@ -14,8 +14,9 @@ export const updateProductSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   slug: z.string().min(1).max(255).optional(),
   description: z.string().nullable().optional(),
-  status: z.string().min(1).optional(),
+  status: z.string().min(1).nullable().optional(),
   categoryId: z.string().nullable().optional(),
+  sku: z.string().min(1).max(255).optional(),
   price: z.number().int().min(1).optional(),
   stock: z.number().int().min(0).optional(),
   removeImage: z.boolean().optional(),
@@ -57,8 +58,11 @@ export const updateCartItemSchema = z.object({
 });
 
 export const deleteCartItemSchema = z.object({
-  variantId: z.string().min(1),
+  variantId: z.string().min(1).optional(),
   clearAll: z.boolean().optional(),
+}).refine(data => data.clearAll === true || data.variantId !== undefined, {
+  message: "Must provide variantId when not clearing all",
+  path: ["variantId"],
 });
 
 export const checkoutPreferenceSchema = z.object({
@@ -75,8 +79,8 @@ export const shippingDetailsSchema = z.object({
 export const createCheckoutSchema = shippingDetailsSchema;
 
 export const dashboardQuerySchema = z.object({
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
+  startDate: z.string().datetime().nullable().optional(),
+  endDate: z.string().datetime().nullable().optional(),
 });
 
 export const createTenantSchema = z.object({

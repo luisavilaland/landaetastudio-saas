@@ -8,28 +8,6 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   allowedDevOrigins: ['lvh.me', '*.lvh.me'],
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '9000',
-        pathname: '/**',
-      },
-      {
-        protocol: 'http',
-        hostname: '*.lvh.me',
-        port: '9000',
-        pathname: '/**',
-      },
-      {
-        protocol: 'http',
-        hostname: 'host.docker.internal',
-        port: '9000',
-        pathname: '/**',
-      },
-    ],
-  },
 };
 
 export default nextConfig;

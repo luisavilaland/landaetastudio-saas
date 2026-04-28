@@ -17,6 +17,10 @@ type CartItem = {
     price: number;
     stock: number | null;
   } | null;
+  variant?: {
+    sku: string;
+    options: Record<string, string>;
+  };
 };
 
 type Props = {
@@ -32,8 +36,20 @@ function formatPrice(cents: number): string {
 
 export function CartList({ initialItems }: Props) {
   const router = useRouter();
-  const [items, setItems] = useState(initialItems);
+  const [items, setItems] = useState<CartItem[]>(initialItems || []);
   const [loading, setLoading] = useState(false);
+
+  const fetchCartItems = async () => {
+    try {
+      const res = await fetch("/api/cart", { method: "GET" });
+      if (res.ok) {
+        const data = await res.json();
+        setItems(Array.isArray(data.items) ? data.items : []);
+      }
+    } catch (error) {
+      console.error("Error fetching cart:", error);
+    }
+  };
 
   const updateQuantity = async (variantId: string, quantity: number) => {
     setLoading(true);
@@ -45,9 +61,7 @@ export function CartList({ initialItems }: Props) {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        setItems(data.items || []);
-        router.refresh();
+        await fetchCartItems();
       }
     } catch (error) {
       console.error("Error updating quantity:", error);
@@ -66,9 +80,7 @@ export function CartList({ initialItems }: Props) {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        setItems(data.items || []);
-        router.refresh();
+        await fetchCartItems();
       }
     } catch (error) {
       console.error("Error removing item:", error);
@@ -90,7 +102,6 @@ export function CartList({ initialItems }: Props) {
 
       if (res.ok) {
         setItems([]);
-        router.refresh();
       }
     } catch (error) {
       console.error("Error clearing cart:", error);
@@ -99,7 +110,19 @@ export function CartList({ initialItems }: Props) {
     }
   };
 
-  if (items.length === 0) {
+  const safeItems = Array.isArray(items) ? items : [];
+
+  if (!Array.isArray(items)) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <p className="text-zinc-500">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (safeItems.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center max-w-md">
@@ -136,7 +159,7 @@ export function CartList({ initialItems }: Props) {
     );
   }
 
-  const total = items.reduce((sum, item) => {
+  const total = safeItems.reduce((sum, item) => {
     const price = item.product?.price ?? 0;
     return sum + price * item.quantity;
   }, 0);
@@ -155,7 +178,7 @@ export function CartList({ initialItems }: Props) {
       </div>
 
       <div className="space-y-4">
-        {items.map((item) => {
+        {safeItems.map((item) => {
           const price = item.product?.price ?? 0;
           const subtotal = price * item.quantity;
 
@@ -187,6 +210,13 @@ export function CartList({ initialItems }: Props) {
                 >
                   {item.product?.name}
                 </Link>
+                {item.variant?.options && Object.keys(item.variant.options).length > 0 && (
+                  <p className="text-sm text-zinc-500">
+                    {Object.entries(item.variant.options)
+                      .map(([key, value]) => `${key}: ${value}`)
+                      .join(", ")}
+                  </p>
+                )}
                 <p className="text-sm text-zinc-500">
                   {formatPrice(price)} c/u
                 </p>

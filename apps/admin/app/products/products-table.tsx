@@ -21,16 +21,19 @@ type Product = {
   createdAt: Date;
   categoryName: string | null;
   variant?: ProductVariant;
+  images?: { url: string }[];
 };
 
 function StockCell({
   productId,
   variantId,
   initialStock,
+  onStockUpdate,
 }: {
   productId: string;
   variantId?: string;
   initialStock: number | null;
+  onStockUpdate: (productId: string, newStock: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(initialStock ?? ""));
@@ -66,6 +69,7 @@ function StockCell({
         body: JSON.stringify({ stock: newStock }),
       });
       if (res.ok) {
+        onStockUpdate(productId, newStock);
         setSuccess(true);
         setTimeout(() => {
           setSuccess(false);
@@ -107,7 +111,7 @@ function StockCell({
           disabled={saving}
         />
         {saving && <span className="text-xs text-zinc-500">Guardando...</span>}
-        {success && <span className="text-xs text-green-600">✓</span>}
+        {success && <span className="text-xs text-green-600">✓ {value}</span>}
         {error && <span className="text-xs text-red-600">Error</span>}
       </div>
     );
@@ -148,6 +152,16 @@ function StockCell({
 export function ProductsTable({ initialProducts }: { initialProducts: Product[] }) {
   const router = useRouter();
   const [products, setProducts] = useState(initialProducts);
+
+  const handleStockUpdate = (productId: string, newStock: number) => {
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === productId && p.variant
+          ? { ...p, variant: { ...p.variant, stock: newStock } }
+          : p
+      )
+    );
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar este producto?")) return;
@@ -211,7 +225,13 @@ export function ProductsTable({ initialProducts }: { initialProducts: Product[] 
               products.map((product) => (
                 <tr key={product.id} className="hover:bg-zinc-50">
                   <td className="px-4 py-3 text-sm">
-                    {product.imageUrl ? (
+                    {product.images && product.images.length > 0 ? (
+                      <img
+                        src={product.images[0].url}
+                        alt={product.name}
+                        className="w-12 h-12 object-cover rounded-md"
+                      />
+                    ) : product.imageUrl ? (
                       <img
                         src={product.imageUrl}
                         alt={product.name}
@@ -242,13 +262,14 @@ export function ProductsTable({ initialProducts }: { initialProducts: Product[] 
                   <td className="px-4 py-3 text-sm">
                     {product.variant ? formatPrice(product.variant.price) : "-"}
                   </td>
-<td className="px-4 py-3 text-sm">
-                      <StockCell
-                        productId={product.id}
-                        variantId={product.variant?.id}
-                        initialStock={product.variant?.stock ?? null}
-                      />
-                    </td>
+                  <td className="px-4 py-3 text-sm">
+                       <StockCell
+                         productId={product.id}
+                         variantId={product.variant?.id}
+                         initialStock={product.variant?.stock ?? null}
+                         onStockUpdate={handleStockUpdate}
+                       />
+                     </td>
                   <td className="px-4 py-3 text-sm">{formatDate(product.createdAt)}</td>
                   <td className="px-4 py-3 text-right">
                     <button

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { redisClient } from "@/lib/redis";
-import { db, dbProducts, dbProductVariants } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbProductImages } from "@repo/db";
 import { inArray, eq } from "drizzle-orm";
 import { addCartItemSchema, updateCartItemSchema, deleteCartItemSchema } from "@repo/validation";
 
@@ -33,15 +33,34 @@ async function saveCart(sessionId: string, cart: Cart): Promise<void> {
   await redisClient.setex(`cart:${sessionId}`, CART_TTL, JSON.stringify(cart));
 }
 
-function getEnrichedItems(cart: Cart, variants: any[]) {
+async function getEnrichedItems(cart: Cart, variants: any[]) {
   if (cart.items.length === 0) return [];
 
   const variantMap = new Map(variants.map((v) => [v.variantId, v]));
+
+  const productIds = variants.map((v) => v.productId);
+  const images = productIds.length > 0
+    ? await db
+        .select({
+          productId: dbProductImages.productId,
+          url: dbProductImages.url,
+        })
+        .from(dbProductImages)
+        .where(inArray(dbProductImages.productId, productIds))
+        .orderBy(dbProductImages.position)
+    : [];
+
+  const firstImageByProduct = images.reduce((acc, img) => {
+    if (!acc[img.productId]) acc[img.productId] = img.url;
+    return acc;
+  }, {} as Record<string, string>);
 
   const itemsWithProduct = cart.items
     .map((item) => {
       const variant = variantMap.get(item.variantId);
       if (!variant) return null;
+
+      const firstImage = firstImageByProduct[variant.productId];
 
       return {
         ...item,
@@ -49,9 +68,13 @@ function getEnrichedItems(cart: Cart, variants: any[]) {
           id: variant.productId,
           name: variant.productName,
           slug: variant.productSlug,
-          imageUrl: variant.productImage,
+          imageUrl: firstImage || variant.productImage,
           price: variant.variantPrice,
           stock: variant.variantStock,
+        },
+        variant: {
+          sku: variant.variantSku,
+          options: variant.variantOptions || {},
         },
       };
     })
@@ -186,6 +209,8 @@ export async function PUT(request: NextRequest) {
             variantId: dbProductVariants.id,
             variantPrice: dbProductVariants.price,
             variantStock: dbProductVariants.stock,
+            variantSku: dbProductVariants.sku,
+            variantOptions: dbProductVariants.options,
             productId: dbProducts.id,
             productName: dbProducts.name,
             productSlug: dbProducts.slug,
@@ -222,10 +247,19 @@ export async function DELETE(request: NextRequest) {
 
     const cart = await getCart(sessionId);
 
-    const body = await request.json();
+    let body: any = {};
+    try {
+      body = await request.json();
+    } catch (e) {
+      console.error("[Cart API] DELETE - Error parsing JSON body:", e);
+    }
+
+    console.log("[Cart API] DELETE - Request body:", body);
+
     const validation = deleteCartItemSchema.safeParse(body);
 
     if (!validation.success) {
+      console.error("[Cart API] DELETE - Validation failed:", validation.error.issues);
       return NextResponse.json(
         { error: "Validation failed", issues: validation.error.issues },
         { status: 400 }
@@ -250,6 +284,8 @@ export async function DELETE(request: NextRequest) {
             variantId: dbProductVariants.id,
             variantPrice: dbProductVariants.price,
             variantStock: dbProductVariants.stock,
+            variantSku: dbProductVariants.sku,
+            variantOptions: dbProductVariants.options,
             productId: dbProducts.id,
             productName: dbProducts.name,
             productSlug: dbProducts.slug,
@@ -295,6 +331,7 @@ export async function GET() {
         variantPrice: dbProductVariants.price,
         variantStock: dbProductVariants.stock,
         variantSku: dbProductVariants.sku,
+        variantOptions: dbProductVariants.options,
         productId: dbProducts.id,
         productName: dbProducts.name,
         productSlug: dbProducts.slug,
@@ -308,6 +345,23 @@ export async function GET() {
           : undefined
       );
 
+    const productIds = variants.map((v) => v.productId);
+    const images = productIds.length > 0
+      ? await db
+          .select({
+            productId: dbProductImages.productId,
+            url: dbProductImages.url,
+          })
+          .from(dbProductImages)
+          .where(inArray(dbProductImages.productId, productIds))
+          .orderBy(dbProductImages.position)
+      : [];
+
+    const firstImageByProduct = images.reduce((acc, img) => {
+      if (!acc[img.productId]) acc[img.productId] = img.url;
+      return acc;
+    }, {} as Record<string, string>);
+
     const variantMap = new Map(variants.map((v) => [v.variantId, v]));
 
     const itemsWithProduct = cart.items
@@ -315,15 +369,21 @@ export async function GET() {
         const variant = variantMap.get(item.variantId);
         if (!variant) return null;
 
+        const firstImage = firstImageByProduct[variant.productId];
+
         return {
           ...item,
           product: {
             id: variant.productId,
             name: variant.productName,
             slug: variant.productSlug,
-            imageUrl: variant.productImage,
+            imageUrl: firstImage || variant.productImage,
             price: variant.variantPrice,
             stock: variant.variantStock,
+          },
+          variant: {
+            sku: variant.variantSku,
+            options: variant.variantOptions || {},
           },
         };
       })

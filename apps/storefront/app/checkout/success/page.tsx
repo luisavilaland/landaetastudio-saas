@@ -4,12 +4,11 @@ import { db, dbOrders } from "@repo/db";
 import { eq } from "drizzle-orm";
 
 type Props = {
-  searchParams: Promise<{ order_id?: string }>;
+  searchParams: { order_id?: string };
 };
 
 export default async function CheckoutSuccessPage({ searchParams }: Props) {
-  const params = await searchParams;
-  const orderId = params.order_id;
+  const orderId = searchParams.order_id;
 
   let order = null;
   if (orderId) {

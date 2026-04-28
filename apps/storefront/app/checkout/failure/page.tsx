@@ -1,10 +1,9 @@
 type Props = {
-  searchParams: Promise<{ order_id?: string }>;
+  searchParams: { order_id?: string };
 };
 
 export default async function CheckoutFailurePage({ searchParams }: Props) {
-  const params = await searchParams;
-  const orderId = params.order_id;
+  const orderId = searchParams.order_id;
 
   return (
     <div className="min-h-screen flex items-center justify-center">

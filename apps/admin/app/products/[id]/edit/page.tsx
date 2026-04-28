@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { db, dbProducts, dbProductVariants, dbCategories } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbProductImages, dbCategories } from "@repo/db";
 import { eq } from "drizzle-orm";
 import { ProductForm } from "@/components/product-form";
 
@@ -37,6 +37,12 @@ export default async function EditProductPage({ params }: Props) {
      .where(eq(dbProductVariants.productId, id))
      .orderBy(dbProductVariants.createdAt);
 
+   const images = await db
+     .select()
+     .from(dbProductImages)
+     .where(eq(dbProductImages.productId, id))
+     .orderBy(dbProductImages.position);
+
    const categories = await db
      .select()
      .from(dbCategories)
@@ -50,6 +56,7 @@ export default async function EditProductPage({ params }: Props) {
      description: product[0].description,
      status: product[0].status ?? "draft",
      categoryId: product[0].categoryId,
+     images: images,
      variants: variants.map(v => ({
        id: v.id,
        sku: v.sku,

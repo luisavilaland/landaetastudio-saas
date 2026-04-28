@@ -1,10 +1,16 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import type { User } from "next-auth";
 import { db, dbCustomers, dbTenants } from "@repo/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
 import { getTenantId } from "@/lib/tenant";
+import { NextResponse } from "next/server";
+
+interface StorefrontUser extends User {
+  tenantId?: string | null;
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -21,22 +27,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = credentials.email as string;
         const password = credentials.password as string;
 
-        // Get tenant from header
-        const headersList = await headers();
-        const tenantSlug = headersList.get("x-tenant-slug");
-
-        if (!tenantSlug) {
-          console.log("[Storefront Auth] No tenant slug in header");
-          return null;
-        }
-
-        const tenantId = await getTenantId(tenantSlug);
-        if (!tenantId) {
-          console.log("[Storefront Auth] Tenant not found:", tenantSlug);
-          return null;
-        }
-
-        // Find customer by email first (unique per tenant)
+        // Find customer by email across all tenants
+        // Customers can have same email in different tenants
         const [customer] = await db
           .select({
             id: dbCustomers.id,
@@ -53,12 +45,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        // Verify tenant matches (extra security)
-        if (customer.tenantId !== tenantId) {
-          console.log("[Storefront Auth] Customer belongs to different tenant");
-          return null;
-        }
-
+        // For login without tenant context (like after logout),
+        // we need to set the tenant in the session
+        // The middleware/proxy will need to handle this
+        
         // Verify password
         const isValid = await bcrypt.compare(password, customer.password);
         if (!isValid) {
@@ -69,6 +59,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: customer.id,
           email: customer.email,
           name: customer.name || undefined,
+          tenantId: customer.tenantId,
         };
       }
     })
@@ -78,6 +69,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         token.email = user.email;
+        const storefrontUser = user as StorefrontUser;
+        if (storefrontUser.tenantId) {
+          token.tenantId = storefrontUser.tenantId;
+        }
       }
       return token;
     },
@@ -85,6 +80,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
+        if (token.tenantId) {
+          (session.user as StorefrontUser).tenantId = token.tenantId as string;
+        }
       }
       return session;
     }

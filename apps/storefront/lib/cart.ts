@@ -1,4 +1,4 @@
-import { db, dbProducts, dbProductVariants } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbProductImages } from "@repo/db";
 import { eq, inArray } from "drizzle-orm";
 import { redisClient } from "./redis";
 
@@ -22,6 +22,10 @@ export type EnrichedCartItem = CartItem & {
     price: number;
     stock: number | null;
   } | null;
+  variant?: {
+    sku: string;
+    options: Record<string, string>;
+  };
 };
 
 export async function getCart(sessionId: string): Promise<EnrichedCartItem[]> {
@@ -42,6 +46,8 @@ export async function getCart(sessionId: string): Promise<EnrichedCartItem[]> {
       variantId: dbProductVariants.id,
       variantPrice: dbProductVariants.price,
       variantStock: dbProductVariants.stock,
+      variantSku: dbProductVariants.sku,
+      variantOptions: dbProductVariants.options,
       productId: dbProducts.id,
       productName: dbProducts.name,
       productSlug: dbProducts.slug,
@@ -53,11 +59,30 @@ export async function getCart(sessionId: string): Promise<EnrichedCartItem[]> {
 
   const variantMap = new Map(variants.map((v) => [v.variantId, v]));
 
+  const productIds = variants.map((v) => v.productId);
+  const images = productIds.length > 0
+    ? await db
+        .select({
+          productId: dbProductImages.productId,
+          url: dbProductImages.url,
+        })
+        .from(dbProductImages)
+        .where(inArray(dbProductImages.productId, productIds))
+        .orderBy(dbProductImages.position)
+    : [];
+
+  const firstImageByProduct = images.reduce((acc, img) => {
+    if (!acc[img.productId]) acc[img.productId] = img.url;
+    return acc;
+  }, {} as Record<string, string>);
+
   const enrichedItems: EnrichedCartItem[] = [];
 
   for (const item of cart.items) {
     const variant = variantMap.get(item.variantId);
     if (!variant) continue;
+
+    const firstImage = firstImageByProduct[variant.productId];
 
     enrichedItems.push({
       ...item,
@@ -65,9 +90,13 @@ export async function getCart(sessionId: string): Promise<EnrichedCartItem[]> {
         id: variant.productId,
         name: variant.productName,
         slug: variant.productSlug,
-        imageUrl: variant.productImage,
+        imageUrl: firstImage || variant.productImage,
         price: variant.variantPrice,
         stock: variant.variantStock,
+      },
+      variant: {
+        sku: variant.variantSku,
+        options: (variant.variantOptions as Record<string, string>) || {},
       },
     });
   }

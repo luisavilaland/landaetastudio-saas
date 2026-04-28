@@ -20,15 +20,13 @@ export async function POST(request: NextRequest) {
     const { name, email, password } = validation.data;
 
     // Get tenant from header
-    const tenantSlug = request.headers.get("x-tenant-slug");
-    if (!tenantSlug) {
+    const tenantId = await getTenantId();
+    if (!tenantId) {
       return NextResponse.json(
-        { error: "Tenant no especificado" },
+        { error: "Tienda no encontrada" },
         { status: 400 }
       );
     }
-
-    const tenantId = await getTenantId(tenantSlug);
     if (!tenantId) {
       return NextResponse.json(
         { error: "Tienda no encontrada" },

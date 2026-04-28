@@ -30,8 +30,7 @@ export async function SearchResults({
   }
 
   const headersList = await headers();
-  const tenantSlug = headersList.get("x-tenant-slug") || "default";
-  const tenantId = await getTenantId(tenantSlug);
+  const tenantId = await getTenantId();
 
   if (!tenantId) {
     return (

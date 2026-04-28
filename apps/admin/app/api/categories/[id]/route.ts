@@ -82,35 +82,29 @@ export async function PUT(
       );
     }
 
-    const { name, slug } = validation.data;
+    const { name, slug: providedSlug } = validation.data;
 
-    if (!name && !slug) {
+    if (!name && !providedSlug) {
       return NextResponse.json(
         { error: "At least one field must be provided" },
         { status: 400 }
       );
     }
 
-    if (slug && slug !== existingCategory.slug) {
-      const existingSlug = await db
-        .select()
-        .from(dbCategories)
-        .where(
-          and(
-            eq(dbCategories.slug, slug),
-            eq(dbCategories.tenantId, tenantId),
-            eq(dbCategories.id, id)
-          )
-        )
-        .limit(1);
+    const generateSlug = (name: string): string => {
+      return name
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "");
+    };
 
-      if (existingSlug.length > 0) {
-        return NextResponse.json(
-          { error: "Slug already exists" },
-          { status: 409 }
-        );
-      }
+    const slug = (name && name !== existingCategory.name)
+      ? generateSlug(name)
+      : (providedSlug || existingCategory.slug);
 
+    if (slug !== existingCategory.slug) {
       const duplicateSlug = await db
         .select()
         .from(dbCategories)
@@ -133,7 +127,7 @@ export async function PUT(
     const now = new Date();
     const updateData: Record<string, unknown> = { updatedAt: now };
     if (name) updateData.name = name;
-    if (slug) updateData.slug = slug;
+    updateData.slug = slug;
 
     const [category] = await db
       .update(dbCategories)

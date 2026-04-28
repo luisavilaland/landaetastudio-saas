@@ -28,17 +28,51 @@ function getOrCreateSessionId(request: NextRequest, response: NextResponse): str
 }
 
 export function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
   const hostname = (request.headers.get('host') ?? '').replace(/:\d+$/, '');
+  const headerTenantSlug = request.headers.get('x-tenant-slug');
 
-  console.log('[Proxy] Hostname:', hostname);
+  console.log('[Proxy] Hostname:', hostname, '| Header slug:', headerTenantSlug, '| Path:', pathname);
 
-  let tenantSlug = 'default';
+  // Rutas públicas que no requieren tenant
+  const publicPaths = ['/login', '/register', '/api/auth'];
+  const isPublicPath = publicPaths.some(path => pathname === path || pathname.startsWith(path + '/'));
 
-  if (hostname && hostname.includes('.') && !hostname.startsWith('localhost')) {
+  let tenantSlug: string | null = null;
+
+  // Priorizar header x-tenant-slug si viene en la petición
+  if (headerTenantSlug && headerTenantSlug.trim() !== '') {
+    tenantSlug = headerTenantSlug.trim();
+  }
+  // Si no viene en el header, intentar resolver desde subdominio
+  else if (hostname && hostname.includes('.') && !hostname.startsWith('localhost')) {
     tenantSlug = hostname.split('.')[0];
   }
+  // Si no, intentar desde cookie (para after logout redirect)
+  else {
+    const tenantCookie = request.cookies.get('tenant-slug');
+    if (tenantCookie?.value) {
+      tenantSlug = tenantCookie.value;
+    }
+  }
 
-  console.log('[Proxy] Tenant Slug:', tenantSlug);
+  // Si no se pudo resolver el tenant y no es ruta pública, devolver 400
+  if (!tenantSlug) {
+    if (isPublicPath) {
+      console.log('[Proxy] Ruta pública sin tenant, continuando sin slug');
+      const response = NextResponse.next();
+      const sessionId = getOrCreateSessionId(request, response);
+      response.headers.set('x-cart-session-id', sessionId);
+      return response;
+    }
+    console.log('[Proxy] No se pudo resolver tenant slug');
+    return new NextResponse(
+      JSON.stringify({ error: 'Tenant no encontrado. Usa header x-tenant-slug o subdominio.' }),
+      { status: 400, headers: { 'content-type': 'application/json' } }
+    );
+  }
+
+  console.log('[Proxy] Tenant Slug resuelto:', tenantSlug);
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-tenant-slug', tenantSlug);

@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
 
     const tenantId = session.user.tenantId;
     if (!tenantId) {
+      console.error("[Dashboard GET] Tenant ID no encontrado en sesión:", session.user);
       return NextResponse.json({ error: "Tenant no encontrado" }, { status: 400 });
     }
 
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!queryValidation.success) {
+      console.error("[Dashboard GET] Validation error:", queryValidation.error.issues);
       return NextResponse.json(
         { error: "Validation failed", issues: queryValidation.error.issues },
         { status: 400 }
@@ -30,8 +32,15 @@ export async function GET(request: NextRequest) {
     }
 
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const firstDayOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+    const start = (queryValidation.data.startDate && queryValidation.data.startDate !== 'null')
+      ? new Date(queryValidation.data.startDate)
+      : firstDayOfMonth;
+    const end = (queryValidation.data.endDate && queryValidation.data.endDate !== 'null')
+      ? new Date(queryValidation.data.endDate)
+      : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+
+    console.log('[Dashboard GET] Start:', start, '| End:', end);
 
     const [revenueResult] = await db
       .select({ total: sql<number>`COALESCE(SUM(${dbOrders.total}), 0)` })
@@ -40,8 +49,8 @@ export async function GET(request: NextRequest) {
         and(
           eq(dbOrders.tenantId, tenantId),
           eq(dbOrders.status, "confirmed"),
-          gte(dbOrders.createdAt, startOfMonth),
-          lte(dbOrders.createdAt, endOfMonth)
+          gte(dbOrders.createdAt, start),
+          lte(dbOrders.createdAt, end)
         )
       );
 

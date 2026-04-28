@@ -6,13 +6,14 @@ export const metadata: Metadata = {
   title: "Buscar productos",
 };
 
-export default function SearchPage({
+export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: { q?: string; offset?: string };
+  searchParams: Promise<{ q?: string; offset?: string }>;
 }) {
-  const query = searchParams.q || "";
-  const offset = parseInt(searchParams.offset || "0");
+  const params = await searchParams;
+  const query = params.q || "";
+  const offset = parseInt(params.offset || "0");
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">

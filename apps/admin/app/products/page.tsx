@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { db, dbProducts, dbProductVariants, dbCategories } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbProductImages, dbCategories } from "@repo/db";
 import { eq, desc } from "drizzle-orm";
 import { ProductsTable } from "./products-table";
 
@@ -49,6 +49,20 @@ export default async function ProductsPage() {
     }
   }
 
+  // Get product IDs for images
+  const productIds = [...new Set(productsRaw.map(p => p.id))];
+  const images = await db
+    .select()
+    .from(dbProductImages)
+    .where(eq(dbProductImages.tenantId, tenantId))
+    .orderBy(dbProductImages.position);
+
+  const imagesByProduct = images.reduce((acc, img) => {
+    if (!acc[img.productId]) acc[img.productId] = [];
+    acc[img.productId].push(img);
+    return acc;
+  }, {} as Record<string, typeof images>);
+
   // Group by product ID and nest variant
   const productMap = new Map();
   for (const row of productsRaw) {
@@ -63,6 +77,7 @@ export default async function ProductsPage() {
         createdAt: row.createdAt,
         categoryName: row.categoryId ? categoriesMap.get(row.categoryId) || null : null,
         variant: undefined,
+        images: imagesByProduct[row.id] || [],
       });
     }
     if (row.variantId) {

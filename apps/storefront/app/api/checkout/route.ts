@@ -93,21 +93,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get tenantId from header x-tenant-slug
-    const headersList = await headers();
-    const tenantSlug = headersList.get("x-tenant-slug");
-    
-    if (!tenantSlug) {
-      return NextResponse.json(
-        { error: "Tenant no encontrado" },
-        { status: 400 }
-      );
-    }
-
-    const tenantIdFromSlug = await getTenantId(tenantSlug);
+     const tenantIdFromSlug = await getTenantId();
     if (!tenantIdFromSlug) {
       return NextResponse.json(
-        { error: `Tenant "${tenantSlug}" no válido` },
+        { error: "Tenant no válido" },
         { status: 400 }
       );
     }
