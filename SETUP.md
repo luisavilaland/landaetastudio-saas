@@ -75,21 +75,35 @@ SELECT count(*) FROM admin_users;
 
 - **Email:** admin@tienda1.com
 - **Password:** 123456
+- **Rol:** admin (tenant: tienda1)
 
 ### superadmin
 
 - **Email:** super@admin.com
 - **Password:** 123456
+- **Rol:** superadmin (sin tenant)
 
 ### Cliente
 
 - **Email:** cliente@ejemplo.com
 - **Password:** 123456
+- **Rol:** customer (tenant: tienda1)
 
 ### Tenant
 
 - **Slug:** tienda1
 - **Nombre:** Tienda Demo
+
+### Productos de Prueba
+
+- **Remera Básica** (Categoría: Remeras) - 6 variantes (S/M/L x Rojo/Azul)
+- **Pantalón Jeans** (Categoría: Pantalones) - 6 variantes (38/40/42 x Azul/Negro)
+- **Gorra** (Categoría: Accesorios) - 1 variante (Único, Negra)
+
+### Órdenes de Ejemplo
+
+- Orden #1: **confirmed** (2 remeras M rojas + 1 jean 40 azul)
+- Orden #2: **pending_payment** (1 gorra negra + 1 remera L azul)
 
 ## Variables de Entorno
 
@@ -225,4 +239,4 @@ tenant1.lvh.me:3000
 
 ## Nota
 
-Última actualización: 27 de abril de 2026 – Admin dashboard, stock management.
+Última actualización: 28 de abril de 2026 – Fase 3 completada: categorías, imágenes, variantes, búsqueda, Zod.

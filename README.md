@@ -18,7 +18,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Badge "Agotado" en storefront y product-card
 - Lista de productos con stock bajo en dashboard (enlace a editar)
 
-## Fase 3 – Experiencia de Tienda Completa 🔄 (Pendiente)
+## Fase 3 – Experiencia de Tienda Completa ✅ (Completada)
 
 - Categorías de productos
 - Búsqueda en catálogo
@@ -59,13 +59,16 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - CRUD de productos en admin (API + UI): create, read, update, delete.
 - Tipos TypeScript para NextAuth (tenantId, role).
 - Logout functionality.
-- Validación backend: price > 0, stock >= 0, SKU regeneration on slug update.
+- Validación backend con Zod: price > 0, stock >= 0, SKU regeneration on slug update.
 - Índices de base de datos: unique (tenantId, slug) para products, (tenantId, email) para customers, (tenantId, sku) para variants.
 - Índices en tenantId en todas las tablas de negocio.
-- Subida de imágenes a MinIO con FormData.
-- Paquete `@repo/storage` para integración con MinIO.
-- Storefront: catálogo, página de detalle, navbar, breadcrumbs.
-- **Carrito funcional:** Redis + cookie session, 7-day TTL, usuarios anónimos.
+- Subida de imágenes a MinIO con FormData (@repo/storage).
+- Múltiples imágenes por producto (tabla product_images, ordenamiento por position).
+- Categorías de productos con CRUD completo.
+- Variantes reales con JSONB (talle, color, SKU, stock independiente).
+- Búsqueda server-side con ILIKE en storefront.
+- Storefront: catálogo, página de detalle, navbar con categorías, búsqueda.
+- **Carrito funcional:** Redis + cookie session, 7-day TTL, usuarios anónimos, variantes en carrito.
 - **Checkout:** Flujo completo con MercadoPago (binary_mode).
 - **Webhook:** Actualiza orden según notificación (con prevención de duplicados, modo simulación).
 - **Email:** Confirmación de orden con nodemailer.
@@ -73,13 +76,20 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - **Admin orders:** Panel de gestión de órdenes con cambio de status.
 - **Admin dashboard:** Métricas (ventas, órdenes, stock), tabla de productos con stock bajo.
 - **Stock management:** Edición rápida de stock en tabla, badge "Agotado", alertas en dashboard.
-- **Fixes:** Bug inArray en cart/checkout, deleteImage, validación tenant, queries N+1, payment_methods exclusions.
+- **Fixes:** Bugs carrito, variantes, imágenes, validación tenant, queries N+1, logout redirects.
 
-🔄 **En desarrollo:**
-- typecheck pasa correctamente (React 19.2.4 forzado con pnpm.overrides)
-- Políticas RLS.
-- Normalizar slug en create/edit.
-- CSRF protection.
+## Tech Stack
+
+- **Framework:** Next.js 16 (App Router)
+- **ORM:** Drizzle ORM
+- **Auth:** NextAuth v5 (Auth.js)
+- **Base de datos:** PostgreSQL 16
+- **Cache/Carrito:** Redis 7
+- **Storage:** MinIO (S3-compatible)
+- **Email:** MailHog (dev) / Resend (prod)
+- **Pagos:** MercadoPago (Checkout Pro)
+- **Monorepo:** Turborepo + pnpm
+- **Validación:** Zod (endpoints API)
 
 ## Requisitos previos
 
@@ -176,12 +186,26 @@ saas-ecommerce/
 
 ### Admin Products
 
-|Method|Endpoint|Descripción|
-|:-:|-|/api/products|Listar productos|
-|POST|/api/products|Crear producto|
-|GET|/api/products/[id]|Obtener producto|
-|PUT|/api/products/[id]|Actualizar producto|
-|DELETE|/api/products/[id]|Eliminar producto|
+| Method | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| GET | /api/products | Listar productos |
+| POST | /api/products | Crear producto |
+| GET | /api/products/[id] | Obtener producto |
+| PUT | /api/products/[id] | Actualizar producto |
+| DELETE | /api/products/[id] | Eliminar producto |
+| POST | /api/products/[id]/images | Subir imágenes |
+| DELETE | /api/products/[id]/images/[imageId] | Eliminar imagen |
+| GET/PUT | /api/products/[id]/variants | Gestionar variantes |
+
+### Categories
+
+| Method | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| GET | /api/categories | Listar categorías |
+| POST | /api/categories | Crear categoría |
+| GET | /api/categories/[id] | Obtener categoría |
+| PUT | /api/categories/[id] | Actualizar categoría |
+| DELETE | /api/categories/[id] | Eliminar categoría |
 
 ### Storefront Cart
 
@@ -299,4 +323,4 @@ Para recibir notificaciones de pago en desarrollo:
 
 ---
 
-**Última actualización:** 27 de abril de 2026 – Admin dashboard, stock management.
+**Última actualización:** 28 de abril de 2026 – Fase 3 completada: categorías, imágenes, variantes, búsqueda, Zod.

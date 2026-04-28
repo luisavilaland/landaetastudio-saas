@@ -28,8 +28,26 @@ El blueprint original consideraba usar MedusaJS como librería de dominio. Duran
 
 Separamos las apps en `storefront`, `admin` y `superadmin` porque cada una tiene su propio dominio de negocio y políticas de seguridad. Los paquetes compartidos (`db`, `storage` y proximamente `commerce`) evitan duplicar lógica de acceso a datos o reglas de negocio.
 
+## ¿Por qué validación con Zod en toda la API?
+
+Elegimos Zod para validar todos los endpoints porque ofrece tipos TypeScript automáticos, errores estructurados y consistencia en toda la API. Los schemas se definen en `@repo/validation` y se reutilizan en múltiples endpoints.
+
+## ¿Por qué búsqueda server-side con ILIKE?
+
+Para la Fase 3, optamos por ILIKE en PostgreSQL en lugar de un motor de búsqueda externo (como Meilisearch o Algolia). Esto simplifica la arquitectura, no añade dependencias adicionales y es suficiente para el MVP con un catálogo pequeño/medio.
+
+## ¿Por qué variantes con JSONB?
+
+Las variantes usan un campo JSONB (`options`) para almacenar combinaciones de atributos (talle, color, etc.) sin necesidad de tablas adicionales para atributos. Esto ofrece flexibilidad total: cada producto puede tener diferentes atributos sin cambiar el schema.
+
+## ¿Por qué imágenes múltiples con tabla product_images?
+
+La tabla `product_images` permite múltiples imágenes por producto, con soporte para galería, ordenamiento por `position` y eliminación individual. Usa MinIO (S3-compatible) para almacenamiento.
+
 ## Convenciones clave
 
 - **Nombres en camelCase** para columnas y tablas en Drizzle, porque es el idioma que habla TypeScript. Drizzle maneja la traducción a snake_case en la BD si fuera necesario, pero mantenemos consistencia con el código.
 - **Migraciones inmutables**: una vez generadas, no se editan. Esto garantiza historial limpio y cero conflictos en equipo.
 - **Carrito anónimo en Redis**: permite a los clientes usar el carrito sin crear cuenta. La sesión expira a los 7 días; el TTL de Redis se encarga automáticamente de la limpieza.
+- **Validación Zod**: toda la API usa schemas de `@repo/validation` para validar inputs (create, update, delete).
+- **Búsqueda**: se implementa con ILIKE en PostgreSQL, sin dependencias externas en esta fase.
