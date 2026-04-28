@@ -1,47 +1,12 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { db, dbTenants, dbCategories } from "@repo/db";
-import { eq } from "drizzle-orm";
 import Navbar from "@/components/navbar";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { SessionProvider } from "@/components/session-provider";
+import { getCategoriesForTenant } from "@/lib/categories";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
-
-type CategoryData = {
-  id: string;
-  name: string;
-  slug: string;
-};
-
-async function getCategoriesForTenant(tenantSlug: string): Promise<CategoryData[]> {
-  try {
-    const tenant = await db
-      .select({ id: dbTenants.id })
-      .from(dbTenants)
-      .where(eq(dbTenants.slug, tenantSlug))
-      .limit(1);
-
-    if (tenant.length === 0) {
-      return [];
-    }
-
-    const categories = await db
-      .select({
-        id: dbCategories.id,
-        name: dbCategories.name,
-        slug: dbCategories.slug,
-      })
-      .from(dbCategories)
-      .where(eq(dbCategories.tenantId, tenant[0].id))
-      .orderBy(dbCategories.name);
-
-    return categories;
-  } catch {
-    return [];
-  }
-}
 
 export async function generateMetadata() {
   const headersList = await headers();
@@ -50,6 +15,9 @@ export async function generateMetadata() {
   let tenantName = "Mi Tienda";
 
   try {
+    const { db, dbTenants } = await import("@repo/db");
+    const { eq } = await import("drizzle-orm");
+
     const result = await db
       .select({ name: dbTenants.name })
       .from(dbTenants)
@@ -80,6 +48,9 @@ export default async function RootLayout({
   let tenantName = "Mi Tienda";
 
   try {
+    const { db, dbTenants } = await import("@repo/db");
+    const { eq } = await import("drizzle-orm");
+
     const result = await db
       .select({ name: dbTenants.name })
       .from(dbTenants)
@@ -103,9 +74,19 @@ export default async function RootLayout({
             <Breadcrumbs />
             <main className="flex-1">{children}</main>
             <footer className="bg-zinc-100 border-t border-zinc-200 px-6 py-4 mt-auto">
-              <p className="text-center text-sm text-zinc-500">
-                &copy; {new Date().getFullYear()} {tenantName}
-              </p>
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p className="text-sm text-zinc-500">
+                  &copy; {new Date().getFullYear()} {tenantName}
+                </p>
+                <div className="flex items-center gap-4">
+                  <a
+                    href="/perfil"
+                    className="text-sm text-zinc-600 hover:text-zinc-900"
+                  >
+                    Sobre la tienda
+                  </a>
+                </div>
+              </div>
             </footer>
           </SessionProvider>
         </body>

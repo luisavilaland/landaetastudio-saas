@@ -43,6 +43,13 @@ export default function Navbar({
           {tenantName || "Tienda"}
         </Link>
 
+        <Link
+          href="/perfil"
+          className="text-sm text-zinc-600 hover:text-zinc-900"
+        >
+          Perfil
+        </Link>
+
         <div className="flex items-center gap-4 flex-1 justify-center">
           {/* Categories Dropdown */}
           {categories && categories.length > 0 && (
