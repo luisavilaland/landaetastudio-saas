@@ -1,20 +1,26 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, dbOrders, dbProductVariants, dbProducts } from "@repo/db";
 import { eq, sql, and, lte, gte, desc } from "drizzle-orm";
 import { dashboardQuerySchema } from "@repo/validation";
 
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+function jsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return jsonResponse({ error: "No autorizado" }, 401);
     }
 
     const tenantId = session.user.tenantId;
     if (!tenantId) {
       console.error("[Dashboard GET] Tenant ID no encontrado en sesión:", session.user);
-      return NextResponse.json({ error: "Tenant no encontrado" }, { status: 400 });
+      return jsonResponse({ error: "Tenant no encontrado" }, 400);
     }
 
     const { searchParams } = new URL(request.url);
@@ -25,10 +31,7 @@ export async function GET(request: NextRequest) {
 
     if (!queryValidation.success) {
       console.error("[Dashboard GET] Validation error:", queryValidation.error.issues);
-      return NextResponse.json(
-        { error: "Validation failed", issues: queryValidation.error.issues },
-        { status: 400 }
-      );
+      return jsonResponse({ error: "Validation failed" }, 400);
     }
 
     const now = new Date();
@@ -90,7 +93,7 @@ export async function GET(request: NextRequest) {
         total: order.total,
         status: order.status,
         createdAt: order.createdAt,
-      }));
+    }));
 
     const lowStockProductsRaw = await db
       .select({
@@ -115,10 +118,10 @@ export async function GET(request: NextRequest) {
         name: p.name,
         sku: p.sku || "",
         stock: p.stock,
-      }));
+    }));
 
-    return NextResponse.json({
-      totalRevenue: revenueResult?.total || 0,
+    return jsonResponse({
+      totalRevenue: Number(revenueResult?.total || 0),
       pendingOrders: Number(pendingResult?.count || 0),
       lowStockProducts: Number(lowStockResult?.count || 0),
       outOfStockProducts: Number(outOfStockResult?.count || 0),
@@ -127,6 +130,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("[Dashboard GET] Error:", error);
-    return NextResponse.json({ error: "Error al obtener métricas" }, { status: 500 });
+    return jsonResponse({ error: "Error al obtener métricas" }, 500);
   }
 }

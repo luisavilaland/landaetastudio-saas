@@ -87,9 +87,16 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 
 - **Sub-fase 3**: Dominio personalizado implementado (proxy.ts, API superadmin, UI admin, validación Zod).
 - **Sub-fase 4**: Página de perfil de tienda implementada (/perfil, SEO, navegación).
+- **Sub-fase 5**: Endpoints de dominio en admin (/api/config/tenant [GET/PUT]).
+  - GET /api/config/tenant → devuelve {id, slug, customDomain}
+  - PUT /api/config/tenant/domain → valida dominio, verifica duplicados, actualiza
+  - Página /store/domain llama a estos endpoints
 - Seed actualizado con customDomain y settings de perfil.
 - Tests: 175 totales (154 pasando, 21 fallando por next-auth beta + BD requerida).
-- Problems conocidos: Build falla por favicon.ico (Next.js 16.2.4 bug preexistente).
+- Problemas conocidos:
+  - Build falla por favicon.ico (Next.js 16.2.4 bug preexistente)
+  - 21 tests fallando por next-auth + BD real requerida
+  - Proxy暂时停用 (NextResponse.next() roto con Turbopack)
 
 ## Proxy pendiente de resolver
 

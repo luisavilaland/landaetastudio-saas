@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
   const headersList = await headers();
-  const tenantSlug = headersList.get("x-tenant-slug") || "";
+  const host = headersList.get("host") || "";
+  const tenantSlug = host.includes(".") ? host.split(".")[0] : "";
 
   let tenantName = "Tienda";
   let description = "";
@@ -48,7 +49,8 @@ type CategoryData = {
 
 export default async function PerfilPage() {
   const headersList = await headers();
-  const tenantSlug = headersList.get("x-tenant-slug") || "";
+  const host = headersList.get("host") || "";
+  const tenantSlug = host.includes(".") ? host.split(".")[0] : "";
 
   let tenantName = "Tienda";
   let logoUrl = "";

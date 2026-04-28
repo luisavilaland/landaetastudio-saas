@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { db, dbTenants } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { redisClient } from "@/lib/redis";
@@ -6,8 +6,17 @@ import { eq } from "drizzle-orm";
 import { updateTenantSchema } from "@repo/validation";
 
 const TENANT_CACHE_PREFIX = "tenant:slug:";
+const JSON_HEADERS = { "Content-Type": "application/json" };
 
 type Params = Promise<{ id: string }>;
+
+function jsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
+}
+
+function errorResponse(error: string, status: number): Response {
+  return jsonResponse({ error }, status);
+}
 
 export async function GET(
   request: NextRequest,
@@ -16,7 +25,7 @@ export async function GET(
   const session = await auth();
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
@@ -28,13 +37,10 @@ export async function GET(
     .limit(1);
 
   if (tenant.length === 0) {
-    return NextResponse.json(
-      { error: "Tenant not found" },
-      { status: 404 }
-    );
+    return errorResponse("Tenant not found", 404);
   }
 
-  return NextResponse.json(tenant[0]);
+  return jsonResponse(tenant[0]);
 }
 
 export async function PUT(
@@ -45,7 +51,7 @@ export async function PUT(
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return errorResponse("Unauthorized", 401);
     }
 
     const { id } = await params;
@@ -53,10 +59,7 @@ export async function PUT(
     const validation = updateTenantSchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
-        { status: 400 }
-      );
+      return errorResponse("Validation failed", 400);
     }
 
     const { name, plan, status, slug, customDomain } = validation.data;
@@ -68,10 +71,7 @@ export async function PUT(
       .limit(1);
 
     if (existing.length === 0) {
-      return NextResponse.json(
-        { error: "Tenant not found" },
-        { status: 404 }
-      );
+      return errorResponse("Tenant not found", 404);
     }
 
     if (slug && slug !== existing[0].slug) {
@@ -82,10 +82,7 @@ export async function PUT(
         .limit(1);
 
       if (slugExists.length > 0) {
-        return NextResponse.json(
-          { error: "Slug already exists" },
-          { status: 409 }
-        );
+        return errorResponse("Slug already exists", 409);
       }
     }
 
@@ -97,10 +94,7 @@ export async function PUT(
         .limit(1);
 
       if (domainExists.length > 0) {
-        return NextResponse.json(
-          { error: "Custom domain already in use" },
-          { status: 409 }
-        );
+        return errorResponse("Custom domain already in use", 409);
       }
     }
 
@@ -111,7 +105,12 @@ export async function PUT(
         plan: plan ?? existing[0].plan,
         status: status ?? existing[0].status,
         slug: slug ?? existing[0].slug,
-        customDomain: customDomain !== undefined ? customDomain : existing[0].customDomain,
+        customDomain:
+          customDomain !== undefined
+            ? customDomain === ""
+              ? null
+              : customDomain
+            : existing[0].customDomain,
         updatedAt: new Date(),
       })
       .where(eq(dbTenants.id, id))
@@ -138,13 +137,10 @@ export async function PUT(
       }
     }
 
-    return NextResponse.json(updated[0]);
+    return jsonResponse(updated[0]);
   } catch (error) {
     console.error("Error updating tenant:", error);
-    return NextResponse.json(
-      { error: "Failed to update tenant" },
-      { status: 500 }
-    );
+    return errorResponse("Failed to update tenant", 500);
   }
 }
 
@@ -156,7 +152,7 @@ export async function DELETE(
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return errorResponse("Unauthorized", 401);
     }
 
     const { id } = await params;
@@ -168,10 +164,7 @@ export async function DELETE(
       .limit(1);
 
     if (existing.length === 0) {
-      return NextResponse.json(
-        { error: "Tenant not found" },
-        { status: 404 }
-      );
+      return errorResponse("Tenant not found", 404);
     }
 
     const oldSlug = existing[0].slug;
@@ -183,12 +176,9 @@ export async function DELETE(
       console.error("[Cache] Failed to invalidate:", e);
     }
 
-    return new NextResponse(null, { status: 204 });
+    return new Response(null, { status: 204 });
   } catch (error) {
     console.error("Error deleting tenant:", error);
-    return NextResponse.json(
-      { error: "Failed to delete tenant" },
-      { status: 500 }
-    );
+    return errorResponse("Failed to delete tenant", 500);
   }
 }

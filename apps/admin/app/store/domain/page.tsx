@@ -25,14 +25,20 @@ export default function DomainPage() {
 
   const fetchTenant = async () => {
     try {
-      const res = await fetch("/api/store/tenant");
+      console.log("[DomainPage] Fetching tenant from /api/config/tenant...");
+      const res = await fetch("/api/config/tenant");
+      console.log("[DomainPage] Response status:", res.status);
       const data = await res.json();
+      console.log("[DomainPage] Response data:", data);
       if (res.ok) {
         setTenant(data);
         setCustomDomain(data.customDomain || "");
+      } else {
+        setError(data.error || "Error al cargar tenant");
       }
     } catch (err) {
       console.error("Error loading tenant:", err);
+      setError("Error de conexión");
     } finally {
       setLoading(false);
     }
@@ -45,13 +51,16 @@ export default function DomainPage() {
     setSuccess("");
 
     try {
-      const res = await fetch("/api/store/tenant/domain", {
+      console.log("[DomainPage] Saving domain:", customDomain.trim());
+      const res = await fetch("/api/config/tenant/domain", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customDomain: customDomain.trim() || undefined }),
       });
 
+      console.log("[DomainPage] Save response status:", res.status);
       const data = await res.json();
+      console.log("[DomainPage] Save response data:", data);
 
       if (!res.ok) {
         setError(data.error || "Error al guardar");
@@ -62,6 +71,7 @@ export default function DomainPage() {
       fetchTenant();
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
+      console.error("Error de conexión:", err);
       setError("Error de conexión");
     } finally {
       setSaving(false);
@@ -100,6 +110,14 @@ export default function DomainPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-zinc-500">Cargando...</div>
+      </div>
+    );
+  }
+
+  if (error && !tenant) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-red-600">{error}</div>
       </div>
     );
   }

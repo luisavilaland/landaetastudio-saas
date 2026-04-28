@@ -27,6 +27,7 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
     name: tenant?.name || "",
     plan: tenant?.plan || "starter",
     status: tenant?.status || "active",
+    customDomain: tenant?.customDomain || "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,6 +131,23 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
             <option value="active">Activo</option>
             <option value="inactive">Inactivo</option>
           </select>
+        </div>
+
+        <div>
+          <label htmlFor="customDomain" className="block text-sm font-medium text-zinc-700">
+            Dominio personalizado
+          </label>
+          <input
+            id="customDomain"
+            type="text"
+            value={form.customDomain}
+            onChange={(e) => setForm({ ...form, customDomain: e.target.value })}
+            className="mt-1 block w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
+            placeholder="mitienda.com"
+          />
+          <p className="mt-1 text-xs text-zinc-500">
+            Ejemplo: mitienda.com (sin http://)
+          </p>
         </div>
 
         <div className="flex gap-3 pt-4">
