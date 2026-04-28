@@ -13,5 +13,8 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json", "html"],
     },
+    deps: {
+      moduleDirectories: ["node_modules", "node_modules/.pnpm"],
+    },
   },
 });

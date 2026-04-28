@@ -16,6 +16,8 @@
 | 6 | [📚 Documentación](#6-documentación) | Actualizar docs |
 | 7 | [🔄 Refactorización](#7-refactorización) | Refactors Seguros |
 | 8 | [⚙️ Varios](#8-varios) | Salud, dependencias, revert |
+| 9 | [📋 Cierre de Fase](#9-cierre-de-fase) | Realizar cierre formal de fase |
+| 10 | [🌱 Actualización de Seed](#10-actualización-de-seed) | Actualizar seed con datos de prueba |
 
 ---
 
@@ -247,4 +249,145 @@ No actualices nada sin mi confirmación.
 
 ```
 Quiero revertir todos los cambios hechos en esta sesión y volver al último commit. Muéstrame qué archivos se descartarían antes de ejecutar nada.
+```
+
+---
+
+## 9. Cierre de Fase
+
+### 📋 Cierre de Fase
+
+```
+Vas a realizar el cierre formal de la [FASE X] del proyecto saas-ecommerce.
+
+Autorizo explícitamente comandos git en este cierre (commit, push, delete branch).
+
+Paso 1 - Sincronización y limpieza de ramas
+Cambia a main: git switch main
+
+Asegúrate de que main está actualizada: git pull origin main
+
+Elimina la rama local: git branch -d fase-[X]
+
+Elimina la rama remota: git push origin --delete fase-[X]
+
+Paso 2 - Actualización de documentación
+Revisa y actualiza si es necesario:
+
+README.md: marca la fase como completada (✅) en el roadmap. Verifica que no haya secciones duplicadas. Añade nuevos endpoints a las tablas correspondientes. Actualiza la fecha de "Última actualización".
+
+SETUP.md: actualiza datos de prueba, nuevas variables de entorno, pasos de setup si cambiaron.
+
+AGENTS.md: añade nuevas restricciones, comandos o convenciones descubiertas durante la fase. Corrige erratas visibles (caracteres extraños, errores de formato).
+
+docs/arquitectura.md: documenta nuevas decisiones de diseño (nuevas tablas, elección de tecnologías, patrones usados).
+
+.gitignore: verifica que nuevos artefactos estén ignorados.
+
+Paso 3 - Crear o actualizar TESTING.md
+Si no existe, créalo. Si existe, actualízalo.
+
+Checklist de pruebas agrupado por fase con ✅ (verificado), ⬜ (pendiente).
+
+Sección "Problemas Conocidos": tests que fallan, causa documentada, solución propuesta si se conoce, impacto (si bloquea o no).
+
+Incluir pruebas manuales realizadas (flujo E2E, UX, etc.).
+
+Paso 4 - Verificación DoD
+Ejecuta y reporta el estado de cada comando:
+
+pnpm lint
+
+pnpm typecheck
+
+pnpm build
+
+pnpm test
+
+Si algún comando falla, documéntalo en TESTING.md.
+
+Paso 5 - Commit y push
+Haz commits atómicos si los cambios son de distinta naturaleza:
+
+feat: actualizar seed con datos de prueba Fase [X] (si aplica)
+
+docs: cierre de fase [X] y actualización de documentación
+
+fix: correcciones varias de la fase [X] (si aplica)
+
+Haz push a main.
+
+Paso 6 - Resumen final
+Al terminar, preséntame un resumen con:
+
+Estado de la DoD (✅/⚠️/❌ para cada comando)
+
+Lista de archivos modificados
+
+Rama eliminada (local y remota)
+
+Problemas conocidos documentados
+```
+
+---
+
+## 10. Actualización de Seed
+
+### 🌱 Actualización de Seed
+
+```
+Actualizá el script de seed de la base de datos para reflejar todas las funcionalidades implementadas hasta la Fase [X].
+
+Reglas del AGENTS.md que aplican:
+
+Precios siempre en centavos (integer).
+
+Fechas en UTC.
+
+Multi-tenant: todos los datos de negocio deben tener tenantId.
+
+Migraciones inmutables: no modifiques migraciones existentes.
+
+Al finalizar, ejecutá pnpm lint, pnpm typecheck, pnpm build y pnpm test.
+
+No ejecutes comandos git sin mi permiso.
+
+Tareas
+Leer el seed actual: localizá el archivo de seed (probablemente en packages/db/seed.ts) y entiende su estructura.
+
+Identificar tablas nuevas: basándote en las features implementadas en cada fase, determiná qué tablas necesitan datos de prueba.
+
+Actualizar la limpieza inicial: si el seed hace TRUNCATE, incluí las nuevas tablas respetando el orden de foreign keys.
+
+Insertar datos de prueba para:
+
+Tenant(s) de prueba
+
+Usuarios (admin, cliente, superadmin)
+
+Categorías con slugs únicos
+
+Productos con variantes y SKUs coherentes
+
+Imágenes vinculadas a productos (usar URLs placeholder)
+
+Órdenes de ejemplo con estados variados y order_items
+
+Cualquier otra entidad nueva de las fases completadas
+
+Verificar coherencia:
+
+Los precios están en centavos (enteros, sin decimales).
+
+Las variantes tienen SKU basado en el slug del producto.
+
+Las imágenes tienen tenantId y position correctos.
+
+Las órdenes tienen totales que coinciden con la suma de sus items.
+
+Ejecutar seed: pnpm db:seed debe terminar sin errores.
+
+Si el seed falla, corregí los errores y volvé a ejecutar hasta que pase.
+
+No hagas commit a menos que yo lo autorice explícitamente.
 ```

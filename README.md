@@ -42,7 +42,6 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Normalizar slug on create/edit
 - CSRF protection
 - Authentication hardening
-- **Eliminar `ignoreBuildErrors: true`** de los `next.config.ts` de las apps que lo tengan. Una vez que el typecheck pase limpiamente, el build debe fallar si hay errores de tipo. Esto es crítico para detectar regresiones en CI/CD.
 
 ---
 
@@ -164,23 +163,12 @@ saas-ecommerce/
 
 ## Scripts
 
-|Script|Descripción|
-|:-:|-|
-|pnpm dev|Levanta todas las apps en modo desarrollo|
-|pnpm db:generate|Genera migraciones desde el schema Drizzle|
-|pnpm db:migrate|Ejecuta migraciones pendientes|
-
-## Tech Stack
-
-- **Framework:** Next.js 16 (App Router)
-- **ORM:** Drizzle ORM
-- **Auth:** NextAuth v5 (Auth.js)
-- **Base de datos:** PostgreSQL 16
-- **Cache/Carrito:** Redis 7
-- **Storage:** MinIO (S3-compatible)
-- **Email:** MailHog (dev) / Resend (prod)
-- **Pagos:** MercadoPago (Checkout Pro)
-- **Monorepo:** Turborepo + pnpm
+| Script | Descripción |
+| :--- | :--- |
+| `pnpm dev` | Levanta todas las apps en modo desarrollo |
+| `pnpm db:generate` | Genera migraciones desde el schema |
+| `pnpm db:migrate` | Aplica migraciones pendientes |
+| `pnpm db:seed` | Limpia la BD y crea datos de prueba |
 
 ## API Endpoints
 
@@ -209,18 +197,20 @@ saas-ecommerce/
 
 ### Storefront Cart
 
-|Method|Endpoint|Descripción|
-|:-:|-|/api/cart|Obtener carrito|
-|POST|/api/cart|Agregar item|
-|PUT|/api/cart|Actualizar cantidad|
-|DELETE|/api/cart|Eliminar item o vaciar|
+| Method | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| GET | /api/cart | Obtener carrito |
+| POST | /api/cart | Agregar item |
+| PUT | /api/cart | Actualizar cantidad |
+| DELETE | /api/cart | Eliminar item o vaciar |
 
 ### Storefront Checkout
 
-|Method|Endpoint|Descripción|
-|:-:|-|/api/checkout|Crear orden desde carrito|
-|POST|/api/checkout/preference|Crear preferencia de pago MP|
-|POST|/api/webhooks/mercadopago|Notificación de pago|
+| Method | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| POST | /api/checkout | Crear orden desde carrito |
+| POST | /api/checkout/preference | Crear preferencia de pago MP |
+| POST | /api/webhooks/mercadopago | Notificación de pago |
 
 ### Admin Dashboard
 
@@ -238,12 +228,13 @@ saas-ecommerce/
 
 ### Superadmin Tenants
 
-|Method|Endpoint|Descripción|
-|:-:|-|/api/tenants|Listar tenants|
-|POST|/api/tenants|Crear tenant|
-|GET|/api/tenants/[id]|Obtener tenant|
-|PUT|/api/tenants/[id]|Actualizar tenant|
-|DELETE|/api/tenants/[id]|Eliminar tenant|
+| Method | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| GET | /api/tenants | Listar tenants |
+| POST | /api/tenants | Crear tenant |
+| GET | /api/tenants/[id] | Obtener tenant |
+| PUT | /api/tenants/[id] | Actualizar tenant |
+| DELETE | /api/tenants/[id] | Eliminar tenant |
 
 ### Storefront Auth
 
@@ -283,7 +274,7 @@ Para recibir notificaciones de pago en desarrollo:
 ### 🔴 Alta prioridad (crítico antes de producción)
 
 | # | Tarea |
-|---|-------|
+| ---|-------|
 | 1 | **RLS** - Habilitar políticas de fila por tenant |
 | 2 | **AUTH_SECRET** - Validar que exista en prod, eliminar fallback |
 | 3 | **CSRF** - Habilitar en producción |
@@ -292,14 +283,14 @@ Para recibir notificaciones de pago en desarrollo:
 ### 🟡 Media prioridad
 
 | # | Tarea |
-|---|-------|
+| ---|-------|
 | 5 | Normalizar slug en create/edit |
 | 6 | Mejorar UI de errores 409 |
 
 ### 🟢 Baja prioridad
 
 | # | Tarea |
-|---|-------|
+| ---|-------|
 | 8 | Extraer auth duplicado a paquete compartido |
 | 9 | dotenv repetido en next.config.ts |
 | 10 | Productos con Server Actions |
@@ -309,7 +300,7 @@ Para recibir notificaciones de pago en desarrollo:
 
 - NO hacer deploy a cloud hasta que el MVP funcione 100% local.
 - Usar `lvh.me` para testing de subdominios.
-- Las migraciones son immutables – generar nuevas para cambios.
+- Las migraciones son inmutables – generar nuevas para cambios.
 - Prices siempre en centavos (integer), nunca floats.
 - Cart funciona sin autenticación (usuarios anónimos).
 - Checkout requiere email para enviar confirmación.
@@ -320,6 +311,7 @@ Para recibir notificaciones de pago en desarrollo:
 - [Guía de setup](./SETUP.md) – Configuración del proyecto y solución de problemas.
 - [Guía para agentes de IA](./AGENTS.md) – Políticas y comandos para asistentes de código.
 - [Prompts reutilizables](./PROMPTS.md) – Plantillas de prompts para agentes de IA.
+- [Plan de Fase 4](./docs/plan-fase-4.md) – Plan de implementación detallado para la Fase 4.
 
 ---
 

@@ -58,7 +58,9 @@ docker exec -it saas-postgres psql -U saas -d saas_ecommerce
 TRUNCATE TABLE order_items CASCADE;
 TRUNCATE TABLE orders CASCADE;
 TRUNCATE TABLE product_variants CASCADE;
+TRUNCATE TABLE product_images CASCADE;
 TRUNCATE TABLE products CASCADE;
+TRUNCATE TABLE categories CASCADE;
 TRUNCATE TABLE customers CASCADE;
 TRUNCATE TABLE admin_users CASCADE;
 TRUNCATE TABLE tenants CASCADE;
