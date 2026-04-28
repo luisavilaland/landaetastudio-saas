@@ -83,6 +83,14 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Paquetes actuales: `@repo/db`, `@repo/storage`, `@repo/auth`, `@repo/validation` – Validación Zod compartida para toda la API.
 - **Deuda técnica actual**: la lógica de carrito/órdenes está duplicada en `apps/storefront/lib` y `apps/admin/lib`. Durante la Fase 4, no se debe duplicar más lógica. Nueva lógica compartida (ej. cálculo de envío) debe ir en un solo lugar consensuado o en `packages/commerce` si procede.
 
+## Fase 4 Completada ✅
+
+- **Sub-fase 3**: Dominio personalizado implementado (proxy.ts, API superadmin, UI admin, validación Zod).
+- **Sub-fase 4**: Página de perfil de tienda implementada (/perfil, SEO, navegación).
+- Seed actualizado con customDomain y settings de perfil.
+- Tests: 175 totales (154 pasando, 21 fallando por next-auth beta + BD requerida).
+- Problems conocidos: Build falla por favicon.ico (Next.js 16.2.4 bug preexistente).
+
 ## Mantenimiento de la documentación
 
 - **AGENTS.md:** si durante una tarea descubres que una restricción, comando o convención importante no está documentada aquí, proponme añadirla al finalizar la tarea. Si es evidente (ej. se ha creado un script `pnpm storybook`), puedes actualizar este archivo directamente y notificármelo.
