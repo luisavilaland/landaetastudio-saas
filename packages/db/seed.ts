@@ -32,7 +32,17 @@ async function seed() {
      name: 'Tienda Demo',
      plan: 'starter',
      status: 'active',
-     settings: {},
+     customDomain: 'tienda1.local',
+     settings: {
+       logoUrl: 'https://picsum.photos/seed/tienda-logo/200/80',
+       storeDescription: 'Tu tienda online de confianza. Encontra los mejores productos con la mejor calidad.',
+       contactEmail: 'contacto@tienda1.com',
+       contactPhone: '+598 99 123 456',
+       socialLinks: {
+         instagram: 'https://instagram.com/tienda1',
+         facebook: 'https://facebook.com/tienda1',
+       },
+     },
    }).returning();
    console.log(`✅ Tenant creado: ${tenant.slug} (ID: ${tenant.id})`);
 
