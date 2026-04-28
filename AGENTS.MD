@@ -91,6 +91,14 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Tests: 175 totales (154 pasando, 21 fallando por next-auth beta + BD requerida).
 - Problems conocidos: Build falla por favicon.ico (Next.js 16.2.4 bug preexistente).
 
+## Proxy pendiente de resolver
+
+- **Estado**: Proxy temporalmente desactivado (`apps/storefront/proxy.ts` → `proxy.ts.bak`).
+- **Causa**: `NextResponse.next()` y `NextResponse.rewrite()` fallan con Turbopack en Next.js 16.2.4 (`NextResponse.next is not a function`).
+- **Solución temporal**: Resolución de tenant的直接a en `page.tsx` mediante `headers()` + consulta a `dbTenants`.
+- **Funcionalidades afectadas**: Dominio personalizado (customDomain), Redis cache de dominios, logging de headers.
+- **Más detalles**: Ver `docs/proxy-issue.md`.
+
 ## Mantenimiento de la documentación
 
 - **AGENTS.md:** si durante una tarea descubres que una restricción, comando o convención importante no está documentada aquí, proponme añadirla al finalizar la tarea. Si es evidente (ej. se ha creado un script `pnpm storybook`), puedes actualizar este archivo directamente y notificármelo.

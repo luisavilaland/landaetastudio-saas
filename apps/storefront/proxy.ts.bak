@@ -1,0 +1,131 @@
+import type { NextRequest } from 'next/server';
+import { db } from '@repo/db';
+import { dbTenants } from '@repo/db';
+import { eq } from 'drizzle-orm';
+
+export const config = {
+  matcher: '/:path*',
+};
+
+const CART_COOKIE_NAME = 'cart_session_id';
+
+function getOrCreateSessionId(request: NextRequest): string {
+  const cookie = request.cookies.get(CART_COOKIE_NAME);
+  if (cookie?.value) {
+    return cookie.value;
+  }
+
+  return crypto.randomUUID();
+}
+
+export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const hostname = (request.headers.get('host') ?? '').replace(/:\d+$/, '');
+  const headerTenantSlug = request.headers.get('x-tenant-slug');
+
+  console.log('[Proxy] Hostname:', hostname, '| Header slug:', headerTenantSlug, '| Path:', pathname);
+
+  const publicPaths = ['/login', '/register', '/api/auth'];
+  const isPublicPath = publicPaths.some(path => pathname === path || pathname.startsWith(path + '/'));
+
+  let tenantSlug: string | null = null;
+  let tenantId: string | null = null;
+
+  if (headerTenantSlug && headerTenantSlug.trim() !== '') {
+    tenantSlug = headerTenantSlug.trim();
+    try {
+      const tenant = await db
+        .select({ slug: dbTenants.slug, id: dbTenants.id })
+        .from(dbTenants)
+        .where(eq(dbTenants.slug, tenantSlug))
+        .limit(1);
+      if (tenant.length > 0) {
+        tenantId = tenant[0].id;
+      }
+    } catch (error) {
+      console.error('[Proxy] Error resolving tenant by slug:', error);
+    }
+  } else if (hostname && hostname.includes('.') && !hostname.startsWith('localhost')) {
+    try {
+      const tenant = await db
+        .select({ slug: dbTenants.slug, id: dbTenants.id })
+        .from(dbTenants)
+        .where(eq(dbTenants.customDomain, hostname))
+        .limit(1);
+
+      if (tenant.length > 0) {
+        tenantSlug = tenant[0].slug;
+        tenantId = tenant[0].id;
+        console.log('[Proxy] Resolved by customDomain:', hostname, '->', tenantSlug);
+      }
+    } catch (error) {
+      console.error('[Proxy] Error resolving custom domain:', error);
+    }
+
+    if (!tenantSlug) {
+      tenantSlug = hostname.split('.')[0];
+      try {
+        const tenant = await db
+          .select({ slug: dbTenants.slug, id: dbTenants.id })
+          .from(dbTenants)
+          .where(eq(dbTenants.slug, tenantSlug))
+          .limit(1);
+        if (tenant.length > 0) {
+          tenantId = tenant[0].id;
+        }
+      } catch (error) {
+        console.error('[Proxy] Error resolving tenant by subdomain:', error);
+      }
+    }
+  } else {
+    const tenantCookie = request.cookies.get('tenant-slug');
+    if (tenantCookie?.value) {
+      tenantSlug = tenantCookie.value;
+      try {
+        const tenant = await db
+          .select({ slug: dbTenants.slug, id: dbTenants.id })
+          .from(dbTenants)
+          .where(eq(dbTenants.slug, tenantSlug))
+          .limit(1);
+        if (tenant.length > 0) {
+          tenantId = tenant[0].id;
+        }
+      } catch (error) {
+        console.error('[Proxy] Error resolving tenant by cookie:', error);
+      }
+    }
+  }
+
+  if (!tenantSlug) {
+    if (isPublicPath) {
+      console.log('[Proxy] Ruta pública sin tenant, continuando sin slug');
+      const sessionId = getOrCreateSessionId(request);
+      return new Response(null, {
+        status: 200,
+        headers: {
+          ...(sessionId && { 'x-cart-session-id': sessionId }),
+        },
+      });
+    }
+    console.log('[Proxy] No se pudo resolver tenant slug');
+    return new Response(
+      JSON.stringify({ error: 'Tenant no encontrado. Usa header x-tenant-slug o subdominio.' }),
+      { status: 404, headers: { 'content-type': 'application/json' } }
+    );
+  }
+
+  console.log('[Proxy] Tenant Slug resuelto:', tenantSlug);
+
+  const sessionId = getOrCreateSessionId(request);
+
+  const response = new Response(null, {
+    status: 200,
+    headers: {
+      'x-tenant-slug': tenantSlug,
+      ...(tenantId && { 'x-tenant-id': tenantId }),
+      ...(sessionId && { 'x-cart-session-id': sessionId }),
+    },
+  });
+
+  return response;
+}
