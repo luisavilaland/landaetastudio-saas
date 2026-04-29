@@ -44,6 +44,22 @@ Las variantes usan un campo JSONB (`options`) para almacenar combinaciones de at
 
 La tabla `product_images` permite múltiples imágenes por producto, con soporte para galería, ordenamiento por `position` y eliminación individual. Usa MinIO (S3-compatible) para almacenamiento.
 
+## ¿Por qué métodos de envío configurables por tenant?
+
+Implementamos los métodos de envío como una tabla independiente (`shipping_methods`) vinculada a `tenantId`. Esto permite que cada comercio configure sus propias opciones (envío estándar, express, retiro en tienda) con precios y descripciones personalizadas. La validación de Zod en `@repo/validation` asegura consistencia en la API.
+
+## ¿Por qué configuración visual del tenant en JSON?
+
+La configuración visual (logo, colores, fuente, redes sociales) se almacena en una tabla `store_settings` vinculada al tenant. Usamos campos específicos para logo, colores (primary, secondary, accent) y redes sociales (JSONB para flexibilidad). Esto evita tener que modificar el schema para agregar nuevas redes sociales o campos de configuración.
+
+## ¿Por qué página de perfil de tienda pública?
+
+La página `/perfil` es un Server Component que expone la información del tenant (nombre, logo, descripción, contacto, categorías) con metadatos SEO (JSON-LD). Esto mejora el SEO y permite que cada comercio tenga una presencia pública única. El proxy multi-tenant resuelve el tenant automáticamente por subdominio o dominio personalizado.
+
+## ¿Por qué dominio personalizado con verificación?
+
+Permitimos que cada tenant configure un dominio personalizado (ej. `tienda.com`) guardado en el campo `customDomain`. La verificación se hace vía API pública (`/api/domain-check`) y el proxy (`proxy.ts`) resuelve el tenant tanto por subdominio como por dominio personalizado. Esto ofrece flexibilidad total para comercios que ya tienen su propio dominio.
+
 ## Convenciones clave
 
 - **Nombres en camelCase** para columnas y tablas en Drizzle, porque es el idioma que habla TypeScript. Drizzle maneja la traducción a snake_case en la BD si fuera necesario, pero mantenemos consistencia con el código.

@@ -209,15 +209,15 @@ Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 
 ### Problemas Conocidos (Known Issues)
 
-#### Tests Fallando (15 tests preexistentes)
+#### Tests Fallando (16 tests preexistentes)
 - **Estado**: 🔄 Pendiente de fix
-- **Tests preexistentes (15)**:
-  - **Archivo**: `apps/admin/app/api/categories/[id]/__tests__/route.test.ts` (3 tests)
-    - `should regenerate slug when name changes`
-    - `should return 409 when regenerated slug already exists for tenant`
-    - `should keep provided slug if name doesn't change`
-  - **Archivo**: `apps/admin/app/api/shipping/__tests__/route.test.ts` (5 tests)
-  - **Archivo**: `apps/admin/app/api/shipping/__tests__/[id].test.ts` (9 tests)
+- **Tests preexistentes (16)**:
+   - **Archivo**: `apps/admin/app/api/categories/[id]/__tests__/route.test.ts` (3 tests)
+     - `should regenerate slug when name changes`
+     - `should return 409 when regenerated slug already exists for tenant`
+     - `should keep provided slug if name doesn't change`
+   - **Archivo**: `apps/admin/app/api/shipping/__tests__/route.test.ts` (5 tests)
+   - **Archivo**: `apps/admin/app/api/shipping/__tests__/[id].test.ts` (8 tests)
 - **Error**: `Cannot find module 'next/server' imported from next-auth/lib/env.js`
 - **Causa**: Vitest + next-auth@5.0.0-beta.31 incompatibilidad con la estructura de módulos en pnpm
 - **Solución propuesta**: Migrar tests a Jest o esperar actualización de next-auth stable
@@ -233,9 +233,9 @@ Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 
 ## Notas
 - Última actualización: 29 de abril de 2026 — Fase 4 completada. Documentación actualizada con fixes de proxy, domain-check, /store/domain y dashboard.
-- Total de pruebas automatizadas: 175 (159 pasando, 16 fallando por next-auth beta)
+- Total de pruebas automatizadas: 175 (160 pasando, 15 fallando por next-auth beta)
 - Fase 4 completada: Dominio Personalizado + Página de Perfil
 - Problemas críticos pendientes:
-  - Tests fallantes por next-auth beta (16 tests)
+  - Tests fallantes por next-auth beta (15 tests)
   - Build falla por favicon.ico (Next.js 16.2.4 bug)
   - Flujo E2E MercadoPago pendiente de verificación
