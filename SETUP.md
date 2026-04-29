@@ -239,12 +239,12 @@ pnpm build         # Build de todas las apps
 
 ### Tests Fallantes Conocidos
 
-**17 tests fallando** (de 175 totales) por incompatibilidad con `next-auth@5.0.0-beta.31`:
+**15 tests fallando** (de 175 totales) por incompatibilidad con `next-auth@5.0.0-beta.31`:
 
 - El bug ocurre porque `next-auth` importa `next/server` sin extensión `.js`, lo que falla en vitest.
 - Además, los mocks de `vi.mock("@/lib/auth")` no interceptan la instancia `auth` creada por `NextAuth()` al cargar el módulo.
 - Suites afectadas: `apps/admin/app/api/shipping/` y `apps/admin/app/api/categories/`.
-- Ver `AGENTS.md` para detalles técnicos y solución requerida.
+- Ver `TESTING.md` para detalles técnicos y solución requerida.
 
 ### Tarjetas de prueba MercadoPago
 

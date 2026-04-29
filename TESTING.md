@@ -112,30 +112,30 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 
 - ✅ Proxy activo: logs [Proxy] visibles en consola para cada request
 - ✅ Matcher optimizado: rutas /_next/static/* excluidas del proxy
-- 🔄 Caso 1.1: Pendiente verificación manual — Acceder vía tienda1.lvh.me:3000 → resolver tenant
-- 🔄 Caso 1.2: Pendiente verificación manual — customDomain en BD → resolver al tenant correcto
-- 🔄 Caso 1.3: Pendiente verificación manual — dominio inexistente → fallback a "default"
+- ✅ Caso 1.1: Acceder vía tienda1.lvh.me:3000 → resolver tenant
+- ✅ Caso 1.2: customDomain en BD → resolver al tenant correcto
+- 🔄 Caso 1.3: Dominio inexistente → fallback a "default" (BUG: debería devolver 404)
 - ✅ Caso 1.4: Logs [Proxy] visibles en consola con Hostname, Path y Tenant Slug
 
 #### API Superadmin - Gestión de Tenant
-- Caso 2.1: PUT /api/tenants/[id] con customDomain: "mitienda.com" → respuesta 200 con campo actualizado
-- Caso 2.2: Enviar customDomain con formato inválido (ej. http://mitienda.com) → respuesta 400
-- Caso 2.3: Asignar un customDomain que ya tiene otro tenant → respuesta 409 Conflict
-- Caso 2.4: Enviar customDomain: "" (vacío) → el campo se setea a null en BD
-- Caso 2.5: GET /api/tenants/[id] → respuesta incluye campo customDomain
+- ✅ Caso 2.1: PUT /api/tenants/[id] con customDomain: "mitienda.com" → respuesta 200 con campo actualizado
+- ✅ Caso 2.2: Enviar customDomain con formato inválido (ej. http://mitienda.com) → respuesta 400
+- ✅ Caso 2.3: Asignar un customDomain que ya tiene otro tenant → respuesta 409 Conflict
+- ✅ Caso 2.4: Enviar customDomain: "" (vacío) → el campo se setea a null en BD
+- ✅ Caso 2.5: GET /api/tenants/[id] → respuesta incluye campo customDomain
 
 #### API Pública de Verificación
-- Caso 3.1: GET /api/domain-check?domain=disponible.com → {"available": true}
-- Caso 3.2: GET /api/domain-check?domain=dominio-ya-usado.com → {"available": false}
-- Caso 3.3: Sin parámetro domain → respuesta 400
+- 🔄 Caso 3.1: GET /api/domain-check?domain=disponible.com → **404** (NO IMPLEMENTADO)
+- 🔄 Caso 3.2: GET /api/domain-check?domain=dominio-ya-usado.com → **404** (NO IMPLEMENTADO)
+- 🔄 Caso 3.3: Sin parámetro domain → **404** (NO IMPLEMENTADO)
 
 #### UI Admin - Página de Dominio (/store/domain)
-- Caso 4.1: Acceder a /store/domain → mostrar "No configurado" inicialmente
-- Caso 4.2: Ingresar dominio válido y guardar → mostrar "Configurado" y mensaje de éxito
-- Caso 4.3: Ingresar dominio inválido (con http://) → mostrar error de validación
-- Caso 4.4: Hacer click en "Verificar ahora" → mostrar mensaje de verificación (puede fallar si DNS no apunta, es esperado)
-- Caso 4.5: Verificar que las instrucciones de DNS se muestren correctamente
-- Caso 4.6: Verificar navegación: el enlace "Dominio" aparece en el header del dashboard
+- 🔄 Caso 4.1: Acceder a /store/domain → muestra "Tenant not found" (GET /api/config/tenant devuelve 404)
+- 🔄 Caso 4.2: Ingresar dominio válido y guardar → no funciona (endpoint no existe)
+- 🔄 Caso 4.3: Ingresar dominio inválido (con http://) → no verificable
+- 🔄 Caso 4.4: Hacer click en "Verificar ahora" → no funciona (endpoint no existe)
+- 🔄 Caso 4.5: Verificar que las instrucciones de DNS se muestren correctamente → pendiente
+- 🔄 Caso 4.6: Verificar navegación: el enlace "Dominio" aparece en el header del dashboard → pendiente
 
 #### Redis Cache (Opcional - Si se implementa en Fase 5)
 - Caso 5.1: Tras configurar dominio, verificar que se cachea en Redis con TTL 1 hora
@@ -144,38 +144,38 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 ### Sub-fase 4: Página de Perfil de Tienda
 
 #### Página Pública de Perfil (/perfil)
-- Caso 6.1: Acceder a /perfil → mostrar nombre de la tienda
-- Caso 6.2: Si settings.logoUrl existe → mostrar logo
-- Caso 6.3: Si settings.storeDescription existe → mostrar descripción
-- Caso 6.4: Si settings.contactEmail existe → mostrar en sección "Contacto" con link mailto:
-- Caso 6.5: Si settings.contactPhone existe → mostrar teléfono
-- Caso 6.6: Si settings.socialLinks.instagram existe → mostrar link a Instagram
-- Caso 6.7: Si settings.socialLinks.facebook existe → mostrar link a Facebook
-- Caso 6.8: Verificar que las categorías se muestren como links clickeables
-- Caso 6.9: Si no hay categorías → la sección no debe aparecer
+- ✅ Caso 6.1: Acceder a /perfil → mostrar nombre de la tienda
+- ✅ Caso 6.2: Si settings.logoUrl existe → mostrar logo
+- ✅ Caso 6.3: Si settings.storeDescription existe → mostrar descripción
+- ✅ Caso 6.4: Si settings.contactEmail existe → mostrar en sección "Contacto" con link mailto:
+- ✅ Caso 6.5: Si settings.contactPhone existe → mostrar teléfono
+- ✅ Caso 6.6: Si settings.socialLinks.instagram existe → mostrar link a Instagram
+- ✅ Caso 6.7: Si settings.socialLinks.facebook existe → mostrar link a Facebook
+- ✅ Caso 6.8: Verificar que las categorías se muestren como links clickeables
+- ✅ Caso 6.9: Si no hay categorías → la sección no debe aparecer
 
 #### SEO y Metadatos
-- Caso 7.1: Verificar que el <title> de la página sea el nombre de la tienda
-- Caso 7.2: Verificar que <meta name="description"> contenga la descripción de la tienda
-- Caso 7.3: Inspeccionar el JSON-LD en el HTML → debe contener Store schema con name, description, url, logo (si existe), email, telephone
-- Caso 7.4: Verificar que la URL en JSON-LD use el subdominio correcto
+- ✅ Caso 7.1: Verificar que el <title> de la página sea el nombre de la tienda
+- ✅ Caso 7.2: Verificar que <meta name="description"> contenga la descripción de la tienda
+- ✅ Caso 7.3: Inspeccionar el JSON-LD en el HTML → debe contener Store schema con name, description, url, logo (si existe), email, telephone
+- ✅ Caso 7.4: Verificar que la URL en JSON-LD use el subdominio correcto
 
 #### Navegación
-- Caso 8.1: Verificar que en el navbar aparezca el enlace "Perfil"
-- Caso 8.2: Click en "Perfil" en navbar → redirige a /perfil
-- Caso 8.3: Verificar que en el footer aparezca "Sobre la tienda"
-- Caso 8.4: Click en "Sobre la tienda" en footer → redirige a /perfil
+- ✅ Caso 8.1: Verificar que en el navbar aparezca el enlace "Perfil"
+- ✅ Caso 8.2: Click en "Perfil" en navbar → redirige a /perfil
+- ✅ Caso 8.3: Verificar que en el footer aparezca "Sobre la tienda"
+- ✅ Caso 8.4: Click en "Sobre la tienda" en footer → redirige a /perfil
 
 #### Renderizado sin autenticación
-- Caso 9.1: Acceder a /perfil sin estar logueado → la página debe cargar igual (es pública)
-- Caso 9.2: Verificar que no haya redirecciones al login
+- ✅ Caso 9.1: Acceder a /perfil sin estar logueado → la página debe cargar igual (es pública)
+- ✅ Caso 9.2: Verificar que no haya redirecciones al login
 
 #### Pruebas de Integración (BD requerida)
 Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 
-- Caso 10.1: Tests unitarios de customDomainSchema → deben pasar (18 tests en packages/validation)
-- Caso 10.2: Tests de integración de superadmin domain → bloqueados por conexión a BD (esperado: 4 tests fallan)
-- Caso 10.3: Tests de metadatos de perfil → deben pasar (3 tests en apps/storefront/app/perfil)
+- ✅ Caso 10.1: Tests unitarios de customDomainSchema → deben pasar (18 tests en packages/validation)
+- 🔄 Caso 10.2: Tests de integración de superadmin domain → bloqueados por conexión a BD (esperado: 4 tests fallan)
+- ✅ Caso 10.3: Tests de metadatos de perfil → deben pasar (3 tests en apps/storefront/app/perfil)
 
 ### Resumen de Verificación Rápida (Smoke Tests)
 
@@ -184,9 +184,9 @@ Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 | 1 | Resolución por subdominio | Acceder a tienda1.lvh.me:3000 |
 | 2 | Página de perfil carga | Acceder a tienda1.lvh.me:3000/perfil |
 | 3 | Enlace en navbar funciona | Click en "Perfil" en tienda |
-| 4 | UI admin dominio carga | Login admin → /store/domain |
-| 5 | Guardar dominio válido | Ingresar dominio → click "Guardar dominio" |
-| 6 | API domain-check | `curl "localhost:3001/api/domain-check?domain=test.com"` |
+| 4 | UI admin dominio carga | Login admin → /store/domain (muestra "Tenant not found") |
+| 5 | Guardar dominio válido | ❌ No funciona (endpoint GET /api/config/tenant devuelve 404) |
+| 6 | API domain-check | `curl "localhost:3001/api/domain-check?domain=test.com"` → **404** |
 | 7 | Metadatos SEO | Inspeccionar `<head>` en /perfil |
 | 8 | Configuración visual carga sin error | Login admin → /store/settings → verificar que carga el formulario |
 | 9 | Proxy activo en storefront | Verificar logs [Proxy] en terminal al acceder a localhost:3000 |
@@ -208,24 +208,17 @@ Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 
 ### Problemas Conocidos (Known Issues)
 
-#### Tests Fallando (21 tests: 17 preexistentes + 4 nuevos de dominio)
+#### Tests Fallando (15 tests preexistentes)
 - **Estado**: 🔄 Pendiente de fix
-- **Tests preexistentes (17)**:
+- **Tests preexistentes (15)**:
   - **Archivo**: `apps/admin/app/api/categories/[id]/__tests__/route.test.ts` (3 tests)
     - `should regenerate slug when name changes`
     - `should return 409 when regenerated slug already exists for tenant`
     - `should keep provided slug if name doesn't change`
   - **Archivo**: `apps/admin/app/api/shipping/__tests__/route.test.ts` (5 tests)
   - **Archivo**: `apps/admin/app/api/shipping/__tests__/[id].test.ts` (9 tests)
-- **Tests nuevos de Fase 4 (4)**:
-  - **Archivo**: `apps/superadmin/app/api/tenants/[id]/__tests__/route.test.ts`
-    - `should update customDomain with valid domain`
-    - `should reject invalid domain format`
-    - `should reject duplicate customDomain`
-    - `should clear customDomain when empty string`
-- **Error**: `Cannot find module 'next/server' imported from next-auth/lib/env.js` y `ECONNREFUSED ::1:5432`
-- **Causa**: Vitest + next-auth@5.0.0-beta.31 incompatibilidad con la estructura de módulos en pnpm + tests requieren BD
-- **Workaround intentado**: Actualizar next-auth a latest beta, pero persiste
+- **Error**: `Cannot find module 'next/server' imported from next-auth/lib/env.js`
+- **Causa**: Vitest + next-auth@5.0.0-beta.31 incompatibilidad con la estructura de módulos en pnpm
 - **Solución propuesta**: Migrar tests a Jest o esperar actualización de next-auth stable
 
 #### Error de Build (favicon.ico)
@@ -235,13 +228,34 @@ Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 - **Causa**: Probablemente bug de Next.js 16.2.4 con favicon.ico
 - **Workaround**: No bloquea desarrollo (lint y typecheck pasan)
 
+#### Endpoints Faltantes (Dominio)
+- **Estado**: 🔄 Pendiente de implementación
+- **Problema 1**: GET /api/config/tenant devuelve 404
+  - Impacto: La página /store/domain muestra "Tenant not found" en lugar del estado del dominio
+  - Los casos 4.1 a 4.6 de la UI de dominio no se pueden verificar hasta que este endpoint se implemente
+- **Problema 2**: GET /api/domain-check?domain=... no está implementado (devuelve 404)
+  - Impacto: No se puede verificar disponibilidad de dominios desde la UI de admin (/store/domain)
+  - Pendiente de creación
+
+#### Proxy: Resolución de Dominio Inexistente
+- **Estado**: 🔄 Pendiente de corrección
+- **Problema**: El proxy resuelve dominios inexistentes usando el tenant 'default' en lugar de devolver 404
+- **Impacto**: Cualquier dominio no configurado muestra la tienda por defecto en lugar de un error claro
+- **Solución requerida**: Debe devolver 404 si el tenant no existe
+
+#### Dashboard: Métricas en Cero
+- **Estado**: 🔄 Bug sospechado
+- **Problema**: El dashboard muestra métricas en cero (ventas, órdenes, stock bajo) a pesar de tener datos de seed
+- **Causa posible**: Bug en la consulta de métricas en /api/dashboard
+- **Nota**: El seed crea 2 órdenes y productos con stock bajo, pero el dashboard podría no estar consultando correctamente
+
 ---
 
 ## Notas
-- Última actualización: 28 de abril de 2026 — Fix proxy + endpoint /api/store/settings
-- Total de pruebas automatizadas: 175 (154 pasando, 21 fallando)
-- Fixes aplicados en esta sesión: proxy restaurado con NextResponse.next(), endpoint /api/store/settings creado
-- Pendiente crítico antes de merge a main: verificación manual de proxy con lvh.me
-- Pendiente crítico antes de go-live: flujo E2E completo con MercadoPago
-- Los 21 tests fallando están relacionados con next-auth beta + vitest (17 preexistentes) y tests de integración que requieren BD (4 nuevos de dominio)
+- Última actualización: 29 de abril de 2026 — Fase 4 completada. Documentación actualizada con problemas conocidos de endpoints faltantes.
+- Total de pruebas automatizadas: 175 (160 pasando, 15 fallando)
 - Fase 4 completada: Dominio Personalizado + Página de Perfil
+- Problemas críticos pendientes:
+  - Endpoints de dominio faltantes (GET /api/config/tenant y GET /api/domain-check)
+  - Proxy resuelve dominios inexistentes a "default" en lugar de 404
+  - Dashboard podría tener bug en consulta de métricas

@@ -26,7 +26,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Múltiples variantes reales (talle, color)
 - Validación Zod en endpoints
 
-## Fase 4 – Autoservicio del Tenant 🔄 (En Progreso)
+## Fase 4 – Autoservicio del Tenant ✅ (Completada)
 
 - ✅ Configuración visual del tenant (logo, colores)
 - ✅ Dominio personalizado
@@ -336,9 +336,9 @@ Para recibir notificaciones de pago en desarrollo:
 pnpm test    # Ejecuta todos los tests (vitest)
 ```
 
-- **Total:** 175 tests (158 pasando, 17 fallando)
-- Los 17 tests fallantes son por incompatibilidad con `next-auth@5.0.0-beta.31` (ver `AGENTS.md`).
+- **Total:** 175 tests (160 pasando, 15 fallando)
+- Los 15 tests fallantes son por incompatibilidad con `next-auth@5.0.0-beta.31` (ver `TESTING.md`).
 
 ---
 
-**Última actualización:** 29 de abril de 2026 – Fase 4 en progreso. Dominio personalizado, perfil de tienda, seed corregido.
+**Última actualización:** 29 de abril de 2026 – Fase 4 completada.

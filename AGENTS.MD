@@ -56,7 +56,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Rutas API: todas bajo app/api/, no uses pages router.
 - Componentes de React: funciones nombradas, preferir Server Components salvo interactividad.
 
-**Reglas automáticas (asegúrate de que ESLint y Prettier las cubran; si no, añádelas):**
+**Reglas automáticas (asegúrate de que ESLint y Prettier las cubran; si no, añádelas:**
 
 - import/order
 - @typescript-eslint/no-unused-vars
@@ -83,59 +83,14 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Paquetes actuales: `@repo/db`, `@repo/storage`, `@repo/auth`, `@repo/validation` – Validación Zod compartida para toda la API.
 - **Deuda técnica actual**: la lógica de carrito/órdenes está duplicada en `apps/storefront/lib` y `apps/admin/lib`. Durante la Fase 4, no se debe duplicar más lógica. Nueva lógica compartida (ej. cálculo de envío) debe ir en un solo lugar consensuado o en `packages/commerce` si procede.
 
-## Fase 4 Completada ✅
+## Problemas conocidos
 
-- **Sub-fase 3**: Dominio personalizado implementado (proxy.ts, API superadmin, UI admin, validación Zod).
-- **Sub-fase 4**: Página de perfil de tienda implementada (/perfil, SEO, navegación).
-- **Sub-fase 5**: Endpoints de dominio en admin (/api/config/tenant [GET/PUT]).
-  - GET /api/config/tenant → devuelve {id, slug, customDomain}
-  - PUT /api/config/tenant/domain → valida dominio, verifica duplicados, actualiza
-  - Página /store/domain llama a estos endpoints
-- Seed actualizado con customDomain y settings de perfil.
-- Tests: 175 totales (160 pasando, 15 fallando).
-- Problemas conocidos:
-  - Build falla por favicon.ico (Next.js 16.2.4 bug preexistente)
-  - 15 tests fallando por next-auth beta (ver sección "Tests fallantes conocidos")
-  - Proxy temporalmente desactivado (NextResponse.next() roto con Turbopack)
-  - El proxy resuelve dominios inexistentes usando el tenant 'default' en lugar de devolver 404. Esto causa que cualquier dominio no configurado muestre la tienda por defecto en lugar de un error claro. Pendiente de corrección: debe devolver 404 si el tenant no existe.
-  - El endpoint GET /api/domain-check?domain=... no está implementado (devuelve 404). Es necesario para verificar disponibilidad de dominios desde la UI de admin (/store/domain). Pendiente de creación.
-  - El endpoint GET /api/config/tenant devuelve 404, lo que causa que la página /store/domain muestre 'Tenant not found' en lugar del estado del dominio. Los casos 4.1 a 4.6 de la UI de dominio no se pueden verificar hasta que este endpoint se implemente correctamente.
-
-## Tests fallantes conocidos
-
-**Total**: 15 tests fallando en 3 suites (de 175 totales).
-
-### Causa raíz: `next-auth@5.0.0-beta.31` + mocking
-
-Los tests de integración/admin usan `vi.mock("@/lib/auth")` para mockear la función `auth`, pero el mock no intercepta la instancia real creada por `NextAuth({...})` al cargar el módulo. Esto ocurre porque:
-
-1. `@/lib/auth` ejecuta `NextAuth(...)` al importar, creando una instancia cerrada de `auth`.
-2. `vi.mock()` reemplaza el módulo, pero el route ya tiene su referencia a la `auth` real evaluada.
-3. El error visible es: `Cannot find module 'next/server' imported from next-auth/lib/env.js` — la import de `next-auth` sin `.js` falla en el entorno de vitest.
-
-**Suites afectadas:**
-- `apps/admin/app/api/shipping/__tests__/route.test.ts` (5 tests)
-- `apps/admin/app/api/shipping/__tests__/[id].test.ts` (9 tests)
-- `apps/admin/app/api/categories/[id]/__tests__/route.test.ts` (3 tests)
-
-**Solución requerida**: Actualizar a `next-auth` stable o reestructurar `@/lib/auth` para que `auth` sea exportado de forma mockeable (ej. wrapper function que delegue a la instancia interna).
-
-### Fixes aplicados (tests que ahora pasan)
-
-| Archivo | Fix |
-|---------|-----|
-| `vitest.config.ts` | Agregado `dotenv.config({ path: '.env.local' })` para cargar variables de entorno en tests |
-| `packages/db/seed.ts` | Corregida ruta de `.env.local` de `../../.env.local` a `.env.local` |
-| `apps/superadmin/.../tenants/[id]/__tests__/route.test.ts` | Convertido de integración (`fetch`) a unitario con mocks de `@/lib/auth`, `@/lib/redis` y `@repo/db`. Eliminados timeouts en hooks |
-| `apps/superadmin/.../tenants/[id]/route.ts` | Corregido manejo de `customDomain: ""` para limpiar dominio (detectado con `in body` antes de validación) |
-
-## Proxy pendiente de resolver
-
-- **Estado**: Proxy temporalmente desactivado (`apps/storefront/proxy.ts` → `proxy.ts.bak`).
-- **Causa**: `NextResponse.next()` y `NextResponse.rewrite()` fallan con Turbopack en Next.js 16.2.4 (`NextResponse.next is not a function`).
-- **Solución temporal**: Resolución de tenant的直接a en `page.tsx` mediante `headers()` + consulta a `dbTenants`.
-- **Funcionalidades afectadas**: Dominio personalizado (customDomain), Redis cache de dominios, logging de headers.
-- **Más detalles**: Ver `docs/proxy-issue.md`.
+- Build falla por favicon.ico (Next.js 16.2.4 bug preexistente)
+- 15 tests fallando por next-auth beta (ver TESTING.md para detalles).
+- Proxy temporalmente desactivado (NextResponse.next() roto con Turbopack).
+- El proxy resuelve dominios inexistentes usando el tenant 'default' en lugar de devolver 404. Esto causa que cualquier dominio no configurado muestre la tienda por defecto en lugar de un error claro. Pendiente de corrección: debe devolver 404 si el tenant no existe.
+- El endpoint GET /api/domain-check?domain=... no está implementado (devuelve 404). Es necesario para verificar disponibilidad de dominios desde la UI de admin (/store/domain). Pendiente de creación.
+- El endpoint GET /api/config/tenant devuelve 404, lo que causa que la página /store/domain muestre 'Tenant not found' en lugar del estado del dominio. Los casos 4.1 a 4.6 de la UI de dominio no se pueden verificar hasta que este endpoint se implemente correctamente.
 
 ## Mantenimiento de la documentación
 
