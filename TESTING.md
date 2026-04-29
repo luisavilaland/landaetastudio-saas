@@ -93,13 +93,29 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 
 ## Fase 4 – Dominio Personalizado y Perfil de Tienda ✅
 
+### Sub-fase 0: Configuración Visual del Tenant
+
+#### API Admin - Settings
+- ✅ GET /api/store/settings → retorna configuración actual del tenant
+- ✅ PUT /api/store/settings → actualiza logo, colores, descripción, contacto y redes sociales
+- ✅ Endpoint corregido: frontend apuntaba a /api/store/settings (correcto) pero el archivo existía solo en /api/config/settings (fix aplicado en Fase 4)
+
+#### UI Admin - Página de Configuración (/store/settings)
+- ✅ Acceder a /store/settings → carga sin error JSON
+- ✅ Formulario muestra campos: logo, color primario, secundario, acento, fuente, descripción, email, teléfono, Instagram, Facebook
+- ✅ Guardar configuración → respuesta 200 y mensaje de éxito
+
 ### Sub-fase 3: Dominio Personalizado
 
 #### Resolución de Dominio en Proxy (proxy.ts)
-- Caso 1.1: Acceder vía subdominio tienda1.lvh.me:3000 → resolver correctamente el tenant
-- Caso 1.2: Configurar customDomain en BD (ej. mitienda.local) → acceder vía ese dominio → resolver al tenant correcto
-- Caso 1.3: Acceder con dominio inexistente → recibir 404
-- Caso 1.4: Verificar logs en consola muestren [Proxy] Resolved by customDomain: cuando corresponda
+> ✅ Proxy restaurado en Fase 4. NextResponse.next() funciona correctamente con Turbopack en Next.js 16.2.4. Matcher optimizado para excluir rutas estáticas (_next/static, imágenes).
+
+- ✅ Proxy activo: logs [Proxy] visibles en consola para cada request
+- ✅ Matcher optimizado: rutas /_next/static/* excluidas del proxy
+- 🔄 Caso 1.1: Pendiente verificación manual — Acceder vía tienda1.lvh.me:3000 → resolver tenant
+- 🔄 Caso 1.2: Pendiente verificación manual — customDomain en BD → resolver al tenant correcto
+- 🔄 Caso 1.3: Pendiente verificación manual — dominio inexistente → fallback a "default"
+- ✅ Caso 1.4: Logs [Proxy] visibles en consola con Hostname, Path y Tenant Slug
 
 #### API Superadmin - Gestión de Tenant
 - Caso 2.1: PUT /api/tenants/[id] con customDomain: "mitienda.com" → respuesta 200 con campo actualizado
@@ -172,13 +188,23 @@ Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 | 5 | Guardar dominio válido | Ingresar dominio → click "Guardar dominio" |
 | 6 | API domain-check | `curl "localhost:3001/api/domain-check?domain=test.com"` |
 | 7 | Metadatos SEO | Inspeccionar `<head>` en /perfil |
+| 8 | Configuración visual carga sin error | Login admin → /store/settings → verificar que carga el formulario |
+| 9 | Proxy activo en storefront | Verificar logs [Proxy] en terminal al acceder a localhost:3000 |
 
 ---
 
 ## Pendientes 🔄
 
 ### Flujo E2E Completo de Compra con MercadoPago
-- 🔄 Flujo E2E completo de compra con MercadoPago (no se pudo probar por problemas con la cuenta de comprador de prueba)
+- 🔄 **BLOQUEANTE para producción** — Flujo E2E completo con MercadoPago pendiente de verificación
+- Problema: cuenta de comprador de prueba en sandbox no disponible
+- Pasos para verificar cuando esté disponible:
+  1. Agregar producto al carrito en storefront
+  2. Completar checkout con datos de envío
+  3. Pagar con tarjeta de prueba de MercadoPago sandbox
+  4. Verificar que la orden cambia a estado "confirmed"
+  5. Verificar que llega email de confirmación
+  6. Verificar que el stock se descuenta correctamente
 
 ### Problemas Conocidos (Known Issues)
 
@@ -212,7 +238,10 @@ Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 ---
 
 ## Notas
-- Última actualización: 28 de abril de 2026
+- Última actualización: 28 de abril de 2026 — Fix proxy + endpoint /api/store/settings
 - Total de pruebas automatizadas: 175 (154 pasando, 21 fallando)
+- Fixes aplicados en esta sesión: proxy restaurado con NextResponse.next(), endpoint /api/store/settings creado
+- Pendiente crítico antes de merge a main: verificación manual de proxy con lvh.me
+- Pendiente crítico antes de go-live: flujo E2E completo con MercadoPago
 - Los 21 tests fallando están relacionados con next-auth beta + vitest (17 preexistentes) y tests de integración que requieren BD (4 nuevos de dominio)
 - Fase 4 completada: Dominio Personalizado + Página de Perfil
