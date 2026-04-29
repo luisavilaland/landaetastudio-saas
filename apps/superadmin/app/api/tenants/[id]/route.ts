@@ -56,6 +56,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
+    const clearDomain = "customDomain" in body && body.customDomain === "";
     const validation = updateTenantSchema.safeParse(body);
 
     if (!validation.success) {
@@ -106,11 +107,11 @@ export async function PUT(
         status: status ?? existing[0].status,
         slug: slug ?? existing[0].slug,
         customDomain:
-          customDomain !== undefined
-            ? customDomain === ""
-              ? null
-              : customDomain
-            : existing[0].customDomain,
+          clearDomain
+            ? null
+            : customDomain !== undefined
+              ? customDomain
+              : existing[0].customDomain,
         updatedAt: new Date(),
       })
       .where(eq(dbTenants.id, id))
@@ -124,7 +125,7 @@ export async function PUT(
       }
     }
 
-    if (customDomain !== undefined) {
+    if (clearDomain || customDomain !== undefined) {
       try {
         if (existing[0].customDomain) {
           await redisClient.del(`domain:${existing[0].customDomain}`);

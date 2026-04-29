@@ -92,11 +92,39 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
   - PUT /api/config/tenant/domain → valida dominio, verifica duplicados, actualiza
   - Página /store/domain llama a estos endpoints
 - Seed actualizado con customDomain y settings de perfil.
-- Tests: 175 totales (154 pasando, 21 fallando por next-auth beta + BD requerida).
+- Tests: 175 totales (158 pasando, 17 fallando).
 - Problemas conocidos:
   - Build falla por favicon.ico (Next.js 16.2.4 bug preexistente)
-  - 21 tests fallando por next-auth + BD real requerida
+  - 17 tests fallando por next-auth beta (ver sección "Tests fallantes conocidos")
   - Proxy暂时停用 (NextResponse.next() roto con Turbopack)
+
+## Tests fallantes conocidos
+
+**Total**: 17 tests fallando en 3 suites (de 175 totales).
+
+### Causa raíz: `next-auth@5.0.0-beta.31` + mocking
+
+Los tests de integración/admin usan `vi.mock("@/lib/auth")` para mockear la función `auth`, pero el mock no intercepta la instancia real creada por `NextAuth({...})` al cargar el módulo. Esto ocurre porque:
+
+1. `@/lib/auth` ejecuta `NextAuth(...)` al importar, creando una instancia cerrada de `auth`.
+2. `vi.mock()` reemplaza el módulo, pero el route ya tiene su referencia a la `auth` real evaluada.
+3. El error visible es: `Cannot find module 'next/server' imported from next-auth/lib/env.js` — la import de `next-auth` sin `.js` falla en el entorno de vitest.
+
+**Suites afectadas:**
+- `apps/admin/app/api/shipping/__tests__/route.test.ts` (5 tests)
+- `apps/admin/app/api/shipping/__tests__/[id].test.ts` (9 tests)
+- `apps/admin/app/api/categories/[id]/__tests__/route.test.ts` (3 tests)
+
+**Solución requerida**: Actualizar a `next-auth` stable o reestructurar `@/lib/auth` para que `auth` sea exportado de forma mockeable (ej. wrapper function que delegue a la instancia interna).
+
+### Fixes aplicados (tests que ahora pasan)
+
+| Archivo | Fix |
+|---------|-----|
+| `vitest.config.ts` | Agregado `dotenv.config({ path: '.env.local' })` para cargar variables de entorno en tests |
+| `packages/db/seed.ts` | Corregida ruta de `.env.local` de `../../.env.local` a `.env.local` |
+| `apps/superadmin/.../tenants/[id]/__tests__/route.test.ts` | Convertido de integración (`fetch`) a unitario con mocks de `@/lib/auth` y `@/lib/redis` |
+| `apps/superadmin/.../tenants/[id]/route.ts` | Corregido manejo de `customDomain: ""` para limpiar dominio (detectado con `in body` antes de validación) |
 
 ## Proxy pendiente de resolver
 

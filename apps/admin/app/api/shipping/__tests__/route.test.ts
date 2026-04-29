@@ -1,13 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextResponse } from "next/server";
 
-vi.mock("next/server", () => ({
-  NextResponse: {
-    json: vi.fn((data, init) => ({
-      status: init?.status || 200,
-      json: async () => data,
-    })),
-  },
+vi.mock("next-auth", () => ({
+  default: vi.fn(() => ({
+    handlers: { GET: vi.fn(), POST: vi.fn() },
+    auth: vi.fn(),
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  })),
+}));
+
+vi.mock("next-auth/providers/credentials", () => ({
+  default: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -32,6 +35,9 @@ vi.mock("@repo/db", () => ({
   dbShippingMethods: {},
 }));
 
+import { auth } from "@/lib/auth";
+import { db } from "@repo/db";
+
 const createSelectChain = (result: any[]) => ({
   from: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
@@ -43,31 +49,38 @@ const createInsertChain = (result: any[]) => ({
   returning: vi.fn().mockResolvedValue(result),
 });
 
+async function importGet() {
+  const mod = await import("../route");
+  return mod.GET;
+}
+
+async function importPost() {
+  const mod = await import("../route");
+  return mod.POST;
+}
+
 describe("GET /api/shipping", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("should return 401 when no session", async () => {
-    const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValueOnce(null);
+    vi.mocked(auth).mockResolvedValue(null);
 
-    const { GET } = await import("../route");
+    const GET = await importGet();
     const response = await GET();
 
     expect(response.status).toBe(401);
   });
 
   it("should return 200 with methods array when authenticated", async () => {
-    const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth).mockResolvedValue({
       user: { tenantId: "tenant-1" },
     } as any);
 
-    const { db } = await import("@repo/db");
-    vi.mocked(db.select).mockReturnValueOnce(createSelectChain([]) as any);
+    vi.mocked(db.select).mockReturnValue(createSelectChain([]) as any);
 
-    const { GET } = await import("../route");
+    const GET = await importGet();
     const response = await GET();
 
     expect(response.status).toBe(200);
@@ -82,10 +95,9 @@ describe("POST /api/shipping", () => {
   });
 
   it("should return 401 when no session", async () => {
-    const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValueOnce(null);
+    vi.mocked(auth).mockResolvedValue(null);
 
-    const { POST } = await import("../route");
+    const POST = await importPost();
     const request = {
       json: async () => ({ name: "Envío", price: 150 }),
     } as any;
@@ -95,8 +107,7 @@ describe("POST /api/shipping", () => {
   });
 
   it("should return 201 with created method when valid data", async () => {
-    const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth).mockResolvedValue({
       user: { tenantId: "tenant-1" },
     } as any);
 
@@ -108,11 +119,10 @@ describe("POST /api/shipping", () => {
       isActive: "true",
     };
 
-    const { db } = await import("@repo/db");
-    vi.mocked(db.select).mockReturnValueOnce(createSelectChain([]) as any);
-    vi.mocked(db.insert).mockReturnValueOnce(createInsertChain([mockMethod]) as any);
+    vi.mocked(db.select).mockReturnValue(createSelectChain([]) as any);
+    vi.mocked(db.insert).mockReturnValue(createInsertChain([mockMethod]) as any);
 
-    const { POST } = await import("../route");
+    const POST = await importPost();
     const request = {
       json: async () => ({ name: "Envío", price: 150 }),
     } as any;
@@ -124,12 +134,11 @@ describe("POST /api/shipping", () => {
   });
 
   it("should return 400 with validation errors when invalid data", async () => {
-    const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth).mockResolvedValue({
       user: { tenantId: "tenant-1" },
     } as any);
 
-    const { POST } = await import("../route");
+    const POST = await importPost();
     const request = {
       json: async () => ({ name: "", price: -10 }),
     } as any;

@@ -228,6 +228,24 @@ pnpm db:migrate
 
 ## Testing Conventions
 
+### Ejecutar Tests
+
+```bash
+pnpm test          # Todos los tests (vitest run)
+pnpm lint          # Linting + formatting
+pnpm typecheck     # TypeScript --noEmit
+pnpm build         # Build de todas las apps
+```
+
+### Tests Fallantes Conocidos
+
+**17 tests fallando** (de 175 totales) por incompatibilidad con `next-auth@5.0.0-beta.31`:
+
+- El bug ocurre porque `next-auth` importa `next/server` sin extensión `.js`, lo que falla en vitest.
+- Además, los mocks de `vi.mock("@/lib/auth")` no interceptan la instancia `auth` creada por `NextAuth()` al cargar el módulo.
+- Suites afectadas: `apps/admin/app/api/shipping/` y `apps/admin/app/api/categories/`.
+- Ver `AGENTS.md` para detalles técnicos y solución requerida.
+
 ### Tarjetas de prueba MercadoPago
 
 > Próximamente: tarjetas de prueba para simular pagos aprobados y rechazados en el entorno de desarrollo de MercadoPago.
@@ -241,4 +259,4 @@ tenant1.lvh.me:3000
 
 ## Nota
 
-Última actualización: 28 de abril de 2026 – Fase 3 completada: categorías, imágenes, variantes, búsqueda, Zod.
+Última actualización: 29 de abril de 2026 – Fase 4 completada. Seed y tests corregidos.

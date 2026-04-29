@@ -26,12 +26,12 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - Múltiples variantes reales (talle, color)
 - Validación Zod en endpoints
 
-## Fase 4 – Autoservicio del Tenant 🔄 (Pendiente)
+## Fase 4 – Autoservicio del Tenant 🔄 (En Progreso)
 
-- Configuración visual del tenant (logo, colores)
-- Dominio personalizado
-- Métodos de envío configurables
-- Página de perfil de tienda
+- ✅ Configuración visual del tenant (logo, colores)
+- ✅ Dominio personalizado
+- ✅ Métodos de envío configurables
+- ✅ Página de perfil de tienda
 
 ## Fase 5 – Producción 🔄 (Pendiente)
 
@@ -137,11 +137,24 @@ pnpm dev
 tenant1.lvh.me:3000  # Tienda1 storefront
 ```
 
-## Usuario de prueba
+## Usuarios de prueba
+
+### Admin
 
 - **Email:** admin@tienda1.com
 - **Password:** 123456
-- **Tenant:** five-mice-do (id: 11111111-1111-1111-1111-111111111111)
+- **Tenant:** tienda1
+
+### Superadmin
+
+- **Email:** super@admin.com
+- **Password:** 123456
+- **Rol:** superadmin (sin tenant)
+
+### Cliente
+
+- **Email:** cliente@ejemplo.com
+- **Password:** 123456
 
 ## Estructura del proyecto
 
@@ -169,6 +182,10 @@ saas-ecommerce/
 | `pnpm db:generate` | Genera migraciones desde el schema |
 | `pnpm db:migrate` | Aplica migraciones pendientes |
 | `pnpm db:seed` | Limpia la BD y crea datos de prueba |
+| `pnpm test` | Ejecuta todos los tests (vitest) |
+| `pnpm lint` | Linting + formatting |
+| `pnpm typecheck` | Verificación de tipos TypeScript |
+| `pnpm build` | Build de producción de todas las apps |
 
 ## API Endpoints
 
@@ -313,6 +330,15 @@ Para recibir notificaciones de pago en desarrollo:
 - [Prompts reutilizables](./PROMPTS.md) – Plantillas de prompts para agentes de IA.
 - [Plan de Fase 4](./docs/plan-fase-4.md) – Plan de implementación detallado para la Fase 4.
 
+## Tests
+
+```bash
+pnpm test    # Ejecuta todos los tests (vitest)
+```
+
+- **Total:** 175 tests (158 pasando, 17 fallando)
+- Los 17 tests fallantes son por incompatibilidad con `next-auth@5.0.0-beta.31` (ver `AGENTS.md`).
+
 ---
 
-**Última actualización:** 28 de abril de 2026 – Fase 3 completada: categorías, imágenes, variantes, búsqueda, Zod.
+**Última actualización:** 29 de abril de 2026 – Fase 4 en progreso. Dominio personalizado, perfil de tienda, seed corregido.

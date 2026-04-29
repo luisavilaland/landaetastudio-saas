@@ -5,7 +5,7 @@ import * as schema from './src/schema';
 import bcrypt from 'bcryptjs';
 import { sql } from 'drizzle-orm';
 
-config({ path: '../../.env.local' });
+config({ path: '.env.local' });
 
 const client = postgres(process.env.DATABASE_URL!);
 const db = drizzle(client, { schema });

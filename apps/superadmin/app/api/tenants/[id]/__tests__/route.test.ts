@@ -1,11 +1,41 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { db, dbTenants } from "@repo/db";
 import { eq } from "drizzle-orm";
+
+vi.mock("@/lib/auth", () => ({
+  auth: vi.fn(),
+}));
+
+vi.mock("@/lib/redis", () => ({
+  redisClient: {
+    del: vi.fn().mockResolvedValue(0),
+    setex: vi.fn().mockResolvedValue("OK"),
+  },
+}));
+
+import { auth } from "@/lib/auth";
+import { PUT } from "../route";
+
+const mockSession = {
+  user: { email: "super@admin.com" },
+  expires: "2099-01-01T00:00:00.000Z",
+};
+
+function makeRequest(id: string, body: Record<string, unknown>) {
+  return PUT(
+    {
+      json: async () => body,
+    } as any,
+    { params: Promise.resolve({ id }) }
+  );
+}
 
 describe("PUT /api/tenants/[id]", () => {
   let testTenantId: string;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.mocked(auth).mockResolvedValue(mockSession as any);
     const [tenant] = await db
       .insert(dbTenants)
       .values({
@@ -20,14 +50,11 @@ describe("PUT /api/tenants/[id]", () => {
 
   afterEach(async () => {
     await db.delete(dbTenants).where(eq(dbTenants.id, testTenantId));
+    await db.delete(dbTenants).where(eq(dbTenants.slug, "other-tenant"));
   });
 
   it("should update customDomain with valid domain", async () => {
-    const res = await fetch(`http://localhost:3001/api/tenants/${testTenantId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customDomain: "mitienda.com.uy" }),
-    });
+    const res = await makeRequest(testTenantId, { customDomain: "mitienda.com.uy" });
 
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -35,11 +62,7 @@ describe("PUT /api/tenants/[id]", () => {
   });
 
   it("should reject invalid domain format", async () => {
-    const res = await fetch(`http://localhost:3001/api/tenants/${testTenantId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customDomain: "http://mitienda.com" }),
-    });
+    const res = await makeRequest(testTenantId, { customDomain: "http://mitienda.com" });
 
     expect(res.status).toBe(400);
   });
@@ -51,11 +74,7 @@ describe("PUT /api/tenants/[id]", () => {
       customDomain: "existing.com",
     });
 
-    const res = await fetch(`http://localhost:3001/api/tenants/${testTenantId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customDomain: "existing.com" }),
-    });
+    const res = await makeRequest(testTenantId, { customDomain: "existing.com" });
 
     expect(res.status).toBe(409);
 
@@ -72,11 +91,7 @@ describe("PUT /api/tenants/[id]", () => {
       .set({ customDomain: "mitienda.com" })
       .where(eq(dbTenants.id, testTenantId));
 
-    const res = await fetch(`http://localhost:3001/api/tenants/${testTenantId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customDomain: "" }),
-    });
+    const res = await makeRequest(testTenantId, { customDomain: "" });
 
     expect(res.status).toBe(200);
     const data = await res.json();
