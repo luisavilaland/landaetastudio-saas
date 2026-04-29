@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { db, dbTenants } from "@repo/db";
-import { eq } from "drizzle-orm";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Tenant } from "@repo/db";
+import { db } from "@repo/db";
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
@@ -13,10 +13,23 @@ vi.mock("@/lib/redis", () => ({
   },
 }));
 
+vi.mock("@repo/db", async () => {
+  const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
+  return {
+    ...actual,
+    db: {
+      select: vi.fn(),
+      update: vi.fn(),
+      insert: vi.fn(),
+      delete: vi.fn(),
+    },
+  };
+});
+
 import { auth } from "@/lib/auth";
 import { PUT } from "../route";
 
-const mockSession = {
+const mockSession: Record<string, unknown> = {
   user: { email: "super@admin.com" },
   expires: "2099-01-01T00:00:00.000Z",
 };
@@ -25,36 +38,58 @@ function makeRequest(id: string, body: Record<string, unknown>) {
   return PUT(
     {
       json: async () => body,
-    } as any,
+      nextUrl: new URL("http://localhost"),
+      cookies: { get: () => undefined },
+      headers: new Headers(),
+    } as Parameters<typeof PUT>[0],
     { params: Promise.resolve({ id }) }
   );
 }
 
+const baseTenant: Tenant = {
+  id: "test-tenant-id",
+  slug: "test-tenant-domain",
+  name: "Test Tenant",
+  plan: "starter",
+  status: "active",
+  customDomain: null,
+  settings: {},
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
 describe("PUT /api/tenants/[id]", () => {
-  let testTenantId: string;
-
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(auth).mockResolvedValue(mockSession as any);
-    const [tenant] = await db
-      .insert(dbTenants)
-      .values({
-        slug: "test-tenant-domain",
-        name: "Test Tenant",
-        plan: "starter",
-        status: "active",
-      })
-      .returning({ id: dbTenants.id });
-    testTenantId = tenant.id;
-  });
-
-  afterEach(async () => {
-    await db.delete(dbTenants).where(eq(dbTenants.id, testTenantId));
-    await db.delete(dbTenants).where(eq(dbTenants.slug, "other-tenant"));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (auth as any).mockResolvedValue(mockSession);
   });
 
   it("should update customDomain with valid domain", async () => {
-    const res = await makeRequest(testTenantId, { customDomain: "mitienda.com.uy" });
+    const existingTenant = { ...baseTenant };
+    const updatedTenant = { ...baseTenant, customDomain: "mitienda.com.uy" };
+
+    vi.mocked(db.select)
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([existingTenant]),
+      } as unknown as ReturnType<typeof db.select>)
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([]),
+      } as unknown as ReturnType<typeof db.select>);
+
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([updatedTenant]),
+        }),
+      }),
+    } as unknown as ReturnType<typeof db.update>);
+
+    const res = await makeRequest("test-tenant-id", { customDomain: "mitienda.com.uy" });
 
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -62,36 +97,51 @@ describe("PUT /api/tenants/[id]", () => {
   });
 
   it("should reject invalid domain format", async () => {
-    const res = await makeRequest(testTenantId, { customDomain: "http://mitienda.com" });
+    const res = await makeRequest("test-tenant-id", { customDomain: "http://mitienda.com" });
 
     expect(res.status).toBe(400);
   });
 
   it("should reject duplicate customDomain", async () => {
-    await db.insert(dbTenants).values({
-      slug: "other-tenant",
-      name: "Other Tenant",
-      customDomain: "existing.com",
-    });
+    const existingTenant = { ...baseTenant };
+    const duplicateTenant = { ...baseTenant, id: "other-tenant-id", customDomain: "existing.com" };
 
-    const res = await makeRequest(testTenantId, { customDomain: "existing.com" });
+    vi.mocked(db.select)
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([existingTenant]),
+      } as unknown as ReturnType<typeof db.select>)
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([duplicateTenant]),
+      } as unknown as ReturnType<typeof db.select>);
+
+    const res = await makeRequest("test-tenant-id", { customDomain: "existing.com" });
 
     expect(res.status).toBe(409);
-
-    const [other] = await db
-      .select({ id: dbTenants.id })
-      .from(dbTenants)
-      .where(eq(dbTenants.slug, "other-tenant"));
-    await db.delete(dbTenants).where(eq(dbTenants.id, other.id));
   });
 
   it("should clear customDomain when empty string", async () => {
-    await db
-      .update(dbTenants)
-      .set({ customDomain: "mitienda.com" })
-      .where(eq(dbTenants.id, testTenantId));
+    const existingTenant = { ...baseTenant, customDomain: "mitienda.com" };
+    const updatedTenant = { ...baseTenant, customDomain: null };
 
-    const res = await makeRequest(testTenantId, { customDomain: "" });
+    vi.mocked(db.select).mockReturnValueOnce({
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([existingTenant]),
+    } as unknown as ReturnType<typeof db.select>);
+
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([updatedTenant]),
+        }),
+      }),
+    } as unknown as ReturnType<typeof db.update>);
+
+    const res = await makeRequest("test-tenant-id", { customDomain: "" });
 
     expect(res.status).toBe(200);
     const data = await res.json();

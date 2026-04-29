@@ -92,15 +92,15 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
   - PUT /api/config/tenant/domain → valida dominio, verifica duplicados, actualiza
   - Página /store/domain llama a estos endpoints
 - Seed actualizado con customDomain y settings de perfil.
-- Tests: 175 totales (158 pasando, 17 fallando).
+- Tests: 175 totales (160 pasando, 15 fallando).
 - Problemas conocidos:
   - Build falla por favicon.ico (Next.js 16.2.4 bug preexistente)
-  - 17 tests fallando por next-auth beta (ver sección "Tests fallantes conocidos")
+  - 15 tests fallando por next-auth beta (ver sección "Tests fallantes conocidos")
   - Proxy暂时停用 (NextResponse.next() roto con Turbopack)
 
 ## Tests fallantes conocidos
 
-**Total**: 17 tests fallando en 3 suites (de 175 totales).
+**Total**: 15 tests fallando en 3 suites (de 175 totales).
 
 ### Causa raíz: `next-auth@5.0.0-beta.31` + mocking
 
@@ -123,7 +123,7 @@ Los tests de integración/admin usan `vi.mock("@/lib/auth")` para mockear la fun
 |---------|-----|
 | `vitest.config.ts` | Agregado `dotenv.config({ path: '.env.local' })` para cargar variables de entorno en tests |
 | `packages/db/seed.ts` | Corregida ruta de `.env.local` de `../../.env.local` a `.env.local` |
-| `apps/superadmin/.../tenants/[id]/__tests__/route.test.ts` | Convertido de integración (`fetch`) a unitario con mocks de `@/lib/auth` y `@/lib/redis` |
+| `apps/superadmin/.../tenants/[id]/__tests__/route.test.ts` | Convertido de integración (`fetch`) a unitario con mocks de `@/lib/auth`, `@/lib/redis` y `@repo/db`. Eliminados timeouts en hooks |
 | `apps/superadmin/.../tenants/[id]/route.ts` | Corregido manejo de `customDomain: ""` para limpiar dominio (detectado con `in body` antes de validación) |
 
 ## Proxy pendiente de resolver
