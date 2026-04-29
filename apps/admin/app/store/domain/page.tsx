@@ -87,8 +87,10 @@ export default function DomainPage() {
       const res = await fetch(`/api/domain-check?domain=${encodeURIComponent(customDomain.trim())}`);
       const data = await res.json();
 
-      if (res.ok && !data.available) {
+      if (res.ok && data.available) {
         setSuccess("Dominio verificado y disponible");
+      } else if (res.ok && !data.available) {
+        setError("El dominio ya está en uso. Elige otro dominio.");
       } else {
         setError("No se pudo verificar el dominio. Asegúrate de que el DNS apunte correctamente.");
       }

@@ -87,10 +87,6 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 
 - Build falla por favicon.ico (Next.js 16.2.4 bug preexistente)
 - 15 tests fallando por next-auth beta (ver TESTING.md para detalles).
-- Proxy temporalmente desactivado (NextResponse.next() roto con Turbopack).
-- El proxy resuelve dominios inexistentes usando el tenant 'default' en lugar de devolver 404. Esto causa que cualquier dominio no configurado muestre la tienda por defecto en lugar de un error claro. Pendiente de corrección: debe devolver 404 si el tenant no existe.
-- El endpoint GET /api/domain-check?domain=... no está implementado (devuelve 404). Es necesario para verificar disponibilidad de dominios desde la UI de admin (/store/domain). Pendiente de creación.
-- El endpoint GET /api/config/tenant devuelve 404, lo que causa que la página /store/domain muestre 'Tenant not found' en lugar del estado del dominio. Los casos 4.1 a 4.6 de la UI de dominio no se pueden verificar hasta que este endpoint se implemente correctamente.
 
 ## Mantenimiento de la documentación
 

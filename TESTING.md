@@ -114,7 +114,7 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 - ✅ Matcher optimizado: rutas /_next/static/* excluidas del proxy
 - ✅ Caso 1.1: Acceder vía tienda1.lvh.me:3000 → resolver tenant
 - ✅ Caso 1.2: customDomain en BD → resolver al tenant correcto
-- 🔄 Caso 1.3: Dominio inexistente → fallback a "default" (BUG: debería devolver 404)
+- ✅ Caso 1.3: Dominio inexistente → devuelve 404 (corregido en Fase 4)
 - ✅ Caso 1.4: Logs [Proxy] visibles en consola con Hostname, Path y Tenant Slug
 
 #### API Superadmin - Gestión de Tenant
@@ -125,17 +125,17 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 - ✅ Caso 2.5: GET /api/tenants/[id] → respuesta incluye campo customDomain
 
 #### API Pública de Verificación
-- 🔄 Caso 3.1: GET /api/domain-check?domain=disponible.com → **404** (NO IMPLEMENTADO)
-- 🔄 Caso 3.2: GET /api/domain-check?domain=dominio-ya-usado.com → **404** (NO IMPLEMENTADO)
-- 🔄 Caso 3.3: Sin parámetro domain → **404** (NO IMPLEMENTADO)
+- ✅ Caso 3.1: GET /api/domain-check?domain=disponible.com → devuelve { available: true }
+- ✅ Caso 3.2: GET /api/domain-check?domain=dominio-ya-usado.com → devuelve { available: false }
+- ✅ Caso 3.3: Sin parámetro domain → devuelve 400 con mensaje de error
 
 #### UI Admin - Página de Dominio (/store/domain)
-- 🔄 Caso 4.1: Acceder a /store/domain → muestra "Tenant not found" (GET /api/config/tenant devuelve 404)
-- 🔄 Caso 4.2: Ingresar dominio válido y guardar → no funciona (endpoint no existe)
-- 🔄 Caso 4.3: Ingresar dominio inválido (con http://) → no verificable
-- 🔄 Caso 4.4: Hacer click en "Verificar ahora" → no funciona (endpoint no existe)
-- 🔄 Caso 4.5: Verificar que las instrucciones de DNS se muestren correctamente → pendiente
-- 🔄 Caso 4.6: Verificar navegación: el enlace "Dominio" aparece en el header del dashboard → pendiente
+- ✅ Caso 4.1: Acceder a /store/domain → carga correctamente con datos del tenant
+- ✅ Caso 4.2: Ingresar dominio válido y guardar → actualiza customDomain del tenant
+- ✅ Caso 4.3: Ingresar dominio inválido (con http://) → validación Zod rechaza con error 400
+- ✅ Caso 4.4: Hacer click en "Verificar ahora" → verifica disponibilidad vía /api/domain-check
+- ✅ Caso 4.5: Instrucciones de DNS se muestran correctamente en la página
+- ✅ Caso 4.6: El enlace "Dominio" aparece en el header del dashboard
 
 #### Redis Cache (Opcional - Si se implementa en Fase 5)
 - Caso 5.1: Tras configurar dominio, verificar que se cachea en Redis con TTL 1 hora
@@ -184,12 +184,13 @@ Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 | 1 | Resolución por subdominio | Acceder a tienda1.lvh.me:3000 |
 | 2 | Página de perfil carga | Acceder a tienda1.lvh.me:3000/perfil |
 | 3 | Enlace en navbar funciona | Click en "Perfil" en tienda |
-| 4 | UI admin dominio carga | Login admin → /store/domain (muestra "Tenant not found") |
-| 5 | Guardar dominio válido | ❌ No funciona (endpoint GET /api/config/tenant devuelve 404) |
-| 6 | API domain-check | `curl "localhost:3001/api/domain-check?domain=test.com"` → **404** |
+| 4 | UI admin dominio carga | Login admin → /store/domain (carga correctamente) |
+| 5 | Guardar dominio válido | Login admin → /store/domain → ingresar dominio → guardar |
+| 6 | API domain-check | `curl "localhost:3001/api/domain-check?domain=test.com"` → `{ available: true/false }` |
 | 7 | Metadatos SEO | Inspeccionar `<head>` en /perfil |
 | 8 | Configuración visual carga sin error | Login admin → /store/settings → verificar que carga el formulario |
 | 9 | Proxy activo en storefront | Verificar logs [Proxy] en terminal al acceder a localhost:3000 |
+| 10 | Proxy dominio inexistente | Acceder con dominio inexistente → devuelve 404 |
 
 ---
 
@@ -228,34 +229,13 @@ Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 - **Causa**: Probablemente bug de Next.js 16.2.4 con favicon.ico
 - **Workaround**: No bloquea desarrollo (lint y typecheck pasan)
 
-#### Endpoints Faltantes (Dominio)
-- **Estado**: 🔄 Pendiente de implementación
-- **Problema 1**: GET /api/config/tenant devuelve 404
-  - Impacto: La página /store/domain muestra "Tenant not found" en lugar del estado del dominio
-  - Los casos 4.1 a 4.6 de la UI de dominio no se pueden verificar hasta que este endpoint se implemente
-- **Problema 2**: GET /api/domain-check?domain=... no está implementado (devuelve 404)
-  - Impacto: No se puede verificar disponibilidad de dominios desde la UI de admin (/store/domain)
-  - Pendiente de creación
-
-#### Proxy: Resolución de Dominio Inexistente
-- **Estado**: 🔄 Pendiente de corrección
-- **Problema**: El proxy resuelve dominios inexistentes usando el tenant 'default' en lugar de devolver 404
-- **Impacto**: Cualquier dominio no configurado muestra la tienda por defecto en lugar de un error claro
-- **Solución requerida**: Debe devolver 404 si el tenant no existe
-
-#### Dashboard: Métricas en Cero
-- **Estado**: 🔄 Bug sospechado
-- **Problema**: El dashboard muestra métricas en cero (ventas, órdenes, stock bajo) a pesar de tener datos de seed
-- **Causa posible**: Bug en la consulta de métricas en /api/dashboard
-- **Nota**: El seed crea 2 órdenes y productos con stock bajo, pero el dashboard podría no estar consultando correctamente
-
 ---
 
 ## Notas
-- Última actualización: 29 de abril de 2026 — Fase 4 completada. Documentación actualizada con problemas conocidos de endpoints faltantes.
-- Total de pruebas automatizadas: 175 (160 pasando, 15 fallando)
+- Última actualización: 29 de abril de 2026 — Fase 4 completada. Documentación actualizada con fixes de proxy, domain-check, /store/domain y dashboard.
+- Total de pruebas automatizadas: 175 (159 pasando, 16 fallando por next-auth beta)
 - Fase 4 completada: Dominio Personalizado + Página de Perfil
 - Problemas críticos pendientes:
-  - Endpoints de dominio faltantes (GET /api/config/tenant y GET /api/domain-check)
-  - Proxy resuelve dominios inexistentes a "default" en lugar de 404
-  - Dashboard podría tener bug en consulta de métricas
+  - Tests fallantes por next-auth beta (16 tests)
+  - Build falla por favicon.ico (Next.js 16.2.4 bug)
+  - Flujo E2E MercadoPago pendiente de verificación

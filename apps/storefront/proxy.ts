@@ -73,10 +73,10 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // 4. Fallback final: default
+  // 4. Si no se resolvió ningún tenant, devolver 404
   if (!tenantSlug) {
-    tenantSlug = 'default';
-    console.log('[Proxy] Sin tenant resuelto, usando default');
+    console.log('[Proxy] No tenant resolved for hostname:', hostname);
+    return new NextResponse('Not Found', { status: 404 });
   }
 
   const sessionId = getOrCreateSessionId(request);
