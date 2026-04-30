@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Navbar from "@/components/navbar";
-import { Breadcrumbs } from "@/components/breadcrumbs";
+import { Breadcrumbs, BreadcrumbsProvider } from "@/components/breadcrumbs";
 import { SessionProvider } from "@/components/session-provider";
 import { getCategoriesForTenant } from "@/lib/categories";
 import "./globals.css";
@@ -75,30 +75,32 @@ export default async function RootLayout({
 
   const categories = tenantId ? await getCategoriesForTenant(tenantId) : [];
 
-   return (
-      <html lang="es">
-        <body className="min-h-screen flex flex-col bg-zinc-50">
-          <SessionProvider>
-            <Navbar tenantName={tenantName} logoUrl={logoUrl} categories={categories} />
-            <Breadcrumbs />
-            <main className="flex-1">{children}</main>
-            <footer className="bg-zinc-100 border-t border-zinc-200 px-6 py-4 mt-auto">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <p className="text-sm text-zinc-500">
-                  &copy; {new Date().getFullYear()} {tenantName}
-                </p>
-                <div className="flex items-center gap-4">
-                  <a
-                    href="/perfil"
-                    className="text-sm text-zinc-600 hover:text-zinc-900"
-                  >
-                    Sobre la tienda
-                  </a>
-                </div>
-              </div>
-            </footer>
-          </SessionProvider>
-        </body>
-      </html>
-    );
+    return (
+       <html lang="es">
+         <body className="min-h-screen flex flex-col bg-zinc-50">
+           <SessionProvider>
+             <BreadcrumbsProvider>
+               <Navbar tenantName={tenantName} logoUrl={logoUrl} categories={categories} />
+               <Breadcrumbs />
+               <main className="flex-1">{children}</main>
+               <footer className="bg-zinc-100 border-t border-zinc-200 px-6 py-4 mt-auto">
+                 <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                   <p className="text-sm text-zinc-500">
+                     &copy; {new Date().getFullYear()} {tenantName}
+                   </p>
+                   <div className="flex items-center gap-4">
+                     <a
+                       href="/perfil"
+                       className="text-sm text-zinc-600 hover:text-zinc-900"
+                     >
+                       Sobre la tienda
+                     </a>
+                   </div>
+                 </div>
+               </footer>
+             </BreadcrumbsProvider>
+           </SessionProvider>
+         </body>
+       </html>
+     );
 }

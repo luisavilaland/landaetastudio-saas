@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { getProductBySlug } from "@/lib/products";
 import { ImageGallery } from "@/components/image-gallery";
 import { VariantSelector } from "@/components/variant-selector";
+import { SetBreadcrumbs } from "@/components/breadcrumbs";
 
 export const dynamic = "force-dynamic";
 
@@ -129,11 +130,23 @@ export default async function ProductPage({ params }: PageProps) {
     ? [{ id: 'default', url: product.imageUrl, alt: product.name, position: 0 }]
     : [];
 
+  const breadcrumbItems = [
+    { label: "Inicio", href: "/" },
+    ...(product.categorySlug && product.categoryName
+      ? [
+          { label: product.categoryName, href: `/categoria/${product.categorySlug}` },
+        ]
+      : []),
+    { label: product.name, href: `/products/${product.slug}` },
+  ];
+
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
+      <SetBreadcrumbs items={breadcrumbItems} />
+
       <Link
         href="/"
-        className="text-sm text-zinc-500 hover:text-zinc-700 mb-6 inline-block"
+        className="text-sm text-zinc-500 hover:text-zinc-700 mt-4 inline-block"
       >
         &larr; Volver al catálogo
       </Link>
