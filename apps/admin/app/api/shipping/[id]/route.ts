@@ -12,7 +12,7 @@ export async function GET(
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const tenantId = session.user?.tenantId as string;
@@ -30,14 +30,14 @@ export async function GET(
       .limit(1);
 
     if (!method) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
     return NextResponse.json({ method });
   } catch (error) {
     console.error("Error getting shipping method:", error);
     return NextResponse.json(
-      { error: "Failed to get shipping method" },
+      { error: "Error al obtener método de envío" },
       { status: 500 }
     );
   }
@@ -51,7 +51,7 @@ export async function PUT(
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const tenantId = session.user?.tenantId as string;
@@ -69,7 +69,7 @@ export async function PUT(
       .limit(1);
 
     if (!existing) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
     const body = await request.json();
@@ -78,7 +78,7 @@ export async function PUT(
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
+        { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
       );
     }
@@ -102,7 +102,7 @@ export async function PUT(
   } catch (error) {
     console.error("Error updating shipping method:", error);
     return NextResponse.json(
-      { error: "Failed to update shipping method" },
+      { error: "Error al actualizar método de envío" },
       { status: 500 }
     );
   }
@@ -116,7 +116,7 @@ export async function DELETE(
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const tenantId = session.user?.tenantId as string;
@@ -134,7 +134,7 @@ export async function DELETE(
       .limit(1);
 
     if (!existing) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
     await db
@@ -145,7 +145,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting shipping method:", error);
     return NextResponse.json(
-      { error: "Failed to delete shipping method" },
+      { error: "Error al eliminar método de envío" },
       { status: 500 }
     );
   }

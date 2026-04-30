@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest) {
     const session = await auth();
 
     if (!session) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
+       return jsonResponse({ error: "No autorizado" }, 401);
     }
 
     const tenantId = session.user?.tenantId as string;
@@ -22,7 +22,7 @@ export async function PUT(request: NextRequest) {
     const validation = customDomainSchema.safeParse(body.customDomain);
 
     if (!validation.success) {
-      return jsonResponse({ error: "Validation failed" }, 400);
+       return jsonResponse({ error: "Validación fallida" }, 400);
     }
 
     const customDomain = validation.data;
@@ -34,7 +34,7 @@ export async function PUT(request: NextRequest) {
       .limit(1);
 
     if (!existing) {
-      return jsonResponse({ error: "Tenant not found" }, 404);
+       return jsonResponse({ error: "Tenant no encontrado" }, 404);
     }
 
     if (customDomain && customDomain !== existing.customDomain) {
@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest) {
         .limit(1);
 
       if (domainExists.length > 0) {
-        return jsonResponse({ error: "Domain already in use" }, 409);
+         return jsonResponse({ error: "El dominio ya está en uso" }, 409);
       }
     }
 
@@ -61,6 +61,6 @@ export async function PUT(request: NextRequest) {
     return jsonResponse(updated);
   } catch (error) {
     console.error("Error updating domain:", error);
-    return jsonResponse({ error: "Failed to update domain" }, 500);
+     return jsonResponse({ error: "Error al actualizar dominio" }, 500);
   }
 }

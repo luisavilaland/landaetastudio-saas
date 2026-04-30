@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     if (!queryValidation.success) {
       console.error("[Dashboard GET] Validation error:", queryValidation.error.issues);
-      return jsonResponse({ error: "Validation failed" }, 400);
+      return jsonResponse({ error: "Validación fallida" }, 400);
     }
 
     const now = new Date();

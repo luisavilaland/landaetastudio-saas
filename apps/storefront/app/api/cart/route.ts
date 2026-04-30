@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
+        { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
       );
     }
@@ -174,8 +174,8 @@ export async function PUT(request: NextRequest) {
     const validation = updateCartItemSchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
+       return NextResponse.json(
+        { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
       );
     }
@@ -259,9 +259,9 @@ export async function DELETE(request: NextRequest) {
     const validation = deleteCartItemSchema.safeParse(body);
 
     if (!validation.success) {
-      console.error("[Cart API] DELETE - Validation failed:", validation.error.issues);
+       console.error("[Cart API] DELETE - Validación fallida:", validation.error.issues);
       return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
+        { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
       );
     }

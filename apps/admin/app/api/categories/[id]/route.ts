@@ -12,7 +12,7 @@ export async function GET(
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const { id } = await params;
@@ -30,14 +30,14 @@ export async function GET(
       .limit(1);
 
     if (!category) {
-      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+      return NextResponse.json({ error: "Categoría no encontrada" }, { status: 404 });
     }
 
     return NextResponse.json({ category });
   } catch (error) {
     console.error("Error fetching category:", error);
     return NextResponse.json(
-      { error: "Failed to fetch category" },
+      { error: "Error al obtener categoría" },
       { status: 500 }
     );
   }
@@ -51,7 +51,7 @@ export async function PUT(
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const { id } = await params;
@@ -69,7 +69,7 @@ export async function PUT(
       .limit(1);
 
     if (!existingCategory) {
-      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+      return NextResponse.json({ error: "Categoría no encontrada" }, { status: 404 });
     }
 
     const body = await request.json();
@@ -77,7 +77,7 @@ export async function PUT(
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
+        { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
       );
     }
@@ -86,7 +86,7 @@ export async function PUT(
 
     if (!name && !providedSlug) {
       return NextResponse.json(
-        { error: "At least one field must be provided" },
+        { error: "Debe proporcionar al menos un campo" },
         { status: 400 }
       );
     }
@@ -118,7 +118,7 @@ export async function PUT(
 
       if (duplicateSlug.length > 0 && duplicateSlug[0].id !== id) {
         return NextResponse.json(
-          { error: "Slug already exists" },
+           { error: "El slug ya existe" },
           { status: 409 }
         );
       }
@@ -144,7 +144,7 @@ export async function PUT(
   } catch (error) {
     console.error("Error updating category:", error);
     return NextResponse.json(
-      { error: "Failed to update category" },
+      { error: "Error al actualizar categoría" },
       { status: 500 }
     );
   }
@@ -158,7 +158,7 @@ export async function DELETE(
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const { id } = await params;
@@ -176,7 +176,7 @@ export async function DELETE(
       .limit(1);
 
     if (!existingCategory) {
-      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+      return NextResponse.json({ error: "Categoría no encontrada" }, { status: 404 });
     }
 
     const productsWithCategory = await db
@@ -210,7 +210,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting category:", error);
     return NextResponse.json(
-      { error: "Failed to delete category" },
+      { error: "Error al eliminar categoría" },
       { status: 500 }
     );
   }

@@ -13,7 +13,7 @@ export async function GET() {
     const session = await auth();
 
     if (!session) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
+      return jsonResponse({ error: "No autorizado" }, 401);
     }
 
     const tenantId = session.user?.tenantId as string;
@@ -29,12 +29,12 @@ export async function GET() {
       .limit(1);
 
     if (!tenant) {
-      return jsonResponse({ error: "Tenant not found" }, 404);
+      return jsonResponse({ error: "Tenant no encontrado" }, 404);
     }
 
     return jsonResponse(tenant);
   } catch (error) {
     console.error("Error getting tenant:", error);
-    return jsonResponse({ error: "Failed to get tenant" }, 500);
+    return jsonResponse({ error: "Error al obtener tenant" }, 500);
   }
 }

@@ -8,7 +8,7 @@ export async function GET() {
   const session = await auth();
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   const tenantId = session.user?.tenantId as string;
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const tenantId = session.user?.tenantId as string;
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
+        { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
       );
     }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     if (existingSlug.length > 0) {
       return NextResponse.json(
-        { error: "Slug already exists" },
+         { error: "El slug ya existe" },
         { status: 409 }
       );
     }
@@ -78,9 +78,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ category }, { status: 201 });
   } catch (error) {
     console.error("Error creating category:", error);
-    return NextResponse.json(
-      { error: "Failed to create category" },
-      { status: 500 }
-    );
+      return NextResponse.json(
+        { error: "Error al crear categoría" },
+        { status: 500 }
+      );
+    }
   }
-}

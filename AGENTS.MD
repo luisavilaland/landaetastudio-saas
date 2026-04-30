@@ -87,12 +87,6 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 
 ## Problemas conocidos
 
-### Problemas de idioma (inglés → español)
-- Validación de dominio duplicado en superadmin: `"Custom domain already in use"` (POST y PUT `/api/tenants/[id]`)
-- Validación de formato de dominio: `"Validation failed"` (PUT `/api/tenants/[id]`)
-- Validación de slug duplicado en categorías: `"Slug already exists"` (POST y PUT `/api/categories`)
-- Validación de checkout en storefront: `"Validation failed"` (POST `/api/checkout`)
-
 ### Bugs funcionales
 - **POST /api/tenants no valida customDomain duplicado**: si se envía un `customDomain` que ya está en uso, el tenant se crea igual con el dominio vacío en lugar de devolver 409 Conflict. El PUT sí valida correctamente.
 - **Slug en formulario de producto captura solo primera letra**: al escribir el nombre manualmente en el formulario de creación de producto (admin), el campo slug solo captura la primera letra. Al pegar el nombre completo, el slug se genera correctamente.

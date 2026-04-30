@@ -117,7 +117,7 @@ export async function PUT(
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
+        { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
       );
     }

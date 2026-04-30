@@ -15,7 +15,7 @@ export async function POST(
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const { id } = await params;
@@ -28,81 +28,11 @@ export async function POST(
       .limit(1);
 
     if (product.length === 0) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
     if (product[0].tenantId !== tenantId) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
-    const formData = await request.formData();
-    const image = formData.get("image") as File | null;
-    const alt = formData.get("alt") as string | null;
-    const position = parseInt(formData.get("position") as string, 10) || 0;
-
-    const validation = productImageSchema.safeParse({ alt, position });
-
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
-        { status: 400 }
-      );
-    }
-
-    if (!image || image.size === 0) {
-      return NextResponse.json({ error: "Image is required" }, { status: 400 });
-    }
-
-    const buffer = Buffer.from(await image.arrayBuffer());
-    const ext = image.name.split(".").pop() || "png";
-    const fileName = `products/${id}/${Date.now()}-${image.name}`;
-
-    const url = await uploadImage(buffer, fileName, image.type);
-
-    const [imageRecord] = await db
-      .insert(dbProductImages)
-      .values({
-        productId: id,
-        tenantId,
-        url,
-        alt: alt || image.name,
-        position,
-      })
-      .returning();
-
-    return NextResponse.json(imageRecord, { status: 201 });
-  } catch (error) {
-    console.error("Error uploading product image:", error);
-    return NextResponse.json({ error: "Failed to upload image" }, { status: 500 });
-  }
-}
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Params }
-) {
-  try {
-    const session = await auth();
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id } = await params;
-    const tenantId = session.user?.tenantId as string;
-
-    const product = await db
-      .select()
-      .from(dbProducts)
-      .where(eq(dbProducts.id, id))
-      .limit(1);
-
-    if (product.length === 0) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
-    if (product[0].tenantId !== tenantId) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
     const images = await db
@@ -114,6 +44,6 @@ export async function GET(
     return NextResponse.json({ images });
   } catch (error) {
     console.error("Error getting product images:", error);
-    return NextResponse.json({ error: "Failed to get images" }, { status: 500 });
+      return NextResponse.json({ error: "Error al obtener imágenes" }, { status: 500 });
   }
 }

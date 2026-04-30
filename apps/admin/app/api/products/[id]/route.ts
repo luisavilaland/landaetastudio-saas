@@ -28,11 +28,11 @@ export async function GET(
       .limit(1);
 
     if (product.length === 0) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
     if (product[0].tenantId !== tenantId) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
     const variant = await db
@@ -54,7 +54,7 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error getting product:", error);
-    return NextResponse.json({ error: "Failed to get product" }, { status: 500 });
+    return NextResponse.json({ error: "Error al obtener producto" }, { status: 500 });
   }
 }
 
@@ -70,7 +70,7 @@ export async function PUT(
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const { id } = await params;
@@ -83,11 +83,11 @@ export async function PUT(
       .limit(1);
 
     if (product.length === 0) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
     if (product[0].tenantId !== tenantId) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
     const contentType = request.headers.get("content-type") || "";
@@ -138,7 +138,7 @@ export async function PUT(
     if (!validation.success) {
       console.error("[PUT Product] Validation error:", validation.error.issues);
       return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
+        { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
       );
     }
@@ -153,7 +153,7 @@ export async function PUT(
         .limit(1);
       if (category.length === 0 || category[0].tenantId !== tenantId) {
         return NextResponse.json(
-          { error: "Invalid category" },
+          { error: "Categoría inválida" },
           { status: 400 }
         );
       }
@@ -172,7 +172,7 @@ export async function PUT(
         .limit(1);
 
       if (existingSlug.length > 0) {
-        return NextResponse.json({ error: "Slug already exists" }, { status: 409 });
+        return NextResponse.json({ error: "El slug ya existe" }, { status: 409 });
       }
     }
 
@@ -192,7 +192,7 @@ export async function PUT(
         newImageUrl = await uploadImage(buffer, `products/${Date.now()}-${safeSlug}.${ext}`, image.type);
       } catch (uploadError) {
         console.error("[PUT Product] Error uploading image:", uploadError);
-        return NextResponse.json({ error: "Failed to upload image" }, { status: 500 });
+        return NextResponse.json({ error: "Error al subir imagen" }, { status: 500 });
       }
     } else if (removeImage && product[0].imageUrl) {
       try {

@@ -11,7 +11,7 @@ export async function GET(
   try {
     const session = await auth();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const { id: productId } = await params;
@@ -24,10 +24,10 @@ export async function GET(
       .limit(1);
 
     if (product.length === 0 || product[0].tenantId !== tenantId) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
+    return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+  }
 
-    const variants = await db
+  const variants = await db
       .select()
       .from(dbProductVariants)
       .where(eq(dbProductVariants.productId, productId))
@@ -36,10 +36,7 @@ export async function GET(
     return NextResponse.json({ variants });
   } catch (error) {
     console.error("Error fetching variants:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch variants" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Error al obtener variantes" }, { status: 500 });
   }
 }
 
@@ -50,7 +47,7 @@ export async function POST(
   try {
     const session = await auth();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const { id: productId } = await params;
@@ -63,17 +60,17 @@ export async function POST(
       .limit(1);
 
     if (product.length === 0 || product[0].tenantId !== tenantId) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
     const body = await request.json();
     const validation = variantsArraySchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
-        { status: 400 }
-      );
+    return NextResponse.json(
+      { error: "Validación fallida", issues: validation.error.issues },
+      { status: 400 }
+    );
     }
 
     const { variants } = validation.data;
@@ -216,9 +213,6 @@ export async function POST(
       );
     }
     
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update variants" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Error al actualizar variantes" }, { status: 500 });
   }
 }

@@ -28,7 +28,7 @@ export async function GET() {
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const tenantId = session.user?.tenantId as string;
@@ -40,7 +40,7 @@ export async function GET() {
       .limit(1);
 
     if (!tenant) {
-      return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+      return NextResponse.json({ error: "Tenant no encontrado" }, { status: 404 });
     }
 
     const settings = (tenant.settings as Record<string, unknown>) || {};
@@ -49,7 +49,7 @@ export async function GET() {
   } catch (error) {
     console.error("Error getting store settings:", error);
     return NextResponse.json(
-      { error: "Failed to get store settings" },
+      { error: "Error al obtener configuración de tienda" },
       { status: 500 }
     );
   }
@@ -60,7 +60,7 @@ export async function PUT(request: NextRequest) {
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const tenantId = session.user?.tenantId as string;
@@ -72,7 +72,7 @@ export async function PUT(request: NextRequest) {
       .limit(1);
 
     if (!existing) {
-      return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+      return NextResponse.json({ error: "Tenant no encontrado" }, { status: 404 });
     }
 
     const body = await request.json();
@@ -81,7 +81,7 @@ export async function PUT(request: NextRequest) {
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
+        { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
       );
     }
@@ -102,7 +102,7 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     console.error("Error updating store settings:", error);
     return NextResponse.json(
-      { error: "Failed to update store settings" },
+      { error: "Error al actualizar configuración de tienda" },
       { status: 500 }
     );
   }

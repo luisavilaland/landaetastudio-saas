@@ -14,7 +14,7 @@ export async function DELETE(
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const { id, imageId } = await params;
@@ -27,17 +27,17 @@ export async function DELETE(
       .limit(1);
 
     if (images.length === 0) {
-      return NextResponse.json({ error: "Image not found" }, { status: 404 });
+      return NextResponse.json({ error: "Imagen no encontrada" }, { status: 404 });
     }
 
     const image = images[0];
 
     if (image.productId !== id) {
-      return NextResponse.json({ error: "Image not found" }, { status: 404 });
+      return NextResponse.json({ error: "Imagen no encontrada" }, { status: 404 });
     }
 
     if (image.tenantId !== tenantId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
     const fileName = image.url.replace(/^.*\//, "");
@@ -50,6 +50,6 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting product image:", error);
-    return NextResponse.json({ error: "Failed to delete image" }, { status: 500 });
+      return NextResponse.json({ error: "Error al eliminar imagen" }, { status: 500 });
   }
 }

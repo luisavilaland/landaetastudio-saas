@@ -9,7 +9,7 @@ export async function GET() {
   const session = await auth();
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   const tenantId = session.user?.tenantId as string;
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const session = await auth();
 
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const tenantId = session.user?.tenantId as string;
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validation failed", issues: validation.error.issues },
+        { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
       );
     }
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
         .limit(1);
       if (category.length === 0 || category[0].tenantId !== tenantId) {
         return NextResponse.json(
-          { error: "Invalid category" },
+          { error: "Categoría inválida" },
           { status: 400 }
         );
       }
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     if (existingSlug.length > 0) {
       return NextResponse.json(
-        { error: "Slug already exists" },
+        { error: "El slug ya existe" },
         { status: 409 }
       );
     }
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error creating product:", error);
     return NextResponse.json(
-      { error: "Failed to create product" },
+      { error: "Error al crear producto" },
       { status: 500 }
     );
   }

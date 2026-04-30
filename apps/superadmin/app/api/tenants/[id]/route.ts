@@ -24,7 +24,7 @@ export async function GET(
   const session = await auth();
 
   if (!session) {
-    return errorResponse("Unauthorized", 401);
+    return errorResponse("No autorizado", 401);
   }
 
   const { id } = await params;
@@ -36,7 +36,7 @@ export async function GET(
     .limit(1);
 
   if (tenant.length === 0) {
-    return errorResponse("Tenant not found", 404);
+    return errorResponse("Tenant no encontrado", 404);
   }
 
   return jsonResponse(tenant[0]);
@@ -49,32 +49,32 @@ export async function PUT(
   try {
     const session = await auth();
 
-    if (!session) {
-      return errorResponse("Unauthorized", 401);
-    }
+  if (!session) {
+    return errorResponse("No autorizado", 401);
+  }
 
-    const { id } = await params;
-    const body = await request.json();
-    const clearDomain = "customDomain" in body && body.customDomain === "";
-    const validation = updateTenantSchema.safeParse(body);
+  const { id } = await params;
+  const body = await request.json();
+  const clearDomain = "customDomain" in body && body.customDomain === "";
+  const validation = updateTenantSchema.safeParse(body);
 
-    if (!validation.success) {
-      return errorResponse("Validation failed", 400);
-    }
+  if (!validation.success) {
+    return errorResponse("Validación fallida", 400);
+  }
 
-    const { name, plan, status, slug, customDomain } = validation.data;
+  const { name, plan, status, slug, customDomain } = validation.data;
 
-    const existing = await db
+  const existing = await db
       .select()
       .from(dbTenants)
       .where(eq(dbTenants.id, id))
       .limit(1);
 
-    if (existing.length === 0) {
-      return errorResponse("Tenant not found", 404);
-    }
+  if (existing.length === 0) {
+    return errorResponse("Tenant no encontrado", 404);
+  }
 
-    if (slug && slug !== existing[0].slug) {
+  if (slug && slug !== existing[0].slug) {
       const slugExists = await db
         .select()
         .from(dbTenants)
@@ -82,7 +82,7 @@ export async function PUT(
         .limit(1);
 
       if (slugExists.length > 0) {
-        return errorResponse("Slug already exists", 409);
+        return errorResponse("El slug ya existe", 409);
       }
     }
 
@@ -94,7 +94,7 @@ export async function PUT(
         .limit(1);
 
       if (domainExists.length > 0) {
-        return errorResponse("Custom domain already in use", 409);
+        return errorResponse("El dominio personalizado ya está en uso", 409);
       }
     }
 
@@ -140,7 +140,7 @@ export async function PUT(
     return jsonResponse(updated[0]);
   } catch (error) {
     console.error("Error updating tenant:", error);
-    return errorResponse("Failed to update tenant", 500);
+    return errorResponse("Error al actualizar tenant", 500);
   }
 }
 
@@ -151,23 +151,23 @@ export async function DELETE(
   try {
     const session = await auth();
 
-    if (!session) {
-      return errorResponse("Unauthorized", 401);
-    }
+  if (!session) {
+    return errorResponse("No autorizado", 401);
+  }
 
-    const { id } = await params;
+  const { id } = await params;
 
-    const existing = await db
+  const existing = await db
       .select()
       .from(dbTenants)
       .where(eq(dbTenants.id, id))
       .limit(1);
 
-    if (existing.length === 0) {
-      return errorResponse("Tenant not found", 404);
-    }
+  if (existing.length === 0) {
+    return errorResponse("Tenant no encontrado", 404);
+  }
 
-    const oldSlug = existing[0].slug;
+  const oldSlug = existing[0].slug;
     await db.delete(dbTenants).where(eq(dbTenants.id, id));
 
     try {
@@ -179,6 +179,6 @@ export async function DELETE(
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error("Error deleting tenant:", error);
-    return errorResponse("Failed to delete tenant", 500);
+    return errorResponse("Error al eliminar tenant", 500);
   }
 }
