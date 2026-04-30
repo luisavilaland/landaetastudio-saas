@@ -66,6 +66,8 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
     stock: initialProduct?.variant?.stock ?? "",
   });
 
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
+
   const [attributes, setAttributes] = useState<{ name: string; values: string[] }[]>(() => {
     if (initialProduct?.variants && initialProduct.variants.length > 0) {
       const firstVariant = initialProduct.variants[0];
@@ -125,7 +127,7 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
     setForm((prev) => ({
       ...prev,
       name,
-      slug: prev.slug || generateSlug(name),
+      slug: isSlugManuallyEdited ? prev.slug : generateSlug(name),
     }));
   };
 
@@ -386,7 +388,10 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
             type="text"
             required
             value={form.slug}
-            onChange={(e) => setForm({ ...form, slug: e.target.value })}
+             onChange={(e) => {
+               setIsSlugManuallyEdited(true);
+               setForm({ ...form, slug: e.target.value });
+             }}
             className="mt-1 block w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
             placeholder="mi-producto"
           />
