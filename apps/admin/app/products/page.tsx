@@ -63,7 +63,7 @@ export default async function ProductsPage() {
     return acc;
   }, {} as Record<string, typeof images>);
 
-  // Group by product ID and nest variant
+  // Group by product ID and collect all variants
   const productMap = new Map();
   for (const row of productsRaw) {
     if (!productMap.has(row.id)) {
@@ -76,18 +76,19 @@ export default async function ProductsPage() {
         status: row.status,
         createdAt: row.createdAt,
         categoryName: row.categoryId ? categoriesMap.get(row.categoryId) || null : null,
-        variant: undefined,
+        variants: [],
         images: imagesByProduct[row.id] || [],
       });
     }
     if (row.variantId) {
-      (productMap.get(row.id) as any).variant = {
+      const product = productMap.get(row.id);
+      product.variants.push({
         id: row.variantId,
         sku: row.variantSku || "",
         price: row.variantPrice || 0,
         stock: row.variantStock || 0,
         options: {},
-      };
+      });
     }
   }
 
