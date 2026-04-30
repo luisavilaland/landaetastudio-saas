@@ -12,11 +12,13 @@ type CategoryData = {
   slug: string;
 };
 
-export default function Navbar({ 
-  tenantName, 
-  categories 
-}: { 
-  tenantName?: string; 
+export default function Navbar({
+  tenantName,
+  logoUrl,
+  categories,
+}: {
+  tenantName?: string;
+  logoUrl?: string | null;
   categories?: CategoryData[];
 }) {
   const { data: session } = useSession();
@@ -39,8 +41,12 @@ export default function Navbar({
   return (
     <nav className="bg-white border-b">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
-        <Link href="/" className="text-xl font-bold whitespace-nowrap">
-          {tenantName || "Tienda"}
+        <Link href="/" className="flex items-center whitespace-nowrap">
+          {logoUrl ? (
+            <img src={logoUrl} alt={tenantName || "Tienda"} className="h-10 w-auto object-contain" />
+          ) : (
+            <span className="text-xl font-bold">{tenantName || "Tienda"}</span>
+          )}
         </Link>
 
         <Link

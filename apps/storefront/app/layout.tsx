@@ -46,31 +46,40 @@ export default async function RootLayout({
   const tenantSlug = headersList.get("x-tenant-slug") || "default";
 
   let tenantName = "Mi Tienda";
+  let tenantId: string | null = null;
+  let logoUrl: string | null = null;
 
   try {
     const { db, dbTenants } = await import("@repo/db");
     const { eq } = await import("drizzle-orm");
 
     const result = await db
-      .select({ name: dbTenants.name })
+      .select({
+        id: dbTenants.id,
+        name: dbTenants.name,
+        settings: dbTenants.settings,
+      })
       .from(dbTenants)
       .where(eq(dbTenants.slug, tenantSlug))
       .limit(1);
 
     if (result.length > 0) {
       tenantName = result[0].name;
+      tenantId = result[0].id;
+      const settings = result[0].settings as { logoUrl?: string } | null;
+      logoUrl = settings?.logoUrl ?? null;
     }
   } catch {
     // ignore
   }
 
-  const categories = await getCategoriesForTenant(tenantSlug);
+  const categories = tenantId ? await getCategoriesForTenant(tenantId) : [];
 
    return (
       <html lang="es">
         <body className="min-h-screen flex flex-col bg-zinc-50">
           <SessionProvider>
-            <Navbar tenantName={tenantName} categories={categories} />
+            <Navbar tenantName={tenantName} logoUrl={logoUrl} categories={categories} />
             <Breadcrumbs />
             <main className="flex-1">{children}</main>
             <footer className="bg-zinc-100 border-t border-zinc-200 px-6 py-4 mt-auto">
