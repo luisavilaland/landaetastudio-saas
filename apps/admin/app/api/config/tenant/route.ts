@@ -1,11 +1,11 @@
+import { NextRequest, NextResponse } from "next/server";
 import { db, dbTenants } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 
-const JSON_HEADERS = { "Content-Type": "application/json" };
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
+function jsonResponse(data: unknown, status = 200) {
+  return NextResponse.json(data, { status });
 }
 
 export async function GET() {

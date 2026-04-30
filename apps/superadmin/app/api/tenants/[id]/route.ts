@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db, dbTenants } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { redisClient } from "@/lib/redis";
@@ -6,15 +6,14 @@ import { eq } from "drizzle-orm";
 import { updateTenantSchema } from "@repo/validation";
 
 const TENANT_CACHE_PREFIX = "tenant:slug:";
-const JSON_HEADERS = { "Content-Type": "application/json" };
 
 type Params = Promise<{ id: string }>;
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
+function jsonResponse(data: unknown, status = 200) {
+  return NextResponse.json(data, { status });
 }
 
-function errorResponse(error: string, status: number): Response {
+function errorResponse(error: string, status: number) {
   return jsonResponse({ error }, status);
 }
 
@@ -177,7 +176,7 @@ export async function DELETE(
       console.error("[Cache] Failed to invalidate:", e);
     }
 
-    return new Response(null, { status: 204 });
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error("Error deleting tenant:", error);
     return errorResponse("Failed to delete tenant", 500);

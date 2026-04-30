@@ -1,13 +1,11 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, dbOrders, dbProductVariants, dbProducts } from "@repo/db";
 import { eq, sql, and, lte, gte, desc } from "drizzle-orm";
 import { dashboardQuerySchema } from "@repo/validation";
 
-const JSON_HEADERS = { "Content-Type": "application/json" };
-
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
+function jsonResponse(data: unknown, status = 200) {
+  return NextResponse.json(data, { status });
 }
 
 export async function GET(request: NextRequest) {
