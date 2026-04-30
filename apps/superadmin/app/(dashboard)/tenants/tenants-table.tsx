@@ -7,6 +7,7 @@ type Tenant = {
   id: string;
   slug: string;
   name: string;
+  customDomain: string | null;
   plan: string | null;
   status: string | null;
   createdAt: Date;
@@ -47,33 +48,35 @@ export function TenantsTable({ initialTenants }: { initialTenants: Tenant[] }) {
 
       <div className="border rounded-lg overflow-hidden">
         <table className="w-full">
-          <thead className="bg-zinc-100">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Slug</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Nombre</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Plan</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Estado</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Creado</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-zinc-600">Acciones</th>
-            </tr>
-          </thead>
+           <thead className="bg-zinc-100">
+             <tr>
+               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Slug</th>
+               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Nombre</th>
+               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Dominio</th>
+               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Plan</th>
+               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Estado</th>
+               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Creado</th>
+               <th className="px-4 py-3 text-right text-sm font-medium text-zinc-600">Acciones</th>
+             </tr>
+           </thead>
           <tbody className="divide-y divide-zinc-200">
             {tenants.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
-                  No hay tenants. Crea el primero.
-                </td>
-              </tr>
+                 <tr>
+                 <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">
+                   No hay tenants. Crea el primero.
+                 </td>
+               </tr>
             ) : (
               tenants.map((tenant) => (
                 <tr key={tenant.id} className="hover:bg-zinc-50">
                   <td className="px-4 py-3 text-sm">{tenant.slug}</td>
-                  <td className="px-4 py-3 text-sm">{tenant.name}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className="px-2 py-1 text-xs rounded-full bg-zinc-200">
-                      {tenant.plan}
-                    </span>
-                  </td>
+                   <td className="px-4 py-3 text-sm">{tenant.name}</td>
+                   <td className="px-4 py-3 text-sm">{tenant.customDomain || "-"}</td>
+                   <td className="px-4 py-3 text-sm">
+                     <span className="px-2 py-1 text-xs rounded-full bg-zinc-200">
+                       {tenant.plan}
+                     </span>
+                   </td>
                   <td className="px-4 py-3 text-sm">
                     <span
                       className={`px-2 py-1 text-xs rounded-full ${
