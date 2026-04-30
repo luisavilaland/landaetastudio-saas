@@ -68,7 +68,7 @@ export default function Navbar({
                 Categorías
                 <ChevronDown className="w-4 h-4" />
               </button>
-              
+
               {isCategoriesOpen && (
                 <div className="absolute top-full left-0 mt-1 bg-white border rounded-md shadow-lg py-1 min-w-[200px] z-50">
                   {categories.map((cat) => (
