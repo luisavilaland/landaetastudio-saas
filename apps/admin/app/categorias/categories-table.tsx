@@ -51,7 +51,7 @@ export function CategoriesTable({ initialCategories }: { initialCategories: Cate
   const handleNameChange = (name: string) => {
     setFormData((prev) => ({
       name,
-      slug: editingCategory ? prev.slug : generateSlug(name),
+      slug: generateSlug(name),
     }));
   };
 
