@@ -153,9 +153,10 @@ export default function CheckoutPage() {
         <h1 className="text-2xl font-bold mb-8">Finalizar compra</h1>
         <div className="grid md:grid-cols-2 gap-8">
 
-          {/* Formulario */}
-          <div className="space-y-6">
-            <div>
+           {/* Formulario */}
+            <div className="space-y-6">
+            <form onSubmit={handleSubmit}>
+              <div>
               <h2 className="text-lg font-semibold mb-4">Datos de envío</h2>
               <div className="space-y-4">
                 <div>
@@ -203,81 +204,82 @@ export default function CheckoutPage() {
                   />
                 </div>
               </div>
-            </div>
-
-            {/* Selector de método de envío */}
-            {shippingMethods.length > 0 && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Método de envío</h2>
-                <div className="space-y-3">
-                  {shippingMethods.map((method) => {
-                    const isFree =
-                      method.freeShippingThreshold !== null &&
-                      cartTotal >= method.freeShippingThreshold;
-                    const effectivePrice = isFree ? 0 : method.price;
-                    return (
-                      <label
-                        key={method.id}
-                        className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${
-                          selectedShippingId === method.id
-                            ? "border-blue-600 bg-blue-50"
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="shippingMethod"
-                          value={method.id}
-                          checked={selectedShippingId === method.id}
-                          onChange={() => setSelectedShippingId(method.id)}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">{method.name}</span>
-                            <span className="font-semibold text-blue-700">
-                              {effectivePrice === 0 ? (
-                                <span className="text-green-600">Gratis</span>
-                              ) : (
-                                `$${(effectivePrice / 100).toFixed(2)}`
-                              )}
-                            </span>
-                          </div>
-                          {method.description && (
-                            <p className="text-sm text-gray-500 mt-1">
-                              {method.description}
-                            </p>
-                          )}
-                          {method.estimatedDaysMin && method.estimatedDaysMax && (
-                            <p className="text-xs text-gray-400 mt-1">
-                              {method.estimatedDaysMin === method.estimatedDaysMax
-                                ? `${method.estimatedDaysMin} día${method.estimatedDaysMin > 1 ? "s" : ""} hábil${method.estimatedDaysMin > 1 ? "es" : ""}`
-                                : `${method.estimatedDaysMin} a ${method.estimatedDaysMax} días hábiles`}
-                            </p>
-                          )}
-                          {isFree && (
-                            <p className="text-xs text-green-600 mt-1">
-                              ✓ Envío gratis aplicado
-                            </p>
-                          )}
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
               </div>
-            )}
 
-            {error && <p className="text-red-600 text-sm">{error}</p>}
+              {/* Selector de método de envío */}
+              {shippingMethods.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Método de envío</h2>
+                  <div className="space-y-3">
+                    {shippingMethods.map((method) => {
+                      const isFree =
+                        method.freeShippingThreshold !== null &&
+                        cartTotal >= method.freeShippingThreshold;
+                      const effectivePrice = isFree ? 0 : method.price;
+                      return (
+                        <label
+                          key={method.id}
+                          className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${
+                            selectedShippingId === method.id
+                              ? "border-blue-600 bg-blue-50"
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="shippingMethod"
+                            value={method.id}
+                            checked={selectedShippingId === method.id}
+                            onChange={() => setSelectedShippingId(method.id)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">{method.name}</span>
+                              <span className="font-semibold text-blue-700">
+                                {effectivePrice === 0 ? (
+                                  <span className="text-green-600">Gratis</span>
+                                ) : (
+                                  `$${(effectivePrice / 100).toFixed(2)}`
+                                )}
+                              </span>
+                            </div>
+                            {method.description && (
+                              <p className="text-sm text-gray-500 mt-1">
+                                {method.description}
+                              </p>
+                            )}
+                            {method.estimatedDaysMin && method.estimatedDaysMax && (
+                              <p className="text-xs text-gray-400 mt-1">
+                                {method.estimatedDaysMin === method.estimatedDaysMin
+                                  ? `${method.estimatedDaysMin} día${method.estimatedDaysMin > 1 ? "s" : ""} hábil${method.estimatedDaysMin > 1 ? "es" : ""}`
+                                  : `${method.estimatedDaysMin} a ${method.estimatedDaysMax} días hábiles`}
+                              </p>
+                            )}
+                            {isFree && (
+                              <p className="text-xs text-green-600 mt-1">
+                                ✓ Envío gratis aplicado
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-            <button
-              onClick={handleSubmit}
-              disabled={processing || items.length === 0}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
-            >
-              {processing ? "Procesando..." : `Pagar $${(total / 100).toFixed(2)}`}
-            </button>
-          </div>
+              {error && <p className="text-red-600 text-sm">{error}</p>}
+
+               <button
+                 type="submit"
+                 disabled={processing || items.length === 0}
+                 className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
+               >
+                 {processing ? "Procesando..." : `Pagar $${(total / 100).toFixed(2)}`}
+               </button>
+             </form>
+            </div>
 
           {/* Resumen */}
           <div>
