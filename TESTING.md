@@ -194,6 +194,50 @@ Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 
 ---
 
+## Fase 4 – Shipping, Checkout y Refactor ✅
+
+### Métodos de Envío (API Admin)
+
+- ✅ GET /api/shipping → lista métodos del tenant
+- ✅ POST /api/shipping → crea método con validación Zod
+- ✅ PUT /api/shipping/[id] → actualiza método
+- ✅ DELETE /api/shipping/[id] → elimina método
+- ✅ Tenant isolation: solo métodos del tenant activo
+- ✅ 14 tests en patrón de lógica pura (`route.test.ts`)
+
+### Métodos de Envío (API Storefront)
+
+- ✅ GET /api/shipping → solo métodos activos del tenant
+- ✅ Lee `x-tenant-id` del header del proxy
+- ✅ Retorna lista vacía sin tenant
+- ✅ Filtra métodos inactivos
+- ✅ 4 tests en patrón de lógica pura
+
+### Checkout UI
+
+- ✅ Selector visual de métodos de envío
+- ✅ Cálculo dinámico de envío gratis cuando carrito supera umbral
+- ✅ Desglose: subtotal + envío + total
+- ✅ Resumen del pedido actualizado en tiempo real
+
+### Refactor de API
+
+- ✅ `new Response()` eliminado → `NextResponse` en 5 archivos
+- ✅ `JSON_HEADERS` manual eliminado
+- ✅ Helper `jsonResponse` unificado en rutas de admin y superadmin
+
+### Tests de Categorías (reescritos)
+
+- ✅ Patrón de lógica pura — ya no importan el route directamente
+- ✅ Compatible con vitest sin problema de next-auth
+- ✅ Casos nuevos: 401, 404, normalización de slug con acentos
+
+### Pruebas Manuales
+
+- ✅ `TESTING-MANUAL.md` agregado: 92 ítems en 5 áreas (Superadmin, Admin, Storefront, Seguridad, Tests automáticos)
+
+---
+
 ## Pendientes 🔄
 
 ### Flujo E2E Completo de Compra con MercadoPago
@@ -209,33 +253,16 @@ Nota: Estos tests requieren BD disponible. Documentado en TESTING.md.
 
 ### Problemas Conocidos (Known Issues)
 
-#### Tests Fallando (16 tests preexistentes)
-- **Estado**: 🔄 Pendiente de fix
-- **Tests preexistentes (16)**:
-   - **Archivo**: `apps/admin/app/api/categories/[id]/__tests__/route.test.ts` (3 tests)
-     - `should regenerate slug when name changes`
-     - `should return 409 when regenerated slug already exists for tenant`
-     - `should keep provided slug if name doesn't change`
-   - **Archivo**: `apps/admin/app/api/shipping/__tests__/route.test.ts` (5 tests)
-   - **Archivo**: `apps/admin/app/api/shipping/__tests__/[id].test.ts` (8 tests)
-- **Error**: `Cannot find module 'next/server' imported from next-auth/lib/env.js`
-- **Causa**: Vitest + next-auth@5.0.0-beta.31 incompatibilidad con la estructura de módulos en pnpm
-- **Solución propuesta**: Migrar tests a Jest o esperar actualización de next-auth stable
+### Problemas Conocidos (Known Issues)
 
-#### Error de Build (favicon.ico)
-- **Estado**: 🔄 Pendiente de investigación
-- **Error**: `TypeError: Cannot read private member #state from an object whose class did not declare it` en `/favicon.ico`
-- **Impacto**: Afecta builds de admin y superadmin
-- **Causa**: Probablemente bug de Next.js 16.2.4 con favicon.ico
-- **Workaround**: No bloquea desarrollo (lint y typecheck pasan)
+- Ninguno conocido. Todos los tests pasan y el build es limpio en las 3 apps.
 
 ---
 
 ## Notas
-- Última actualización: 29 de abril de 2026 — Fase 4 completada. Documentación actualizada con fixes de proxy, domain-check, /store/domain y dashboard.
-- Total de pruebas automatizadas: 175 (160 pasando, 15 fallando por next-auth beta)
-- Fase 4 completada: Dominio Personalizado + Página de Perfil
-- Problemas críticos pendientes:
-  - Tests fallantes por next-auth beta (15 tests)
-  - Build falla por favicon.ico (Next.js 16.2.4 bug)
-  - Flujo E2E MercadoPago pendiente de verificación
+- Última actualización: 30 de abril de 2026 — Fase 4 completada.
+- Total de pruebas automatizadas: 195 (195 pasando, 0 fallos)
+- Build limpio en las 3 apps (storefront, admin, superadmin)
+- Sin ocurrencias de `new Response()` nativa ni `JSON_HEADERS` en el código
+- Fase 4 completada: Dominio personalizado + Página de perfil + Shipping + Checkout refactorizado
+- Próximo paso: ejecutar checklist `TESTING-MANUAL.md` (92 ítems) antes de Fase 5

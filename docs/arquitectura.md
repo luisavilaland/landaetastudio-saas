@@ -60,6 +60,14 @@ La página `/perfil` es un Server Component que expone la información del tenan
 
 Permitimos que cada tenant configure un dominio personalizado (ej. `tienda.com`) guardado en el campo `customDomain`. La verificación se hace vía API pública (`/api/domain-check`) y el proxy (`proxy.ts`) resuelve el tenant tanto por subdominio como por dominio personalizado. Esto ofrece flexibilidad total para comercios que ya tienen su propio dominio.
 
+## ¿Por qué `NextResponse` en lugar de `new Response()` nativa?
+
+Todas las rutas API usan `NextResponse` de Next.js en lugar de la API `new Response()` nativa del navegador. `NextResponse` integra manejo de cookies, headers específicos de Next.js (como `revalidatePath`), y es la forma recomendada por el framework. Se eliminaron todos los helpers `jsonResponse` con `JSON_HEADERS` manual y se unificó todo con la API de Next.js. El helper local `jsonResponse` es aceptable si simplemente envuelve `NextResponse.json()` para evitar repetición de código.
+
+## ¿Por qué tests de "lógica pura" para endpoints?
+
+Los tests de endpoints que importan directamente rutas de Next.js (`import { GET } from "../route"`) fallan con `next-auth@5.0.0-beta.31` porque el beta importa `next/server` sin la extensión `.js`, lo que vitest no resuelve. La solución fue reescribir los tests con patrón de "lógica pura": en lugar de importar la ruta, mockean las dependencias (`@repo/db`, `next/headers`, `drizzle-orm`) y verifican el comportamiento esperado. Esto elimina la incompatibilidad sin cambiar de test runner. Los tests de shipping (25) y categorías usan este patrón.
+
 ## Convenciones clave
 
 - **Nombres en camelCase** para columnas y tablas en Drizzle, porque es el idioma que habla TypeScript. Drizzle maneja la traducción a snake_case en la BD si fuera necesario, pero mantenemos consistencia con el código.

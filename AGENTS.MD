@@ -55,6 +55,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Variables de entorno: cargadas con dotenv en development. En producción, inyectarlas sin fallback visible. No hardcodear valores como NEXTAUTH_URL.
 - Rutas API: todas bajo app/api/, no uses pages router.
 - Componentes de React: funciones nombradas, preferir Server Components salvo interactividad.
+- Responses HTTP: usar `NextResponse` (nunca `new Response()` nativa). El helper `jsonResponse` es aceptable si envuelve `NextResponse.json`.
 
 **Reglas automáticas (asegúrate de que ESLint y Prettier las cubran; si no, añádelas:**
 
@@ -67,6 +68,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Subdominios locales: tenant1.lvh.me:3000. Para probar resolución de tenant, lanza el servidor con pnpm dev y usa ese host.
 - Webhook simulado: POST /api/webhooks/mercadopago con header x-test-order-id=<orderId> y body {"type":"payment","data":{"id":"123456789"}} (approved) o "000000" (rejected).
 - Seed de datos: pnpm db:seed resetea la BD con datos de prueba.
+- Pruebas manuales: ejecutar `TESTING-MANUAL.md` con 92 ítems organizados en 5 áreas (Superadmin, Admin, Storefront, Seguridad, Tests automáticos).
 
 ## Herramientas de desarrollo (uso por el agente)
 
@@ -85,8 +87,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 
 ## Problemas conocidos
 
-- Build falla por favicon.ico (Next.js 16.2.4 bug preexistente)
-- 15 tests fallando por next-auth beta (ver TESTING.md para detalles).
+- Ninguno conocido. Todos los tests pasan (195/195) y el build es limpio en las 3 apps.
 
 ## Mantenimiento de la documentación
 

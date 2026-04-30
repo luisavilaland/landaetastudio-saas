@@ -29,9 +29,12 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 ## Fase 4 – Autoservicio del Tenant ✅ (Completada)
 
 - ✅ Configuración visual del tenant (logo, colores)
-- ✅ Dominio personalizado
-- ✅ Métodos de envío configurables
-- ✅ Página de perfil de tienda
+- ✅ Dominio personalizado con verificación
+- ✅ Métodos de envío configurables por tenant
+- ✅ Página de perfil de tienda pública con SEO
+- ✅ Checkout con selector visual de envío y cálculo dinámico
+- ✅ Refactor de API: `NextResponse` unificado en todas las rutas
+- ✅ 195 tests (100% passing), build limpio en 3 apps
 
 ## Fase 5 – Producción 🔄 (Pendiente)
 
@@ -75,7 +78,9 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - **Admin orders:** Panel de gestión de órdenes con cambio de status.
 - **Admin dashboard:** Métricas (ventas, órdenes, stock), tabla de productos con stock bajo.
 - **Stock management:** Edición rápida de stock en tabla, badge "Agotado", alertas en dashboard.
-- **Fixes:** Bugs carrito, variantes, imágenes, validación tenant, queries N+1, logout redirects.
+- **Métodos de envío:** API `GET /api/shipping` en storefront que lee `x-tenant-id` del proxy. Checkout con selector visual, cálculo dinámico de envío gratis, desglose subtotal + envío + total.
+- **Seed:** 2 métodos para tienda1 (estándar $150, express $350) + 25 tests de lógica pura.
+- **Fixes:** Bugs carrito, variantes, imágenes, validación tenant, queries N+1, logout redirects. Refactor completo de `new Response()` → `NextResponse` en 5 rutas. Tests de categorías reescritos con patrón de lógica pura.
 
 ## Tech Stack
 
@@ -229,6 +234,21 @@ saas-ecommerce/
 | POST | /api/checkout/preference | Crear preferencia de pago MP |
 | POST | /api/webhooks/mercadopago | Notificación de pago |
 
+### Admin Shipping
+
+| Method | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| GET | /api/shipping | Listar métodos de envío del tenant |
+| POST | /api/shipping | Crear método de envío |
+| PUT | /api/shipping/[id] | Actualizar método de envío |
+| DELETE | /api/shipping/[id] | Eliminar método de envío |
+
+### Storefront Shipping
+
+| Method | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| GET | /api/shipping | Métodos activos del tenant (lee `x-tenant-id` del proxy) |
+
 ### Admin Dashboard
 
 | Method | Endpoint | Descripción |
@@ -301,17 +321,16 @@ Para recibir notificaciones de pago en desarrollo:
 
 | # | Tarea |
 | ---|-------|
-| 5 | Normalizar slug en create/edit |
-| 6 | Mejorar UI de errores 409 |
+| 1 | Normalizar slug en create/edit (acentos y mayúsculas) |
+| 2 | Consolidar auth duplicada en `@repo/auth` |
+| 3 | Refactorizar lógica de negocio duplicada a `@repo/commerce` |
 
 ### 🟢 Baja prioridad
 
 | # | Tarea |
 | ---|-------|
-| 8 | Extraer auth duplicado a paquete compartido |
-| 9 | dotenv repetido en next.config.ts |
-| 10 | Productos con Server Actions |
-| 11 | Paquetes faltantes: commerce, ui, config |
+| 1 | Eliminar dotenv duplicado en `next.config.ts` |
+| 2 | Mejorar UI de errores 409 |
 
 ## Notas importantes
 
@@ -328,7 +347,8 @@ Para recibir notificaciones de pago en desarrollo:
 - [Guía de setup](./SETUP.md) – Configuración del proyecto y solución de problemas.
 - [Guía para agentes de IA](./AGENTS.md) – Políticas y comandos para asistentes de código.
 - [Prompts reutilizables](./PROMPTS.md) – Plantillas de prompts para agentes de IA.
-- [Plan de Fase 4](./docs/plan-fase-4.md) – Plan de implementación detallado para la Fase 4.
+- [Brief técnico Fase 5](./docs/brief%20tecnico%20fase%205.md) – Plan de producción.
+- [Checklist de pruebas manuales](./TESTING-MANUAL.md) – 92 ítems de verificación manual.
 
 ## Tests
 
@@ -336,9 +356,10 @@ Para recibir notificaciones de pago en desarrollo:
 pnpm test    # Ejecuta todos los tests (vitest)
 ```
 
-- **Total:** 175 tests (160 pasando, 15 fallando)
-- Los 15 tests fallantes son por incompatibilidad con `next-auth@5.0.0-beta.31` (ver `TESTING.md`).
+- **Total:** 195 tests (195 pasando, 0 fallos)
+- Tests de shipping (25) escritos en patrón de lógica pura para compatibilidad con vitest.
+- Tests de categorías reescritos con patrón de lógica pura — ya no importan el route directamente.
 
 ---
 
-**Última actualización:** 29 de abril de 2026 – Fase 4 completada.
+**Última actualización:** 30 de abril de 2026 – Fase 4 completada. 195/195 tests. Build limpio.

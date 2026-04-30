@@ -79,7 +79,7 @@ describe("GET /api/shipping (storefront)", () => {
           orderBy: vi.fn().mockResolvedValue(mockActiveMethods),
         }),
       }),
-    } as ReturnType<typeof db.select>);
+    } as unknown as ReturnType<typeof db.select>);
 
     const res = await GET();
     const data = await res.json();
@@ -92,7 +92,7 @@ describe("GET /api/shipping (storefront)", () => {
   it("retorna lista vacía si no hay tenantId en headers", async () => {
     vi.mocked(headers).mockResolvedValue({
       get: () => null,
-    } as ReturnType<typeof headers> extends Promise<infer T> ? T : never);
+    } as unknown as ReturnType<typeof headers> extends Promise<infer T> ? T : never);
 
     const res = await GET();
     const data = await res.json();
@@ -105,7 +105,7 @@ describe("GET /api/shipping (storefront)", () => {
     const { db } = await import("@repo/db");
     vi.mocked(headers).mockResolvedValue({
       get: (key: string) => (key === "x-tenant-id" ? "tenant-1" : null),
-    } as ReturnType<typeof headers> extends Promise<infer T> ? T : never);
+    } as unknown as ReturnType<typeof headers> extends Promise<infer T> ? T : never);
 
     vi.mocked(db.select).mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -113,7 +113,7 @@ describe("GET /api/shipping (storefront)", () => {
           orderBy: vi.fn().mockResolvedValue([...mockActiveMethods, mockInactiveMethod]),
         }),
       }),
-    } as ReturnType<typeof db.select>);
+    } as unknown as ReturnType<typeof db.select>);
 
     const res = await GET();
     const data = await res.json();
@@ -126,7 +126,7 @@ describe("GET /api/shipping (storefront)", () => {
     const { db } = await import("@repo/db");
     vi.mocked(headers).mockResolvedValue({
       get: (key: string) => (key === "x-tenant-id" ? "tenant-1" : null),
-    } as ReturnType<typeof headers> extends Promise<infer T> ? T : never);
+    } as unknown as ReturnType<typeof headers> extends Promise<infer T> ? T : never);
 
     vi.mocked(db.select).mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -134,7 +134,7 @@ describe("GET /api/shipping (storefront)", () => {
           orderBy: vi.fn().mockResolvedValue([]),
         }),
       }),
-    } as ReturnType<typeof db.select>);
+    } as unknown as ReturnType<typeof db.select>);
 
     const res = await GET();
     const data = await res.json();

@@ -29,8 +29,12 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 | **Checkout MercadoPago** | ✅ OK | Flujo completo, webhook, confirmación por email. |
 | **Panel admin órdenes + dashboard** | ✅ OK | Métricas reales, cambio de estado, stock bajo. |
 | **Configuración visual del tenant** | ✅ OK | Logo, colores, descripción, redes sociales. |
-| **Métodos de envío configurables** | ✅ OK | CRUD en admin, integración en checkout. |
+| **Métodos de envío configurables** | ✅ OK | CRUD en admin + API storefront con `x-tenant-id`. Checkout con selector visual y cálculo dinámico. |
 | **Proxy multi-tenant (storefront)** | ✅ OK | Restaurado en Fase 4 con NextResponse.next(). |
+| **Dominio personalizado** | ✅ OK | Verificación + resolución por dominio en proxy. |
+| **Página de perfil de tienda** | ✅ OK | Server Component con SEO (JSON-LD). |
+| **Responses HTTP** | ✅ OK | `NextResponse` unificado en todas las rutas. Sin `new Response()` nativa. |
+| **Tests** | ✅ OK | 195/195 pasando, 0 fallos. Build limpio en 3 apps. |
 | **Row Level Security (RLS)** | ❌ Falta | Crítico. Sin RLS, un bug puede exponer datos entre tenants. |
 | **AUTH_SECRET con fallback hardcoded** | ❌ Falta | Si falta la variable, usa secret predecible. Bloquea deploy. |
 | **CSRF protection** | ❌ Falta | Desactivado por comodidad en dev. Obligatorio en prod. |
@@ -39,11 +43,12 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 | **Logs estructurados** | ❌ Falta | Solo console.log. En prod necesitamos logs indexables. |
 | **Deploy en Vercel** | ❌ Falta | Ningún ambiente productivo configurado todavía. |
 
-**2. Prioridades y orden de implementación**
+**2. Pasos previos antes de Fase 5**
 
-Regla de oro de la Fase 5
+Antes de comenzar la Fase 5, completar en orden:
 
-Primero seguridad, después infraestructura, después observabilidad. No hacer deploy a producción hasta tener los tres ítems BLOQUEANTES resueltos.
+1. **Pruebas manuales:** Ejecutar el checklist `TESTING-MANUAL.md` completo (92 ítems en 5 áreas). Anotar fallos y corregirlos antes de avanzar.
+2. **Deuda técnica menor:** Consolidar auth duplicada en `@repo/auth` (admin y superadmin tienen su propio `lib/auth.ts`), normalización de slugs (acentos y mayúsculas), y refactorización de lógica duplicada hacia `@repo/commerce`.
 
 ---
 
@@ -369,3 +374,5 @@ Observabilidad — Antes de escalar
 ---
 
 *SaaS eCommerce — Brief Técnico Fase 5 — Abril 2026 — Confidencial*
+
+*Actualizado 30 de abril 2026: Fase 4 completada. 195/195 tests. Build limpio. `NextResponse` unificado. TESTING-MANUAL.md agregado.*

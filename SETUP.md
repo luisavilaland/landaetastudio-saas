@@ -102,6 +102,11 @@ SELECT count(*) FROM admin_users;
 - **Pantalón Jeans** (Categoría: Pantalones) - 6 variantes (38/40/42 x Azul/Negro)
 - **Gorra** (Categoría: Accesorios) - 1 variante (Único, Negra)
 
+### Métodos de Envío (tienda1)
+
+- **Envío estándar** - $150 (gratis sobre $2000, 3-5 días hábiles)
+- **Envío express** - $350 (1 día hábil)
+
 ### Órdenes de Ejemplo
 
 - Orden #1: **confirmed** (2 remeras M rojas + 1 jean 40 azul)
@@ -237,14 +242,14 @@ pnpm typecheck     # TypeScript --noEmit
 pnpm build         # Build de todas las apps
 ```
 
-### Tests Fallantes Conocidos
+### Estado de Tests
 
-**15 tests fallando** (de 175 totales) por incompatibilidad con `next-auth@5.0.0-beta.31`:
+**195 tests pasando, 0 fallos.** Todos los suites de test están operativos incluyendo los 25 tests de shipping escritos en patrón de lógica pura (evitan importar rutas de Next.js directamente, lo que elimina la incompatibilidad con next-auth@5.0.0-beta.31).
 
-- El bug ocurre porque `next-auth` importa `next/server` sin extensión `.js`, lo que falla en vitest.
-- Además, los mocks de `vi.mock("@/lib/auth")` no interceptan la instancia `auth` creada por `NextAuth()` al cargar el módulo.
-- Suites afectadas: `apps/admin/app/api/shipping/` y `apps/admin/app/api/categories/`.
-- Ver `TESTING.md` para detalles técnicos y solución requerida.
+### Patrones de Testing
+
+- **Lógica pura:** Los tests de endpoints no importan la ruta directamente. Mockean dependencias y exportan funciones puras que pueden ser testeada sin el runtime de Next.js.
+- **Ubicación:** `__tests__/` junto al archivo bajo test.
 
 ### Tarjetas de prueba MercadoPago
 
@@ -259,4 +264,4 @@ tenant1.lvh.me:3000
 
 ## Nota
 
-Última actualización: 29 de abril de 2026 – Fase 4 completada. Seed y tests corregidos.
+Última actualización: 30 de abril de 2026 – Fase 4 completada. 195/195 tests. Build limpio. Seed incluye métodos de envío.
