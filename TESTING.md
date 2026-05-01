@@ -38,6 +38,7 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 | 6 | Asignar customDomain | ✅ |
 | 7 | Limpiar customDomain (vacío → null) | ✅ |
 | 8 | GET /api/tenants/[id] incluye customDomain | ✅ |
+| 9 | Validación customDomain duplicado al crear | ✅ |
 
 ### Superadmin – API Domain-Check
 
@@ -46,6 +47,12 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 | 1 | GET /api/domain-check?domain=disponible.com → available: true | ✅ |
 | 2 | GET /api/domain-check?domain=usado.com → available: false | ✅ |
 | 3 | Sin parámetro domain → 400 | ✅ |
+
+### Superadmin – General
+
+| # | Prueba | Estado |
+|---|--------|--------|
+| 1 | Ruta /plans accesible | ✅ |
 
 ---
 
@@ -85,14 +92,17 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 |---|--------|--------|
 | 1 | Listado de productos | ✅ |
 | 2 | Stock visible con badges | ✅ |
-| 3 | Edición rápida de stock inline | ✅ |
+| 3 | Edición rápida de stock inline | ⚠️ |
 | 4 | Editar producto (nombre, descripción, precio) | ✅ |
 | 5 | Eliminar imagen individual | ✅ |
 | 6 | Crear producto (bug: slug primera letra) | ⚠️ |
-| 7 | Subir imagen en creación (bug: UUID undefined) | ❌ |
-| 8 | Crear producto con variantes (bug: no se guardan) | ❌ |
-| 9 | Editar producto (bug: precio/stock vacíos) | ⚠️ |
-| 10 | Editar imagen (bug: falla silenciosamente) | ❌ |
+| 7 | Subir imagen en creación | ✅ |
+| 8 | Crear producto con variantes | ✅ |
+| 9 | Editar producto | ✅ |
+| 10 | Editar imagen | ✅ |
+| 11 | Eliminar imagen individual | ✅ |
+| 12 | SKU se regenera al actualizar slug | ✅ |
+| 13 | Importar productos por CSV | ❌ No implementado |
 
 ### Admin – Variantes
 
@@ -109,7 +119,7 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 | 1 | Listado de órdenes | ✅ |
 | 2 | Detalle de orden | ✅ |
 | 3 | Cambio de estado | ✅ |
-| 4 | Filtro por estado | ❌ No implementado |
+| 4 | Filtro por estado | ✅ |
 
 ### Admin – Métodos de Envío
 
@@ -119,7 +129,7 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 | 2 | Editar método | ✅ |
 | 3 | Desactivar método | ✅ |
 | 4 | Eliminar método | ✅ |
-| 5 | Crear nuevo método | ❌ /shipping/new devuelve 404 |
+| 5 | Crear nuevo método | ✅ |
 
 ### Admin – Configuración Visual
 
@@ -127,7 +137,7 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 |---|--------|--------|
 | 1 | Carga del formulario /store/settings | ✅ |
 | 2 | Guardar configuración (200 OK) | ✅ |
-| 3 | Colores aplicados en storefront | ❌ Bug: no se reflejan |
+| 3 | Colores aplicados en storefront | ✅ |
 
 ### Admin – Dominio Personalizado
 
@@ -153,8 +163,8 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 | # | Prueba | Estado |
 |---|--------|--------|
 | 1 | Catálogo de productos visible | ✅ |
-| 2 | Logo en navbar | ❌ Bug: no se muestra |
-| 3 | Menú de categorías en navbar | ❌ Bug: no se muestra |
+| 2 | Logo en navbar | ✅ |
+| 3 | Menú de categorías en navbar | ✅ |
 
 ### Storefront – Catálogo y Búsqueda
 
@@ -173,7 +183,7 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 | 2 | Galería de imágenes | ✅ |
 | 3 | Selector de variantes | ✅ |
 | 4 | Precio y stock según variante | ✅ |
-| 5 | Breadcrumbs (bug: sin categoría) | ⚠️ |
+| 5 | Breadcrumbs | ✅ |
 
 ### Storefront – Carrito
 
@@ -185,6 +195,8 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 | 4 | Vaciar carrito | ✅ |
 | 5 | Persistencia (7 días TTL) | ✅ |
 | 6 | Carrito anónimo (sin login) | ✅ |
+| 7 | Variante seleccionada visible | ✅ |
+| 8 | Precio correcto según variante | ✅ |
 
 ### Storefront – Checkout
 
@@ -195,7 +207,11 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 | 3 | Desglose subtotal + envío + total | ✅ |
 | 4 | Crear orden (POST /api/checkout) | ✅ |
 | 5 | Redirección a MercadoPago | ✅ |
-| 6 | Validación campos vacíos (bug: mensaje en inglés) | ⚠️ |
+| 6 | Validación campos vacíos | ✅ |
+| 7 | Formulario muestra campos completos | ✅ |
+| 8 | Seleccionar envío express actualiza resumen | ✅ |
+| 9 | Carrito > $2000 → envío gratis | ✅ |
+| 10 | Botón pagar incluye total con envío | ✅ |
 
 ### Storefront – Perfil
 
@@ -213,6 +229,7 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 | 10 | <title> con nombre de tienda | ✅ |
 | 11 | Meta description | ✅ |
 | 12 | JSON-LD Store schema | ✅ |
+| 13 | Página carga sin login (pública) | ✅ |
 
 ### Storefront – Autenticación Cliente
 
@@ -221,7 +238,7 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 | 1 | Registro de cliente | ✅ |
 | 2 | Login de cliente | ✅ |
 | 3 | Logout redirige a storefront | ✅ |
-| 4 | /login y /register con sesión activa | ❌ Bug: no redirigen a / |
+| 4 | /login y /register con sesión activa | ✅ |
 
 ---
 
@@ -275,14 +292,13 @@ pnpm test
 | Área | Total | ✅ | ⚠️ | ❌ |
 |------|-------|----|-----|-----|
 | Setup | 4 | 4 | 0 | 0 |
-| Superadmin | 15 | 15 | 0 | 0 |
-| Admin | 37 | 30 | 3 | 4 |
-| Storefront | 45 | 40 | 2 | 3 |
+| Superadmin | 17 | 17 | 0 | 0 |
+| Admin | 47 | 41 | 2 | 1 |
+| Storefront | 50 | 50 | 0 | 0 |
 | Seguridad | 5 | 5 | 0 | 0 |
-| **Total** | **106** | **94** | **5** | **7** |
+| **Total** | **123** | **117** | **2** | **1** |
 
 ---
-
 ## Notas
 
 - Última actualización: 30 de abril de 2026 — Pruebas manuales completadas.
@@ -290,4 +306,4 @@ pnpm test
 - 195 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Flujo E2E de MercadoPago pendiente (bloqueado por cuenta de prueba).
 - Ver AGENTS.md para detalles de bugs funcionales y mejoras de UX pendientes.
-- Próximo paso antes de Fase 5: corregir los 7 items marcados como ❌.
+- Próximo paso antes de Fase 5: corregir el ítem marcado como ❌ (Importar productos por CSV) y los 2 marcados como ⚠️.
