@@ -85,17 +85,6 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Paquetes actuales: `@repo/db`, `@repo/storage`, `@repo/auth`, `@repo/validation` – Validación Zod compartida para toda la API.
 - **Deuda técnica actual**: la lógica de carrito/órdenes está duplicada en `apps/storefront/lib` y `apps/admin/lib`. Durante la Fase 4, no se debe duplicar más lógica. Nueva lógica compartida (ej. cálculo de envío) debe ir en un solo lugar consensuado o en `packages/commerce` si procede.
 
-## Problemas conocidos
-
-### Bugs funcionales
-- **Admin y superadmin accesibles vía subdominios de tenant**: los paneles son accesibles usando subdominios de tienda (ej. `tienda1.lvh.me:3001/login`). Solo deben ser accesibles desde `localhost:3001` y `localhost:3002`.
-
-### Funcionalidades no implementadas
-- **Importación de productos por CSV**: no existe endpoint ni UI para importar productos masivamente.
-
-### Mejoras de UX
-- Todos los tests pasan (195/195) y el build es limpio en las 3 apps.
-
 ## Mantenimiento de la documentación
 
 - **AGENTS.md:** si durante una tarea descubres que una restricción, comando o convención importante no está documentada aquí, proponme añadirla al finalizar la tarea. Si es evidente (ej. se ha creado un script `pnpm storybook`), puedes actualizar este archivo directamente y notificármelo.

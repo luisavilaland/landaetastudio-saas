@@ -244,7 +244,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**195 tests pasando, 0 fallos.** Todos los suites de test están operativos incluyendo los 25 tests de shipping escritos en patrón de lógica pura (evitan importar rutas de Next.js directamente, lo que elimina la incompatibilidad con next-auth@5.0.0-beta.31).
+**216 tests pasando, 0 fallos.** Todos los suites de test están operativos incluyendo los 25 tests de shipping escritos en patrón de lógica pura (evitan importar rutas de Next.js directamente, lo que elimina la incompatibilidad con next-auth@5.0.0-beta.31).
 
 ### Patrones de Testing
 
@@ -264,4 +264,4 @@ tenant1.lvh.me:3000
 
 ## Nota
 
-Última actualización: 30 de abril de 2026 – Fase 4 completada. 195/195 tests. Build limpio. Seed incluye métodos de envío.
+Última actualización: 1 de mayo de 2026 – Fase 4 completada. 216/216 tests. Build limpio. Seed incluye métodos de envío.

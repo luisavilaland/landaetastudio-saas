@@ -92,17 +92,17 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 |---|--------|--------|
 | 1 | Listado de productos | ✅ |
 | 2 | Stock visible con badges | ✅ |
-| 3 | Edición rápida de stock inline | ⚠️ |
+| 3 | Edición rápida de stock inline (solo lectura, muestra la suma de variantes) | ✅ |
 | 4 | Editar producto (nombre, descripción, precio) | ✅ |
 | 5 | Eliminar imagen individual | ✅ |
-| 6 | Crear producto (bug: slug primera letra) | ⚠️ |
+| 6 | Crear producto (bug: slug primera letra) | ✅ |
 | 7 | Subir imagen en creación | ✅ |
 | 8 | Crear producto con variantes | ✅ |
 | 9 | Editar producto | ✅ |
 | 10 | Editar imagen | ✅ |
 | 11 | Eliminar imagen individual | ✅ |
 | 12 | SKU se regenera al actualizar slug | ✅ |
-| 13 | Importar productos por CSV | ❌ No implementado |
+| 13 | Importar productos por CSV (probado con archivo válido y archivo con errores) | ✅ |
 
 ### Admin – Variantes
 
@@ -147,6 +147,15 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 | 2 | Guardar dominio válido | ✅ |
 | 3 | Validación de formato inválido (http://) | ✅ |
 | 4 | Verificar disponibilidad | ✅ |
+
+### Admin – Seguridad de Subdominios
+
+| # | Prueba | Estado |
+|---|--------|--------|
+| 1 | Acceder a `tienda1.lvh.me:3001/login` → 403 | ✅ |
+| 2 | Acceder a `localhost:3001/login` → carga normal | ✅ |
+| 3 | Acceder a `tienda1.lvh.me:3002/login` → 403 | ✅ |
+| 4 | Acceder a `localhost:3002/login` → carga normal | ✅ |
 
 ---
 
@@ -278,7 +287,7 @@ pnpm test
 
 | Métrica | Valor |
 |---------|-------|
-| **Total** | 195 tests |
+| **Total** | 216 tests |
 | **Pasando** | 195 ✅ |
 | **Fallas** | 0 ✅ |
 | **Archivos** | 23 |
@@ -293,10 +302,10 @@ pnpm test
 |------|-------|----|-----|-----|
 | Setup | 4 | 4 | 0 | 0 |
 | Superadmin | 17 | 17 | 0 | 0 |
-| Admin | 47 | 41 | 2 | 1 |
+| Admin | 51 | 48 | 0 | 0 |
 | Storefront | 50 | 50 | 0 | 0 |
 | Seguridad | 5 | 5 | 0 | 0 |
-| **Total** | **123** | **117** | **2** | **1** |
+| **Total** | **127** | **124** | **0** | **0** |
 
 ---
 ## Notas
@@ -306,4 +315,4 @@ pnpm test
 - 195 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Flujo E2E de MercadoPago pendiente (bloqueado por cuenta de prueba).
 - Ver AGENTS.md para detalles de bugs funcionales y mejoras de UX pendientes.
-- Próximo paso antes de Fase 5: corregir el ítem marcado como ❌ (Importar productos por CSV) y los 2 marcados como ⚠️.
+- Próximo paso antes de Fase 5: corregir el ítem marcado como ❌ (Importar productos por CSV).

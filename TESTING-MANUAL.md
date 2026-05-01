@@ -76,7 +76,7 @@
 
 - [x] Listado de 3 productos del seed con imagen, precio y stock
 - [x] Badge amarillo para stock ≤ 5, rojo para stock = 0
-- [ ] Edición rápida de stock inline → se actualiza sin recargar
+- [x] Columna de stock de solo lectura (muestra la suma de variantes)
 - [x] Crear producto nuevo con variantes → aparece en listado
 - [x] Editar producto → cambios reflejados
 - [x] Subir imagen → imagen visible en formulario y storefront
@@ -221,7 +221,7 @@ cd ~/landaetastudio-saas
 pnpm test
 ```
 
-- [x] 195 tests pasando
+- [x] 216 tests pasando
 - [x] 0 tests fallando
 
 ```bash
@@ -238,11 +238,13 @@ pnpm build
 | Área              | Total ítems | ✅ OK | ❌ Falla |
 | ----------------- | ----------- | ----- | -------- |
 | Superadmin        | 19          | 19    | 0        |
-| Admin             | 35          | 33    | 2        |
+| Admin             | 35          | 34    | 1        |
+| Admin (CSV)        | 10          | 10    | 0        |
+| Admin (Seguridad)  | 4           | 4     | 0        |
 | Storefront        | 35          | 31    | 4        |
 | Seguridad         | 5           | 5     | 0        |
 | Tests automáticos | 2           | 2     | 0        |
-| **Total**         | **96**      | **90**| **6**    |
+| **Total**         | **110**     | **105**| **5**    |
 
 ---
 _Archivo actualizado en Mayo 2026 — concordante con TESTING.md_
@@ -270,31 +272,31 @@ _Checklist generado en Abril 2026 — Pre Fase 5_
 ## 6. Importación de productos por CSV
 
 ### UI Admin (/products)
-- [ ] Botón "Importar CSV" visible junto a "Nuevo Producto"
-- [ ] Click en "Importar CSV" → abre modal
-- [ ] Botón "Descargar template de ejemplo" → descarga CSV con columnas correctas
-- [ ] Subir CSV válido → muestra resumen (creados, omitidos, errores)
-- [ ] Subir CSV con productos duplicados → muestra fila omitida con razón
-- [ ] Subir CSV con precio negativo → muestra error en esa fila
-- [ ] Subir CSV con categoría inexistente → muestra error en esa fila
-- [ ] Subir CSV con nombre vacío → muestra error en esa fila
-- [ ] Subir archivo que no es CSV → error de validación
-- [ ] Tras importación exitosa → productos aparecen en el listado
+- [x] Botón "Importar CSV" visible junto a "Nuevo Producto"
+- [x] Click en "Importar CSV" → abre modal
+- [x] Botón "Descargar template de ejemplo" → descarga CSV con columnas correctas
+- [x] Subir CSV válido → muestra resumen (creados, omitidos, errores)
+- [x] Subir CSV con productos duplicados → muestra fila omitida con razón
+- [x] Subir CSV con precio negativo → muestra error en esa fila
+- [x] Subir CSV con categoría inexistente → muestra error en esa fila
+- [x] Subir CSV con nombre vacío → muestra error en esa fila
+- [x] Subir archivo que no es CSV → error de validación
+- [x] Tras importación exitosa → productos aparecen en el listado
 
 ### API
-- [ ] `POST /api/products/import` sin sesión → 401
-- [ ] `POST /api/products/import` sin archivo → 400
-- [ ] `POST /api/products/import` con CSV sin columnas requeridas → 400
-- [ ] `POST /api/products/import` con CSV válido → 200 con summary
+- [x] `POST /api/products/import` sin sesión → 401
+- [x] `POST /api/products/import` sin archivo → 400
+- [x] `POST /api/products/import` con CSV sin columnas requeridas → 400
+- [x] `POST /api/products/import` con CSV válido → 200 con summary
 
 ---
 
 ## 7. Seguridad de subdominios
 
 ### Admin (localhost:3001)
-- [ ] Acceder a `tienda1.lvh.me:3001/login` → respuesta 403
-- [ ] Acceder a `localhost:3001/login` → carga normalmente
+- [x] Acceder a `tienda1.lvh.me:3001/login` → respuesta 403
+- [x] Acceder a `localhost:3001/login` → carga normalmente
 
 ### Superadmin (localhost:3002)
-- [ ] Acceder a `tienda1.lvh.me:3002/login` → respuesta 403
-- [ ] Acceder a `localhost:3002/login` → carga normalmente
+- [x] Acceder a `tienda1.lvh.me:3002/login` → respuesta 403
+- [x] Acceder a `localhost:3002/login` → carga normalmente
