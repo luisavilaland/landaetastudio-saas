@@ -247,3 +247,20 @@ pnpm build
 ---
 _Archivo actualizado en Mayo 2026 — concordante con TESTING.md_
 _Checklist generado en Abril 2026 — Pre Fase 5_
+
+---
+
+## Pendientes documentados
+
+### Importación de productos por CSV
+- **Estado:** No implementado
+- **Descripción:** Permitir que el admin cargue productos masivamente desde un archivo CSV
+- **Campos mínimos del CSV:** nombre, slug, descripción, precio, stock, categoría, SKU
+- **Ubicación sugerida:** `/admin/products` → botón "Importar CSV"
+- **Endpoints a crear:** `POST /api/products/import` en admin
+- **Consideraciones:** validar formato, manejar errores por fila, reportar resumen de importación
+
+### Seguridad de subdominios en admin y superadmin
+- **Estado:** ✅ Implementado — commit 13b5f28
+- **Descripción:** proxy.ts en admin y superadmin rechaza requests desde subdominios de tenant
+- **Pendiente para producción:** configurar variables `ADMIN_HOST` y `SUPERADMIN_HOST` en Vercel
