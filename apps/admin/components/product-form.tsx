@@ -49,6 +49,7 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [images, setImages] = useState<ProductImage[]>([]);
   const [imagesLoading, setImagesLoading] = useState(false);
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
@@ -255,6 +256,7 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
     if (newImageFiles.length === 0) return;
 
     setUploadingImages(true);
+    setError("");
     try {
       for (const file of newImageFiles) {
         const formData = new FormData();
@@ -266,15 +268,18 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
         });
 
         if (!res.ok) {
-          throw new Error("Error uploading image");
+          const data = await res.json();
+          throw new Error(data.error || "Error uploading image");
         }
       }
 
       setNewImageFiles([]);
       setNewImagePreviews([]);
+      setSuccess(`${newImageFiles.length} imagen(es) subida(s) correctamente`);
       await loadImages();
-    } catch {
-      throw new Error("Error al subir las imágenes");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al subir las imágenes");
+      throw err;
     } finally {
       setUploadingImages(false);
     }
@@ -284,6 +289,7 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
     const priceInCents = Math.round(Number(form.price) * 100);
 
@@ -315,8 +321,8 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
         throw new Error(data.error || "Error saving product");
       }
 
-      const savedProduct = await res.json();
-      const productId = savedProduct.id || initialProduct?.id;
+const savedProduct = await res.json();
+const productId = savedProduct.product?.id || savedProduct.id || initialProduct?.id;
 
       if (mode === "create" && newImageFiles.length > 0) {
         await uploadNewImages(productId);
@@ -360,6 +366,12 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
       {error && (
         <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 rounded-md">
           {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-4 p-3 text-sm text-green-600 bg-green-50 rounded-md">
+          {success}
         </div>
       )}
 
