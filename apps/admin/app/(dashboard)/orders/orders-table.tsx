@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -37,6 +37,17 @@ const STATUS_LABELS: Record<string, string> = {
   payment_failed: "Fallido",
 };
 
+const FILTER_STATUSES = [
+  { value: "", label: "Todas" },
+  { value: "pending_payment", label: "Pendiente" },
+  { value: "confirmed", label: "Confirmado" },
+  { value: "processing", label: "Procesando" },
+  { value: "shipped", label: "Enviado" },
+  { value: "delivered", label: "Entregado" },
+  { value: "cancelled", label: "Cancelado" },
+  { value: "refunded", label: "Reembolsado" },
+];
+
 function formatStatus(status: string | null): string {
   return (status && STATUS_LABELS[status]) || status || "Desconocido";
 }
@@ -64,11 +75,15 @@ type Order = {
   createdAt: Date | string;
 };
 
-export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
+export function OrdersTable({ initialOrders, currentStatus }: { initialOrders: Order[]; currentStatus?: string }) {
   const router = useRouter();
   const [orders, setOrders] = useState(initialOrders);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    setOrders(initialOrders);
+  }, [initialOrders]);
 
   const updateStatus = async (orderId: string, newStatus: string) => {
     setUpdatingId(orderId);
@@ -100,6 +115,16 @@ export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
 
   const allStatuses = Object.keys(STATUS_LABELS);
 
+  const handleFilterChange = (status: string) => {
+    const url = new URL(window.location.href);
+    if (status) {
+      url.searchParams.set("status", status);
+    } else {
+      url.searchParams.delete("status");
+    }
+    router.push(url.pathname + url.search);
+  };
+
   return (
     <div>
       {message && (
@@ -115,6 +140,27 @@ export function OrdersTable({ initialOrders }: { initialOrders: Order[] }) {
           {message.text}
         </div>
       )}
+
+      <div style={{ marginBottom: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        {FILTER_STATUSES.map((filter) => (
+          <button
+            key={filter.value}
+            onClick={() => handleFilterChange(filter.value)}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "0.375rem",
+              border: "1px solid #d1d5db",
+              background: currentStatus === filter.value ? "#2563eb" : "white",
+              color: currentStatus === filter.value ? "white" : "#374151",
+              cursor: "pointer",
+              fontSize: "0.875rem",
+              fontWeight: currentStatus === filter.value ? "600" : "400",
+            }}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
 
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>

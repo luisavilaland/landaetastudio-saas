@@ -2,9 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db, dbOrders, dbCustomers } from "@repo/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
-export async function GET() {
+const VALID_STATUSES = [
+  "pending_payment",
+  "confirmed",
+  "processing",
+  "shipped",
+  "delivered",
+  "cancelled",
+  "refunded",
+];
+
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session) {
@@ -14,6 +24,14 @@ export async function GET() {
     const tenantId = session.user.tenantId;
     if (!tenantId) {
       return NextResponse.json({ error: "Tenant no encontrado" }, { status: 400 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status");
+
+    const whereConditions = [eq(dbOrders.tenantId, tenantId)];
+    if (status && VALID_STATUSES.includes(status)) {
+      whereConditions.push(eq(dbOrders.status, status));
     }
 
     const orders = await db
@@ -28,7 +46,7 @@ export async function GET() {
       })
       .from(dbOrders)
       .leftJoin(dbCustomers, eq(dbOrders.customerId, dbCustomers.id))
-      .where(eq(dbOrders.tenantId, tenantId))
+      .where(and(...whereConditions))
       .orderBy(dbOrders.createdAt);
 
     const ordersWithCustomer = orders.map((order) => ({

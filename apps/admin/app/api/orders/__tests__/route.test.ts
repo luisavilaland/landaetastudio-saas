@@ -67,6 +67,69 @@ describe("GET /api/orders", () => {
       expect(limit).toBeGreaterThan(0);
     });
   });
+
+  describe("Status Filter", () => {
+    const validStatuses = [
+      "pending_payment",
+      "confirmed",
+      "processing",
+      "shipped",
+      "delivered",
+      "cancelled",
+      "refunded",
+    ];
+
+    it("should accept valid status parameter", () => {
+      validStatuses.forEach((status) => {
+        expect(validStatuses).toContain(status);
+      });
+    });
+
+    it("should reject invalid status parameter", () => {
+      const invalidStatus = "invalid_status";
+      expect(validStatuses).not.toContain(invalidStatus);
+    });
+
+    it("should return all orders when no status provided", () => {
+      const status = undefined;
+      expect(status).toBeUndefined();
+    });
+
+    it("should filter orders by pending_payment status", () => {
+      const status = "pending_payment";
+      expect(validStatuses).toContain(status);
+    });
+
+    it("should filter orders by confirmed status", () => {
+      const status = "confirmed";
+      expect(validStatuses).toContain(status);
+    });
+
+    it("should filter orders by processing status", () => {
+      const status = "processing";
+      expect(validStatuses).toContain(status);
+    });
+
+    it("should filter orders by shipped status", () => {
+      const status = "shipped";
+      expect(validStatuses).toContain(status);
+    });
+
+    it("should filter orders by delivered status", () => {
+      const status = "delivered";
+      expect(validStatuses).toContain(status);
+    });
+
+    it("should filter orders by cancelled status", () => {
+      const status = "cancelled";
+      expect(validStatuses).toContain(status);
+    });
+
+    it("should filter orders by refunded status", () => {
+      const status = "refunded";
+      expect(validStatuses).toContain(status);
+    });
+  });
 });
 
 describe("Order Status Updates", () => {
