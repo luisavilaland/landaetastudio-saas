@@ -264,3 +264,37 @@ _Checklist generado en Abril 2026 — Pre Fase 5_
 - **Estado:** ✅ Implementado — commit 13b5f28
 - **Descripción:** proxy.ts en admin y superadmin rechaza requests desde subdominios de tenant
 - **Pendiente para producción:** configurar variables `ADMIN_HOST` y `SUPERADMIN_HOST` en Vercel
+
+---
+
+## 6. Importación de productos por CSV
+
+### UI Admin (/products)
+- [ ] Botón "Importar CSV" visible junto a "Nuevo Producto"
+- [ ] Click en "Importar CSV" → abre modal
+- [ ] Botón "Descargar template de ejemplo" → descarga CSV con columnas correctas
+- [ ] Subir CSV válido → muestra resumen (creados, omitidos, errores)
+- [ ] Subir CSV con productos duplicados → muestra fila omitida con razón
+- [ ] Subir CSV con precio negativo → muestra error en esa fila
+- [ ] Subir CSV con categoría inexistente → muestra error en esa fila
+- [ ] Subir CSV con nombre vacío → muestra error en esa fila
+- [ ] Subir archivo que no es CSV → error de validación
+- [ ] Tras importación exitosa → productos aparecen en el listado
+
+### API
+- [ ] `POST /api/products/import` sin sesión → 401
+- [ ] `POST /api/products/import` sin archivo → 400
+- [ ] `POST /api/products/import` con CSV sin columnas requeridas → 400
+- [ ] `POST /api/products/import` con CSV válido → 200 con summary
+
+---
+
+## 7. Seguridad de subdominios
+
+### Admin (localhost:3001)
+- [ ] Acceder a `tienda1.lvh.me:3001/login` → respuesta 403
+- [ ] Acceder a `localhost:3001/login` → carga normalmente
+
+### Superadmin (localhost:3002)
+- [ ] Acceder a `tienda1.lvh.me:3002/login` → respuesta 403
+- [ ] Acceder a `localhost:3002/login` → carga normalmente
