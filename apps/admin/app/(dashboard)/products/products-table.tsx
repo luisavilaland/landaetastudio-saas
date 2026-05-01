@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CSVImport } from "./csv-import";
 
 type ProductVariant = {
   id: string;
@@ -24,7 +25,11 @@ type Product = {
   images?: { url: string }[];
 };
 
-export function ProductsTable({ initialProducts }: { initialProducts: Product[] }) {
+export function ProductsTable({
+  initialProducts,
+}: {
+  initialProducts: Product[];
+}) {
   const router = useRouter();
   const [products, setProducts] = useState(initialProducts);
 
@@ -56,41 +61,70 @@ export function ProductsTable({ initialProducts }: { initialProducts: Product[] 
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold">Productos</h1>
-        <button
-          onClick={() => router.push("/products/new")}
-          className="px-4 py-2 bg-zinc-900 text-white rounded-md hover:bg-zinc-800"
-        >
-          Nuevo Producto
-        </button>
+        <div className="flex gap-3">
+          <CSVImport onImportComplete={() => router.refresh()} />
+          <button
+            onClick={() => router.push("/products/new")}
+            className="px-4 py-2 bg-zinc-900 text-white rounded-md hover:bg-zinc-800"
+          >
+            Nuevo Producto
+          </button>
+        </div>
       </div>
 
       <div className="border rounded-lg overflow-hidden">
         <table className="w-full">
           <thead className="bg-zinc-100">
-             <tr>
-               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Imagen</th>
-               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Nombre</th>
-               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Categoría</th>
-               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Slug</th>
-               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Estado</th>
-               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Variantes</th>
-               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Precio</th>
-               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Stock total</th>
-               <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Creado</th>
-               <th className="px-4 py-3 text-right text-sm font-medium text-zinc-600">Acciones</th>
-             </tr>
+            <tr>
+              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">
+                Imagen
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">
+                Nombre
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">
+                Categoría
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">
+                Slug
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">
+                Estado
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">
+                Variantes
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">
+                Precio
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">
+                Stock total
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">
+                Creado
+              </th>
+              <th className="px-4 py-3 text-right text-sm font-medium text-zinc-600">
+                Acciones
+              </th>
+            </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200">
             {products.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-zinc-500">
+                <td
+                  colSpan={10}
+                  className="px-4 py-8 text-center text-zinc-500"
+                >
                   No hay productos. Crea el primero.
                 </td>
               </tr>
             ) : (
               products.map((product) => {
                 const variantCount = product.variants.length;
-                const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
+                const totalStock = product.variants.reduce(
+                  (sum, v) => sum + v.stock,
+                  0,
+                );
                 const firstVariant = product.variants[0];
 
                 return (
@@ -115,7 +149,9 @@ export function ProductsTable({ initialProducts }: { initialProducts: Product[] 
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm">{product.name}</td>
-                    <td className="px-4 py-3 text-sm">{product.categoryName || "-"}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {product.categoryName || "-"}
+                    </td>
                     <td className="px-4 py-3 text-sm">{product.slug}</td>
                     <td className="px-4 py-3 text-sm">
                       <span
@@ -123,8 +159,8 @@ export function ProductsTable({ initialProducts }: { initialProducts: Product[] 
                           product.status === "active"
                             ? "bg-green-100 text-green-700"
                             : product.status === "draft"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-zinc-100 text-zinc-700"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-zinc-100 text-zinc-700"
                         }`}
                       >
                         {product.status}
@@ -132,23 +168,34 @@ export function ProductsTable({ initialProducts }: { initialProducts: Product[] 
                     </td>
                     <td className="px-4 py-3 text-sm">
                       {variantCount > 0 ? (
-                        <span className="text-sm">{variantCount} variante{variantCount !== 1 ? 's' : ''}</span>
+                        <span className="text-sm">
+                          {variantCount} variante{variantCount !== 1 ? "s" : ""}
+                        </span>
                       ) : (
-                        <span className="text-sm text-zinc-400">Sin variantes</span>
+                        <span className="text-sm text-zinc-400">
+                          Sin variantes
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       {firstVariant ? formatPrice(firstVariant.price) : "-"}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <span title="Stock combinado de variantes" className="cursor-help">
+                      <span
+                        title="Stock combinado de variantes"
+                        className="cursor-help"
+                      >
                         {totalStock}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm">{formatDate(product.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {formatDate(product.createdAt)}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => router.push(`/products/${product.id}/edit`)}
+                        onClick={() =>
+                          router.push(`/products/${product.id}/edit`)
+                        }
                         className="px-3 py-1 text-sm text-zinc-600 hover:text-zinc-900 mr-2"
                       >
                         Editar
