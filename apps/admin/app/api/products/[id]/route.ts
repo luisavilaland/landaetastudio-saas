@@ -3,7 +3,7 @@ import { db, dbProducts, dbProductVariants, dbProductImages, dbOrderItems, dbCat
 import { auth } from "@/lib/auth";
 import { and, eq, inArray } from "drizzle-orm";
 import { uploadImage, deleteImage } from "@repo/storage";
-import { updateProductSchema } from "@repo/validation";
+import { updateProductSchema, normalizeSlug } from "@repo/validation";
 
 type Params = Promise<{ id: string }>;
 
@@ -159,27 +159,28 @@ export async function PUT(
       }
     }
 
-    const slugChanged = slug && slug !== product[0].slug;
-
-    if (slugChanged && slug) {
+    const normalizedSlug = slug ? normalizeSlug(slug) : undefined;
+    const slugChanged = normalizedSlug && normalizedSlug !== product[0].slug;
+    
+    if (slugChanged && normalizedSlug) {
       const existingSlug = await db
         .select()
         .from(dbProducts)
         .where(
           and(
-            eq(dbProducts.slug, slug),
+            eq(dbProducts.slug, normalizedSlug),
             eq(dbProducts.tenantId, tenantId)
           )
         )
         .limit(1);
-
+      
       if (existingSlug.length > 0) {
         return NextResponse.json({ error: "El slug ya existe" }, { status: 409 });
       }
     }
 
     const now = new Date();
-    const safeSlug = slug ?? product[0].slug;
+    const safeSlug = normalizedSlug ?? product[0].slug;
 
     let imageUrl = product[0].imageUrl;
     let newImageUrl = imageUrl;
@@ -226,7 +227,7 @@ export async function PUT(
 
     // If slug changed, regenerate SKU for all variants based on new slug
     if (slugChanged && existingVariants.length > 0) {
-      const newSlug = slug ?? product[0].slug;
+      const newSlug = normalizedSlug ?? product[0].slug;
       for (const variant of existingVariants) {
         const options = variant.options as Record<string, string> || {};
         const optionValues = Object.values(options);
@@ -263,7 +264,7 @@ export async function PUT(
 
       // Handle SKU regeneration if slug changed
       if (slugChanged) {
-        const newSlug = slug ?? product[0].slug;
+        const newSlug = normalizedSlug ?? product[0].slug;
         const options = currentVariant.options as Record<string, string> || {};
         const optionValues = Object.values(options);
         const newSku = `${newSlug}-${optionValues.join("-").toLowerCase()}`;
@@ -315,12 +316,13 @@ export async function PUT(
       if (Object.keys(variantFields).length > 1) {
         variantOperation = 'update';
       }
-    } else {
-      // No variant exists - INSERT (rare case)
-      console.log(`[PUT Product] No variant found for product ${id}, creating new variant`);
-      variantOperation = 'insert';
-      
-      const newSku = slug ? slug.replace(/\s+/g, "-").toLowerCase() : `product-${id}`;
+      } else {
+        // No variant exists - INSERT (rare case)
+        console.log(`[PUT Product] No variant found for product ${id}, creating new variant`);
+        variantOperation = 'insert';
+        
+        const baseSlug = normalizedSlug ?? product[0].slug;
+        const newSku = baseSlug.replace(/\s+/g, "-").toLowerCase();
       
       // Check SKU uniqueness for new variant
       const existingSku = await db

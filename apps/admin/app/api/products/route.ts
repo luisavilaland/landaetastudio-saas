@@ -3,7 +3,7 @@ import { db, dbProducts, dbProductVariants, dbProductImages, dbCategories } from
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
 import { uploadImage } from "@repo/storage";
-import { createProductSchema } from "@repo/validation";
+import { createProductSchema, normalizeSlug } from "@repo/validation";
 
 export async function GET() {
   const session = await auth();
@@ -94,12 +94,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const normalizedSlug = normalizeSlug(slug);
+    
     const existingSlug = await db
       .select()
       .from(dbProducts)
       .where(
         and(
-          eq(dbProducts.slug, slug),
+          eq(dbProducts.slug, normalizedSlug),
           eq(dbProducts.tenantId, tenantId)
         )
       )
@@ -119,7 +121,7 @@ export async function POST(request: NextRequest) {
     if (image && image.size > 0) {
       const buffer = Buffer.from(await image.arrayBuffer());
       const ext = image.name.split(".").pop() || "png";
-      imageUrl = await uploadImage(buffer, `products/${Date.now()}-${slug}.${ext}`, image.type);
+      imageUrl = await uploadImage(buffer, `products/${Date.now()}-${normalizedSlug}.${ext}`, image.type);
     }
 
     const newProduct = await db.transaction(async (tx) => {
@@ -128,7 +130,7 @@ export async function POST(request: NextRequest) {
         .values({
           tenantId,
           name,
-          slug,
+          slug: normalizedSlug,
           description,
           imageUrl,
           status,
@@ -139,7 +141,7 @@ export async function POST(request: NextRequest) {
         })
         .returning();
 
-      const sku = slug.replace(/\s+/g, "-").toLowerCase();
+      const sku = normalizedSlug.replace(/\s+/g, "-").toLowerCase();
 
       await tx
         .insert(dbProductVariants)

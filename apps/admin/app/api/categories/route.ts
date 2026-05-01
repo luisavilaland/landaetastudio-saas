@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, dbCategories } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq, asc } from "drizzle-orm";
-import { createCategorySchema } from "@repo/validation";
+import { createCategorySchema, normalizeSlug } from "@repo/validation";
 
 export async function GET() {
   const session = await auth();
@@ -43,18 +43,19 @@ export async function POST(request: NextRequest) {
     }
 
     const { name, slug } = validation.data;
-
+    const normalizedSlug = normalizeSlug(slug);
+    
     const existingSlug = await db
       .select()
       .from(dbCategories)
       .where(
         and(
-          eq(dbCategories.slug, slug),
+          eq(dbCategories.slug, normalizedSlug),
           eq(dbCategories.tenantId, tenantId)
         )
       )
       .limit(1);
-
+    
     if (existingSlug.length > 0) {
       return NextResponse.json(
          { error: "El slug ya existe" },
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
       .values({
         tenantId,
         name,
-        slug,
+        slug: normalizedSlug,
         createdAt: now,
         updatedAt: now,
       })
