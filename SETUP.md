@@ -265,3 +265,8 @@ tenant1.lvh.me:3000
 ## Nota
 
 Ãšltima actualizaciÃ³n: 1 de mayo de 2026 â€“ Fase 4 completada. 216/216 tests. Build limpio. Seed incluye mÃ©todos de envÃ­o.
+
+
+## Actualización
+
+Última actualización: 3 de mayo de 2026 – Refactorización pre-Fase 5 completada. Auth consolidada en @repo/auth, lógica de negocio migrada a @repo/commerce, slugs normalizados.

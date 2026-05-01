@@ -172,6 +172,7 @@ saas-ecommerce/
 ├── packages/
 │   ├── auth/           # NextAuth v5 para admin y superadmin
 │   ├── db/             # Schema Drizzle, migrations, client
+│   ├── commerce/        # Lógica de negocio (carrito, productos, emails, tenant, Redis)
 │   └── storage/        # MinIO client for image upload
 ├── docker-compose.yml
 ├── .env.local
@@ -321,9 +322,9 @@ Para recibir notificaciones de pago en desarrollo:
 
 | # | Tarea |
 | ---|-------|
-| 1 | Normalizar slug en create/edit (acentos y mayúsculas) |
-| 2 | Consolidar auth duplicada en `@repo/auth` |
-| 3 | Refactorizar lógica de negocio duplicada a `@repo/commerce` |
+| 1 | ~~Normalizar slug en create/edit (acentos y mayúsculas)~~ ✅ Completada |
+| 2 | ~~Consolidar auth duplicada en `@repo/auth`~~ ✅ Completada |
+| 3 | ~~Refactorizar lógica de negocio duplicada a `@repo/commerce`~~ ✅ Completada |
 
 ### 🟢 Baja prioridad
 
@@ -362,4 +363,4 @@ pnpm test    # Ejecuta todos los tests (vitest)
 
 ---
 
-**Última actualización:** 1 de mayo de 2026 – Fase 4 completada. 216/216 tests. Build limpio.
+**Última actualización:** 3 de mayo de 2026 – Refactorización pre-Fase 5 completada. Auth consolidada en @repo/auth, lógica de negocio migrada a @repo/commerce, slugs normalizados.

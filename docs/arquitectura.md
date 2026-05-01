@@ -75,3 +75,15 @@ Los tests de endpoints que importan directamente rutas de Next.js (`import { GET
 - **Carrito anónimo en Redis**: permite a los clientes usar el carrito sin crear cuenta. La sesión expira a los 7 días; el TTL de Redis se encarga automáticamente de la limpieza.
 - **Validación Zod**: toda la API usa schemas de `@repo/validation` para validar inputs (create, update, delete).
 - **Búsqueda**: se implementa con ILIKE en PostgreSQL, sin dependencias externas en esta fase.
+
+## ¿Por qué se consolidó NextAuth en @repo/auth?
+
+Durante la Fase 4, detectamos que la configuración de NextAuth v5 estaba duplicada en `apps/admin/lib/auth.ts` y `apps/superadmin/lib/auth.ts`. Ambas configuraciones solo diferían en el rol validado (`"admin"` vs `"superadmin"`). Se consolidó en `@repo/auth` creando funciones `createAdminAuth()` y `createSuperadminAuth()` que centralizan la lógica, mientras que las apps ahora reexportan desde el paquete. Esto elimina la duplicación y facilita el mantenimiento.
+
+## ¿Por qué la lógica de negocio se centralizó en @repo/commerce?
+
+Originalmente la lógica de carrito, productos, emails y resolución de tenant estaba en `apps/storefront/lib/`. Esto representaba una deuda técnica ya que no había una ubicación clara para nueva lógica compartida. Se creó `packages/commerce` como parte de la preparación para la Fase 5, moviendo toda la lógica de negocio de storefront hacia este paquete centralizado. Las apps ahora reexportan desde `@repo/commerce`, eliminando la duplicación y preparando el proyecto para escalar.
+
+## ¿Por qué se normalizan los slugs?
+
+Se implementó la función `normalizeSlug()` en `@repo/validation/src/utils.ts` para asegurar que todos los slugs de productos y categorías sigan un formato consistente: minúsculas, sin acentos, espacios reemplazados por guiones, y limpieza de guiones duplicados o en extremos. Esto se aplica tanto en creación como en edición (regenerando el SKU de variantes si cambia el slug). La centralización en `@repo/validation` garantiza que toda la API use el mismo criterio de normalización.
