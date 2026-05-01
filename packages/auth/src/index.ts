@@ -143,14 +143,20 @@ export function createSuperadminAuth() {
   });
 }
 
+// Admin auth instance
 export const adminAuth = createAdminAuth();
 export const handlers = adminAuth.handlers;
 export const auth = adminAuth.auth;
 export const signIn = adminAuth.signIn;
 export const signOut = adminAuth.signOut;
 
+// Superadmin auth instance
 export const superadminAuth = createSuperadminAuth();
 export const superadminHandlers = superadminAuth.handlers;
 export const superadminAuthFn = superadminAuth.auth;
 export const superadminSignIn = superadminAuth.signIn;
 export const superadminSignOut = superadminAuth.signOut;
+
+// Re-exports for superadmin app (expects `handlers` and `auth` naming)
+export const superadminAuthHandlers = superadminAuth.handlers;
+export const superadminAuthAuth = superadminAuth.auth;

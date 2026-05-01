@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Tenant } from "@repo/db";
 import { db } from "@repo/db";
 
-vi.mock("@/lib/auth", () => ({
-  auth: vi.fn(),
+vi.mock("@repo/auth", () => ({
+  superadminAuthFn: vi.fn(),
 }));
 
 vi.mock("@/lib/redis", () => ({
@@ -26,7 +26,7 @@ vi.mock("@repo/db", async () => {
   };
 });
 
-import { auth } from "@/lib/auth";
+import { superadminAuthFn as auth } from "@repo/auth";
 import { PUT } from "../route";
 
 const mockSession: Record<string, unknown> = {
