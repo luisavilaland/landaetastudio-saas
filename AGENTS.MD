@@ -94,20 +94,13 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - **Al editar producto, precio y stock aparecen vacíos**: los campos solicitan reingreso en lugar de mostrar los valores actuales.
 - **Edición de imagen falla silenciosamente**: al editar la imagen de un producto, la nueva imagen no se guarda y no se muestra ningún mensaje de error ni confirmación.
 - **SKU de variantes no se regenera al cambiar slug**: el checklist de la Fase 3 indica que debería regenerarse automáticamente. Actualmente los SKUs permanecen con el slug anterior.
-- **Páginas de auth accesibles con sesión en storefront**: `/login` y `/register` siguen siendo accesibles aunque el cliente ya tenga sesión iniciada.
 - **Admin y superadmin accesibles vía subdominios de tenant**: los paneles son accesibles usando subdominios de tienda (ej. `tienda1.lvh.me:3001/login`). Solo deben ser accesibles desde `localhost:3001` y `localhost:3002`.
 
 ### Funcionalidades no implementadas
 - **Importación de productos por CSV**: no existe endpoint ni UI para importar productos masivamente.
-- **Filtro de órdenes por estado en admin**: el listado de órdenes (`/orders`) no tiene filtro visual por estado.
-- **Página de creación de método de envío**: `GET /shipping/new` devuelve 404. La tabla lista métodos pero no se pueden crear nuevos desde la UI.
 - **Ruta `/plans` en superadmin**: `http://localhost:3002/plans` no está implementada.
 
 ### Mejoras de UX
-- **Columna `customDomain` ausente en tabla de tenants**: el campo no se muestra como columna en el listado del superadmin.
-- **Cambio de estado de órdenes solo en detalle**: no es posible cambiar el estado desde la tabla general, solo desde la página de detalle.
-- **Ruta raíz del admin en blanco**: `http://localhost:3001` muestra "Dashboard Bienvenido al panel de administración" en lugar del dashboard real.
-- **Navbar lateral ausente en páginas internas**: las páginas internas del admin (productos, categorías, órdenes, envíos, configuración, dominio) no muestran la barra de navegación lateral que sí aparece en el dashboard. Lo mismo ocurre en superadmin.
 - Todos los tests pasan (195/195) y el build es limpio en las 3 apps.
 
 ## Mantenimiento de la documentación
