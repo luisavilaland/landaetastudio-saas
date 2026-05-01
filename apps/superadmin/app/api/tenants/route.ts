@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { slug, name, plan, status } = validation.data;
+    const { slug, name, plan, status, customDomain } = validation.data;
 
     const existing = await db
       .select()
@@ -55,6 +55,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (customDomain) {
+      const existingDomain = await db
+        .select()
+        .from(dbTenants)
+        .where(eq(dbTenants.customDomain, customDomain))
+        .limit(1);
+
+      if (existingDomain.length > 0) {
+        return NextResponse.json(
+          { error: "El dominio personalizado ya está en uso" },
+          { status: 409 }
+        );
+      }
+    }
+
     const newTenant = await db
       .insert(dbTenants)
       .values({
@@ -62,6 +77,7 @@ export async function POST(request: NextRequest) {
         name,
         plan: plan || "starter",
         status: status || "active",
+        customDomain: customDomain || null,
       })
       .returning();
 

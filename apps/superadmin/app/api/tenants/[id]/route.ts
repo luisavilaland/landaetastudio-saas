@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbTenants } from "@repo/db";
+import { db, dbTenants, dbProducts, dbProductImages, dbProductVariants, dbCategories, dbCustomers, dbOrders, dbOrderItems, dbShippingMethods, dbAdminUsers } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { redisClient } from "@/lib/redis";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { updateTenantSchema } from "@repo/validation";
 
 const TENANT_CACHE_PREFIX = "tenant:slug:";
@@ -151,24 +151,96 @@ export async function DELETE(
   try {
     const session = await auth();
 
-  if (!session) {
-    return errorResponse("No autorizado", 401);
-  }
+    if (!session) {
+      return errorResponse("No autorizado", 401);
+    }
 
-  const { id } = await params;
+    const { id } = await params;
 
-  const existing = await db
+    const existing = await db
       .select()
       .from(dbTenants)
       .where(eq(dbTenants.id, id))
       .limit(1);
 
-  if (existing.length === 0) {
-    return errorResponse("Tenant no encontrado", 404);
-  }
+    if (existing.length === 0) {
+      return errorResponse("Tenant no encontrado", 404);
+    }
 
-  const oldSlug = existing[0].slug;
-    await db.delete(dbTenants).where(eq(dbTenants.id, id));
+    const oldSlug = existing[0].slug;
+
+    await db.transaction(async (tx) => {
+      // Get all products for this tenant
+      const products = await tx
+        .select({ id: dbProducts.id })
+        .from(dbProducts)
+        .where(eq(dbProducts.tenantId, id));
+
+      const productIds = products.map(p => p.id);
+
+      if (productIds.length > 0) {
+        // Get all product variants for these products
+        const variants = await tx
+          .select({ id: dbProductVariants.id })
+          .from(dbProductVariants)
+          .where(inArray(dbProductVariants.productId, productIds));
+
+        const variantIds = variants.map(v => v.id);
+
+        // Delete order items that reference these variants
+        if (variantIds.length > 0) {
+          await tx
+            .delete(dbOrderItems)
+            .where(inArray(dbOrderItems.productVariantId, variantIds));
+        }
+
+        // Delete orders for this tenant
+        await tx
+          .delete(dbOrders)
+          .where(eq(dbOrders.tenantId, id));
+
+        // Delete product images
+        await tx
+          .delete(dbProductImages)
+          .where(eq(dbProductImages.tenantId, id));
+
+        // Delete product variants
+        await tx
+          .delete(dbProductVariants)
+          .where(eq(dbProductVariants.tenantId, id));
+
+        // Delete products
+        await tx
+          .delete(dbProducts)
+          .where(eq(dbProducts.tenantId, id));
+      }
+
+      // Delete categories
+      await tx
+        .delete(dbCategories)
+        .where(eq(dbCategories.tenantId, id));
+
+      // Delete customers
+      await tx
+        .delete(dbCustomers)
+        .where(eq(dbCustomers.tenantId, id));
+
+      // Delete shipping methods
+      await tx
+        .delete(dbShippingMethods)
+        .where(eq(dbShippingMethods.tenantId, id));
+
+      // Set admin users' tenantId to null
+      await tx
+        .update(dbAdminUsers)
+        .set({ tenantId: null })
+        .where(eq(dbAdminUsers.tenantId, id));
+
+      // Finally, delete the tenant
+      await tx
+        .delete(dbTenants)
+        .where(eq(dbTenants.id, id));
+    });
 
     try {
       await redisClient.del(`${TENANT_CACHE_PREFIX}${oldSlug}`);

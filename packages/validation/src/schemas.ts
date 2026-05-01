@@ -84,13 +84,6 @@ export const dashboardQuerySchema = z.object({
   endDate: z.string().datetime().nullable().optional(),
 });
 
-export const createTenantSchema = z.object({
-  slug: z.string().min(1).max(255),
-  name: z.string().min(1).max(255),
-  plan: z.string().min(1),
-  status: z.string().min(1),
-});
-
 export const customDomainSchema = z.string().optional().transform((val) => {
   if (val === undefined || val === null || val.trim() === '') return undefined;
   return val.trim();
@@ -98,6 +91,14 @@ export const customDomainSchema = z.string().optional().transform((val) => {
   (val) => !val || /^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(val),
   { message: "Dominio inválido. Usa formato ej. mitienda.com (sin http:// ni paths)" }
 );
+
+export const createTenantSchema = z.object({
+  slug: z.string().min(1).max(255),
+  name: z.string().min(1).max(255),
+  plan: z.string().min(1),
+  status: z.string().min(1),
+  customDomain: customDomainSchema.optional(),
+});
 
 export const updateTenantSchema = z.object({
   slug: z.string().min(1).max(255).optional(),

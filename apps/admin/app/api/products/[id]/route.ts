@@ -159,7 +159,9 @@ export async function PUT(
       }
     }
 
-    if (slug && slug !== product[0].slug) {
+    const slugChanged = slug && slug !== product[0].slug;
+
+    if (slugChanged && slug) {
       const existingSlug = await db
         .select()
         .from(dbProducts)
@@ -216,22 +218,62 @@ export async function PUT(
     if (metadata) updateProductFields.metadata = metadata;
     if (newImageUrl !== imageUrl) updateProductFields.imageUrl = newImageUrl;
 
-    // Get existing variant
-    const existingVariant = await db
+    // Get existing variants to check if SKU needs regeneration
+    const existingVariants = await db
       .select()
       .from(dbProductVariants)
-      .where(eq(dbProductVariants.productId, id))
-      .limit(1);
+      .where(eq(dbProductVariants.productId, id));
+
+    // If slug changed, regenerate SKU for all variants based on new slug
+    if (slugChanged && existingVariants.length > 0) {
+      const newSlug = slug ?? product[0].slug;
+      for (const variant of existingVariants) {
+        const options = variant.options as Record<string, string> || {};
+        const optionValues = Object.values(options);
+        const newSku = `${newSlug}-${optionValues.join("-").toLowerCase()}`;
+
+        // Check if new SKU already exists for this tenant (in another variant)
+        if (newSku !== variant.sku) {
+          const existingSku = await db
+            .select()
+            .from(dbProductVariants)
+            .where(
+              and(
+                eq(dbProductVariants.sku, newSku),
+                eq(dbProductVariants.tenantId, tenantId)
+              )
+            )
+            .limit(1);
+
+          if (existingSku.length > 0) {
+            return NextResponse.json(
+              { error: `El SKU generado "${newSku}" ya existe en otra variante` },
+              { status: 409 }
+            );
+          }
+        }
+      }
+    }
 
     // Determine if we need to update variant
-    if (existingVariant.length > 0) {
+    if (existingVariants.length > 0) {
       // Variant exists - UPDATE
-      const currentVariant = existingVariant[0];
+      const currentVariant = existingVariants[0];
       variantFields = { updatedAt: now };
 
-      // Handle SKU: only update if explicitly sent and different from current
-      // The SKU should only change if frontend explicitly sends a different SKU
-      // We don't automatically change SKU based on slug
+      // Handle SKU regeneration if slug changed
+      if (slugChanged) {
+        const newSlug = slug ?? product[0].slug;
+        const options = currentVariant.options as Record<string, string> || {};
+        const optionValues = Object.values(options);
+        const newSku = `${newSlug}-${optionValues.join("-").toLowerCase()}`;
+
+        if (newSku !== currentVariant.sku) {
+          variantFields.sku = newSku;
+        }
+      }
+
+      // Handle SKU from body: only update if explicitly sent and different from current
       let skuFromBody = validation.data.sku || null;
       
       if (skuFromBody && skuFromBody !== currentVariant.sku) {
@@ -318,8 +360,24 @@ export async function PUT(
           .where(eq(dbProducts.id, id));
       }
 
-      // Handle variant operation
-      if (variantOperation === 'update') {
+      // Handle variant operations
+      if (slugChanged && existingVariants.length > 0) {
+        // Regenerate SKU for all variants when slug changes
+        const newSlug = slug ?? product[0].slug;
+        for (const variant of existingVariants) {
+          const options = variant.options as Record<string, string> || {};
+          const optionValues = Object.values(options);
+          const newSku = `${newSlug}-${optionValues.join("-").toLowerCase()}`;
+
+          if (newSku !== variant.sku) {
+            await tx
+              .update(dbProductVariants)
+              .set({ sku: newSku, updatedAt: now })
+              .where(eq(dbProductVariants.id, variant.id));
+          }
+        }
+      } else if (variantOperation === 'update') {
+        // Update single variant fields (price, stock, etc.)
         console.log("[PUT Product] Updating variant with fields:", variantFields);
         await tx
           .update(dbProductVariants)
