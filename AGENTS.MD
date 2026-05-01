@@ -88,17 +88,10 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 ## Problemas conocidos
 
 ### Bugs funcionales
-- **POST /api/tenants no valida customDomain duplicado**: si se envía un `customDomain` que ya está en uso, el tenant se crea igual con el dominio vacío en lugar de devolver 409 Conflict. El PUT sí valida correctamente.
-- **No se puede subir imagen al crear producto nuevo**: error UUID `"undefined"`. El producto se crea pero sin imagen. Requiere flujo en dos pasos: crear producto primero, luego subir imagen.
-- **Las variantes no se guardan al crear producto nuevo**: el producto se crea pero sin las variantes definidas en el formulario. Al editar el producto después, las variantes sí se pueden agregar correctamente. Posible causa: POST `/api/products` no procesa el array de variantes.
-- **Al editar producto, precio y stock aparecen vacíos**: los campos solicitan reingreso en lugar de mostrar los valores actuales.
-- **Edición de imagen falla silenciosamente**: al editar la imagen de un producto, la nueva imagen no se guarda y no se muestra ningún mensaje de error ni confirmación.
-- **SKU de variantes no se regenera al cambiar slug**: el checklist de la Fase 3 indica que debería regenerarse automáticamente. Actualmente los SKUs permanecen con el slug anterior.
 - **Admin y superadmin accesibles vía subdominios de tenant**: los paneles son accesibles usando subdominios de tienda (ej. `tienda1.lvh.me:3001/login`). Solo deben ser accesibles desde `localhost:3001` y `localhost:3002`.
 
 ### Funcionalidades no implementadas
 - **Importación de productos por CSV**: no existe endpoint ni UI para importar productos masivamente.
-- **Ruta `/plans` en superadmin**: `http://localhost:3002/plans` no está implementada.
 
 ### Mejoras de UX
 - Todos los tests pasan (195/195) y el build es limpio en las 3 apps.
