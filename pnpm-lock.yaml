@@ -311,6 +311,31 @@ importers:
         specifier: ^5
         version: 5.9.3
 
+  packages/commerce:
+    dependencies:
+      '@repo/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: ^0.45.0
+        version: 0.45.2(@types/pg@8.20.0)(postgres@3.4.9)
+      ioredis:
+        specifier: ^5.10.1
+        version: 5.10.1
+      next:
+        specifier: ^16.0.0
+        version: 16.2.4(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      nodemailer:
+        specifier: ^8.0.5
+        version: 8.0.7
+    devDependencies:
+      '@types/nodemailer':
+        specifier: ^8.0.0
+        version: 8.0.0
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
   packages/db:
     dependencies:
       bcryptjs:

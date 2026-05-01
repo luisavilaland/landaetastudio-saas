@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@repo/commerce/*": ["../../packages/commerce/src/*"]
     }
   },
   "include": [

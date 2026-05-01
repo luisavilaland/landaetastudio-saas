@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getProducts, getProductBySlug } from "../products";
+import { getProducts, getProductBySlug } from "@repo/commerce/products";
 import * as dbModule from "@repo/db";
 
 vi.mock("@repo/db", () => ({
