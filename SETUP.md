@@ -270,3 +270,20 @@ tenant1.lvh.me:3000
 ## ActualizaciÛn
 
 ⁄ltima actualizaciÛn: 3 de mayo de 2026 ñ RefactorizaciÛn pre-Fase 5 completada. Auth consolidada en @repo/auth, lÛgica de negocio migrada a @repo/commerce, slugs normalizados.
+
+## Configuraci√≥n de MinIO (bucket de im√°genes)
+
+Despu√©s de levantar Docker con `docker compose up -d`, hay que crear el bucket de im√°genes manualmente. Sin este paso, la subida de im√°genes falla con error `NoSuchBucket`.
+
+```bash
+docker exec saas-minio mc alias set local http://localhost:9000 minioadmin minioadmin123
+docker exec saas-minio mc mb local/saas-images
+docker exec saas-minio mc anonymous set public local/saas-images
+```
+
+Verificar que qued√≥ creado:
+```bash
+docker exec saas-minio mc ls local
+```
+
+Deber√≠as ver `saas-images` en el listado.
