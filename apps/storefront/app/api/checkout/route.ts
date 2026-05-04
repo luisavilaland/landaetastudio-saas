@@ -229,6 +229,7 @@ export async function POST(request: NextRequest) {
         if (!variant) continue;
 
         await tx.insert(dbOrderItems).values({
+          tenantId: variant.tenantId,
           orderId: newOrder.id,
           productVariantId: item.variantId,
           quantity: item.quantity,

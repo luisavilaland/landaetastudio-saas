@@ -115,6 +115,7 @@ export const dbOrders = pgTable("orders", {
 
 export const dbOrderItems = pgTable("order_items", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenantId").notNull().references(() => dbTenants.id, { onDelete: "restrict" }),
   orderId: uuid("orderId").notNull().references(() => dbOrders.id, { onDelete: "cascade" }),
   productVariantId: uuid("productVariantId").notNull().references(() => dbProductVariants.id, { onDelete: "restrict" }),
   quantity: integer("quantity").notNull(),
@@ -122,6 +123,7 @@ export const dbOrderItems = pgTable("order_items", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => {
   return {
+    tenantIdIdx: index("order_items_tenant_id_idx").on(table.tenantId),
     orderIdIdx: index("order_items_order_id_idx").on(table.orderId),
     productVariantIdIdx: index("order_items_product_variant_id_idx").on(table.productVariantId),
   };
