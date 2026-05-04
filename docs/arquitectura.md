@@ -26,7 +26,7 @@ El blueprint original consideraba usar MedusaJS como librería de dominio. Duran
 
 ## Estructura de monorepo
 
-Separamos las apps en `storefront`, `admin` y `superadmin` porque cada una tiene su propio dominio de negocio y políticas de seguridad. Los paquetes compartidos (`db`, `storage` y proximamente `commerce`) evitan duplicar lógica de acceso a datos o reglas de negocio.
+Separamos las apps en `storefront`, `admin` y `superadmin` porque cada una tiene su propio dominio de negocio y políticas de seguridad. Los paquetes compartidos (`db`, `storage`, `auth`, `validation` y `commerce`) evitan duplicar lógica de acceso a datos o reglas de negocio.
 
 ## ¿Por qué validación con Zod en toda la API?
 

@@ -172,8 +172,9 @@ saas-ecommerce/
 ├── packages/
 │   ├── auth/           # NextAuth v5 para admin y superadmin
 │   ├── db/             # Schema Drizzle, migrations, client
-│   ├── commerce/        # Lógica de negocio (carrito, productos, emails, tenant, Redis)
-│   └── storage/        # MinIO client for image upload
+│   ├── commerce/       # Lógica de negocio (carrito, productos, emails, tenant, Redis)
+│   ├── storage/        # MinIO client for image upload
+│   └── validation/    # Schemas Zod compartidos
 ├── docker-compose.yml
 ├── .env.local
 ├── pnpm-workspace.yaml
@@ -234,6 +235,9 @@ saas-ecommerce/
 | POST | /api/checkout | Crear orden desde carrito |
 | POST | /api/checkout/preference | Crear preferencia de pago MP |
 | POST | /api/webhooks/mercadopago | Notificación de pago |
+| GET | /checkout/success | Página de éxito |
+| GET | /checkout/failure | Página de fallo |
+| GET | /checkout/pending | Página de pendiente |
 
 ### Admin Shipping
 
@@ -273,6 +277,7 @@ saas-ecommerce/
 | GET | /api/tenants/[id] | Obtener tenant |
 | PUT | /api/tenants/[id] | Actualizar tenant |
 | DELETE | /api/tenants/[id] | Eliminar tenant |
+| GET | /plans | Página de gestión de planes |
 
 ### Storefront Auth
 

@@ -35,6 +35,9 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 | **Página de perfil de tienda** | ✅ OK | Server Component con SEO (JSON-LD). |
 | **Responses HTTP** | ✅ OK | `NextResponse` unificado en todas las rutas. Sin `new Response()` nativa. |
 | **Tests** | ✅ OK | 225/225 pasando, 0 fallos. Build limpio en 3 apps. |
+| **Auth consolidada en @repo/auth** | ✅ OK | Código duplicado movido a paquete compartido. |
+| **Lógica de negocio en @repo/commerce** | ✅ OK | Carrito, órdenes, emails, tenant centralizados. |
+| **Normalización de slugs** | ✅ OK | `normalizeSlug()` en @repo/validation/src/utils.ts. |
 | **Row Level Security (RLS)** | ❌ Falta | Crítico. Sin RLS, un bug puede exponer datos entre tenants. |
 | **AUTH_SECRET con fallback hardcoded** | ❌ Falta | Si falta la variable, usa secret predecible. Bloquea deploy. |
 | **CSRF protection** | ❌ Falta | Desactivado por comodidad en dev. Obligatorio en prod. |
@@ -48,7 +51,9 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 Antes de comenzar la Fase 5, completar en orden:
 
 1. **Pruebas manuales:** Ejecutar el checklist `TESTING-MANUAL.md` completo (92 ítems en 5 áreas). Anotar fallos y corregirlos antes de avanzar.
-2. **Deuda técnica menor:** Consolidar auth duplicada en `@repo/auth` (admin y superadmin tienen su propio `lib/auth.ts`), normalización de slugs (acentos y mayúsculas), y refactorización de lógica duplicada hacia `@repo/commerce`.
+2. **Deuda técnica menor:** ~~Consolidar auth duplicada en `@repo/auth` (admin y superadmin tienen su propio `lib/auth.ts`)~~ ✅ Completado, ~~normalización de slugs (acentos y mayúsculas)~~ ✅ Completado, y ~~refactorización de lógica duplicada hacia `@repo/commerce`~~ ✅ Completado.  
+
+✅ Completado: auth duplicada consolidada en @repo/auth, lógica de negocio migrada a @repo/commerce, slugs normalizados con normalizeSlug().
 
 ---
 
