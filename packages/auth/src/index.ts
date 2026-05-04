@@ -5,6 +5,10 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import "@repo/auth/types";
 
+if (!process.env.AUTH_SECRET) {
+  throw new Error('AUTH_SECRET no está configurada. Ver .env.example para instrucciones.');
+}
+
 type ExpectedRole = "admin" | "superadmin";
 
 export function createAdminAuth() {
