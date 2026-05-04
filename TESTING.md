@@ -316,3 +316,10 @@ pnpm test
 - Flujo E2E de MercadoPago pendiente (bloqueado por cuenta de prueba).
 - Ver AGENTS.md para detalles de bugs funcionales y mejoras de UX pendientes.
 - Pr√≥ximo paso antes de Fase 5: corregir el √≠tem marcado como ‚ùå (Importar productos por CSV).
+
+### Fase 5 - Tareas de Seguridad Completadas ?
+- **Row Level Security (RLS)**: Implementado en todas las tablas de negocio con polÌticas 	enant_isolation. FunciÛn set_tenant_id y helper withTenantContext en @repo/db.
+- **AUTH_SECRET obligatorio**: Eliminado fallback hardcoded. ValidaciÛn al arrancar en @repo/auth lanza error si falta la variable.
+- **CSRF protection**: Manejado autom·ticamente por NextAuth v5 en producciÛn (NODE_ENV=production). Documentado en 
+ext.config.ts de las 3 apps.
+

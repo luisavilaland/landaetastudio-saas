@@ -38,9 +38,9 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 | **Auth consolidada en @repo/auth** | ✅ OK | Código duplicado movido a paquete compartido. |
 | **Lógica de negocio en @repo/commerce** | ✅ OK | Carrito, órdenes, emails, tenant centralizados. |
 | **Normalización de slugs** | ✅ OK | `normalizeSlug()` en @repo/validation/src/utils.ts. |
-| **Row Level Security (RLS)** | ❌ Falta | Crítico. Sin RLS, un bug puede exponer datos entre tenants. |
-| **AUTH_SECRET con fallback hardcoded** | ❌ Falta | Si falta la variable, usa secret predecible. Bloquea deploy. |
-| **CSRF protection** | ❌ Falta | Desactivado por comodidad en dev. Obligatorio en prod. |
+| **Row Level Security (RLS)** | ✅ OK | Implementado en tablas de negocio con políticas `tenant_isolation`. Función `set_tenant_id` y helper `withTenantContext` en `@repo/db`. |
+| **AUTH_SECRET con fallback hardcoded** | ✅ OK | Eliminado fallback hardcoded. Validación al arrancar en `@repo/auth` lanza error si falta la variable. |
+| **CSRF protection** | ✅ OK | Manejado automáticamente por NextAuth v5 en producción (NODE_ENV=production). Documentado en `next.config.ts`. |
 | **Infraestructura cloud** | ❌ Falta | Todo corre en Docker local. Hay que migrar a Neon/Upstash/R2. |
 | **Validación de env vars al arrancar** | ❌ Falta | Si falta una variable crítica, el sistema falla en silencio. |
 | **Logs estructurados** | ❌ Falta | Solo console.log. En prod necesitamos logs indexables. |
@@ -48,12 +48,17 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 
 **2. Pasos previos antes de Fase 5**
 
-Antes de comenzar la Fase 5, completar en orden:
+✅ **Completado en orden:**
 
 1. **Pruebas manuales:** Ejecutar el checklist `TESTING-MANUAL.md` completo (92 ítems en 5 áreas). Anotar fallos y corregirlos antes de avanzar.
 2. **Deuda técnica menor:** ~~Consolidar auth duplicada en `@repo/auth` (admin y superadmin tienen su propio `lib/auth.ts`)~~ ✅ Completado, ~~normalización de slugs (acentos y mayúsculas)~~ ✅ Completado, y ~~refactorización de lógica duplicada hacia `@repo/commerce`~~ ✅ Completado.  
 
 ✅ Completado: auth duplicada consolidada en @repo/auth, lógica de negocio migrada a @repo/commerce, slugs normalizados con normalizeSlug().
+
+**Tareas bloqueantes de Fase 5 completadas:**
+- ✅ **Row Level Security (RLS)** implementado en PostgreSQL
+- ✅ **AUTH_SECRET** sin fallback hardcoded, validación al arrancar
+- ✅ **CSRF protection** manejado automáticamente por NextAuth v5 en producción
 
 ---
 

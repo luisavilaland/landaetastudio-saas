@@ -11,6 +11,9 @@
 - **Carrito anónimo**: cookie `cart_session_id` + Redis; 7 días TTL. Sin autenticación requerida.
 - **Imágenes**: usar `@repo/storage` (MinIO local / R2 en prod). Siempre subir con FormData y obtener URL pública.
 - **Webhook MercadoPago**: idempotencia con `payment_id` para evitar duplicados.
+- **RLS (Row Level Security)**: activado en todas las tablas de negocio. Toda query debe ejecutarse dentro de un contexto `withTenantContext(tenantId)` que establece `app.tenant_id` para PostgreSQL.
+- **AUTH_SECRET obligatorio**: sin fallback hardcoded. La app no arranca si la variable no está configurada.
+- **CSRF protection**: manejado automáticamente por NextAuth v5 en producción. No se debe desactivar explícitamente en `next.config.ts`.
 
 ## Comandos obligatorios (Definition of Done)
 

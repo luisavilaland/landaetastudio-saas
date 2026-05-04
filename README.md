@@ -36,14 +36,15 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ Refactor de API: `NextResponse` unificado en todas las rutas
 - ✅ 225 tests (100% passing), build limpio en 3 apps
 
-## Fase 5 – Producción 🔄 (Pendiente)
+## Fase 5 – Producción 🔄 (En progreso)
 
-- RLS policies (Row Level Security)
+- ✅ **RLS policies (Row Level Security)** - Implementado en tablas de negocio
+- ✅ **AUTH_SECRET obligatorio** - Sin fallback hardcoded, validación al arrancar
+- ✅ **CSRF protection** - Manejado automáticamente por NextAuth v5 en producción
 - Validación de variables de entorno en producción
 - Logs estructurados
 - Resolver conflicto drizzle en @repo/auth
 - Normalizar slug on create/edit
-- CSRF protection
 - Authentication hardening
 
 ---
@@ -81,6 +82,11 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - **Métodos de envío:** API `GET /api/shipping` en storefront que lee `x-tenant-id` del proxy. Checkout con selector visual, cálculo dinámico de envío gratis, desglose subtotal + envío + total.
 - **Seed:** 2 métodos para tienda1 (estándar $150, express $350) + 25 tests de lógica pura.
 - **Fixes:** Bugs carrito, variantes, imágenes, validación tenant, queries N+1, logout redirects. Refactor completo de `new Response()` → `NextResponse` en 5 rutas. Tests de categorías reescritos con patrón de lógica pura.
+
+### Fase 5 - Tareas de Seguridad Completadas ✅
+- **Row Level Security (RLS)**: Implementado en todas las tablas de negocio con políticas `tenant_isolation`. Función `set_tenant_id` y helper `withTenantContext` en `@repo/db`.
+- **AUTH_SECRET obligatorio**: Eliminado fallback hardcoded. Validación al arrancar en `@repo/auth` lanza error si falta la variable.
+- **CSRF protection**: Manejado automáticamente por NextAuth v5 en producción (NODE_ENV=production). Documentado en `next.config.ts`.
 
 ## Tech Stack
 
@@ -318,9 +324,9 @@ Para recibir notificaciones de pago en desarrollo:
 
 | # | Tarea |
 | ---|-------|
-| 1 | **RLS** - Habilitar políticas de fila por tenant |
-| 2 | **AUTH_SECRET** - Validar que exista en prod, eliminar fallback |
-| 3 | **CSRF** - Habilitar en producción |
+| 1 | ✅ **RLS** - Habilitar políticas de fila por tenant |
+| 2 | ✅ **AUTH_SECRET** - Validar que exista en prod, eliminar fallback |
+| 3 | ✅ **CSRF** - Habilitar en producción |
 | 4 | **NEXTAUTH_URL** - Usar variable de entorno |
 
 ### 🟡 Media prioridad
