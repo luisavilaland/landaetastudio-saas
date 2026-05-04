@@ -34,7 +34,7 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 | **Dominio personalizado** | ✅ OK | Verificación + resolución por dominio en proxy. |
 | **Página de perfil de tienda** | ✅ OK | Server Component con SEO (JSON-LD). |
 | **Responses HTTP** | ✅ OK | `NextResponse` unificado en todas las rutas. Sin `new Response()` nativa. |
-| **Tests** | ✅ OK | 195/195 pasando, 0 fallos. Build limpio en 3 apps. |
+| **Tests** | ✅ OK | 225/225 pasando, 0 fallos. Build limpio en 3 apps. |
 | **Row Level Security (RLS)** | ❌ Falta | Crítico. Sin RLS, un bug puede exponer datos entre tenants. |
 | **AUTH_SECRET con fallback hardcoded** | ❌ Falta | Si falta la variable, usa secret predecible. Bloquea deploy. |
 | **CSRF protection** | ❌ Falta | Desactivado por comodidad en dev. Obligatorio en prod. |
@@ -375,4 +375,4 @@ Observabilidad — Antes de escalar
 
 *SaaS eCommerce — Brief Técnico Fase 5 — Abril 2026 — Confidencial*
 
-*Actualizado 30 de abril 2026: Fase 4 completada. 195/195 tests. Build limpio. `NextResponse` unificado. TESTING-MANUAL.md agregado.*
+*Actualizado 3 de mayo 2026: Fase 4 completada. 225/225 tests. Build limpio. `NextResponse` unificado. TESTING-MANUAL.md agregado.*

@@ -287,10 +287,10 @@ pnpm test
 
 | Métrica | Valor |
 |---------|-------|
-| **Total** | 216 tests |
-| **Pasando** | 195 ✅ |
+| **Total** | 225 tests |
+| **Pasando** | 225 ✅ |
 | **Fallas** | 0 ✅ |
-| **Archivos** | 23 |
+| **Archivos** | 25 |
 
 > Los 25 tests de shipping usan patrón de "lógica pura" para evitar incompatibilidad con next-auth@5.0.0-beta.31. Los tests de categorías también fueron reescritos con este patrón.
 
@@ -312,7 +312,7 @@ pnpm test
 
 - Última actualización: 30 de abril de 2026 — Pruebas manuales completadas.
 - Fase 4 completada: Dominio personalizado + Perfil de tienda + Shipping + Checkout.
-- 195 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
+- 225 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Flujo E2E de MercadoPago pendiente (bloqueado por cuenta de prueba).
 - Ver AGENTS.md para detalles de bugs funcionales y mejoras de UX pendientes.
 - Próximo paso antes de Fase 5: corregir el ítem marcado como ❌ (Importar productos por CSV).

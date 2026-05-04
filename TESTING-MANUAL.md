@@ -221,7 +221,7 @@ cd ~/landaetastudio-saas
 pnpm test
 ```
 
-- [x] 216 tests pasando
+- [x] 225 tests pasando
 - [x] 0 tests fallando
 
 ```bash

@@ -34,7 +34,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ Página de perfil de tienda pública con SEO
 - ✅ Checkout con selector visual de envío y cálculo dinámico
 - ✅ Refactor de API: `NextResponse` unificado en todas las rutas
-- ✅ 216 tests (100% passing), build limpio en 3 apps
+- ✅ 225 tests (100% passing), build limpio en 3 apps
 
 ## Fase 5 – Producción 🔄 (Pendiente)
 
@@ -357,7 +357,7 @@ Para recibir notificaciones de pago en desarrollo:
 pnpm test    # Ejecuta todos los tests (vitest)
 ```
 
-- **Total:** 216 tests (216 pasando, 0 fallos)
+- **Total:** 225 tests (225 pasando, 0 fallos)
 - Tests de shipping (25) escritos en patrón de lógica pura para compatibilidad con vitest.
 - Tests de categorías reescritos con patrón de lógica pura — ya no importan el route directamente.
 
