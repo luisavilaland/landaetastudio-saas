@@ -1,10 +1,20 @@
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "localhost",
-  port: parseInt(process.env.SMTP_PORT || "1025"),
-  secure: false,
-});
+const isResend = !!process.env.RESEND_API_KEY;
+
+let resend: Resend | undefined;
+let smtpTransporter: nodemailer.Transporter | undefined;
+
+if (isResend) {
+  resend = new Resend(process.env.RESEND_API_KEY);
+} else {
+  smtpTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "localhost",
+    port: parseInt(process.env.SMTP_PORT || "1025"),
+    secure: false,
+  });
+}
 
 export async function sendOrderConfirmationEmail(
   email: string,
@@ -12,9 +22,11 @@ export async function sendOrderConfirmationEmail(
   total: number,
   customerName: string
 ) {
-  const from = process.env.SMTP_FROM || "noreply@saas.local";
+  const from = isResend
+    ? (process.env.RESEND_FROM || "onboarding@resend.dev")
+    : (process.env.SMTP_FROM || "noreply@saas.local");
 
-  const mailOptions = {
+  const mailData = {
     from,
     to: email,
     subject: `Confirmación de tu orden ${orderId}`,
@@ -41,7 +53,11 @@ El equipo de la tienda
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    if (isResend && resend) {
+      await resend.emails.send(mailData);
+    } else if (smtpTransporter) {
+      await smtpTransporter.sendMail(mailData);
+    }
     console.log(`[Email] Confirmation sent to ${email} for order ${orderId}`);
   } catch (error) {
     console.error("[Email] Error sending confirmation:", error);
