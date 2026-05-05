@@ -60,6 +60,10 @@ El equipo de la tienda
     }
     console.log(`[Email] Confirmation sent to ${email} for order ${orderId}`);
   } catch (error) {
+    const isDev = process.env.NODE_ENV !== "production";
     console.error("[Email] Error sending confirmation:", error);
+    if (isDev) {
+      console.error("[Email] Full error details (development mode):", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    }
   }
 }

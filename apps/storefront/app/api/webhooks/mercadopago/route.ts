@@ -52,32 +52,39 @@ async function fetchPaymentDetails(paymentId: string, accessToken: string): Prom
 export async function POST(request: NextRequest) {
   try {
     const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    const isProduction = process.env.NODE_ENV === "production";
+
+    const rawBody = await request.text();
 
     if (webhookSecret) {
       const signature = request.headers.get("x-signature");
-      const requestId = request.headers.get("x-request-id");
-      if (!signature) {
+
+      if (isProduction && !signature) {
         console.warn("[Webhook MP] Missing x-signature header");
         return NextResponse.json({ error: "Missing signature" }, { status: 401 });
       }
-      
-      const dataToSign = requestId 
-        ? `${await request.text()}.${requestId}` 
-        : await request.text();
-      const expectedSignature = crypto.createHmac("sha256", webhookSecret).update(dataToSign).digest("hex");
-      
-      if (signature !== expectedSignature) {
-        console.warn("[Webhook MP] Invalid signature");
-        console.warn("[Webhook MP] Expected:", expectedSignature);
-        console.warn("[Webhook MP] Received:", signature);
-        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+
+      if (signature) {
+        const requestId = request.headers.get("x-request-id");
+        const dataToSign = requestId 
+          ? `${rawBody}.${requestId}` 
+          : rawBody;
+        const expectedSignature = crypto.createHmac("sha256", webhookSecret).update(dataToSign).digest("hex");
+        
+        if (signature !== expectedSignature) {
+          console.warn("[Webhook MP] Invalid signature");
+          console.warn("[Webhook MP] Expected:", expectedSignature);
+          console.warn("[Webhook MP] Received:", signature);
+          return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+        }
+        console.log("[Webhook MP] Signature verified");
+      } else {
+        console.log("[Webhook MP] Signature verification skipped (development mode)");
       }
-      console.log("[Webhook MP] Signature verified");
     } else {
       console.log("[Webhook MP] Signature verification disabled (no secret configured)");
     }
 
-    const rawBody = await request.text();
     const parsedBody = JSON.parse(rawBody);
     const validation = webhookSchema.safeParse(parsedBody);
 

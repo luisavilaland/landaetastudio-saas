@@ -299,12 +299,14 @@ async function seed() {
 
   await db.insert(schema.dbOrderItems).values([
     {
+      tenantId: tenant.id,
       orderId: order1.id,
       productVariantId: varianteRemeraM.id,
       quantity: 2,
       unitPrice: varianteRemeraM.price,
     },
     {
+      tenantId: tenant.id,
       orderId: order1.id,
       productVariantId: varianteJeans40.id,
       quantity: 1,
@@ -312,7 +314,7 @@ async function seed() {
     },
   ]);
 
-  // Orden 2: Pendiente de pago
+  // Orden 2: Pendiente de pago (sin paymentId para pruebas de webhook)
   const order2Total = varianteGorra.price * 1 + varianteRemeraL.price * 1;
   const [order2] = await db
     .insert(schema.dbOrders)
@@ -323,19 +325,21 @@ async function seed() {
       status: "pending_payment",
       total: order2Total,
       currency: "UYU",
-      shippingDetails: { address: "Calle Test 123", city: "Montevideo" },
-      metadata: { paymentId: "mp_test_002", paymentStatus: "pending" },
+      shippingDetails: { address: "Calle Test 123", city: "Montevideo", name: "Cliente Prueba" },
+      metadata: { paymentStatus: "pending" },
     })
     .returning();
 
   await db.insert(schema.dbOrderItems).values([
     {
+      tenantId: tenant.id,
       orderId: order2.id,
       productVariantId: varianteGorra.id,
       quantity: 1,
       unitPrice: varianteGorra.price,
     },
     {
+      tenantId: tenant.id,
       orderId: order2.id,
       productVariantId: varianteRemeraL.id,
       quantity: 1,
