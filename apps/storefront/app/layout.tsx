@@ -4,7 +4,10 @@ import Navbar from "@/components/navbar";
 import { Breadcrumbs, BreadcrumbsProvider } from "@/components/breadcrumbs";
 import { SessionProvider } from "@/components/session-provider";
 import { getCategoriesForTenant } from "@/lib/categories";
+import { validateEnv } from "@repo/validation";
 import "./globals.css";
+
+validateEnv();
 
 export const dynamic = "force-dynamic";
 

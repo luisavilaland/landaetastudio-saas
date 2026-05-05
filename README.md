@@ -41,8 +41,8 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ **RLS policies (Row Level Security)** - Implementado en tablas de negocio
 - ✅ **AUTH_SECRET obligatorio** - Sin fallback hardcoded, validación al arrancar
 - ✅ **CSRF protection** - Manejado automáticamente por NextAuth v5 en producción
-- Validación de variables de entorno en producción
-- Logs estructurados
+- ✅ **Validación de variables de entorno en producción** - Zod valida al arrancar
+- 🔄 Logs estructurados (pendiente)
 - Resolver conflicto drizzle en @repo/auth
 - Normalizar slug on create/edit
 - Authentication hardening
@@ -374,4 +374,4 @@ pnpm test    # Ejecuta todos los tests (vitest)
 
 ---
 
-**Última actualización:** 3 de mayo de 2026 – Refactorización pre-Fase 5 completada. Auth consolidada en @repo/auth, lógica de negocio migrada a @repo/commerce, slugs normalizados.
+**Última actualización:** 5 de mayo de 2026 – Fase 5 en progreso: RLS, AUTH_SECRET, CSRF, validación de variables de entorno, preparación para migración cloud. 225/225 tests. Build limpio.

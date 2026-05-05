@@ -14,6 +14,7 @@
 - **RLS (Row Level Security)**: activado en todas las tablas de negocio. Toda query debe ejecutarse dentro de un contexto `withTenantContext(tenantId)` que establece `app.tenant_id` para PostgreSQL.
 - **AUTH_SECRET obligatorio**: sin fallback hardcoded. La app no arranca si la variable no está configurada.
 - **CSRF protection**: manejado automáticamente por NextAuth v5 en producción. No se debe desactivar explícitamente en `next.config.ts`.
+- **Validación de variables de entorno**: Zod valida todas las variables críticas al iniciar la app (`packages/validation/src/env.ts`). Si falta alguna en producción, la app falla inmediatamente con un error claro.
 
 ## Comandos obligatorios (Definition of Done)
 
@@ -46,6 +47,8 @@ Si la tarea involucra migraciones: ejecutar pnpm db:generate y pnpm db:migrate y
 Si la tarea es un endpoint nuevo: agregar test de integración con los casos de éxito, error 401/403, y validación de tenant.
 
 Si la tarea incluye lógica de negocio nueva, se debe incluir al menos un test unitario o de integración.
+
+⚠️ **Validación de entorno**: verificá que las variables de entorno necesarias estén configuradas según el entorno (desarrollo o producción). En producción, la app no arrancará si falta alguna variable crítica (`packages/validation/src/env.ts`).
 
 **Prioridad única (conflicto de diseño)**
 Si hay que elegir entre rendimiento y legibilidad, gana la legibilidad (código explícito). Pero si la legibilidad se usa para justificar una consulta N+1, gana el rendimiento: usa joins o carga eager.

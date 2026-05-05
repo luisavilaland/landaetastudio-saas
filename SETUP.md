@@ -139,6 +139,34 @@ SMTP_FROM=noreply@saas.local
 MERCADOPAGO_ACCESS_TOKEN=TEST-xxxx
 ```
 
+## Validación de Variables de Entorno
+
+La aplicación valida automáticamente las variables de entorno al arrancar (`packages/validation/src/env.ts`).
+
+### Comportamiento por entorno
+
+| Entorno | Validación |
+|---------|-----------|
+| **Desarrollo** (`NODE_ENV=development`) | Valida solo las variables core (`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`, `MERCADOPAGO_ACCESS_TOKEN`). Las variables cloud son opcionales. |
+| **Producción** (`NODE_ENV=production`) | Valida core + todas las variables cloud (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `MP_WEBHOOK_SECRET`, `STOREFRONT_URL`). |
+
+### Si falta una variable
+
+La app **no arrancará** y mostrará un error claro indicando qué variable falta o es inválida:
+
+```
+❌ Invalid environment variables for PRODUCTION:
+  - RESEND_API_KEY: RESEND_API_KEY is required in production for email delivery
+  - R2_ENDPOINT: R2_ENDPOINT must be a valid URL in production
+```
+
+### Agregar nuevas variables
+
+Si agregás una variable de entorno nueva, actualizá:
+1. `packages/validation/src/env.ts` - agregala al schema correspondiente (dev o prod)
+2. `.env.example` y `.env.local.example` - agregá el placeholder
+3. `SETUP.md` - documentala si es relevante para el setup
+
 ## Desarrollo
 
 ```bash
@@ -264,7 +292,7 @@ tenant1.lvh.me:3000
 
 ## Nota
 
-Última actualización: 3 de mayo de 2026 – Refactorización pre-Fase 5 completada. Auth consolidada en @repo/auth, lógica de negocio migrada a @repo/commerce, slugs normalizados. 225/225 tests. Build limpio. Seed incluye métodos de envío.
+Última actualización: 5 de mayo de 2026 – Fase 5 en progreso: RLS, AUTH_SECRET, CSRF, validación de variables de entorno con Zod, preparación para migración cloud (R2, Resend, Upstash). Webhook y emails corregidos. 225/225 tests. Build limpio.
 
 ## Configuración de MinIO (bucket de imágenes)
 

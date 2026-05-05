@@ -41,8 +41,8 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 | **Row Level Security (RLS)** | ✅ OK | Implementado en tablas de negocio con políticas `tenant_isolation`. Función `set_tenant_id` y helper `withTenantContext` en `@repo/db`. |
 | **AUTH_SECRET con fallback hardcoded** | ✅ OK | Eliminado fallback hardcoded. Validación al arrancar en `@repo/auth` lanza error si falta la variable. |
 | **CSRF protection** | ✅ OK | Manejado automáticamente por NextAuth v5 en producción (NODE_ENV=production). Documentado en `next.config.ts`. |
-| **Infraestructura cloud** | ❌ Falta | Todo corre en Docker local. Hay que migrar a Neon/Upstash/R2. |
-| **Validación de env vars al arrancar** | ❌ Falta | Si falta una variable crítica, el sistema falla en silencio. |
+| **Infraestructura cloud** | 🔄 Parcial | Código preparado con variables condicionales (R2, Resend, Upstash). Falta configurar credenciales de producción. |
+| **Validación de env vars al arrancar** | ✅ OK | Zod valida variables críticas en `packages/validation/src/env.ts`. Falla inmediato si falta alguna en producción. |
 | **Logs estructurados** | ❌ Falta | Solo console.log. En prod necesitamos logs indexables. |
 | **Deploy en Vercel** | ❌ Falta | Ningún ambiente productivo configurado todavía. |
 
