@@ -3,6 +3,9 @@ import type { NextRequest } from 'next/server';
 import { db } from '@repo/db';
 import { dbTenants } from '@repo/db';
 import { eq } from 'drizzle-orm';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('storefront-proxy');
 
 export const config = {
   matcher: [
@@ -22,7 +25,7 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const hostname = (request.headers.get('host') ?? '').replace(/:\d+$/, '');
 
-  console.log('[Proxy] Hostname:', hostname, '| Path:', pathname);
+  logger.debug({ hostname, pathname }, 'Proxy request');
 
   let tenantSlug: string | null = null;
   let tenantId: string | null = null;
@@ -39,10 +42,10 @@ export async function proxy(request: NextRequest) {
       if (byDomain.length > 0) {
         tenantSlug = byDomain[0].slug;
         tenantId = byDomain[0].id;
-        console.log('[Proxy] Resolved by customDomain:', hostname, '->', tenantSlug);
+        logger.info({ hostname, tenantSlug, tenantId }, 'Resolved by customDomain');
       }
     } catch (e) {
-      console.error('[Proxy] Error resolving customDomain:', e);
+      logger.error({ hostname, error: e }, 'Error resolving customDomain');
     }
 
     // 2. Intentar resolver por subdominio
@@ -60,7 +63,7 @@ export async function proxy(request: NextRequest) {
           tenantId = bySlug[0].id;
         }
       } catch (e) {
-        console.error('[Proxy] Error resolving subdomain:', e);
+        logger.error({ hostname, sub, error: e }, 'Error resolving subdomain');
       }
     }
   }
@@ -75,7 +78,7 @@ export async function proxy(request: NextRequest) {
 
   // 4. Si no se resolvió ningún tenant, devolver 404
   if (!tenantSlug) {
-    console.log('[Proxy] No tenant resolved for hostname:', hostname);
+    logger.warn({ hostname }, 'No tenant resolved');
     return new NextResponse('Not Found', { status: 404 });
   }
 
@@ -104,6 +107,6 @@ export async function proxy(request: NextRequest) {
     });
   }
 
-  console.log('[Proxy] Tenant Slug:', tenantSlug, '| Session:', sessionId);
+  logger.debug({ tenantSlug, sessionId }, 'Proxy resolved');
   return response;
 }

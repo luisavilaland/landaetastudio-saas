@@ -4,6 +4,9 @@ import { auth } from "@/lib/auth";
 import { redisClient } from "@/lib/redis";
 import { desc, eq } from "drizzle-orm";
 import { createTenantSchema } from "@repo/validation";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("superadmin-tenants-api");
 
 const TENANT_CACHE_PREFIX = "tenant:slug:";
 
@@ -84,12 +87,12 @@ export async function POST(request: NextRequest) {
     try {
       await redisClient.del(`${TENANT_CACHE_PREFIX}${slug}`);
     } catch (e) {
-      console.error("[Cache] Failed to invalidate:", e);
+      logger.error({ error: e }, "[Cache] Failed to invalidate");
     }
 
     return NextResponse.json(newTenant[0], { status: 201 });
   } catch (error) {
-    console.error("Error creating tenant:", error);
+    logger.error({ error }, "Error creating tenant");
     return NextResponse.json(
       { error: "Error al crear tenant" },
       { status: 500 }

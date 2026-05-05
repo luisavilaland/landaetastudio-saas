@@ -4,6 +4,9 @@ import { auth } from "@/lib/auth";
 import { redisClient } from "@/lib/redis";
 import { eq, inArray } from "drizzle-orm";
 import { updateTenantSchema } from "@repo/validation";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("superadmin-tenant-detail-api");
 
 const TENANT_CACHE_PREFIX = "tenant:slug:";
 
@@ -120,7 +123,7 @@ export async function PUT(
       try {
         await redisClient.del(`${TENANT_CACHE_PREFIX}${slug}`);
       } catch (e) {
-        console.error("[Cache] Failed to invalidate:", e);
+        logger.error({ error: e }, "[Cache] Failed to invalidate");
       }
     }
 
@@ -133,13 +136,13 @@ export async function PUT(
           await redisClient.setex(`domain:${customDomain}`, 3600, updated[0].slug);
         }
       } catch (e) {
-        console.error("[Cache] Failed to update domain cache:", e);
+        logger.error({ error: e }, "[Cache] Failed to update domain cache");
       }
     }
 
     return jsonResponse(updated[0]);
   } catch (error) {
-    console.error("Error updating tenant:", error);
+    logger.error({ error }, "Error updating tenant");
     return errorResponse("Error al actualizar tenant", 500);
   }
 }
@@ -245,12 +248,12 @@ export async function DELETE(
     try {
       await redisClient.del(`${TENANT_CACHE_PREFIX}${oldSlug}`);
     } catch (e) {
-      console.error("[Cache] Failed to invalidate:", e);
+      logger.error({ error: e }, "[Cache] Failed to invalidate");
     }
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error("Error deleting tenant:", error);
+    logger.error({ error }, "Error deleting tenant");
     return errorResponse("Error al eliminar tenant", 500);
   }
 }

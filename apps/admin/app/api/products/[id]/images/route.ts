@@ -4,6 +4,9 @@ import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { uploadImage } from "@repo/storage";
 import { productImageSchema } from "@repo/validation";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("admin-product-images-api");
 
 type Params = Promise<{ id: string }>;
 
@@ -43,7 +46,7 @@ export async function GET(
 
     return NextResponse.json({ images });
   } catch (error) {
-    console.error("Error getting product images:", error);
+    logger.error({ error }, "Error getting product images");
     return NextResponse.json({ error: "Error al obtener imágenes" }, { status: 500 });
   }
 }
@@ -114,7 +117,7 @@ export async function POST(
 
     return NextResponse.json({ image: newImage }, { status: 201 });
   } catch (error) {
-    console.error("Error uploading product image:", error);
+    logger.error({ error }, "Error uploading product image");
     return NextResponse.json({ error: "Error al subir imagen" }, { status: 500 });
   }
 }

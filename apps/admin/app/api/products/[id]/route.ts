@@ -4,6 +4,9 @@ import { auth } from "@/lib/auth";
 import { and, eq, inArray } from "drizzle-orm";
 import { uploadImage, deleteImage } from "@repo/storage";
 import { updateProductSchema, normalizeSlug } from "@repo/validation";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("admin-products-api");
 
 type Params = Promise<{ id: string }>;
 
@@ -53,7 +56,7 @@ export async function GET(
       images,
     });
   } catch (error) {
-    console.error("Error getting product:", error);
+    logger.error({ error }, "Error getting product");
     return NextResponse.json({ error: "Error al obtener producto" }, { status: 500 });
   }
 }
@@ -136,7 +139,7 @@ export async function PUT(
     });
 
     if (!validation.success) {
-      console.error("[PUT Product] Validation error:", validation.error.issues);
+      logger.warn({ issues: validation.error.issues }, "[PUT Product] Validation error");
       return NextResponse.json(
         { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
@@ -194,7 +197,7 @@ export async function PUT(
         const ext = image.name.split(".").pop() || "png";
         newImageUrl = await uploadImage(buffer, `products/${Date.now()}-${safeSlug}.${ext}`, image.type);
       } catch (uploadError) {
-        console.error("[PUT Product] Error uploading image:", uploadError);
+        logger.error({ error: uploadError }, "[PUT Product] Error uploading image");
         return NextResponse.json({ error: "Error al subir imagen" }, { status: 500 });
       }
     } else if (removeImage && product[0].imageUrl) {
@@ -202,7 +205,7 @@ export async function PUT(
         await deleteImage(product[0].imageUrl);
         newImageUrl = null;
       } catch (deleteError) {
-        console.error("[PUT Product] Error deleting image:", deleteError);
+        logger.error({ error: deleteError }, "[PUT Product] Error deleting image");
       }
     }
 
@@ -279,7 +282,7 @@ export async function PUT(
       
       if (skuFromBody && skuFromBody !== currentVariant.sku) {
         const newSku = skuFromBody.replace(/\s+/g, "-").toLowerCase();
-        console.log(`[PUT Product] SKU changing from ${currentVariant.sku} to ${newSku}`);
+        logger.debug({ from: currentVariant.sku, to: newSku }, "[PUT Product] SKU changing");
         
         // Check if new SKU already exists for this tenant (in another variant)
         const existingSku = await db
@@ -299,9 +302,9 @@ export async function PUT(
 
         variantFields.sku = newSku;
       } else if (skuFromBody && skuFromBody === currentVariant.sku) {
-        console.log(`[PUT Product] SKU unchanged (${skuFromBody}), skipping SKU update`);
+        logger.debug({ sku: skuFromBody }, "[PUT Product] SKU unchanged, skipping update");
       } else {
-        console.log(`[PUT Product] No SKU sent, keeping current: ${currentVariant.sku}`);
+        logger.debug({ sku: currentVariant.sku }, "[PUT Product] No SKU sent, keeping current");
       }
 
       // Only add price/stock if they actually changed
@@ -318,7 +321,7 @@ export async function PUT(
       }
       } else {
         // No variant exists - INSERT (rare case)
-        console.log(`[PUT Product] No variant found for product ${id}, creating new variant`);
+        logger.debug({ productId: id }, "[PUT Product] No variant found, creating new variant");
         variantOperation = 'insert';
         
         const baseSlug = normalizedSlug ?? product[0].slug;
@@ -355,7 +358,7 @@ export async function PUT(
     await db.transaction(async (tx) => {
       // Update product
       if (Object.keys(updateProductFields).length > 1) {
-        console.log("[PUT Product] Updating product fields:", updateProductFields);
+        logger.debug({ fields: updateProductFields }, "[PUT Product] Updating product fields");
         await tx
           .update(dbProducts)
           .set(updateProductFields)
@@ -380,13 +383,13 @@ export async function PUT(
         }
       } else if (variantOperation === 'update') {
         // Update single variant fields (price, stock, etc.)
-        console.log("[PUT Product] Updating variant with fields:", variantFields);
+        logger.debug({ fields: variantFields }, "[PUT Product] Updating variant");
         await tx
           .update(dbProductVariants)
           .set(variantFields)
           .where(eq(dbProductVariants.productId, id));
       } else if (variantOperation === 'insert') {
-        console.log("[PUT Product] Inserting new variant:", variantFields);
+        logger.debug({ fields: variantFields }, "[PUT Product] Inserting new variant");
         await tx
           .insert(dbProductVariants)
           .values(variantFields as any);
@@ -410,8 +413,7 @@ export async function PUT(
       variant: variant[0] || null,
     });
   } catch (error) {
-    console.error("[PUT Product] Failed to update product:", error);
-    console.error("[PUT Product] Update fields were:", { updateProductFields, variantFields, variantOperation });
+    logger.error({ error, updateProductFields, variantFields, variantOperation }, "[PUT Product] Failed to update product");
     
     // Handle Postgres unique violation (duplicate SKU)
     if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
@@ -484,7 +486,7 @@ export async function DELETE(
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error("Error deleting product:", error);
+    logger.error({ error }, "Error deleting product");
     return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });
   }
 }

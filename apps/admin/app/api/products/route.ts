@@ -4,6 +4,9 @@ import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
 import { uploadImage } from "@repo/storage";
 import { createProductSchema, normalizeSlug } from "@repo/validation";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("admin-products-create-api");
 
 export async function GET() {
   const session = await auth();
@@ -169,7 +172,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Error creating product:", error);
+    logger.error({ error }, "Error creating product");
     return NextResponse.json(
       { error: "Error al crear producto" },
       { status: 500 }

@@ -4,6 +4,9 @@ import { redisClient } from "@/lib/redis";
 import { db, dbProducts, dbProductVariants, dbProductImages } from "@repo/db";
 import { inArray, eq } from "drizzle-orm";
 import { addCartItemSchema, updateCartItemSchema, deleteCartItemSchema } from "@repo/validation";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("cart-api");
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +151,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ cart, success: true });
   } catch (error) {
-    console.error("[Cart API] Error:", error);
+    logger.error({ error }, "Cart API error");
     return NextResponse.json(
       { error: "Error al agregar al carrito" },
       { status: 500 }
@@ -225,7 +228,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ items });
   } catch (error) {
-    console.error("[Cart API] PUT Error:", error);
+    logger.error({ error }, "Cart API PUT error");
     return NextResponse.json(
       { error: "Error al actualizar el carrito" },
       { status: 500 }
@@ -251,15 +254,15 @@ export async function DELETE(request: NextRequest) {
     try {
       body = await request.json();
     } catch (e) {
-      console.error("[Cart API] DELETE - Error parsing JSON body:", e);
+      logger.warn({ error: e }, "DELETE - Error parsing JSON body");
     }
 
-    console.log("[Cart API] DELETE - Request body:", body);
+    logger.debug({ body }, "DELETE - Request body");
 
     const validation = deleteCartItemSchema.safeParse(body);
 
     if (!validation.success) {
-       console.error("[Cart API] DELETE - Validación fallida:", validation.error.issues);
+       logger.warn({ issues: validation.error.issues }, "DELETE - Validación fallida");
       return NextResponse.json(
         { error: "Validación fallida", issues: validation.error.issues },
         { status: 400 }
@@ -300,7 +303,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ items });
   } catch (error) {
-    console.error("[Cart API] DELETE Error:", error);
+    logger.error({ error }, "Cart API DELETE error");
     return NextResponse.json(
       { error: "Error al eliminar del carrito" },
       { status: 500 }
@@ -391,7 +394,7 @@ export async function GET() {
 
     return NextResponse.json({ items: itemsWithProduct });
   } catch (error) {
-    console.error("[Cart API] Error:", error);
+    logger.error({ error }, "Cart API GET error");
     return NextResponse.json(
       { error: "Error al obtener el carrito" },
       { status: 500 }

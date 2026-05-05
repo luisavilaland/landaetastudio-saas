@@ -4,6 +4,9 @@ import { eq, sql } from "drizzle-orm";
 import { sendOrderConfirmationEmail } from "@/lib/email";
 import crypto from "crypto";
 import { webhookSchema } from "@repo/validation";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("webhook-mercadopago");
 
 type MPWebhookPayload = {
   type: string;
@@ -37,14 +40,14 @@ async function fetchPaymentDetails(paymentId: string, accessToken: string): Prom
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.error(`[Webhook MP] Failed to fetch payment ${paymentId}: ${response.status}`);
+      logger.error({ paymentId, status: response.status }, "Failed to fetch payment");
       return null;
     }
 
     return await response.json() as MPPaymentResponse;
   } catch (error: any) {
     clearTimeout(timeoutId);
-    console.error(`[Webhook MP] Error fetching payment ${paymentId}:`, error.message);
+    logger.error({ paymentId, error: error.message }, "Error fetching payment");
     return null;
   }
 }
@@ -60,7 +63,7 @@ export async function POST(request: NextRequest) {
       const signature = request.headers.get("x-signature");
 
       if (isProduction && !signature) {
-        console.warn("[Webhook MP] Missing x-signature header");
+        logger.warn("Missing x-signature header");
         return NextResponse.json({ error: "Missing signature" }, { status: 401 });
       }
 
@@ -72,53 +75,49 @@ export async function POST(request: NextRequest) {
         const expectedSignature = crypto.createHmac("sha256", webhookSecret).update(dataToSign).digest("hex");
         
         if (signature !== expectedSignature) {
-          console.warn("[Webhook MP] Invalid signature");
-          console.warn("[Webhook MP] Expected:", expectedSignature);
-          console.warn("[Webhook MP] Received:", signature);
+          logger.warn({ expected: expectedSignature, received: signature }, "Invalid signature");
           return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
         }
-        console.log("[Webhook MP] Signature verified");
+        logger.debug("Signature verified");
       } else {
-        console.log("[Webhook MP] Signature verification skipped (development mode)");
+        logger.debug("Signature verification skipped (development mode)");
       }
     } else {
-      console.log("[Webhook MP] Signature verification disabled (no secret configured)");
+      logger.debug("Signature verification disabled (no secret configured)");
     }
 
     const parsedBody = JSON.parse(rawBody);
     const validation = webhookSchema.safeParse(parsedBody);
 
     if (!validation.success) {
-      console.log("[Webhook MP] Invalid webhook payload:", validation.error.issues);
+      logger.warn({ issues: validation.error.issues }, "Invalid webhook payload");
       return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
     }
 
     const body = validation.data;
-    console.log("[Webhook MP] Received webhook:", JSON.stringify(body));
+    logger.info({ paymentId: body.data?.id }, "Received webhook");
 
     const paymentId = body.data?.id;
     if (!paymentId) {
-      console.log("[Webhook MP] No payment_id found in webhook data");
+      logger.warn("No payment_id found in webhook data");
       return NextResponse.json({ error: "No payment_id" }, { status: 400 });
     }
-
-    console.log("[Webhook MP] Payment ID:", paymentId);
 
     let paymentStatusFromSim: string | null = null;
     let mockExternalRef: string | null = null;
     if (process.env.NODE_ENV === "development" && paymentId === "123456789") {
       paymentStatusFromSim = "approved";
       mockExternalRef = request.headers.get("x-test-order-id");
-      console.log("[Webhook MP] Dev mode: simulating approved payment");
+      logger.info("Dev mode: simulating approved payment");
     } else if (process.env.NODE_ENV === "development" && paymentId === "000000") {
       paymentStatusFromSim = "rejected";
       mockExternalRef = request.headers.get("x-test-order-id");
-      console.log("[Webhook MP] Dev mode: simulating rejected payment");
+      logger.info("Dev mode: simulating rejected payment");
     }
 
     const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
     if (!accessToken) {
-      console.error("[Webhook MP] MERCADOPAGO_ACCESS_TOKEN not configured");
+      logger.error("MERCADOPAGO_ACCESS_TOKEN not configured");
       return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 
@@ -135,13 +134,12 @@ export async function POST(request: NextRequest) {
     } else {
       payment = await fetchPaymentDetails(paymentId, accessToken);
       if (!payment) {
-        console.error(`[Webhook MP] Could not fetch payment details for ${paymentId}`);
+        logger.error({ paymentId }, "Could not fetch payment details");
         return NextResponse.json({ error: "Failed to fetch payment" }, { status: 500 });
       }
     }
 
-    console.log("[Webhook MP] Payment status:", payment.status);
-    console.log("[Webhook MP] Payment status_detail:", payment.status_detail);
+    logger.info({ paymentId, status: payment.status, statusDetail: payment.status_detail }, "Payment status");
     
     let orderId: string | null = mockExternalRef || payment.external_reference;
     if (!orderId) {
@@ -149,15 +147,15 @@ export async function POST(request: NextRequest) {
     }
     
     if (!orderId) {
-      console.log("[Webhook MP] No external_reference found - not retrying");
+      logger.info({ paymentId }, "No external_reference found");
       return NextResponse.json({ received: true, message: "No external_reference found" });
     }
 
     if (mockExternalRef) {
-      console.log("[Webhook MP] Using test order ID from header:", orderId);
+      logger.debug({ orderId }, "Using test order ID from header");
     }
 
-    console.log("[Webhook MP] Order ID from external_reference:", orderId);
+    logger.debug({ orderId }, "Order ID from external_reference");
 
     const [order] = await db
       .select()
@@ -166,7 +164,7 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!order) {
-      console.log(`[Webhook MP] Order ${orderId} not found`);
+      logger.warn({ orderId }, "Order not found");
       return NextResponse.json({ received: true });
     }
 
@@ -184,14 +182,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (!newStatus) {
-      console.log(`[Webhook MP] No status update for payment status: ${payment.status}`);
+      logger.debug({ paymentId, paymentStatus: payment.status }, "No status update needed");
       return NextResponse.json({ received: true });
     }
 
     if (newStatus === "confirmed") {
       const metadata = order.metadata as { paymentId?: string } | undefined;
       if (metadata?.paymentId) {
-        console.log(`[Webhook MP] Payment ${paymentId} already processed for order ${orderId}`);
+        logger.info({ orderId, paymentId }, "Payment already processed");
         return NextResponse.json({ received: true });
       }
 
@@ -207,7 +205,7 @@ export async function POST(request: NextRequest) {
         })
         .where(eq(dbOrders.id, orderId));
 
-      console.log(`[Webhook MP] Order ${orderId} updated to ${newStatus}`);
+      logger.info({ orderId, newStatus }, "Order updated");
 
       if (order?.customerEmail && order?.total && order?.shippingDetails) {
         const shippingDetails = order.shippingDetails as { name?: string };
@@ -220,7 +218,7 @@ export async function POST(request: NextRequest) {
       }
     } else if (newStatus === "payment_failed") {
       if (order.status === "payment_failed") {
-        console.log(`[Webhook MP] Order ${orderId} already failed, skipping restoration`);
+        logger.info({ orderId }, "Order already failed, skipping restoration");
         return NextResponse.json({ received: true });
       }
 
@@ -244,7 +242,7 @@ export async function POST(request: NextRequest) {
             })
             .where(eq(dbProductVariants.id, item.productVariantId));
 
-          console.log(`[Webhook MP] Restored ${item.quantity} units to variant ${item.productVariantId}`);
+          logger.info({ orderId, productVariantId: item.productVariantId, quantity: item.quantity }, "Stock restored");
         }
       }
 
@@ -261,12 +259,12 @@ export async function POST(request: NextRequest) {
         })
         .where(eq(dbOrders.id, orderId));
 
-      console.log(`[Webhook MP] Order ${orderId} updated to ${newStatus} and stock restored`);
+      logger.info({ orderId, newStatus }, "Order updated and stock restored");
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("[Webhook MP] Error:", error);
+    logger.error({ error }, "Webhook error");
     return NextResponse.json({ received: true });
   }
 }

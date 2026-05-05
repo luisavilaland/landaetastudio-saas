@@ -3,6 +3,9 @@ import { db, dbCategories } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq, asc } from "drizzle-orm";
 import { createCategorySchema, normalizeSlug } from "@repo/validation";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("admin-categories-api");
 
 export async function GET() {
   const session = await auth();
@@ -78,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ category }, { status: 201 });
   } catch (error) {
-    console.error("Error creating category:", error);
+    logger.error({ error }, "Error creating category");
       return NextResponse.json(
         { error: "Error al crear categoría" },
         { status: 500 }

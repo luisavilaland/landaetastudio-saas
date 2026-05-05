@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, dbProducts, dbProductVariants, dbCategories } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("admin-csv-import");
 
 type CSVRow = {
   name: string;
@@ -202,7 +205,7 @@ export async function POST(request: NextRequest) {
     }, { status: 200 });
 
   } catch (error) {
-    console.error("Error importing CSV:", error);
+    logger.error({ error }, "Error importing CSV");
     return NextResponse.json(
       { error: "Error al procesar el archivo CSV" },
       { status: 500 }

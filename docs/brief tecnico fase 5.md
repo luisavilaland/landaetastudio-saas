@@ -226,7 +226,7 @@ REDIS_URL: z.string().url(),
 
 AUTH_SECRET: z.string().min(32),
 
-NEXTAUTH_URL: z.string().url(),
+NEXTAUTH_URL: z.string().url().optional(), // NextAuth v5 la infiere del Host header
 
 MP_ACCESS_TOKEN: z.string().startsWith('TEST-').or(z.string().startsWith('APP_USR-')),
 
@@ -336,7 +336,7 @@ Esta es la lista completa de variables que deben estar configuradas en cada app 
 | **DATABASE_URL** | Todas | URL de conexión a Neon PostgreSQL |
 | **REDIS_URL** | Todas | URL de Upstash Redis con token |
 | **AUTH_SECRET** | Admin, Superadmin | Secret para JWT. Generar con: openssl rand -base64 32 |
-| **NEXTAUTH_URL** | Admin, Superadmin | URL pública de cada app (diferente por app) |
+| **NEXTAUTH_URL** | Admin, Superadmin | Opcional: NextAuth v5 la infiere del Host header. Solo necesaria si usás proxy inverso. |
 | **MP_ACCESS_TOKEN** | Storefront | Access token de MercadoPago (producción: APP_USR-...) |
 | **MP_WEBHOOK_SECRET** | Storefront | Secret para validar webhooks de MercadoPago |
 | **RESEND_API_KEY** | Storefront | API key de Resend para emails transaccionales |

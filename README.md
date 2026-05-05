@@ -327,7 +327,7 @@ Para recibir notificaciones de pago en desarrollo:
 | 1 | ✅ **RLS** - Habilitar políticas de fila por tenant |
 | 2 | ✅ **AUTH_SECRET** - Validar que exista en prod, eliminar fallback |
 | 3 | ✅ **CSRF** - Habilitar en producción |
-| 4 | **NEXTAUTH_URL** - Usar variable de entorno |
+| 4 | ✅ **NEXTAUTH_URL dinámica** - Opcional; NextAuth v5 la infiere del Host header |
 
 ### 🟡 Media prioridad
 

@@ -120,7 +120,6 @@ Crear `.env.local` basado en `.env.local.example`:
 DATABASE_URL=postgresql://saas:saas123@localhost:5432/saas_ecommerce
 REDIS_URL=redis://localhost:6379
 AUTH_SECRET=<generar-con-openssl-rand-base64-32>
-NEXTAUTH_URL=http://localhost:3001
 
 # MinIO
 MINIO_ENDPOINT=localhost
@@ -147,7 +146,7 @@ La aplicación valida automáticamente las variables de entorno al arrancar (`pa
 
 | Entorno | Validación |
 |---------|-----------|
-| **Desarrollo** (`NODE_ENV=development`) | Valida solo las variables core (`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`, `MERCADOPAGO_ACCESS_TOKEN`). Las variables cloud son opcionales. |
+| **Desarrollo** (`NODE_ENV=development`) | Valida solo las variables core (`DATABASE_URL`, `AUTH_SECRET`, `MERCADOPAGO_ACCESS_TOKEN`). `NEXTAUTH_URL` es opcional (NextAuth v5 la infiere del Host header). Las variables cloud son opcionales. |
 | **Producción** (`NODE_ENV=production`) | Valida core + todas las variables cloud (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `MP_WEBHOOK_SECRET`, `STOREFRONT_URL`). |
 
 ### Si falta una variable

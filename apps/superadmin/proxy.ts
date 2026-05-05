@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("superadmin-proxy");
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
@@ -19,7 +22,7 @@ export async function proxy(request: NextRequest) {
     (process.env.SUPERADMIN_HOST && host === process.env.SUPERADMIN_HOST);
 
   if (!isAllowed) {
-    console.warn(`[Superadmin Proxy] Host no permitido: ${host}`);
+    logger.warn({ host }, "Host no permitido");
     return NextResponse.json(
       { error: "Acceso no permitido desde este dominio" },
       { status: 403 }

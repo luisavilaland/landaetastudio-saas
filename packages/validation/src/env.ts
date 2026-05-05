@@ -12,7 +12,10 @@ const coreSchema = z.object({
   AUTH_SECRET: z
     .string()
     .min(32, "AUTH_SECRET must be at least 32 characters (run: openssl rand -base64 32)"),
-  NEXTAUTH_URL: z.string().url("NEXTAUTH_URL must be a valid URL"),
+  NEXTAUTH_URL: z
+    .string()
+    .url("NEXTAUTH_URL must be a valid URL")
+    .optional(),
   MERCADOPAGO_ACCESS_TOKEN: z
     .string()
     .min(1, "MERCADOPAGO_ACCESS_TOKEN is required for checkout and webhooks"),

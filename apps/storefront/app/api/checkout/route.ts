@@ -6,6 +6,9 @@ import { auth } from "@/lib/auth";
 import { db, dbOrders, dbOrderItems, dbProductVariants, dbShippingMethods } from "@repo/db";
 import { eq, inArray, and } from "drizzle-orm";
 import { createCheckoutSchema } from "@repo/validation";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("checkout-api");
 
 type CartItem = {
   variantId: string;
@@ -248,7 +251,7 @@ export async function POST(request: NextRequest) {
       status: "pending_payment",
     });
   } catch (error) {
-    console.error("[Checkout API] Error:", error);
+    logger.error({ error }, "Checkout error");
     return NextResponse.json(
       { error: "Error al procesar la orden" },
       { status: 500 }

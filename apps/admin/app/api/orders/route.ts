@@ -3,6 +3,9 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db, dbOrders, dbCustomers } from "@repo/db";
 import { eq, and } from "drizzle-orm";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("admin-orders-api");
 
 const VALID_STATUSES = [
   "pending_payment",
@@ -61,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(ordersWithCustomer);
   } catch (error) {
-    console.error("[Orders GET] Error:", error);
+    logger.error({ error }, "[Orders GET] Error");
     return NextResponse.json({ error: "Error al obtener órdenes" }, { status: 500 });
   }
 }
