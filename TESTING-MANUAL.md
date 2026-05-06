@@ -252,6 +252,33 @@ _Checklist generado en Abril 2026 — Pre Fase 5_
 
 ---
 
+## 8. Verificación de la Fase 5 (Seguridad y Rendimiento)
+
+### Seguridad (RLS, Auth y CSRF)
+- [ ] Acceder a `tienda1.lvh.me:3001/login` → debe devolver un error 403. No debe cargar el login del admin.
+- [ ] Acceder a `localhost:3001/login` → debe cargar el panel de administración normalmente.
+- [ ] Acceder a `tienda1.lvh.me:3002/login` → debe devolver un error 403. No debe cargar el login del superadmin.
+- [ ] Acceder a `localhost:3002/login` → debe cargar el panel del superadministrador normalmente.
+- [ ] Registro de cliente con email nuevo → 201. El email de confirmación debe aparecer en MailHog.
+- [ ] Intentar crear un producto en el admin de tienda1. El producto solo debe ser visible en la tienda1 y no en otras.
+
+### Validación de Errores 409 (Conflict)
+- [ ] En el panel de administración, intentar crear un producto con un slug que ya exista. Verificar que aparece un mensaje de error junto al campo slug, no solo un mensaje genérico.
+- [ ] En el panel de superadmin, intentar crear un tenant con un slug que ya exista. Verificar el mensaje de error en el campo slug.
+- [ ] Repetir la prueba para categorías con slug duplicado.
+
+### Logs Estructurados (Pino)
+- [ ] Iniciar la aplicación en modo desarrollo (`pnpm dev`). Navegar por el storefront y el admin.
+- [ ] Verificar que en la terminal los logs aparecen con el nuevo formato (colores, timestamp legible) y no como `console.log` planos.
+- [ ] Buscar en los logs la presencia de la palabra "Proxy" para confirmar que los logs del middleware están usando el nuevo sistema.
+
+### Integración de Sentry
+- [ ] Iniciar la aplicación en modo desarrollo sin configurar `SENTRY_DSN`.
+- [ ] Verificar que la aplicación compila y arranca sin errores relacionados con Sentry.
+- [ ] En la terminal, buscar un mensaje de información que indique que Sentry no está configurado (o simplemente que no hay errores de compilación).
+
+---
+
 ## Pendientes documentados
 
 ### Importación de productos por CSV
