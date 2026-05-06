@@ -169,8 +169,11 @@ Si agregás una variable de entorno nueva, actualizá:
 ## Desarrollo
 
 ```bash
-# Levantar todas las apps
+# Levantar todas las apps (desarrollo)
 pnpm dev
+
+# Iniciar todas las apps (producción, requiere build previo)
+pnpm start
 
 # Opcional: levantar solo una app
 pnpm --filter storefront dev  # http://localhost:3000

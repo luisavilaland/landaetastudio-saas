@@ -90,7 +90,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 ### Fase 5 - Tareas de Seguridad Completadas ✅
 - **Row Level Security (RLS)**: Implementado en todas las tablas de negocio con políticas `tenant_isolation`. Función `set_tenant_id` y helper `withTenantContext` en `@repo/db`.
 - **AUTH_SECRET obligatorio**: Eliminado fallback hardcoded. Validación al arrancar en `@repo/auth` lanza error si falta la variable.
-- **CSRF protection**: Manejado automáticamente por NextAuth v5 en producción (NODE_ENV=production). Documentado en `next.config.ts`.
+- **CSRF protection**: Manejado automáticamente por NextAuth v5 en producción (NODE_ENV=production). Documentado en `next.config.mjs`.
 
 ## Tech Stack
 
@@ -196,6 +196,7 @@ saas-ecommerce/
 | Script | Descripción |
 | :--- | :--- |
 | `pnpm dev` | Levanta todas las apps en modo desarrollo |
+| `pnpm start` | Inicia todas las apps en modo producción (requiere build previo) |
 | `pnpm db:generate` | Genera migraciones desde el schema |
 | `pnpm db:migrate` | Aplica migraciones pendientes |
 | `pnpm db:seed` | Limpia la BD y crea datos de prueba |

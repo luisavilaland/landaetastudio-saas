@@ -13,7 +13,7 @@
 - **Webhook MercadoPago**: idempotencia con `payment_id` para evitar duplicados.
 - **RLS (Row Level Security)**: activado en todas las tablas de negocio. Toda query debe ejecutarse dentro de un contexto `withTenantContext(tenantId)` que establece `app.tenant_id` para PostgreSQL.
 - **AUTH_SECRET obligatorio**: sin fallback hardcoded. La app no arranca si la variable no está configurada.
-- **CSRF protection**: manejado automáticamente por NextAuth v5 en producción. No se debe desactivar explícitamente en `next.config.ts`.
+- **CSRF protection**: manejado automáticamente por NextAuth v5 en producción. No se debe desactivar explícitamente en `next.config.mjs`.
 - **Validación de variables de entorno**: Zod valida todas las variables críticas al iniciar la app (`packages/validation/src/env.ts`). Si falta alguna en producción, la app falla inmediatamente con un error claro.
 
 ## Comandos obligatorios (Definition of Done)
@@ -34,7 +34,7 @@ Si alguno de estos scripts no existe en la raíz, créalo en package.json con tu
 - build: `next build`
 - test: `vitest run`
 
-⚠️ IMPORTANTE: ignoreBuildErrors DEBE ser false en next.config.ts. El build debe fallar si hay errores de tipo. Esto es crítico para detectar regresiones en CI/CD. Nunca usar `ignoreBuildErrors: true`.
+⚠️ IMPORTANTE: ignoreBuildErrors DEBE ser false en next.config.mjs. El build debe fallar si hay errores de tipo. Esto es crítico para detectar regresiones en CI/CD. Nunca usar `ignoreBuildErrors: true`.
 
 **Ubicación de los tests:**
 - Lógica de negocio: coloca el test en una carpeta `__tests__/` junto al módulo (ej. `packages/commerce/src/__tests__/cart.test.ts`).

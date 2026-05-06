@@ -1,6 +1,6 @@
 # Checklist de Pruebas Manuales — SaaS eCommerce
 
-**Fecha:** Abril 2026 | **Versión:** 1.0 | **Estado:** Pre Fase 5
+**Fecha:** Abril 2026 | **Versión:** 2.0 | **Estado:** Fase 5 completada ✅
 
 > Ejecutar en orden. Marcar cada ítem con ✅ al verificar o ❌ si falla.
 > Credenciales: admin@tienda1.com / 123456 | super@admin.com / 123456
@@ -217,7 +217,6 @@
 ## 5. Pruebas de integración automáticas
 
 ```bash
-cd ~/landaetastudio-saas
 pnpm test
 ```
 
