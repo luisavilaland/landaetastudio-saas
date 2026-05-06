@@ -22,6 +22,7 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     slug: tenant?.slug || "",
     name: tenant?.name || "",
@@ -39,6 +40,8 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
       const url = isEdit && tenant?.id ? `/api/tenants/${tenant.id}` : "/api/tenants";
       const method = isEdit ? "PUT" : "POST";
 
+      setFieldErrors({});
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -47,6 +50,9 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
 
       if (!res.ok) {
         const data = await res.json();
+        if (res.status === 409 && data.field) {
+          setFieldErrors({ [data.field]: data.error });
+        }
         throw new Error(data.error || "Error saving tenant");
       }
 
@@ -81,10 +87,18 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
             type="text"
             required
             value={form.slug}
-            onChange={(e) => setForm({ ...form, slug: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
+            onChange={(e) => {
+              setForm({ ...form, slug: e.target.value });
+              if (fieldErrors.slug) setFieldErrors(prev => ({ ...prev, slug: "" }));
+            }}
+            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500 ${
+              fieldErrors.slug ? "border-red-500" : "border-zinc-300"
+            }`}
             placeholder="mi-tienda"
           />
+          {fieldErrors.slug && (
+            <p className="mt-1 text-sm text-red-600">{fieldErrors.slug}</p>
+          )}
         </div>
 
         <div>
@@ -96,10 +110,18 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
             type="text"
             required
             value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
+            onChange={(e) => {
+              setForm({ ...form, name: e.target.value });
+              if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: "" }));
+            }}
+            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500 ${
+              fieldErrors.name ? "border-red-500" : "border-zinc-300"
+            }`}
             placeholder="Mi Tienda"
           />
+          {fieldErrors.name && (
+            <p className="mt-1 text-sm text-red-600">{fieldErrors.name}</p>
+          )}
         </div>
 
         <div>
@@ -141,10 +163,18 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
             id="customDomain"
             type="text"
             value={form.customDomain}
-            onChange={(e) => setForm({ ...form, customDomain: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
+            onChange={(e) => {
+              setForm({ ...form, customDomain: e.target.value });
+              if (fieldErrors.customDomain) setFieldErrors(prev => ({ ...prev, customDomain: "" }));
+            }}
+            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500 ${
+              fieldErrors.customDomain ? "border-red-500" : "border-zinc-300"
+            }`}
             placeholder="mitienda.com"
           />
+          {fieldErrors.customDomain && (
+            <p className="mt-1 text-sm text-red-600">{fieldErrors.customDomain}</p>
+          )}
           <p className="mt-1 text-xs text-zinc-500">
             Ejemplo: mitienda.com (sin http://)
           </p>

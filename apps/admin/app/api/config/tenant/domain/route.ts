@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest) {
         .limit(1);
 
       if (domainExists.length > 0) {
-         return jsonResponse({ error: "El dominio ya está en uso" }, 409);
+         return jsonResponse({ error: "El dominio ya está en uso", field: "customDomain" }, 409);
       }
     }
 

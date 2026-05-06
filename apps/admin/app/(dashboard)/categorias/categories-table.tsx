@@ -19,6 +19,7 @@ export function CategoriesTable({ initialCategories }: { initialCategories: Cate
   const [formData, setFormData] = useState({ name: "", slug: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleOpenModal = (category?: Category) => {
     if (category) {
@@ -59,6 +60,7 @@ export function CategoriesTable({ initialCategories }: { initialCategories: Cate
     e.preventDefault();
     setSaving(true);
     setError("");
+    setFieldErrors({});
 
     try {
       const url = editingCategory
@@ -76,6 +78,9 @@ export function CategoriesTable({ initialCategories }: { initialCategories: Cate
       const data = await res.json();
 
       if (!res.ok) {
+        if (res.status === 409 && data.field) {
+          setFieldErrors({ [data.field]: data.error });
+        }
         setError(data.error || "Error al guardar");
         setSaving(false);
         return;
@@ -207,12 +212,18 @@ export function CategoriesTable({ initialCategories }: { initialCategories: Cate
                 <input
                   type="text"
                   value={formData.slug}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, slug: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border rounded-md"
+                  onChange={(e) => {
+                    setFormData((prev) => ({ ...prev, slug: e.target.value }));
+                    if (fieldErrors.slug) setFieldErrors(prev => ({ ...prev, slug: "" }));
+                  }}
+                  className={`w-full px-3 py-2 border rounded-md ${
+                    fieldErrors.slug ? "border-red-500" : "border-zinc-300"
+                  }`}
                   required
                 />
+                {fieldErrors.slug && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.slug}</p>
+                )}
               </div>
               {error && <p className="text-sm text-red-600">{error}</p>}
               <div className="flex justify-end gap-3 pt-2">

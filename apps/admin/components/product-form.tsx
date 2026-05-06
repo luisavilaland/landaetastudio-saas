@@ -49,6 +49,7 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState("");
   const [images, setImages] = useState<ProductImage[]>([]);
   const [imagesLoading, setImagesLoading] = useState(false);
@@ -300,6 +301,8 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
           : "/api/products";
       const method = mode === "edit" ? "PUT" : "POST";
 
+      setFieldErrors({});
+
       const formData = new FormData();
       formData.append("name", form.name);
       formData.append("slug", form.slug);
@@ -318,6 +321,10 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
 
       if (!res.ok) {
         const data = await res.json();
+        if (res.status === 409 && data.field) {
+          setFieldErrors({ [data.field]: data.error });
+          throw new Error(data.error);
+        }
         throw new Error(data.error || "Error saving product");
       }
 
@@ -403,10 +410,16 @@ const productId = savedProduct.product?.id || savedProduct.id || initialProduct?
              onChange={(e) => {
                setIsSlugManuallyEdited(true);
                setForm({ ...form, slug: e.target.value });
+               if (fieldErrors.slug) setFieldErrors(prev => ({ ...prev, slug: "" }));
              }}
-            className="mt-1 block w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
+            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500 ${
+              fieldErrors.slug ? "border-red-500" : "border-zinc-300"
+            }`}
             placeholder="mi-producto"
           />
+          {fieldErrors.slug && (
+            <p className="mt-1 text-sm text-red-600">{fieldErrors.slug}</p>
+          )}
         </div>
 
         <div>

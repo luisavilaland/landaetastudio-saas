@@ -118,7 +118,7 @@ export async function PUT(
 
       if (duplicateSlug.length > 0 && duplicateSlug[0].id !== id) {
         return NextResponse.json(
-           { error: "El slug ya existe" },
+           { error: "Ya existe una categoría con ese slug", field: "slug" },
           { status: 409 }
         );
       }

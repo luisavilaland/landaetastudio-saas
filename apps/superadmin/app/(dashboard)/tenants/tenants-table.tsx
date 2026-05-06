@@ -16,17 +16,22 @@ type Tenant = {
 export function TenantsTable({ initialTenants }: { initialTenants: Tenant[] }) {
   const router = useRouter();
   const [tenants, setTenants] = useState(initialTenants);
+  const [error, setError] = useState("");
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar este tenant?")) return;
 
     try {
+      setError("");
       const res = await fetch(`/api/tenants/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        setTenants((prev) => prev.filter((t) => t.id !== id));
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Error al eliminar tenant");
+        return;
       }
-    } catch (error) {
-      console.error("Error deleting tenant:", error);
+      setTenants((prev) => prev.filter((t) => t.id !== id));
+    } catch {
+      setError("Error de conexión al eliminar tenant");
     }
   };
 
@@ -45,6 +50,12 @@ export function TenantsTable({ initialTenants }: { initialTenants: Tenant[] }) {
           Crear Tenant
         </button>
       </div>
+
+      {error && (
+        <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
+          {error}
+        </div>
+      )}
 
       <div className="border rounded-lg overflow-hidden">
         <table className="w-full">

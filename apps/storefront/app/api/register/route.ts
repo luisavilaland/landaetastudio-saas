@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     if (existing && existing.tenantId === tenantId) {
       return NextResponse.json(
-        { error: "Email ya registrado" },
+        { error: "Email ya registrado", field: "email" },
         { status: 409 }
       );
     }

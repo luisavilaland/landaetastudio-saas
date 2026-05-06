@@ -16,8 +16,8 @@ function jsonResponse(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
 }
 
-function errorResponse(error: string, status: number) {
-  return jsonResponse({ error }, status);
+function errorResponse(error: string, status: number, field?: string) {
+  return jsonResponse({ error, ...(field && { field }) }, status);
 }
 
 export async function GET(
@@ -85,7 +85,7 @@ export async function PUT(
         .limit(1);
 
       if (slugExists.length > 0) {
-        return errorResponse("El slug ya existe", 409);
+        return errorResponse("El slug ya existe", 409, "slug");
       }
     }
 
@@ -97,7 +97,7 @@ export async function PUT(
         .limit(1);
 
       if (domainExists.length > 0) {
-        return errorResponse("El dominio personalizado ya está en uso", 409);
+        return errorResponse("El dominio personalizado ya está en uso", 409, "customDomain");
       }
     }
 

@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     
     if (existingSlug.length > 0) {
       return NextResponse.json(
-         { error: "El slug ya existe" },
+         { error: "Ya existe una categoría con ese slug", field: "slug" },
         { status: 409 }
       );
     }

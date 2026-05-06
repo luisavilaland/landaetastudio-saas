@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     if (existing.length > 0) {
       return NextResponse.json(
-        { error: "Slug ya existe" },
+        { error: "Slug ya existe", field: "slug" },
         { status: 409 }
       );
     }
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
       if (existingDomain.length > 0) {
         return NextResponse.json(
-          { error: "El dominio personalizado ya está en uso" },
+          { error: "El dominio personalizado ya está en uso", field: "customDomain" },
           { status: 409 }
         );
       }

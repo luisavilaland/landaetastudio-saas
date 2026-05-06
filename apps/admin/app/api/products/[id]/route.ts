@@ -178,7 +178,7 @@ export async function PUT(
         .limit(1);
       
       if (existingSlug.length > 0) {
-        return NextResponse.json({ error: "El slug ya existe" }, { status: 409 });
+        return NextResponse.json({ error: "Ya existe un producto con ese slug", field: "slug" }, { status: 409 });
       }
     }
 
@@ -251,7 +251,7 @@ export async function PUT(
 
           if (existingSku.length > 0) {
             return NextResponse.json(
-              { error: `El SKU generado "${newSku}" ya existe en otra variante` },
+              { error: `El SKU generado "${newSku}" ya existe en otra variante del mismo producto`, field: "sku" },
               { status: 409 }
             );
           }
@@ -297,7 +297,7 @@ export async function PUT(
           .limit(1);
 
         if (existingSku.length > 0) {
-          return NextResponse.json({ error: "El SKU ya existe en otra variante" }, { status: 409 });
+          return NextResponse.json({ error: "El SKU ya existe en otra variante", field: "sku" }, { status: 409 });
         }
 
         variantFields.sku = newSku;
@@ -340,7 +340,7 @@ export async function PUT(
         .limit(1);
 
       if (existingSku.length > 0) {
-        return NextResponse.json({ error: "El SKU ya existe" }, { status: 409 });
+        return NextResponse.json({ error: "El SKU ya existe", field: "sku" }, { status: 409 });
       }
 
       variantFields = {
@@ -417,7 +417,7 @@ export async function PUT(
     
     // Handle Postgres unique violation (duplicate SKU)
     if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
-      return NextResponse.json({ error: "El SKU ya existe en otra variante" }, { status: 409 });
+      return NextResponse.json({ error: "El SKU ya existe en otra variante", field: "sku" }, { status: 409 });
     }
     
     return NextResponse.json({ error: "Failed to update product", details: error instanceof Error ? error.message : String(error) }, { status: 500 });

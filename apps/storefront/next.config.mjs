@@ -1,16 +1,21 @@
-import { config } from 'dotenv';
-config({ path: '../../.env.local' });
-
-import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const nextConfig: NextConfig = {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, "../../.env.local") });
+
+const nextConfig = {
+  typescript: {
+    ignoreBuildErrors: false,
+  },
   allowedDevOrigins: ['lvh.me', '*.lvh.me'],
 };
 
 const sentryOptions = {
   org: process.env.SENTRY_ORG || "",
-  project: process.env.SENTRY_PROJECT || "saas-admin",
+  project: process.env.SENTRY_PROJECT || "saas-storefront",
   authToken: process.env.SENTRY_AUTH_TOKEN,
   silent: !process.env.SENTRY_AUTH_TOKEN,
   widenClientFileUpload: true,
@@ -19,7 +24,7 @@ const sentryOptions = {
   automaticVercelMonitors: true,
 };
 
-const finalConfig: NextConfig = process.env.SENTRY_DSN
+const finalConfig = process.env.SENTRY_DSN
   ? withSentryConfig(nextConfig, sentryOptions)
   : nextConfig;
 
