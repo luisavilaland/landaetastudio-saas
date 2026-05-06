@@ -80,8 +80,9 @@ export function CategoriesTable({ initialCategories }: { initialCategories: Cate
       if (!res.ok) {
         if (res.status === 409 && data.field) {
           setFieldErrors({ [data.field]: data.error });
+        } else {
+          setError(data.error || "Error al guardar");
         }
-        setError(data.error || "Error al guardar");
         setSaving(false);
         return;
       }

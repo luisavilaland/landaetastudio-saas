@@ -323,7 +323,8 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
         const data = await res.json();
         if (res.status === 409 && data.field) {
           setFieldErrors({ [data.field]: data.error });
-          throw new Error(data.error);
+          setLoading(false);
+          return;
         }
         throw new Error(data.error || "Error saving product");
       }

@@ -4,6 +4,10 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getTenantId } from "@/lib/tenant";
 import { registerSchema } from "@repo/validation";
+import { sendWelcomeEmail } from "@repo/commerce";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("register-api");
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,12 +31,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "Tienda no encontrada" },
-        { status: 400 }
-      );
-    }
 
     // Check if customer already exists for this tenant
     const [existing] = await db
@@ -48,6 +46,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get tenant name for welcome email
+    const [tenant] = await db
+      .select({ name: dbTenants.name })
+      .from(dbTenants)
+      .where(eq(dbTenants.id, tenantId))
+      .limit(1);
+
+    const storeName = tenant?.name || "la tienda";
+
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -61,6 +68,13 @@ export async function POST(request: NextRequest) {
       createdAt: now,
       updatedAt: now,
     });
+
+    // Send welcome email (non-blocking)
+    try {
+      await sendWelcomeEmail(email, name, storeName, process.env.STOREFRONT_URL);
+    } catch (error) {
+      logger.error({ email, error }, "Failed to send welcome email");
+    }
 
     return NextResponse.json(
       { success: true },

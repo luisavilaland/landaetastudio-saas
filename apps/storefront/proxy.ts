@@ -76,7 +76,13 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // 4. Si no se resolvió ningún tenant, devolver 404
+  // 4. Fallback para localhost (desarrollo): usar tenant por defecto
+  if (!tenantSlug && hostname.startsWith('localhost')) {
+    tenantSlug = 'tienda1';
+    logger.debug({ hostname, tenantSlug }, 'Using default tenant for localhost');
+  }
+
+  // 5. Si no se resolvió ningún tenant, devolver 404
   if (!tenantSlug) {
     logger.warn({ hostname }, 'No tenant resolved');
     return new NextResponse('Not Found', { status: 404 });

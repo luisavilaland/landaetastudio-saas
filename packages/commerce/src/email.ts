@@ -66,3 +66,52 @@ El equipo de la tienda
     logger.error({ email, orderId, error }, "Error sending confirmation email");
   }
 }
+
+export async function sendWelcomeEmail(
+  email: string,
+  customerName: string,
+  storeName: string,
+  storefrontUrl?: string
+) {
+  const from = isResend
+    ? (process.env.RESEND_FROM || "onboarding@resend.dev")
+    : (process.env.SMTP_FROM || "noreply@saas.local");
+
+  const homeUrl = storefrontUrl || "";
+
+  const mailData = {
+    from,
+    to: email,
+    subject: `¡Bienvenido a ${storeName}!`,
+    text: `
+Hola ${customerName},
+
+¡Gracias por registrarte en ${storeName}!
+
+Tu cuenta ha sido creada exitosamente. Ya podés explorar nuestro catálogo y realizar tus compras.
+
+${homeUrl ? `Visitanos en: ${homeUrl}` : ""}
+
+Saludos,
+El equipo de ${storeName}
+    `.trim(),
+    html: `
+<h2>¡Bienvenido a ${storeName}, ${customerName}!</h2>
+<p>Tu cuenta ha sido creada exitosamente.</p>
+<p>Ya podés explorar nuestro catálogo y realizar tus compras.</p>
+${homeUrl ? `<p><a href="${homeUrl}">Visitanos en la tienda</a></p>` : ""}
+<p>Saludos,<br>El equipo de ${storeName}</p>
+    `.trim(),
+  };
+
+  try {
+    if (isResend && resend) {
+      await resend.emails.send(mailData);
+    } else if (smtpTransporter) {
+      await smtpTransporter.sendMail(mailData);
+    }
+    logger.info({ email, storeName }, "Welcome email sent");
+  } catch (error) {
+    logger.error({ email, storeName, error }, "Error sending welcome email");
+  }
+}

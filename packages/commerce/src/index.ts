@@ -7,7 +7,7 @@ export type { ProductImage, ProductVariant, ProductWithVariants } from "./produc
 export { getProducts, getProductBySlug } from "./products";
 
 // Email
-export { sendOrderConfirmationEmail } from "./email";
+export { sendOrderConfirmationEmail, sendWelcomeEmail } from "./email";
 
 // Tenant
 export { getTenantId } from "./tenant";

@@ -11,6 +11,8 @@ if (!process.env.AUTH_SECRET) {
 
 type ExpectedRole = "admin" | "superadmin";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export function createAdminAuth() {
   return NextAuth({
     providers: [
@@ -76,6 +78,13 @@ export function createAdminAuth() {
     pages: { signIn: "/login" },
     session: { strategy: "jwt" },
     secret: process.env.AUTH_SECRET,
+    cookies: {
+      sessionToken: {
+        name: isProduction
+          ? `__Secure-authjs.session-token-admin`
+          : `authjs.session-token-admin`,
+      },
+    },
   });
 }
 
@@ -144,6 +153,13 @@ export function createSuperadminAuth() {
     pages: { signIn: "/login" },
     session: { strategy: "jwt" },
     secret: process.env.AUTH_SECRET,
+    cookies: {
+      sessionToken: {
+        name: isProduction
+          ? `__Secure-authjs.session-token-superadmin`
+          : `authjs.session-token-superadmin`,
+      },
+    },
   });
 }
 

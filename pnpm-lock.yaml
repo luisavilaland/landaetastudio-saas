@@ -184,6 +184,9 @@ importers:
 
   apps/storefront:
     dependencies:
+      '@repo/commerce':
+        specifier: workspace:*
+        version: link:../../packages/commerce
       '@repo/db':
         specifier: workspace:*
         version: link:../../packages/db

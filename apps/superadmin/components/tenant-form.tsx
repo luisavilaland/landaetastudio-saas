@@ -52,6 +52,8 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
         const data = await res.json();
         if (res.status === 409 && data.field) {
           setFieldErrors({ [data.field]: data.error });
+          setLoading(false);
+          return;
         }
         throw new Error(data.error || "Error saving tenant");
       }
