@@ -42,7 +42,9 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ **AUTH_SECRET obligatorio** - Sin fallback hardcoded, validación al arrancar
 - ✅ **CSRF protection** - Manejado automáticamente por NextAuth v5 en producción
 - ✅ **Validación de variables de entorno en producción** - Zod valida al arrancar
-- 🔄 Logs estructurados (pendiente)
+- ✅ **Logs estructurados** - Pino en @repo/logger, desarrollo con pino-pretty, producción JSON
+- ✅ **Sentry para errores en producción** - Integrado en las tres apps con DSN opcional
+- ✅ **NEXTAUTH_URL dinámica** - Opcional; NextAuth v5 la infiere del Host header
 - Resolver conflicto drizzle en @repo/auth
 - Normalizar slug on create/edit
 - Authentication hardening
@@ -374,4 +376,4 @@ pnpm test    # Ejecuta todos los tests (vitest)
 
 ---
 
-**Última actualización:** 5 de mayo de 2026 – Fase 5 en progreso: RLS, AUTH_SECRET, CSRF, validación de variables de entorno, preparación para migración cloud. 225/225 tests. Build limpio.
+**Última actualización:** 5 de mayo de 2026 – Fase 5 en progreso: RLS, AUTH_SECRET, CSRF, validación de variables de entorno, logs estructurados con Pino, Sentry integrado, NEXTAUTH_URL dinámica. 225/225 tests. Build limpio.

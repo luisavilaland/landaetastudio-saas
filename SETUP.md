@@ -278,6 +278,11 @@ pnpm build         # Build de todas las apps
 - **Lógica pura:** Los tests de endpoints no importan la ruta directamente. Mockean dependencias y exportan funciones puras que pueden ser testeada sin el runtime de Next.js.
 - **Ubicación:** `__tests__/` junto al archivo bajo test.
 
+### Herramientas adicionales
+
+- **Logs estructurados:** `@repo/logger` con `createLogger('nombre')`. En desarrollo usa `pino-pretty`; en producción JSON.
+- **Sentry:** Integrado en las tres apps para captura de errores en producción. Requiere `SENTRY_DSN` configurada.
+
 ### Tarjetas de prueba MercadoPago
 
 > Próximamente: tarjetas de prueba para simular pagos aprobados y rechazados en el entorno de desarrollo de MercadoPago.
@@ -291,7 +296,7 @@ tenant1.lvh.me:3000
 
 ## Nota
 
-Última actualización: 5 de mayo de 2026 – Fase 5 en progreso: RLS, AUTH_SECRET, CSRF, validación de variables de entorno con Zod, preparación para migración cloud (R2, Resend, Upstash). Webhook y emails corregidos. 225/225 tests. Build limpio.
+Última actualización: 5 de mayo de 2026 – Fase 5 en progreso: RLS, AUTH_SECRET, CSRF, validación de variables de entorno con Zod, logs estructurados con Pino, Sentry integrado, NEXTAUTH_URL dinámica. Webhook y emails corregidos. 225/225 tests. Build limpio.
 
 ## Configuración de MinIO (bucket de imágenes)
 

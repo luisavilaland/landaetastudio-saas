@@ -62,6 +62,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Rutas API: todas bajo app/api/, no uses pages router.
 - Componentes de React: funciones nombradas, preferir Server Components salvo interactividad.
 - Responses HTTP: usar `NextResponse` (nunca `new Response()` nativa). El helper `jsonResponse` es aceptable si envuelve `NextResponse.json`.
+- **Logs**: usar el logger de `@repo/logger` en lugar de `console.log`. Crear instancias con `createLogger('nombre-modulo')`. En desarrollo se formatea con `pino-pretty`; en producción usa JSON estándar. Incluir contexto relevante (tenantId, userId, requestId) cuando esté disponible.
 
 **Reglas automáticas (asegúrate de que ESLint y Prettier las cubran; si no, añádelas:**
 

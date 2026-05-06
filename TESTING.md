@@ -315,7 +315,7 @@ pnpm test
 - 225 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Flujo E2E de MercadoPago pendiente (bloqueado por cuenta de prueba).
 - Ver AGENTS.md para detalles de bugs funcionales y mejoras de UX pendientes.
-- **Fase 5 - Tareas completadas**: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, preparación para migración cloud ✅, corrección de flujo webhook y emails ✅.
+- **Fase 5 - Tareas completadas**: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, preparación para migración cloud ✅, corrección de flujo webhook y emails ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅.
 
 ### Fase 5 - Tareas de Seguridad Completadas ✅
 - **Row Level Security (RLS)**: Implementado en todas las tablas de negocio con políticas `tenant_isolation`. Función `set_tenant_id` y helper `withTenantContext` en `@repo/db`.

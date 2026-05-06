@@ -43,8 +43,9 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 | **CSRF protection** | ✅ OK | Manejado automáticamente por NextAuth v5 en producción (NODE_ENV=production). Documentado en `next.config.ts`. |
 | **Infraestructura cloud** | 🔄 Parcial | Código preparado con variables condicionales (R2, Resend, Upstash). Falta configurar credenciales de producción. |
 | **Validación de env vars al arrancar** | ✅ OK | Zod valida variables críticas en `packages/validation/src/env.ts`. Falla inmediato si falta alguna en producción. |
-| **Logs estructurados** | ❌ Falta | Solo console.log. En prod necesitamos logs indexables. |
+| **Logs estructurados** | ✅ OK | `@repo/logger` con `createLogger()`. Pino + pino-pretty en dev, JSON en prod. Contexto con tenantId, userId, requestId. |
 | **Deploy en Vercel** | ❌ Falta | Ningún ambiente productivo configurado todavía. |
+| **Sentry** | ✅ OK | Integrado en las tres apps con `@sentry/nextjs`. Configuración condicional vía SENTRY_DSN. |
 
 **2. Pasos previos antes de Fase 5**
 
@@ -59,6 +60,10 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 - ✅ **Row Level Security (RLS)** implementado en PostgreSQL
 - ✅ **AUTH_SECRET** sin fallback hardcoded, validación al arrancar
 - ✅ **CSRF protection** manejado automáticamente por NextAuth v5 en producción
+- ✅ **Validación de variables de entorno** con Zod en `@repo/validation`
+- ✅ **NEXTAUTH_URL dinámica** - Opcional, inferida del Host header por NextAuth v5
+- ✅ **Logs estructurados** - `@repo/logger` con Pino, `createLogger()` con contexto (tenantId, userId, requestId)
+- ✅ **Sentry** - Integrado en las tres apps con `@sentry/nextjs`, configuración condicional vía SENTRY_DSN
 
 ---
 
@@ -71,13 +76,13 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 | **5** | **Alta** | **Migración Redis local → Upstash** | **2** |
 | **6** | **Alta** | **Migración MinIO → Cloudflare R2** | **2** |
 | **7** | **Alta** | **Deploy Vercel (storefront + admin + superadmin)** | **2-3** |
-| **8** | **Alta** | **Validación de variables de entorno al arrancar (Zod)** | **3** |
-| **9** | **Alta** | **NEXTAUTH_URL dinámica por entorno** | **3** |
-| **10** | **Media** | **Logs estructurados con pino** | **3** |
-| **11** | **Media** | **Sentry para errores en producción** | **3** |
-| **12** | **Media** | **Refactorización auth duplicada → @repo/auth** | **3-4** |
-| **13** | **Media** | **Normalizar slug en create/edit de productos** | **4** |
-| **14** | **Baja** | **Refactorización hacia @repo/commerce** | **4** |
+| **8** | **Alta** | ~~Validación de variables de entorno al arrancar (Zod)~~ | **✅ Completada** |
+| **9** | **Alta** | ~~NEXTAUTH_URL dinámica por entorno~~ | **✅ Completada** |
+| **10** | **Media** | ~~Logs estructurados con pino~~ | **✅ Completada** |
+| **11** | **Media** | ~~Sentry para errores en producción~~ | **✅ Completada** |
+| **12** | **Media** | ~~Refactorización auth duplicada → @repo/auth~~ | **✅ Completada** |
+| **13** | **Media** | ~~Normalizar slug en create/edit de productos~~ | **✅ Completada** |
+| **14** | **Baja** | ~~Refactorización hacia @repo/commerce~~ | **✅ Completada** |
 | **15** | **Baja** | **Eliminar dotenv duplicado en next.config.ts** | **4** |
 
 **3. Implementación detallada — Bloqueantes**
@@ -385,4 +390,4 @@ Observabilidad — Antes de escalar
 
 *SaaS eCommerce — Brief Técnico Fase 5 — Abril 2026 — Confidencial*
 
-*Actualizado 3 de mayo 2026: Fase 4 completada. 225/225 tests. Build limpio. `NextResponse` unificado. TESTING-MANUAL.md agregado.*
+*Actualizado 5 de mayo 2026: NEXTAUTH_URL dinámica, logs estructurados con Pino, Sentry integrado.*
