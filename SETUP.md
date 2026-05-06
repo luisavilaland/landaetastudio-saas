@@ -280,8 +280,9 @@ pnpm build         # Build de todas las apps
 
 ### Herramientas adicionales
 
-- **Logs estructurados:** `@repo/logger` con `createLogger('nombre')`. En desarrollo usa `pino-pretty`; en producción JSON.
-- **Sentry:** Integrado en las tres apps para captura de errores en producción. Requiere `SENTRY_DSN` configurada.
+- **Logs estructurados:** `@repo/logger` con `createLogger('nombre')`. En desarrollo usa `pino-pretty` para logs legibles; en producción formato JSON. Incluir contexto (tenantId, userId, requestId) en cada log.
+- **Sentry:** Integrado en las tres apps (`@sentry/nextjs`) para captura automática de errores en producción. Configuración condicional vía `SENTRY_DSN`. Si la variable no está presente, Sentry no se activa.
+- **Validación de errores 409:** Todos los endpoints retornan `field` para identificar el campo conflictivo. Los formularios muestran errores inline con highlight visual rojo en el campo afectado.
 
 ### Tarjetas de prueba MercadoPago
 
@@ -296,7 +297,7 @@ tenant1.lvh.me:3000
 
 ## Nota
 
-Última actualización: 5 de mayo de 2026 – Fase 5 en progreso: RLS, AUTH_SECRET, CSRF, validación de variables de entorno con Zod, logs estructurados con Pino, Sentry integrado, NEXTAUTH_URL dinámica. Webhook y emails corregidos. 225/225 tests. Build limpio.
+Última actualización: 6 de mayo de 2026 – Fase 5 completada ✅. RLS, AUTH_SECRET, CSRF, validación de variables de entorno con Zod, logs estructurados con Pino, Sentry integrado, NEXTAUTH_URL dinámica, errores 409 con campo específico, UI de validación inline, configuración de build corregida (next.config.mjs). 225/225 tests. Build limpio.
 
 ## Configuración de MinIO (bucket de imágenes)
 

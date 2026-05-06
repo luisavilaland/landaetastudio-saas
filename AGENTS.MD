@@ -63,6 +63,8 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Componentes de React: funciones nombradas, preferir Server Components salvo interactividad.
 - Responses HTTP: usar `NextResponse` (nunca `new Response()` nativa). El helper `jsonResponse` es aceptable si envuelve `NextResponse.json`.
 - **Logs**: usar el logger de `@repo/logger` en lugar de `console.log`. Crear instancias con `createLogger('nombre-modulo')`. En desarrollo se formatea con `pino-pretty`; en producción usa JSON estándar. Incluir contexto relevante (tenantId, userId, requestId) cuando esté disponible.
+- **Sentry**: integrado en las tres apps con `@sentry/nextjs`. Configuración condicional vía `SENTRY_DSN` en `next.config.mjs`. Si la variable no está presente, Sentry no se activa.
+- **Errores 409 Conflict**: todos los endpoints que retornan 409 incluyen la propiedad `field` para identificar el campo conflictivo (ej: `{ error: "Slug ya existe", field: "slug" }`). Los formularios deben mostrar errores inline con highlight visual en el campo afectado.
 
 **Reglas automáticas (asegúrate de que ESLint y Prettier las cubran; si no, añádelas:**
 

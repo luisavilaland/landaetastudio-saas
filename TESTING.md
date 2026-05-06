@@ -310,18 +310,12 @@ pnpm test
 ---
 ## Notas
 
-- Última actualización: 5 de mayo de 2026 — Fase 5 en progreso.
-- Fase 4 completada: Dominio personalizado + Perfil de tienda + Shipping + Checkout.
+- Última actualización: 6 de mayo de 2026 — Fase 5 completada ✅.
+- Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
 - 225 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Flujo E2E de MercadoPago pendiente (bloqueado por cuenta de prueba).
-- Ver AGENTS.md para detalles de bugs funcionales y mejoras de UX pendientes.
-- **Fase 5 - Tareas completadas**: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, preparación para migración cloud ✅, corrección de flujo webhook y emails ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅.
+- Ver AGENTS.md para detalles de convenciones de código y comandos obligatorios.
 
-### Fase 5 - Tareas de Seguridad Completadas ✅
-- **Row Level Security (RLS)**: Implementado en todas las tablas de negocio con políticas `tenant_isolation`. Función `set_tenant_id` y helper `withTenantContext` en `@repo/db`.
-- **AUTH_SECRET obligatorio**: Eliminado fallback hardcoded. Validación al arrancar en `@repo/auth` lanza error si falta la variable.
-- **CSRF protection**: Manejado automáticamente por NextAuth v5 en producción (NODE_ENV=production). Documentado en `next.config.ts`.
-- **Validación de variables de entorno**: Zod valida variables críticas al arrancar (`packages/validation/src/env.ts`). Falla inmediato si falta alguna en producción.
-- **Preparación para migración cloud**: Código adaptado para R2, Resend, Upstash con fallback local. Variables condicionales según entorno.
-- **Flujo webhook y emails corregido**: Proxy excluye `/api/webhooks`, firma opcional en desarrollo, manejo de errores mejorado en `email.ts`.
+- Preparación para migración cloud: código adaptado para R2, Resend, Upstash con fallback local. Variables condicionales según entorno.
+- Flujo webhook y emails corregido: proxy excluye `/api/webhooks`, firma opcional en desarrollo, manejo de errores mejorado en `email.ts`.
 

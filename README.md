@@ -36,7 +36,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ Refactor de API: `NextResponse` unificado en todas las rutas
 - ✅ 225 tests (100% passing), build limpio en 3 apps
 
-## Fase 5 – Producción 🔄 (En progreso)
+## Fase 5 – Producción ✅ (Completada)
 
 - ✅ **RLS policies (Row Level Security)** - Implementado en tablas de negocio
 - ✅ **AUTH_SECRET obligatorio** - Sin fallback hardcoded, validación al arrancar
@@ -45,9 +45,11 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ **Logs estructurados** - Pino en @repo/logger, desarrollo con pino-pretty, producción JSON
 - ✅ **Sentry para errores en producción** - Integrado en las tres apps con DSN opcional
 - ✅ **NEXTAUTH_URL dinámica** - Opcional; NextAuth v5 la infiere del Host header
-- Resolver conflicto drizzle en @repo/auth
-- Normalizar slug on create/edit
-- Authentication hardening
+- ✅ **Resolución de conflictos drizzle en @repo/auth** - Auth consolidada en paquete compartido
+- ✅ **Normalización de slugs en create/edit** - Slugs consistentes en productos y categorías
+- ✅ **Authentication hardening** - Sin credenciales expuestas, validación estricta
+- ✅ **Mensajes de error 409 con campo específico** - UI inline con validación visual en formularios
+- ✅ **Configuración de build corregida** - next.config.mjs para compatibilidad ESM
 
 ---
 
@@ -335,16 +337,19 @@ Para recibir notificaciones de pago en desarrollo:
 
 | # | Tarea |
 | ---|-------|
-| 1 | ~~Normalizar slug en create/edit (acentos y mayúsculas)~~ ✅ Completada |
-| 2 | ~~Consolidar auth duplicada en `@repo/auth`~~ ✅ Completada |
-| 3 | ~~Refactorizar lógica de negocio duplicada a `@repo/commerce`~~ ✅ Completada |
+| 1 | ✅ **Normalizar slug en create/edit** |
+| 2 | ✅ **Consolidar auth duplicada en `@repo/auth`** |
+| 3 | ✅ **Refactorizar lógica de negocio duplicada a `@repo/commerce`** |
+| 4 | ✅ **Logs estructurados con Pino** |
+| 5 | ✅ **Sentry para errores en producción** |
+| 6 | ✅ **Mensajes de error 409 con campo específico** |
 
 ### 🟢 Baja prioridad
 
 | # | Tarea |
 | ---|-------|
-| 1 | Eliminar dotenv duplicado en `next.config.ts` |
-| 2 | Mejorar UI de errores 409 |
+| 1 | ✅ **Eliminar dotenv duplicado en `next.config.ts`** |
+| 2 | ✅ **Mejorar UI de errores 409** |
 
 ## Notas importantes
 
@@ -376,4 +381,4 @@ pnpm test    # Ejecuta todos los tests (vitest)
 
 ---
 
-**Última actualización:** 5 de mayo de 2026 – Fase 5 en progreso: RLS, AUTH_SECRET, CSRF, validación de variables de entorno, logs estructurados con Pino, Sentry integrado, NEXTAUTH_URL dinámica. 225/225 tests. Build limpio.
+**Última actualización:** 6 de mayo de 2026 – Fase 5 completada ✅. RLS, AUTH_SECRET, CSRF, validación de variables de entorno, logs estructurados con Pino, Sentry integrado, NEXTAUTH_URL dinámica, errores 409 con campo específico, UI de validación inline, configuración de build corregida (next.config.mjs). 225/225 tests. Build limpio.
