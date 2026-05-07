@@ -20,7 +20,7 @@ export async function proxy(request: NextRequest) {
   // Rechazar si el host es un subdominio de tenant (contiene punto y no está en la lista)
   const isAllowed =
     ALLOWED_HOSTS.includes(host) ||
-    (process.env.ADMIN_HOST && host === process.env.ADMIN_HOST);||
+    (process.env.ADMIN_HOST && host === process.env.ADMIN_HOST) ||
     (process.env.NODE_ENV === "production" && host.endsWith(".vercel.app") && host.includes("saas-admin"));
 
   if (!isAllowed) {
