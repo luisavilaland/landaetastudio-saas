@@ -76,11 +76,17 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // 4. Fallback para localhost (desarrollo): usar tenant por defecto
+// 4. Fallback para localhost (desarrollo): usar tenant por defecto
   if (!tenantSlug && hostname.startsWith('localhost')) {
     tenantSlug = 'tienda1';
     logger.debug({ hostname, tenantSlug }, 'Using default tenant for localhost');
   }
+
+  // 4b. Fallback para dominio de Vercel sin subdominio de tenant
+  if (!tenantSlug && process.env.DEFAULT_TENANT_SLUG) {
+    tenantSlug = process.env.DEFAULT_TENANT_SLUG;
+    logger.debug({ hostname, tenantSlug }, 'Using DEFAULT_TENANT_SLUG');
+  }  
 
   // 5. Si no se resolvió ningún tenant, devolver 404
   if (!tenantSlug) {
