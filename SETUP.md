@@ -318,3 +318,18 @@ docker exec saas-minio mc ls local
 ```
 
 Deberías ver `saas-images` en el listado.
+
+## URLs de producción (Vercel)
+
+| App | URL |
+|-----|-----|
+| Superadmin | https://landaetastudio-saas-superadmin.vercel.app |
+| Admin | https://saas-admin-sable.vercel.app |
+| Storefront | https://landaetastudio-saas-storefront.vercel.app |
+
+## Variables de entorno adicionales configuradas en Vercel
+
+- `SUPERADMIN_HOST` — dominio del superadmin en Vercel
+- `ADMIN_HOST` — dominio del admin en Vercel  
+- `DEFAULT_TENANT_SLUG` — tenant por defecto para el storefront (tienda1)
+- Todas las variables cloud: Neon, Upstash, R2, Resend, MercadoPago
