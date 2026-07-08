@@ -7,7 +7,7 @@
     "db:generate": "cd packages/db && drizzle-kit generate",
     "db:migrate": "cd packages/db && drizzle-kit up",
     "db:seed": "tsx packages/db/seed.ts",
-    "setup": "pnpm install && docker-compose up -d && pnpm db:generate && pnpm db:migrate && pnpm db:seed",
+    "setup": "pnpm install && pnpm db:generate && pnpm db:migrate && pnpm db:seed",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "build": "turbo run build",

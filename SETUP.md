@@ -4,7 +4,7 @@
 
 - Node.js 20+
 - pnpm
-- Docker Desktop (con PostgreSQL, Redis, MinIO, MailHog)
+- Cuentas activas en: Neon, Upstash, Cloudflare R2, Resend, MercadoPago
 
 ## Inicialización Rápida
 
@@ -12,8 +12,8 @@
 # 1. Instalar dependencias
 pnpm install
 
-# 2. Levantar servicios Docker
-docker-compose up -d
+# 2. Copiar .env.local.example a .env.local y llenar con credenciales reales
+cp .env.local.example .env.local
 
 # 3. Generar migraciones (si hay cambios en el schema)
 pnpm db:generate
@@ -32,44 +32,6 @@ pnpm db:seed
 | `pnpm db:generate` | Genera migraciones desde el schema |
 | `pnpm db:migrate` | Aplica migraciones pendientes |
 | `pnpm db:seed` | Limpia la BD y crea datos de prueba |
-
-## Limpiar Base de Datos Manualmente
-
-### Opción 1: Usando el seed (recomendado)
-
-```bash
-pnpm db:seed
-```
-
-El seed automáticamente:
-- Limpia todas las tablas (TRUNCATE CASCADE)
-- Crea tenant por defecto
-- Crea admins y superadmin
-- Crea productos de ejemplo
-- Crea cliente de prueba
-
-### Opción 2: Directamente en PostgreSQL
-
-```bash
-# Conectar al contenedor
-docker exec -it saas-postgres psql -U saas -d saas_ecommerce
-
-# Dentro de PSQL, ejecutar:
-TRUNCATE TABLE order_items CASCADE;
-TRUNCATE TABLE orders CASCADE;
-TRUNCATE TABLE product_variants CASCADE;
-TRUNCATE TABLE product_images CASCADE;
-TRUNCATE TABLE products CASCADE;
-TRUNCATE TABLE categories CASCADE;
-TRUNCATE TABLE customers CASCADE;
-TRUNCATE TABLE admin_users CASCADE;
-TRUNCATE TABLE tenants CASCADE;
-
--- Verificar
-SELECT count(*) FROM tenants;
-SELECT count(*) FROM products;
-SELECT count(*) FROM admin_users;
-```
 
 ## Datos de Prueba
 
@@ -114,29 +76,16 @@ SELECT count(*) FROM admin_users;
 
 ## Variables de Entorno
 
-Crear `.env.local` basado en `.env.local.example`:
+Todas las variables se configuran en `.env.local` usando servicios cloud. Ver `.env.local.example` para el listado completo.
 
-```env
-DATABASE_URL=postgresql://saas:saas123@localhost:5432/saas_ecommerce
-REDIS_URL=redis://localhost:6379
-AUTH_SECRET=<generar-con-openssl-rand-base64-32>
+Los servicios locales (Docker) ya no se usan. En su lugar:
 
-# MinIO
-MINIO_ENDPOINT=localhost
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin123
-MINIO_BUCKET=saas-media
-MINIO_USE_SSL=false
-
-# Email (MailHog)
-SMTP_HOST=localhost
-SMTP_PORT=1025
-SMTP_FROM=noreply@saas.local
-
-# MercadoPago
-MERCADOPAGO_ACCESS_TOKEN=TEST-xxxx
-```
+| Servicio Local | Reemplazo Cloud |
+|---------------|-----------------|
+| PostgreSQL (Docker) | Neon |
+| Redis (Docker) | Upstash |
+| MinIO (Docker) | Cloudflare R2 |
+| MailHog (Docker) | Resend |
 
 ## Validación de Variables de Entorno
 
@@ -236,22 +185,6 @@ curl -X POST https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago \
 
 ## Troubleshooting
 
-### PostgreSQL no conecta
-
-```bash
-# Verificar que el contenedor está corriendo
-docker ps
-
-# Reiniciar contenedor
-docker restart saas-postgres
-```
-
-### Redis no conecta
-
-```bash
-docker restart saas-redis
-```
-
 ### Error de migraciones
 
 ```bash
@@ -301,23 +234,6 @@ tenant1.lvh.me:3000
 ## Nota
 
 Última actualización: 6 de mayo de 2026 – Fase 5 completada ✅. RLS, AUTH_SECRET, CSRF, validación de variables de entorno con Zod, logs estructurados con Pino, Sentry integrado, NEXTAUTH_URL dinámica, errores 409 con campo específico, UI de validación inline, configuración de build corregida (next.config.mjs). 225/225 tests. Build limpio.
-
-## Configuración de MinIO (bucket de imágenes)
-
-Después de levantar Docker con `docker compose up -d`, hay que crear el bucket de imágenes manualmente. Sin este paso, la subida de imágenes falla con error `NoSuchBucket`.
-
-```bash
-docker exec saas-minio mc alias set local http://localhost:9000 minioadmin minioadmin123
-docker exec saas-minio mc mb local/saas-images
-docker exec saas-minio mc anonymous set public local/saas-images
-```
-
-Verificar que quedó creado:
-```bash
-docker exec saas-minio mc ls local
-```
-
-Deberías ver `saas-images` en el listado.
 
 ## URLs de producción (Vercel)
 

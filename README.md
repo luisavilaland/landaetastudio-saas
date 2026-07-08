@@ -122,13 +122,7 @@ cp .env.local.example .env.local
 pnpm install
 ```
 
-### 2. Levantar servicios Docker
-
-```bash
-docker-compose up -d
-```
-
-### 3. Configurar base de datos
+### 2. Configurar base de datos
 
 ```bash
 pnpm db:generate
