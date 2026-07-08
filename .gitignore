@@ -53,6 +53,9 @@ test-output.txt
 # ngrok (if installed)
 ngrok.yml
 
+# sentry
+.sentryclirc
+
 # Vercel
 .vercel/
 
@@ -62,3 +65,17 @@ next-env.d.ts
 
 # Certificates
 *.pem
+.vercel
+
+# coverage
+coverage/
+
+# memory local overrides
+.superpowers/memory/*.local.json
+
+# agent skills (local tooling config)
+.agents/
+skills-lock.json
+
+# vs code
+.vscode/settings.json
