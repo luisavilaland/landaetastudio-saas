@@ -126,6 +126,17 @@
   - Admin falla en Vercel: tiene `MP_WEBHOOK_SECRET` (nombre viejo), falta renombrar a `MERCADOPAGO_WEBHOOK_SECRET`.
   - Superadmin falla en Vercel: le faltan la mayoría de las env vars cloud (`MERCADOPAGO_ACCESS_TOKEN`, `RESEND_API_KEY`, `R2_*`, `STOREFRONT_URL`).
 
+## 2026-07-10 — Categories centralization
+
+- Migrada `getCategoriesForTenant` de `apps/storefront/lib/categories.ts` a `packages/commerce/src/categories.ts`
+- Creado `packages/commerce/src/__tests__/categories.test.ts` con 2 tests (TDD)
+- Actualizado `packages/commerce/src/index.ts` y `package.json` exports
+- `apps/storefront/lib/categories.ts` ahora re-exporta desde `@repo/commerce/categories`
+- Comportamiento mejorado: sin try/catch silencioso (el original devolvía [] en error)
+- test: 227/227, typecheck: 8/8, lint: ✅
+
+---
+
 ## Estado actual (10 de julio 2026)
 
 | Métrica | Valor |
