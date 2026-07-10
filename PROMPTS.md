@@ -8,50 +8,50 @@
 
 | # | Sección | Uso principal |
 |---|---------|--------------|
-| 1 | [🚀 Inicio de sesión](#1-inicio-de-sesión) | Calibración diaria, análisis de estado |
-| 2 | [🛠️ Desarrollo](#2-desarrollo-de-features) | Implementar features, corregir bugs |
-| 3 | [🔍 Revisión](#3-revisión-y-verificación) | Post-tarea, auditoría de tests |
-| 4 | [🧹 Mantenimiento](#4-mantenimiento) | Limpieza, .gitignore |
-| 5 | [📝 Commits](#5-commits) | Commit y push |
-| 6 | [📚 Documentación](#6-documentación) | Actualizar docs |
-| 7 | [🔄 Refactorización](#7-refactorización) | Refactors Seguros |
-| 8 | [⚙️ Varios](#8-varios) | Salud, dependencias, revert |
-| 9 | [📋 Cierre de Fase](#9-cierre-de-fase) | Realizar cierre formal de fase |
-| 10 | [🌱 Actualización de Seed](#10-actualización-de-seed) | Actualizar seed con datos de prueba |
+| 1 | [Calibración y análisis](#1-calibración-y-análisis) | Inicio de sesión, diagnóstico de estado |
+| 2 | [Desarrollo](#2-desarrollo) | Features, bugs, templates por tipo |
+| 3 | [Revisión y verificación](#3-revisión-y-verificación) | Post-tarea, auditoría |
+| 4 | [Mantenimiento](#4-mantenimiento) | Limpieza, .gitignore |
+| 5 | [Commits](#5-commits) | Commit y push |
+| 6 | [Documentación](#6-documentación) | Actualizar docs |
+| 7 | [Refactorización](#7-refactorización) | Refactors seguros |
+| 8 | [Varios](#8-varios) | Salud, dependencias, revert |
+| 9 | [Seed](#9-seed) | Actualizar datos de prueba |
 
 ---
 
-## 1. Inicio de Sesión
+## 1. Calibración y Análisis
 
-### 📋 Calibración Rápida (diaria)
+### Calibración Rápida (diaria)
 
 ```
 Lee AGENTS.md y confírmame que entiendes las restricciones innegociables, la Definition of Done, las herramientas del proyecto y la regla sobre comandos git. Dame un visto bueno breve.
 ```
 
-### 🔍 Análisis Completo (inicio de fase o después de mucho tiempo)
+### Análisis Completo
 
 ```
 Vas a actuar como un desarrollador senior que se reincorpora al proyecto saas-ecommerce después de un tiempo fuera. Sigue estos pasos en orden, sin modificar ningún archivo:
 
-1. Lee AGENTS.md, README.md, SETUP.md y docs/arquitectura.md.
-2. Ejecuta `pnpm lint`, `pnpm typecheck`, `pnpm build` y `pnpm test` para verificar el estado actual.
-3. Explora la estructura de apps/ y packages/ para detectar cambios desde tu última visita.
-4. Dame un resumen de:
-   - Estado de los comandos obligatorios (¿pasan todos?).
-   - Estado del roadmap (fases completadas y pendientes).
-   - Cualquier discrepancia entre documentación y código real.
-   - Sugerencias de deuda técnica visible.
+1. Lee AGENTS.md, README.md y SETUP.md.
+2. Ejecuta `pnpm lint`, `pnpm typecheck`, `pnpm build` y `pnpm test`.
+3. Explora la estructura de apps/ y packages/ para detectar cambios.
+
+Al final del reporte, pregúntame qué modalidad de trabajo deseo hoy:
+1. Desarrollo interactivo — TDD + validación por paso
+2. Code review — Revisión multi-dimensión del diff actual
+3. Verificación post-tarea — DoD + smoke test
+4. Commit y push — git status + mensaje Conventional Commits
 ```
 
 ---
 
-## 2. Desarrollo de Features
+## 2. Desarrollo
 
-### 🐱 Inicio de Feature
+### Inicio de Feature
 
 ```
-Vas a implementar la siguiente feature: [DESCRIPCIÓN BREVE].
+Vas a implementar la siguiente feature: [DESCRIPCIÓN].
 
 Antes de escribir código:
 1. Confirma que entiendes el alcance.
@@ -59,54 +59,189 @@ Antes de escribir código:
 3. Señala posibles riesgos o conflictos con la arquitectura existente.
 
 Durante la implementación:
-- Respeta todas las restricciones del AGENTS.md.
-- Aplica la Definition of Done al finalizar (pnpm lint, typecheck, build, test).
-- Si la feature incluye endpoints nuevos o lógica de negocio, añade los tests correspondientes.
+- Respeta AGENTS.md (tenantId en toda query, precios en centavos, validación Zod).
+- Aplica la DoD al finalizar (pnpm lint, typecheck, build, test).
+- Si incluye endpoints nuevos o lógica de negocio, añade tests.
 - No ejecutes comandos git sin mi permiso explícito.
 
 Al terminar:
-- Muéstrame un resumen de lo hecho.
-- Confirma que todos los comandos de la DoD pasan.
-- Indica si algún documento necesita actualizarse según la sección de mantenimiento del AGENTS.md.
+- Resumen de lo hecho.
+- Confirma que la DoD pasa.
+- Indica si algún documento necesita actualizarse.
 ```
 
-### 🐛 Corrección de Bug
+### Corrección de Bug
 
 ```
-Hay un bug en [ARCHIVO/FUNCIONALIDAD]. El comportamiento esperado es [ESPERADO], pero ocurre [REAL].
+Hay un bug en [ARCHIVO/FUNCIONALIDAD]. Comportamiento esperado: [ESPERADO]. Comportamiento real: [REAL].
 
 Antes de corregir:
 1. Reproduce mentalmente el bug y explícame la causa raíz.
 2. Propón una solución sin implementarla todavía.
-3. Si es posible, escribe primero un test que falle reproduciendo el bug.
+3. Si es posible, escribe primero un test que falle.
 
-Tras mi visto bueno, implementa la solución y verifica que el test pasa y que no introduces regresiones.
+Tras mi visto bueno, implementa y verifica que no introduces regresiones.
+```
+
+### Templates Base por Tipo de Tarea
+
+#### API Route
+
+```
+Crea API Route en app/api/[ruta]/route.ts para [función].
+
+- Método HTTP explícito (GET/POST/PUT/DELETE)
+- Auth check con NextAuth si modifica datos
+- Filtrar por tenantId en toda query
+- Validación Zod de entrada
+- Respuesta: NextResponse.json({ data?, error }, { status })
+- Logger con @repo/logger
+```
+
+```
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
+import { db } from '@repo/db'
+import { withTenantContext } from '@repo/db'
+import { createLogger } from '@repo/logger'
+import { schema } from './schema'
+
+const logger = createLogger('ruta')
+
+export async function POST(request: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
+  const body = await request.json()
+  const parsed = schema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0].message, field: parsed.error.issues[0].path[0] }, { status: 400 })
+  }
+
+  const ctx = withTenantContext(session.user.tenantId)
+  const [result] = await db.with(ctx).insert(tabla).values(parsed.data).returning()
+
+  logger.info({ tenantId: session.user.tenantId, id: result.id }, 'recurso creado')
+  return NextResponse.json({ data: result }, { status: 201 })
+}
+```
+
+#### Client Component
+
+```
+Crea componente en [ruta]/components/[nombre].tsx.
+
+- 'use client' solo si necesita estado o efectos
+- Props tipadas con interface
+- TailwindCSS responsive
+- Textos en español
+- Estados: loading, empty, error, success
+```
+
+```
+'use client'
+
+interface ComponentProps {
+  items: Item[]
+  onSelect?: (item: Item) => void
+}
+
+export function ComponentName({ items, onSelect }: ComponentProps) {
+  if (items.length === 0) {
+    return <p className="text-muted-foreground">Sin resultados</p>
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {items.map((item) => (
+        <div key={item.id} onClick={() => onSelect?.(item)} className="..." />
+      ))}
+    </div>
+  )
+}
+```
+
+#### Server Component (RSC)
+
+```
+Crea página en app/[ruta]/page.tsx.
+
+- async function, consulta datos directamente
+- export const metadata para SEO
+- NotFound si datos no existen
+- Manejo de errores via error.tsx
+```
+
+```
+import { db } from '@repo/db'
+import { withTenantContext } from '@repo/db'
+import { notFound } from 'next/navigation'
+import { auth } from '@/lib/auth'
+import { Component } from '@/components/component'
+
+export const metadata = { title: 'Título', description: 'Descripción' }
+
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const session = await auth()
+  if (!session?.user?.tenantId) notFound()
+
+  const ctx = withTenantContext(session.user.tenantId)
+  const [data] = await db.with(ctx).select().from(tabla).where(eq(tabla.id, id)).limit(1)
+  if (!data) notFound()
+
+  return <Component item={data} />
+}
+```
+
+#### Zod Schema
+
+```
+Crea schema en [ruta]/schemas.ts.
+
+- Mensajes de error en español
+- Validaciones específicas del dominio
+- Re-exportar tipos inferidos
+```
+
+```
+import { z } from 'zod'
+
+export const productSchema = z.object({
+  name: z.string().min(2, 'Mínimo 2 caracteres').max(200, 'Máximo 200 caracteres'),
+  price: z.number().int().positive('El precio debe ser un entero positivo (centavos)'),
+  stock: z.number().int().min(0, 'El stock no puede ser negativo'),
+})
+
+export type ProductInput = z.infer<typeof productSchema>
 ```
 
 ---
 
 ## 3. Revisión y Verificación
 
-### ✅ Verificación Post-Tarea
+### Verificación Post-Tarea
 
 ```
-Revisa todos los cambios realizados en esta sesión. Para cada archivo modificado, indica:
-- Si respeta las restricciones del AGENTS.md.
-- Si la lógica nueva tiene tests asociados.
-- Si hay código duplicado, imports no usados o comentarios innecesarios.
+Revisa todos los cambios realizados en esta sesión:
+- ¿Respetan AGENTS.md (tenantId, precios en centavos, validación Zod, imports)?
+- ¿La lógica nueva tiene tests asociados?
+- ¿Hay código duplicado, imports no usados, any o console.log?
 
-Ejecuta `pnpm lint`, `pnpm typecheck`, `pnpm build` y `pnpm test`. Si algo falla, corrígelo antes de pedir confirmación.
+Ejecuta pnpm lint, pnpm typecheck, pnpm build y pnpm test. Si algo falla, corrígelo.
 
-Sugiere si algún documento (README.md, SETUP.md, AGENTS.md, docs/arquitectura.md, .gitignore) debería actualizarse.
+Sugiere si algún documento debería actualizarse.
 ```
 
-### 📊 Auditoría de Tests
+### Auditoría de Tests
 
 ```
-Audita la cobertura de tests actual. Para cada app y paquete, indícame:
+Audita la cobertura de tests actual. Para cada app y paquete:
 - Cuántos tests hay.
 - Qué funcionalidades críticas no tienen tests.
-- Si hay tests redundantes o inestables.
+- Tests redundantes o inestables.
 
 No modifiques nada, solo preséntame el informe.
 ```
@@ -115,279 +250,139 @@ No modifiques nada, solo preséntame el informe.
 
 ## 4. Mantenimiento
 
-### 🧹 Limpieza de Archivos Sobrantes
+### Limpieza de Archivos Sobrantes
 
 ```
-Actúa como mantenedor del repositorio. Necesito que hagas una auditoría completa de archivos sobrantes o redundantes. No borres nada todavía, solo muéstrame una lista agrupada por categorías.
+Actúa como mantenedor del repositorio. Audita archivos sobrantes o redundantes. No borres nada, solo muéstrame una lista agrupada:
 
-Realiza las siguientes búsquedas:
-
-1. **Archivos .gitignore duplicados o innecesarios**
-   - Busca todos los archivos `.gitignore` que no estén en la raíz del proyecto.
-   - Si alguno contiene reglas que ya están en el `.gitignore` raíz, márcalos como redundantes.
-   - Si alguno contiene reglas específicas que no están en el raíz, muéstramelas para decidir si migrarlas.
-
-2. **Archivos de entorno duplicados**
-   - Busca `.env.local`, `.env.example`, `.env.local.example`, `.env` fuera de la raíz.
-
-3. **Boilerplate no usado**
-   - Busca en `apps/` archivos como `vercel.svg`, `next.svg`, `favicon.ico`, `globals.css` vacíos, `page.module.css` no referenciados.
-
-4. **Archivos temporales y artefactos**
-   - Busca carpetas como `.turbo/`, `coverage/`, `test-results/`, `.next/`, `dist/` que estén fuera de `.gitignore`.
-   - Verifica si el `.gitignore` raíz ya las ignora; si no, indícalo.
-
-5. **Archivos de sistema**
-   - Busca `.DS_Store`, `Thumbs.db`.
-
-6. **READMEs sobrantes**
-   - Confirma que no quedan `README.md` en `apps/` o `packages/` fuera del raíz.
-   - Busca también `AGENTS.md` y `CLAUDE.md` residuales.
-
-Al terminar, preséntame un resumen con las categorías y los archivos encontrados. Para cada uno, sugiere la acción. Después de tu informe, yo te daré la orden de eliminación si procede.
+1. .gitignore duplicados fuera de la raíz.
+2. Archivos de entorno duplicados (.env, .env.local, .env.example).
+3. Boilerplate no usado (vercel.svg, next.svg, page.module.css no referenciados).
+4. Artefactos no ignorados (.turbo/, coverage/, .next/ fuera de .gitignore).
+5. README.md residuales en apps/ o packages/.
 ```
 
-### 📝 Actualización de .gitignore
+### Actualización de .gitignore
 
 ```
-Revisa los artefactos generados en esta sesión (carpetas de build, cobertura, temporales). Si alguno no está en el .gitignore raíz, añádelo sin preguntar. Si tienes dudas sobre si algo debe ignorarse, consúltame.
+Revisa artefactos generados en esta sesión. Si alguno no está en .gitignore, añádelo.
 ```
 
 ---
 
 ## 5. Commits
 
-### 📦 Commit y Push (genérico)
+### Commit y Push
 
 ```
-Autorizo explícitamente comandos git en esta tarea.
+Autorizo explícitamente comandos git.
 
-Vas a hacer commit de todos los cambios realizados en esta sesión.
+Haz commit de todos los cambios realizados en esta sesión.
 
 Antes del commit:
-- Revisa los archivos modificados, añadidos y eliminados con `git status`.
-- Resume en una lista los cambios principales.
-- Si hay archivos que no deban subirse, verifica que estén en .gitignore o sugiéreme excluirlos.
+- git status. Resumen de cambios.
+- Verifica que archivos no deseados estén en .gitignore.
 
-Después, redacta un mensaje de commit en formato conventional commits:
+Mensaje en formato Conventional Commits en español:
+<tipo>: <resumen breve>
 
-<tipo>: <resumen breve en español o inglés>
+Cuerpo con viñetas de cambios principales.
 
-Incluye en el cuerpo del mensaje los cambios principales en viñetas.
-
-Finalmente, haz push a la rama actual.
+Push a la rama actual.
 ```
 
-### ⚡ Commit y Push (ultra corto)
+### Commit y Push (rápido)
 
 ```
-Autorizo comandos git. Haz commit de todos los cambios con un mensaje descriptivo en formato conventional commits y haz push a la rama actual.
+Autorizo comandos git. Haz commit con mensaje Conventional Commits en español y push.
 ```
 
 ---
 
 ## 6. Documentación
 
-### 📖 Actualización de Documentación
+### Actualización de Documentación
 
 ```
-Revisa los cambios realizados en esta sesión. Según la sección de mantenimiento del AGENTS.md, indica para cada archivo de documentación si necesita actualizarse:
+Revisa los cambios realizados. Indica para cada archivo si necesita actualizarse:
 
-- AGENTS.md: ¿hay nuevas restricciones, comandos o convenciones que no estén documentadas?
+- AGENTS.md: ¿nuevas restricciones, comandos o convenciones no documentadas?
 - README.md: ¿cambió el roadmap, endpoints, setup o stack?
-- SETUP.md: ¿cambió el proceso de setup, troubleshooting o datos de prueba?
-- docs/arquitectura.md: ¿se introdujo o modificó alguna decisión de diseño?
-- .gitignore: ¿se generaron nuevos artefactos que deban ignorarse?
+- SETUP.md: ¿cambió el setup, troubleshooting o datos de prueba?
+- docs/arquitectura.md: ¿nuevas decisiones de diseño?
+- .gitignore: ¿nuevos artefactos que ignorar?
 
-Para cada archivo que necesite cambios, muéstrame la modificación propuesta. No la apliques sin mi confirmación (salvo AGENTS.md si el cambio es evidente).
+Muéstrame la modificación propuesta. No la apliques sin confirmación.
 ```
 
 ---
 
 ## 7. Refactorización
 
-### 🔄 Refactor Seguro
+### Refactor Seguro
 
 ```
 Voy a pedirte un refactor. Antes de empezar:
 
-1. Identifica el código a refactorizar y explícame el riesgo.
-2. Confirma que hay tests que cubren esa funcionalidad. Si no los hay, propón escribirlos primero.
-3. Tras mi visto bueno, realiza el refactor en pasos pequeños.
-4. Después de cada paso, ejecuta los tests para verificar que nada se rompe.
-5. Al terminar, ejecuta la DoD completa.
+1. Identifica el código y explícame el riesgo.
+2. Confirma que hay tests que cubren esa funcionalidad. Si no, propón escribirlos primero.
+3. Tras mi visto bueno, refactoriza en pasos pequeños.
+4. Después de cada paso, ejecuta tests para verificar.
+5. Al terminar, DoD completa.
 ```
 
 ---
 
 ## 8. Varios
 
-### 🏥 Verificar Salud del Proyecto
+### Verificar Salud del Proyecto
 
 ```
-Haz un chequeo rápido de salud del proyecto:
-
-1. Ejecuta `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test`.
-2. Revisa que los tres servicios Docker estén levantados.
-3. Verifica que no hay dependencias obsoletas críticas.
-4. Confirma que la estructura de archivos coincide con el AGENTS.md.
-5. Dame un parte breve: todo OK o qué falla.
+Chequeo rápido:
+1. Ejecuta pnpm lint, pnpm typecheck, pnpm build, pnpm test.
+2. Verifica que no hay dependencias obsoletas críticas.
+3. Confirma que la estructura coincide con AGENTS.md.
+4. Dame un parte breve.
 ```
 
-### 📦 Actualizar Dependencias
+### Actualizar Dependencias
 
 ```
-Revisa las dependencias del proyecto (pnpm outdated) y muéstrame:
-- Qué paquetes tienen actualizaciones disponibles.
-- Cuáles son parches seguros (aplicables sin riesgo).
-- Cuáles son cambios mayores que podrían romper algo.
-
-No actualices nada sin mi confirmación.
+Revisa dependencias (pnpm outdated) y muéstrame:
+- Parches seguros (aplicables sin riesgo).
+- Cambios mayores que podrían romper algo.
+No actualices nada sin confirmación.
 ```
 
-### ↩️ Revertir Cambios
+### Revertir Cambios
 
 ```
-Quiero revertir todos los cambios hechos en esta sesión y volver al último commit. Muéstrame qué archivos se descartarían antes de ejecutar nada.
+Quiero revertir todos los cambios de esta sesión al último commit. Muéstrame qué se descartaría antes de ejecutar.
 ```
 
 ---
 
-## 9. Cierre de Fase
+## 9. Seed
 
-### 📋 Cierre de Fase
-
-```
-Vas a realizar el cierre formal de la [FASE X] del proyecto saas-ecommerce.
-
-Autorizo explícitamente comandos git en este cierre (commit, push, delete branch).
-
-Paso 1 - Sincronización y limpieza de ramas
-Cambia a main: git switch main
-
-Asegúrate de que main está actualizada: git pull origin main
-
-Elimina la rama local: git branch -d fase-[X]
-
-Elimina la rama remota: git push origin --delete fase-[X]
-
-Paso 2 - Actualización de documentación
-Revisa y actualiza si es necesario:
-
-README.md: marca la fase como completada (✅) en el roadmap. Verifica que no haya secciones duplicadas. Añade nuevos endpoints a las tablas correspondientes. Actualiza la fecha de "Última actualización".
-
-SETUP.md: actualiza datos de prueba, nuevas variables de entorno, pasos de setup si cambiaron.
-
-AGENTS.md: añade nuevas restricciones, comandos o convenciones descubiertas durante la fase. Corrige erratas visibles (caracteres extraños, errores de formato).
-
-docs/arquitectura.md: documenta nuevas decisiones de diseño (nuevas tablas, elección de tecnologías, patrones usados).
-
-.gitignore: verifica que nuevos artefactos estén ignorados.
-
-Paso 3 - Crear o actualizar TESTING.md
-Si no existe, créalo. Si existe, actualízalo.
-
-Checklist de pruebas agrupado por fase con ✅ (verificado), ⬜ (pendiente).
-
-Sección "Problemas Conocidos": tests que fallan, causa documentada, solución propuesta si se conoce, impacto (si bloquea o no).
-
-Incluir pruebas manuales realizadas (flujo E2E, UX, etc.).
-
-Paso 4 - Verificación DoD
-Ejecuta y reporta el estado de cada comando:
-
-pnpm lint
-
-pnpm typecheck
-
-pnpm build
-
-pnpm test
-
-Si algún comando falla, documéntalo en TESTING.md.
-
-Paso 5 - Commit y push
-Haz commits atómicos si los cambios son de distinta naturaleza:
-
-feat: actualizar seed con datos de prueba Fase [X] (si aplica)
-
-docs: cierre de fase [X] y actualización de documentación
-
-fix: correcciones varias de la fase [X] (si aplica)
-
-Haz push a main.
-
-Paso 6 - Resumen final
-Al terminar, preséntame un resumen con:
-
-Estado de la DoD (✅/⚠️/❌ para cada comando)
-
-Lista de archivos modificados
-
-Rama eliminada (local y remota)
-
-Problemas conocidos documentados
-```
-
----
-
-## 10. Actualización de Seed
-
-### 🌱 Actualización de Seed
+### Actualización de Seed
 
 ```
-Actualizá el script de seed de la base de datos para reflejar todas las funcionalidades implementadas hasta la Fase [X].
+Actualizá el seed de la base de datos para reflejar las funcionalidades hasta [FASE/DESCRIPCIÓN].
 
-Reglas del AGENTS.md que aplican:
+Reglas que aplican:
+- Precios en centavos (integer).
+- Fechas en UTC.
+- Multi-tenant: todo dato de negocio con tenantId.
+- Migraciones inmutables: no modifiques migraciones existentes.
 
-Precios siempre en centavos (integer).
+Tareas:
+1. Leer el seed actual (packages/db/seed.ts).
+2. Identificar tablas nuevas y agregar datos de prueba.
+3. Actualizar limpieza inicial (TRUNCATE) incluyendo nuevas tablas.
+4. Insertar: tenants, usuarios, categorías, productos con variantes, imágenes, órdenes.
+5. Verificar coherencia: precios en centavos, SKU basado en slug, totales correctos.
+6. Ejecutar pnpm db:seed debe terminar sin errores.
+7. DoD al finalizar.
 
-Fechas en UTC.
-
-Multi-tenant: todos los datos de negocio deben tener tenantId.
-
-Migraciones inmutables: no modifiques migraciones existentes.
-
-Al finalizar, ejecutá pnpm lint, pnpm typecheck, pnpm build y pnpm test.
-
-No ejecutes comandos git sin mi permiso.
-
-Tareas
-Leer el seed actual: localizá el archivo de seed (probablemente en packages/db/seed.ts) y entiende su estructura.
-
-Identificar tablas nuevas: basándote en las features implementadas en cada fase, determiná qué tablas necesitan datos de prueba.
-
-Actualizar la limpieza inicial: si el seed hace TRUNCATE, incluí las nuevas tablas respetando el orden de foreign keys.
-
-Insertar datos de prueba para:
-
-Tenant(s) de prueba
-
-Usuarios (admin, cliente, superadmin)
-
-Categorías con slugs únicos
-
-Productos con variantes y SKUs coherentes
-
-Imágenes vinculadas a productos (usar URLs placeholder)
-
-Órdenes de ejemplo con estados variados y order_items
-
-Cualquier otra entidad nueva de las fases completadas
-
-Verificar coherencia:
-
-Los precios están en centavos (enteros, sin decimales).
-
-Las variantes tienen SKU basado en el slug del producto.
-
-Las imágenes tienen tenantId y position correctos.
-
-Las órdenes tienen totales que coinciden con la suma de sus items.
-
-Ejecutar seed: pnpm db:seed debe terminar sin errores.
-
-Si el seed falla, corregí los errores y volvé a ejecutar hasta que pase.
-
-No hagas commit a menos que yo lo autorice explícitamente.
+No hagas commit sin autorización.
 ```
