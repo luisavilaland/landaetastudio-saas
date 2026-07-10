@@ -43,9 +43,9 @@ const productionSchema = coreSchema.extend({
   R2_BUCKET_NAME: z
     .string()
     .min(1, "R2_BUCKET_NAME is required in production"),
-  MP_WEBHOOK_SECRET: z
+  MERCADOPAGO_WEBHOOK_SECRET: z
     .string()
-    .min(1, "MP_WEBHOOK_SECRET is required in production"),
+    .min(1, "MERCADOPAGO_WEBHOOK_SECRET is required in production"),
   STOREFRONT_URL: z
     .string()
     .url("STOREFRONT_URL must be a valid URL in production"),
@@ -60,7 +60,7 @@ const developmentSchema = coreSchema.extend({
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET_NAME: z.string().optional(),
-  MP_WEBHOOK_SECRET: z.string().optional(),
+  MERCADOPAGO_WEBHOOK_SECRET: z.string().optional(),
   STOREFRONT_URL: z.string().url().optional(),
   SENTRY_DSN: z.string().url().optional(),
 });
