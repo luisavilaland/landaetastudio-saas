@@ -126,6 +126,14 @@
   - Admin falla en Vercel: tiene `MP_WEBHOOK_SECRET` (nombre viejo), falta renombrar a `MERCADOPAGO_WEBHOOK_SECRET`.
   - Superadmin falla en Vercel: le faltan la mayoría de las env vars cloud (`MERCADOPAGO_ACCESS_TOKEN`, `RESEND_API_KEY`, `R2_*`, `STOREFRONT_URL`).
 
+## 2026-07-10 — Proxy cleanup (admin/superadmin)
+
+- Eliminados `apps/admin/proxy.ts` y `apps/superadmin/proxy.ts` (no-ops con params sin usar)
+- Storefront conserva su proxy multi-tenant real
+- lint, typecheck y tests pasan; build fallo pre-existente por AUTH_SECRET
+
+---
+
 ## Estado actual (10 de julio 2026)
 
 | Métrica | Valor |
