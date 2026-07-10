@@ -102,7 +102,7 @@ La aplicación valida automáticamente las variables de entorno al arrancar (`pa
 | Entorno | Validación |
 |---------|-----------|
 | **Desarrollo** (`NODE_ENV=development`) | Valida solo las variables core (`DATABASE_URL`, `AUTH_SECRET`, `MERCADOPAGO_ACCESS_TOKEN`). `NEXTAUTH_URL` es opcional (NextAuth v5 la infiere del Host header). Las variables cloud son opcionales. |
-| **Producción** (`NODE_ENV=production`) | Valida core + todas las variables cloud (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `MP_WEBHOOK_SECRET`, `STOREFRONT_URL`). |
+| **Producción** (`NODE_ENV=production`) | Valida core + todas las variables cloud (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `MERCADOPAGO_WEBHOOK_SECRET`, `STOREFRONT_URL`). |
 
 ### Si falta una variable
 
@@ -239,7 +239,7 @@ tenant1.lvh.me:3000
 
 ## Nota
 
-Última actualización: 6 de mayo de 2026 – Fase 5 completada ✅. RLS, AUTH_SECRET, CSRF, validación de variables de entorno con Zod, logs estructurados con Pino, Sentry integrado, NEXTAUTH_URL dinámica, errores 409 con campo específico, UI de validación inline, configuración de build corregida (next.config.mjs). 225/225 tests. Build limpio.
+Última actualización: 10 de julio de 2026 – Migración a servicios cloud (Neon, Upstash, R2, Resend). Rama `develop`. 225/225 tests. Build limpio.
 
 ## URLs de producción (Vercel)
 

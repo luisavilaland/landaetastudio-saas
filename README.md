@@ -57,7 +57,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 
 ✅ **Completado:**
 - Estructura monorepo con Turborepo (apps: `storefront`, `admin`, `superadmin`).
-- Servicios Docker locales: PostgreSQL 16, Redis 7, MinIO, MailHog.
+- Servicios cloud: PostgreSQL (Neon), Redis (Upstash), R2 (Cloudflare), Resend.
 - Drizzle ORM configurado con todas las tablas (camelCase).
 - Autenticación con NextAuth v5 (Credentials provider) en admin y superadmin.
 - Login pages y rutas protegidas.
@@ -98,9 +98,9 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - **ORM:** Drizzle ORM
 - **Auth:** NextAuth v5 (Auth.js)
 - **Base de datos:** PostgreSQL 16
-- **Cache/Carrito:** Redis 7
-- **Storage:** MinIO (S3-compatible)
-- **Email:** MailHog (dev) / Resend (prod)
+- **Cache/Carrito:** Redis (Upstash)
+- **Storage:** Cloudflare R2 (S3-compatible)
+- **Email:** Resend
 - **Pagos:** MercadoPago (Checkout Pro)
 - **Monorepo:** Turborepo + pnpm
 - **Validación:** Zod (endpoints API)
@@ -108,8 +108,8 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 ## Requisitos previos
 
 - Node.js 20+ y pnpm
-- Docker Desktop (con WSL2)
 - Git
+- Cuentas activas en: Neon, Upstash, Cloudflare R2, Resend, MercadoPago
 
 ## Primeros pasos
 
@@ -179,7 +179,7 @@ saas-ecommerce/
 │   ├── commerce/       # Lógica de negocio (carrito, productos, emails, tenant, Redis)
 │   ├── storage/        # MinIO client for image upload
 │   └── validation/    # Schemas Zod compartidos
-├── docker-compose.yml
+├── docker-compose.yml (opcional, para desarrollo local)
 ├── .env.local
 ├── pnpm-workspace.yaml
 └── turbo.json
@@ -291,13 +291,7 @@ saas-ecommerce/
 | POST | /api/register | Registrar nuevo cliente |
 | POST | /api/auth/[...nextauth] | Login de cliente |
 
-## MercadoPago - Configuración
-
-### Variables de entorno
-
-```env
-MERCADOPAGO_ACCESS_TOKEN=TEST-xxxx
-```
+## MercadoPago
 
 ### Webhook
 
@@ -348,7 +342,7 @@ Para recibir notificaciones de pago en desarrollo:
 
 ## Notas importantes
 
-- NO hacer deploy a cloud hasta que el MVP funcione 100% local.
+- Los servicios Docker locales son reemplazables por cloud (ver SETUP.md).
 - Usar `lvh.me` para testing de subdominios.
 - Las migraciones son inmutables – generar nuevas para cambios.
 - Prices siempre en centavos (integer), nunca floats.
@@ -376,4 +370,4 @@ pnpm test    # Ejecuta todos los tests (vitest)
 
 ---
 
-**Última actualización:** 6 de mayo de 2026 – Fase 5 completada ✅. RLS, AUTH_SECRET, CSRF, validación de variables de entorno, logs estructurados con Pino, Sentry integrado, NEXTAUTH_URL dinámica, errores 409 con campo específico, UI de validación inline, configuración de build corregida (next.config.mjs). 225/225 tests. Build limpio.
+**Última actualización:** 10 de julio de 2026 – Migración a servicios cloud (Neon, Upstash, R2, Resend). Rama `develop` como default. Validación de entorno alineada al código (`MERCADOPAGO_WEBHOOK_SECRET`). 225/225 tests. Build limpio.
