@@ -162,8 +162,8 @@
 | Build | Limpio (sin `ignoreBuildErrors`) |
 | CI | GitHub Actions (lint, typecheck, build) |
 | Storefront | ✅ Deploy OK |
-| Admin | ❌ Falta renombrar env var |
-| Superadmin | ❌ Faltan env vars cloud |
+| Admin | ✅ Deploy OK |
+| Superadmin | ✅ Deploy OK |
 
 **Deuda técnica resuelta en esta sesión:**
 - ✅ Proxy placeholders (`apps/admin/proxy.ts`, `apps/superadmin/proxy.ts`) eliminados
@@ -171,9 +171,8 @@
 - ✅ PROMPTS.md verificado: encoding UTF-8 correcto
 - ✅ Categories centralizadas en `@repo/commerce` (+2 tests, ahora 227)
 
-**Pendientes:**
-- Renombrar `MP_WEBHOOK_SECRET` a `MERCADOPAGO_WEBHOOK_SECRET` en proyecto admin de Vercel.
-- Agregar env vars faltantes al proyecto superadmin de Vercel.
-- Cambiar `default_branch` en GitHub a `develop` (requiere token admin).
-- Ajustar merge options, desactivar Wiki, visibility private (opcional).
-- Configurar Monorepo Change Detection en Vercel para deploys selectivos (solo app afectada).
+**Infraestructura completada (10 de julio 2026):**
+- ✅ `MP_WEBHOOK_SECRET` → `MERCADOPAGO_WEBHOOK_SECRET` renombrado en Vercel admin
+- ✅ Env vars faltantes agregadas al proyecto superadmin en Vercel
+- ✅ `default_branch` cambiado a `develop` en GitHub
+- ✅ Monorepo Change Detection configurado en Vercel (deploys selectivos)
