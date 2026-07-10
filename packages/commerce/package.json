@@ -8,7 +8,8 @@
     ".": "./src/index.ts",
     "./cart": "./src/cart.ts",
     "./products": "./src/products.ts",
-    "./email": "./src/email.ts"
+    "./email": "./src/email.ts",
+    "./categories": "./src/categories.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
