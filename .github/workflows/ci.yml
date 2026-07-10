@@ -9,11 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      AUTH_SECRET: dummy-for-build-min-32-chars-long-enough
-      DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
-      MERCADOPAGO_ACCESS_TOKEN: dummy
-      NODE_ENV: development
 
     steps:
       - uses: actions/checkout@v4
@@ -30,5 +25,11 @@ jobs:
       - run: pnpm typecheck
 
       - run: pnpm lint
+
+      - name: Create .env.local for build
+        run: |
+          echo "AUTH_SECRET=dummy-for-build-min-32-chars-long-enough" >> .env.local
+          echo "DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy" >> .env.local
+          echo "MERCADOPAGO_ACCESS_TOKEN=dummy" >> .env.local
 
       - run: pnpm build
