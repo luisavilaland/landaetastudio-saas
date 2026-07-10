@@ -17,6 +17,7 @@
 | 7 | [Refactorización](#7-refactorización) | Refactors seguros |
 | 8 | [Varios](#8-varios) | Salud, dependencias, revert |
 | 9 | [Seed](#9-seed) | Actualizar datos de prueba |
+| 10 | [Infra y Deploy](#10-infra-y-deploy) | Vercel, env vars, CI |
 
 ---
 
@@ -96,6 +97,7 @@ Crea API Route en app/api/[ruta]/route.ts para [función].
 - Validación Zod de entrada
 - Respuesta: NextResponse.json({ data?, error }, { status })
 - Logger con @repo/logger
+- Webhooks: verificar firma con MERCADOPAGO_WEBHOOK_SECRET
 ```
 
 ```
@@ -229,6 +231,7 @@ Revisa todos los cambios realizados en esta sesión:
 - ¿Respetan AGENTS.md (tenantId, precios en centavos, validación Zod, imports)?
 - ¿La lógica nueva tiene tests asociados?
 - ¿Hay código duplicado, imports no usados, any o console.log?
+- Si agregaste una env var nueva: ¿está en .env.local.example, turbo.json, y Vercel?
 
 Ejecuta pnpm lint, pnpm typecheck, pnpm build y pnpm test. Si algo falla, corrígelo.
 
@@ -385,4 +388,35 @@ Tareas:
 7. DoD al finalizar.
 
 No hagas commit sin autorización.
+```
+
+---
+
+## 10. Infra y Deploy
+
+### Configurar Vercel para una app nueva
+
+```
+Configurá el proyecto [storefront/admin/superadmin] en Vercel:
+
+1. Root Directory: apps/[app]
+2. Framework Preset: Next.js
+3. Build Command: cd ../.. && pnpm run build --filter=[app]
+4. Install Command: cd ../.. && pnpm install --frozen-lockfile
+
+Agregá en Vercel todas las env vars listadas en turbo.json > tasks.build.env.
+Si la app necesita vars opcionales (SENTRY_*, SUPERADMIN_HOST, ADMIN_HOST), agregalas también.
+Cada app debe tener su propio vercel.json en apps/[app]/vercel.json.
+```
+
+### Agregar env var al proyecto
+
+```
+Agregué la variable [NOMBRE] al proyecto. Verificá antes del deploy:
+
+1. ¿Está en .env.local.example con un placeholder descriptivo?
+2. ¿Está en turbo.json > tasks.build.env (si es necesaria en build)?
+3. ¿Está configurada en los proyectos de Vercel que la necesitan?
+4. ¿Está validada en packages/validation/src/env.ts si es crítica?
+5. Si reemplaza una variable anterior, ¿se eliminó la vieja de Vercel?
 ```
