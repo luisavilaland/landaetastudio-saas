@@ -126,6 +126,13 @@
   - Admin falla en Vercel: tiene `MP_WEBHOOK_SECRET` (nombre viejo), falta renombrar a `MERCADOPAGO_WEBHOOK_SECRET`.
   - Superadmin falla en Vercel: le faltan la mayoría de las env vars cloud (`MERCADOPAGO_ACCESS_TOKEN`, `RESEND_API_KEY`, `R2_*`, `STOREFRONT_URL`).
 
+## 2026-07-10 — Vitest deprecation + PROMPTS.md verification
+
+- Reemplazado plugin `vite-tsconfig-paths` por opción nativa `resolve.tsconfigPaths: true` en vitest.config.ts
+- Warning de deprecación eliminado de la salida de tests
+- PROMPTS.md verificado: encoding UTF-8 correcto, sin caracteres corruptos
+- Creado .env.local con vars mínimas para build (necesidad pre-existente)
+- test: 225/225, lint: ✅, typecheck: 8/8, build: 3/3
 ## 2026-07-10 — Proxy cleanup (admin/superadmin)
 
 - Eliminados `apps/admin/proxy.ts` y `apps/superadmin/proxy.ts` (no-ops con params sin usar)
