@@ -23,7 +23,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm typecheck
+        env:
+          AUTH_SECRET: dummy-for-build-min-32-chars-long-enough
+          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+          MERCADOPAGO_ACCESS_TOKEN: dummy
 
       - run: pnpm lint
 
       - run: pnpm build
+        env:
+          AUTH_SECRET: dummy-for-build-min-32-chars-long-enough
+          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+          MERCADOPAGO_ACCESS_TOKEN: dummy
