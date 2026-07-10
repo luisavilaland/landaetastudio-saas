@@ -133,6 +133,11 @@
 - PROMPTS.md verificado: encoding UTF-8 correcto, sin caracteres corruptos
 - Creado .env.local con vars mínimas para build (necesidad pre-existente)
 - test: 225/225, lint: ✅, typecheck: 8/8, build: 3/3
+## 2026-07-10 — Proxy cleanup (admin/superadmin)
+
+- Eliminados `apps/admin/proxy.ts` y `apps/superadmin/proxy.ts` (no-ops con params sin usar)
+- Storefront conserva su proxy multi-tenant real
+- lint, typecheck y tests pasan; build fallo pre-existente por AUTH_SECRET
 
 ---
 
