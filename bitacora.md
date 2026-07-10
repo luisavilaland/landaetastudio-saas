@@ -134,6 +134,18 @@
 - `apps/storefront/lib/categories.ts` ahora re-exporta desde `@repo/commerce/categories`
 - Comportamiento mejorado: sin try/catch silencioso (el original devolvía [] en error)
 - test: 227/227, typecheck: 8/8, lint: ✅
+## 2026-07-10 — Vitest deprecation + PROMPTS.md verification
+
+- Reemplazado plugin `vite-tsconfig-paths` por opción nativa `resolve.tsconfigPaths: true` en vitest.config.ts
+- Warning de deprecación eliminado de la salida de tests
+- PROMPTS.md verificado: encoding UTF-8 correcto, sin caracteres corruptos
+- Creado .env.local con vars mínimas para build (necesidad pre-existente)
+- test: 225/225, lint: ✅, typecheck: 8/8, build: 3/3
+## 2026-07-10 — Proxy cleanup (admin/superadmin)
+
+- Eliminados `apps/admin/proxy.ts` y `apps/superadmin/proxy.ts` (no-ops con params sin usar)
+- Storefront conserva su proxy multi-tenant real
+- lint, typecheck y tests pasan; build fallo pre-existente por AUTH_SECRET
 
 ---
 
