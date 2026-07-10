@@ -107,7 +107,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 
 ## Requisitos previos
 
-- Node.js 20+ y pnpm
+- Node.js 22+ y pnpm
 - Git
 - Cuentas activas en: Neon, Upstash, Cloudflare R2, Resend, MercadoPago
 
@@ -179,10 +179,18 @@ saas-ecommerce/
 │   ├── commerce/       # Lógica de negocio (carrito, productos, emails, tenant, Redis)
 │   ├── storage/        # MinIO client for image upload
 │   └── validation/    # Schemas Zod compartidos
+├── apps/
+│   ├── storefront/
+│   │   └── vercel.json
+│   ├── admin/
+│   │   └── vercel.json
+│   └── superadmin/
+│       └── vercel.json
 ├── docker-compose.yml (opcional, para desarrollo local)
 ├── .env.local
 ├── pnpm-workspace.yaml
-└── turbo.json
+├── turbo.json
+└── vercel.json
 ```
 
 ## Scripts
@@ -370,4 +378,4 @@ pnpm test    # Ejecuta todos los tests (vitest)
 
 ---
 
-**Última actualización:** 10 de julio de 2026 – Migración a servicios cloud (Neon, Upstash, R2, Resend). Rama `develop` como default. Validación de entorno alineada al código (`MERCADOPAGO_WEBHOOK_SECRET`). 225/225 tests. Build limpio.
+**Última actualización:** 10 de julio de 2026 – Migración a servicios cloud, deploy Vercel con 3 apps, CI/CD con GitHub Actions. Rama `develop`. 225/225 tests. Build limpio.

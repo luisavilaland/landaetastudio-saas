@@ -2,7 +2,7 @@
 
 ## Requisitos Previos
 
-- Node.js 20+
+- Node.js 22+
 - pnpm
 - Cuentas activas en: Neon, Upstash, Cloudflare R2, Resend, MercadoPago
 
@@ -239,7 +239,7 @@ tenant1.lvh.me:3000
 
 ## Nota
 
-Última actualización: 10 de julio de 2026 – Migración a servicios cloud (Neon, Upstash, R2, Resend). Rama `develop`. 225/225 tests. Build limpio.
+Última actualización: 10 de julio de 2026 – Migración a servicios cloud, deploy en Vercel (3 apps), CI con GitHub Actions. Rama `develop`. 225/225 tests. Build limpio.
 
 ## URLs de producción (Vercel)
 
@@ -249,9 +249,38 @@ tenant1.lvh.me:3000
 | Admin | https://saas-admin-sable.vercel.app |
 | Storefront | https://landaetastudio-saas-storefront.vercel.app |
 
-## Variables de entorno adicionales configuradas en Vercel
+## Deploy en Vercel
+
+Cada app es un proyecto independiente en Vercel conectado al mismo repositorio.
+
+### Configuración por proyecto
+
+| App | Root Directory | Build Command |
+|-----|---------------|---------------|
+| Storefront | `apps/storefront` | `cd ../.. && pnpm run build --filter=storefront` |
+| Admin | `apps/admin` | `cd ../.. && pnpm run build --filter=admin` |
+| Superadmin | `apps/superadmin` | `cd ../.. && pnpm run build --filter=superadmin` |
+
+Cada proyecto tiene su propio `vercel.json` en la carpeta de la app correspondiente.
+
+### Variables de entorno en Vercel
+
+Todas las variables cloud deben estar configuradas en cada proyecto:
+
+- `DATABASE_URL`, `AUTH_SECRET` (core, obligatorias en todos)
+- `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET`
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+- `RESEND_API_KEY`
+- `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
+- `STOREFRONT_URL`
+- `SUPERADMIN_HOST`, `ADMIN_HOST`, `DEFAULT_TENANT_SLUG`
+
+### turbo.json
+
+Las env vars deben estar declaradas en `turbo.json` > `tasks.build.env` para que Turbo 2 las exponga durante el build. Si agregás una variable nueva en Vercel, agregala también en `turbo.json`.
+
+## Variables de entorno adicionales
 
 - `SUPERADMIN_HOST` — dominio del superadmin en Vercel
 - `ADMIN_HOST` — dominio del admin en Vercel  
 - `DEFAULT_TENANT_SLUG` — tenant por defecto para el storefront (tienda1)
-- Todas las variables cloud: Neon, Upstash, R2, Resend, MercadoPago

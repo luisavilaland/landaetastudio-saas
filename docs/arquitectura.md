@@ -12,9 +12,9 @@ Las sesiones de BD generan una consulta extra en cada petición. Con JWT, el tok
 
 Eliminamos los errores de redondeo propios de floats. Es una práctica estándar en eCommerce. El frontend divide entre 100 solo para mostrar el precio formateado.
 
-## ¿Por qué MinIO local y MercadoPago?
+## ¿Por qué R2 (Cloudflare) y MercadoPago?
 
-MinIO emula la API de S3, lo que nos permite probar subida de imágenes sin salir de localhost. MercadoPago es el gateway de pago más extendido en Uruguay y Argentina, y ofrece excelente sandbox para desarrollo.
+Usamos Cloudflare R2 como storage de imágenes (S3-compatible). En desarrollo se puede usar MinIO local como alternativa. MercadoPago es el gateway de pago más extendido en Uruguay y Argentina.
 
 ## ¿Por qué Redis para el carrito y no PostgreSQL?
 

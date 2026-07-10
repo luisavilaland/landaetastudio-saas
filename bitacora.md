@@ -110,6 +110,22 @@
 
 ---
 
+---
+
+## 2026-07-10 — Sesión 2: CI/CD, Vercel, Documentación
+
+- AGENTS.md unificado con mejores prácticas de bienesraicesVe (checklists, inyección de prompts, permission boundaries, progresividad).
+- PROMPTS.md actualizado con templates base (API Route, Client Component, Server Component, Zod Schema).
+- bitacora.md creada con historial completo del proyecto.
+- **CI fix:** error de `pnpm/action-setup` por version duplicada eliminado. Node 20→22.
+- **CI fix:** env vars movidas a job level y luego a `.env.local` en CI para que Turbo las herede.
+- **turbo.json:** declaradas todas las env vars en `tasks.build.env` (Turbo 2 no las expone sin esto).
+- **Vercel:** creados `apps/admin/vercel.json` y `apps/superadmin/vercel.json` con filtro monorepo.
+- **Documentación:** actualizadas todas las referencias de `MP_WEBHOOK_SECRET` → `MERCADOPAGO_WEBHOOK_SECRET`.
+- **Problemas conocidos:**
+  - Admin falla en Vercel: tiene `MP_WEBHOOK_SECRET` (nombre viejo), falta renombrar a `MERCADOPAGO_WEBHOOK_SECRET`.
+  - Superadmin falla en Vercel: le faltan la mayoría de las env vars cloud (`MERCADOPAGO_ACCESS_TOKEN`, `RESEND_API_KEY`, `R2_*`, `STOREFRONT_URL`).
+
 ## Estado actual (10 de julio 2026)
 
 | Métrica | Valor |
@@ -120,8 +136,14 @@
 | Deploy | Vercel (3 apps) |
 | Rama default | `develop` |
 | Build | Limpio (sin `ignoreBuildErrors`) |
+| CI | GitHub Actions (lint, typecheck, build) |
+| Storefront | ✅ Deploy OK |
+| Admin | ❌ Falta renombrar env var |
+| Superadmin | ❌ Faltan env vars cloud |
 
 **Pendientes:**
+- Renombrar `MP_WEBHOOK_SECRET` a `MERCADOPAGO_WEBHOOK_SECRET` en proyecto admin de Vercel.
+- Agregar env vars faltantes al proyecto superadmin de Vercel.
 - Cambiar `default_branch` en GitHub a `develop` (requiere token admin).
 - Ajustar merge options, desactivar Wiki, visibility private (opcional).
 - Configurar Monorepo Change Detection en Vercel para deploys selectivos (solo app afectada).
