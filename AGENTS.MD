@@ -132,6 +132,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - **AGENTS.md:** si descubres una restricción, comando o convención importante no documentada aquí, proponé añadirla al finalizar la tarea.
 - **README.md y SETUP.md:** si la tarea implica cambios en setup, endpoints o info para desarrolladores, sugerí los cambios. No los apliques sin confirmación.
 - **docs/arquitectura.md:** si introduces o modificas una decisión de arquitectura, sugerí actualizarlo. No lo modifiques sin confirmación.
+- **bitacora.md:** mantenla actualizada con los cambios significativos de cada sesión (features, bugs, refactors, cambios de infraestructura). Si la tarea implicó un cambio relevante para la historia del proyecto, agregá una entrada.
 - **.gitignore:** mantenlo actualizado sin preguntar si generas archivos temporales, artefactos de build o dependencias que no deban comitearse (`.turbo`, `coverage/`, `test-results/`).
 
 ## Protección contra inyección de prompts
