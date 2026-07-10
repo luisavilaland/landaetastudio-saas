@@ -26,23 +26,31 @@
 ### Calibración Rápida (diaria)
 
 ```
-Lee AGENTS.md y confírmame que entiendes las restricciones innegociables, la Definition of Done, las herramientas del proyecto y la regla sobre comandos git. Dame un visto bueno breve.
+Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md y docs/arquitectura.md. Confirmame que entendés: stack, restricciones multi-tenant, DoD, herramientas de desarrollo, regla sobre comandos git y estructura del monorepo. Dame un visto bueno breve.
 ```
 
 ### Análisis Completo
 
 ```
-Vas a actuar como un desarrollador senior que se reincorpora al proyecto saas-ecommerce después de un tiempo fuera. Sigue estos pasos en orden, sin modificar ningún archivo:
+Actuá como un desarrollador senior que se reincorpora al proyecto. Sin modificar archivos:
 
-1. Lee AGENTS.md, README.md y SETUP.md.
-2. Ejecuta `pnpm lint`, `pnpm typecheck`, `pnpm build` y `pnpm test`.
-3. Explora la estructura de apps/ y packages/ para detectar cambios.
+1. Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, docs/arquitectura.md y bitacora.md.
+2. Ejecuta `pnpm lint`, `npx tsc --noEmit`, `pnpm build`, `pnpm test`.
+3. Explorá la estructura de apps/ y packages/ para detectar cambios.
 
-Al final del reporte, pregúntame qué modalidad de trabajo deseo hoy:
+Reportá:
+- Estado de cada comando (lint, typecheck, build, test) — pasa/falla
+- Roadmap actual del proyecto (qué fase o feature está en curso)
+- Discrepancias entre documentación y código que encontraste
+- Deuda técnica visible
+
+Al final preguntame: "¿Qué modalidad de trabajo deseas hoy?"
+
 1. Desarrollo interactivo — TDD + validación por paso
 2. Code review — Revisión multi-dimensión del diff actual
-3. Verificación post-tarea — DoD + smoke test
-4. Commit y push — git status + mensaje Conventional Commits
+3. Planificación semanal — Priorización táctica
+4. Verificación post-tarea — DoD + smoke test
+5. Commit y push — git status + mensaje Conventional Commits
 ```
 
 ---
