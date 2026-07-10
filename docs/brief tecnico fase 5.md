@@ -347,7 +347,7 @@ Esta es la lista completa de variables que deben estar configuradas en cada app 
 | **AUTH_SECRET** | Admin, Superadmin | Secret para JWT. Generar con: openssl rand -base64 32 |
 | **NEXTAUTH_URL** | Admin, Superadmin | Opcional: NextAuth v5 la infiere del Host header. Solo necesaria si usás proxy inverso. |
 | **MP_ACCESS_TOKEN** | Storefront | Access token de MercadoPago (producción: APP_USR-...) |
-| **MP_WEBHOOK_SECRET** | Storefront | Secret para validar webhooks de MercadoPago |
+| **MERCADOPAGO_WEBHOOK_SECRET** | Storefront, Admin, Superadmin | Secret para validar webhooks de MercadoPago |
 | **RESEND_API_KEY** | Storefront | API key de Resend para emails transaccionales |
 | **NEXT_PUBLIC_APP_URL** | Storefront | URL pública del storefront (para links en emails) |
 | **R2_ACCOUNT_ID** | Admin | ID de cuenta Cloudflare para R2 |
