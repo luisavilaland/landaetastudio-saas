@@ -12,8 +12,6 @@
 - Docker Compose con PostgreSQL 16, Redis 7, MinIO, MailHog.
 - Variables de entorno con dotenv, scripts base en `package.json`, Turbo repo config.
 
-**vs bienesraicesVe:** Ambos proyectos arrancaron con Turbo repo. bienesraicesVe usaba SQLite y no tenía Docker. Este proyecto usó PostgreSQL + Docker desde el día 1.
-
 ---
 
 ## 2026-04-22 al 2026-04-25 — Fase 1: Auth y Órdenes
@@ -31,8 +29,6 @@
 - Seed de datos de prueba.
 - Customer auth (registro y login en storefront).
 - Panel de órdenes en admin (lista, detalle, cambio de estado).
-
-**vs bienesraicesVe:** bienesraicesVe también usó NextAuth v5 pero con SQLite. Acá se usó Redis para carrito (bienesraicesVe no tiene carrito). La estructura multi-tenant es común a ambos.
 
 ---
 
@@ -66,8 +62,6 @@
 - Solución de problemas con Turbopack y proxy.
 - 195 tests.
 
-**vs bienesraicesVe:** bienesraicesVe también tuvo que lidiar con el proxy y Turbopack, pero este proyecto tuvo más complejidad por el carrito y check-out.
-
 ---
 
 ## 2026-05-15 al 2026-06-01 — Fase 4: Autoservicio del Tenant
@@ -99,8 +93,6 @@
 - **Deploy a Vercel:** las 3 apps desplegadas con URLs reales.
 - **Fix de dominios:** proxy permitiendo subdominios vercel.app, `DEFAULT_TENANT_SLUG` como fallback.
 
-**vs bienesraicesVe:** bienesraicesVe también desplegó a Vercel, pero saas-ecommerce tiene 3 apps mientras bienesraicesVe tiene 2. La validación de entorno con Zod es similar. bienesraicesVe tiene submodulo ponytail; este proyecto no.
-
 ---
 
 ## 2026-07-10 — Post-Producción: Alineación y Cloud
@@ -115,8 +107,6 @@
 - Documentación actualizada (README, SETUP, sin Docker).
 - Fix: nombre de variable `MERCADOPAGO_WEBHOOK_SECRET` alineado entre validación Zod y código.
 - 225 tests, build limpio en las 3 apps.
-
-**vs bienesraicesVe:** bienesraicesVe todavía usa servicios locales (SQLite, MinIO local). Este proyecto migró completamente a cloud. Ambos comparten CI/CD con pnpm + turbo. bienesraicesVe tiene `imgproxy` vía Vercel Blob; saas-ecommerce usa R2 directamente.
 
 ---
 
