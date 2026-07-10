@@ -141,6 +141,7 @@
 - PROMPTS.md verificado: encoding UTF-8 correcto, sin caracteres corruptos
 - Creado .env.local con vars mínimas para build (necesidad pre-existente)
 - test: 225/225, lint: ✅, typecheck: 8/8, build: 3/3
+
 ## 2026-07-10 — Proxy cleanup (admin/superadmin)
 
 - Eliminados `apps/admin/proxy.ts` y `apps/superadmin/proxy.ts` (no-ops con params sin usar)
@@ -153,7 +154,7 @@
 
 | Métrica | Valor |
 |---------|-------|
-| Tests | 225 pasando, 0 fallos |
+| Tests | 227 pasando, 0 fallos |
 | Apps | storefront, admin, superadmin |
 | Servicios | Neon, Upstash, R2, Resend |
 | Deploy | Vercel (3 apps) |
@@ -163,6 +164,12 @@
 | Storefront | ✅ Deploy OK |
 | Admin | ❌ Falta renombrar env var |
 | Superadmin | ❌ Faltan env vars cloud |
+
+**Deuda técnica resuelta en esta sesión:**
+- ✅ Proxy placeholders (`apps/admin/proxy.ts`, `apps/superadmin/proxy.ts`) eliminados
+- ✅ Vitest deprecation warning (`vite-tsconfig-paths` → `resolve.tsconfigPaths`) corregido
+- ✅ PROMPTS.md verificado: encoding UTF-8 correcto
+- ✅ Categories centralizadas en `@repo/commerce` (+2 tests, ahora 227)
 
 **Pendientes:**
 - Renombrar `MP_WEBHOOK_SECRET` a `MERCADOPAGO_WEBHOOK_SECRET` en proyecto admin de Vercel.

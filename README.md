@@ -372,10 +372,10 @@ Para recibir notificaciones de pago en desarrollo:
 pnpm test    # Ejecuta todos los tests (vitest)
 ```
 
-- **Total:** 225 tests (225 pasando, 0 fallos)
+- **Total:** 227 tests (227 pasando, 0 fallos)
 - Tests de shipping (25) escritos en patrón de lógica pura para compatibilidad con vitest.
 - Tests de categorías reescritos con patrón de lógica pura — ya no importan el route directamente.
 
 ---
 
-**Última actualización:** 10 de julio de 2026 – Migración a servicios cloud, deploy Vercel con 3 apps, CI/CD con GitHub Actions. Rama `develop`. 225/225 tests. Build limpio.
+**Última actualización:** 10 de julio de 2026 – Deuda técnica resuelta (proxy cleanup, vitest deprecation, categories centralization). Rama `develop`. 227/227 tests (2 nuevos). Build limpio.
