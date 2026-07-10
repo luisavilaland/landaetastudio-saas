@@ -74,9 +74,15 @@ pnpm db:seed
 - Orden #1: **confirmed** (2 remeras M rojas + 1 jean 40 azul)
 - Orden #2: **pending_payment** (1 gorra negra + 1 remera L azul)
 
-## Variables de Entorno
+## Variables de Entorno — 3 archivos
 
-Todas las variables se configuran en `.env.local` usando servicios cloud. Ver `.env.local.example` para el listado completo.
+| Archivo | Propósito | Git |
+|---------|-----------|-----|
+| `.env.example` | Template original del proyecto (legado) | ✅ tracked |
+| `.env.local.example` | Template con servicios cloud como default | ✅ tracked |
+| `.env.local` | Credenciales reales (copiar de `.env.local.example`) | ❌ ignorado |
+
+**Solo `.env.local` contiene las credenciales reales** y no debe subirse a git. Los otros dos son templates de referencia.
 
 Los servicios locales (Docker) ya no se usan. En su lugar:
 
