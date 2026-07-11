@@ -112,7 +112,7 @@ export default function CheckoutPage() {
       const prefRes = await fetch("/api/checkout/preference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId }),
+        body: JSON.stringify({ orderId, customerEmail: form.email }),
       });
 
       if (!prefRes.ok) {

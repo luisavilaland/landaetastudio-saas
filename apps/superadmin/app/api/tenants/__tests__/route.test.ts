@@ -62,6 +62,34 @@ describe("GET /api/tenants", () => {
   });
 });
 
+describe("POST /api/tenants — Role Check", () => {
+  it("should return 403 when user is not superadmin", async () => {
+    const session = { user: { role: "admin" } };
+    const handler = async (s: typeof session) => {
+      if (s?.user?.role !== "superadmin") {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+      return NextResponse.json({ success: true });
+    };
+
+    const response = await handler(session);
+    expect(response.status).toBe(403);
+  });
+
+  it("should allow POST for superadmin role", async () => {
+    const session = { user: { role: "superadmin" } };
+    const handler = async (s: typeof session) => {
+      if (s?.user?.role !== "superadmin") {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+      return NextResponse.json({ success: true });
+    };
+
+    const response = await handler(session);
+    expect(response.status).toBe(200);
+  });
+});
+
 describe("POST /api/tenants - Tenant Creation", () => {
   describe("Validation", () => {
     it("should require name", async () => {

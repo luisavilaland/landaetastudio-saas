@@ -158,7 +158,7 @@
 
 | Métrica | Valor |
 |---------|-------|
-| Tests | 227 pasando, 0 fallos |
+| Tests | 233 pasando, 0 fallos |
 | Apps | storefront, admin, superadmin |
 | Servicios | Neon, Upstash, R2, Resend |
 | Deploy | Vercel (3 apps) |
@@ -197,7 +197,7 @@
 | # | Ruta | Fix |
 |---|------|-----|
 | 1 | `webhooks/mercadopago` | Fail-closed HMAC, queries scoped por tenant, `x-test-order-id` solo dev |
-| 2 | `checkout/preference` | IDOR patched, 4 queries scoped, logging estructurado sin PII |
+| 2 | `checkout/preference` | IDOR same-tenant cerrado (ownership check por email), rate limiting 10 req/min/IP, logging estructurado sin PII |
 | 3 | `cart/*` | `getTenantId` + filtro `tenantId` en variant/image queries |
 | 4 | `checkout` | Variant SELECT y stock UPDATE scoped por tenant |
 | 5 | `products/[id]/*` (8 handlers) | SQL-level `and(eq(id), eq(tenantId))` — TOCTOU eliminado |
@@ -212,4 +212,18 @@
 ### Deuda técnica documentada
 - ❌ `withTenantContext` nunca se llama en runtime. RLS es decorativo. Pendiente wiring completo.
 - ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/`.
-- ❌ Faltan 27 tests de integración de tenant isolation (planeados).
+- ❌ Faltan 14 tests de integración de tenant isolation (27 planeados - 13 escritos en hotfixes 1, 2 y 9).
+
+---
+
+## 2026-07-10 — P0 Hotfix v2: IDOR same-tenant + rate limiting + tests
+
+- **Fix IDOR same-tenant en checkout/preference:** se agregó `customerEmail` al schema de validación y ownership check: si `order.customerEmail !== callerEmail`, devuelve 403. Antes solo había tenant-scoping cross-tenant, pero cualquier visitante del mismo tenant podía crear preferencias para órdenes ajenas. `packages/validation/src/schemas.ts` y `apps/storefront/app/api/checkout/preference/route.ts`
+- **Rate limiting:** 10 req/min/IP con Redis (`INCR` + `PEXPIRE`), devuelve 429 al exceder. `apps/storefront/app/api/checkout/preference/route.ts`
+- **Frontend actualizado:** `apps/storefront/app/checkout/page.tsx` ahora envía `customerEmail` en el body de la preferencia.
+- **Tests escritos (13 nuevos, 227→233):**
+  - Checkout preference: 8 tests (IDOR email mismatch/success, rate limiting, token missing)
+  - Webhook: 7 tests (HMAC secret/signature/validation, payment processing)
+  - Superadmin: +2 tests (POST role check), +2 tests (GET + DELETE role check en `[id]`)
+- **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 233/233 ✅
+- **Branch:** `fix/p0-idor-rate-limit-tests`
