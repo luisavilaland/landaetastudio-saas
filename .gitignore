@@ -79,3 +79,6 @@ skills-lock.json
 
 # vs code
 .vscode/settings.json
+
+# Worktrees
+.worktrees/
