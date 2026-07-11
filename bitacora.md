@@ -186,16 +186,30 @@
 
 ## 2026-07-10 — P0 Security Hotfix: Tenant Isolation
 
-- **Auditoría de seguridad completa:** 31 rutas API analizadas por verbo HTTP. 12 rutas con gaps de aislamiento de tenant confirmados.
-- **Estado de RLS documentado:** `withTenantContext` definido en migración DB pero nunca llamado en handlers. Conexión DB usa `neondb_owner` (owner de tabla) que bypasses RLS. RLS es puramente decorativo — la app depende 100% de filtrado manual `tenantId`.
-- **Hotfix 1 (Webhook):** fail-closed sin HMAC, queries scoped por tenant, `x-test-order-id` deshabilitado (solo dev). `apps/storefront/app/api/webhooks/mercadopago/route.ts`
-- **Hotfix 2 (Checkout Preference):** IDOR patched, todas las queries scoped por tenant, logging estructurado (sin PII). `apps/storefront/app/api/checkout/preference/route.ts`
-- **Hotfix 3 (Cart):** `getTenantId` + filtro `tenantId` en queries de variantes e imágenes. `apps/storefront/app/api/cart/route.ts`
-- **Hotfix 4 (Checkout):** variant queries y stock UPDATE scoped por tenant. `apps/storefront/app/api/checkout/route.ts`
-- **Hotfix 5 (Admin products):** 8 handlers en 4 archivos — filtrado a nivel SQL con `and(eq(id), eq(tenantId))`. Checks post-query JS eliminados (previene TOCTOU). `apps/admin/app/api/products/[id]/route.ts` y subrutas
-- **Hotfix 6 (Admin orders):** 4 queries GET + 2 queries PUT scoped por tenant. `apps/admin/app/api/orders/[id]/route.ts`
-- **Hotfix 7 (Admin shipping):** UPDATE y DELETE scoped por tenant. `apps/admin/app/api/shipping/[id]/route.ts`
-- **Hotfix 8 (Register):** email lookup scoped por tenant con `and(eq(email), eq(tenantId))`. `apps/storefront/app/api/register/route.ts`
-- **Hotfix 9 (Superadmin role):** check `session.user.role === "superadmin"` en GET/POST/PUT/DELETE de `/api/tenants/*`. `apps/superadmin/app/api/tenants/route.ts` y `tenants/[id]/route.ts`
+- **Auditoría de seguridad completa:** 31 rutas API analizadas por verbo HTTP. 12 handlers con gaps de aislamiento multi-tenant confirmados.
+- **Estado de RLS documentado:** `withTenantContext` definido en migración DB pero nunca llamado en handlers. Conexión DB usa `neondb_owner` (owner de tabla) que bypasses RLS. RLS es decorativo — la app depende 100% de filtrado manual `tenantId`.
+- **Verificación de logs en Vercel:** sin evidencia de tráfico a las rutas vulnerables, consistente con no tener aún tenants/usuarios reales en producción. No se detectaron accesos cross-tenant ni intentos de explotación.
 - **227 tests pasando**, lint ✅, typecheck ✅
-- **Branch:** `fix/p0-tenant-isolation` desde `develop`
+- **PR mergeado a `develop`.**
+
+### Hotfixes aplicados
+
+| # | Ruta | Fix |
+|---|------|-----|
+| 1 | `webhooks/mercadopago` | Fail-closed HMAC, queries scoped por tenant, `x-test-order-id` solo dev |
+| 2 | `checkout/preference` | IDOR patched, 4 queries scoped, logging estructurado sin PII |
+| 3 | `cart/*` | `getTenantId` + filtro `tenantId` en variant/image queries |
+| 4 | `checkout` | Variant SELECT y stock UPDATE scoped por tenant |
+| 5 | `products/[id]/*` (8 handlers) | SQL-level `and(eq(id), eq(tenantId))` — TOCTOU eliminado |
+| 6 | `orders/[id]` | 6 queries scoped por tenant |
+| 7 | `shipping/[id]` | UPDATE/DELETE scoped por tenant |
+| 8 | `register` | Email lookup con `and(eq(email), eq(tenantId))` |
+| 9 | `tenants/*` (superadmin) | Role check `=== "superadmin"` en 5 handlers |
+
+#### ADR-022 creado
+- `docs/adr/ADR-022-rls-status.md` documenta el hallazgo de RLS decorativo + verificación de logs.
+
+### Deuda técnica documentada
+- ❌ `withTenantContext` nunca se llama en runtime. RLS es decorativo. Pendiente wiring completo.
+- ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/`.
+- ❌ Faltan 27 tests de integración de tenant isolation (planeados).
