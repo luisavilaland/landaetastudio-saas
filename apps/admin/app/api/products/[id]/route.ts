@@ -27,27 +27,23 @@ export async function GET(
     const product = await db
       .select()
       .from(dbProducts)
-      .where(eq(dbProducts.id, id))
+      .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
       .limit(1);
 
     if (product.length === 0) {
       return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
-    if (product[0].tenantId !== tenantId) {
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
-    }
-
     const variant = await db
       .select()
       .from(dbProductVariants)
-      .where(eq(dbProductVariants.productId, id))
+      .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)))
       .limit(1);
 
     const images = await db
       .select()
       .from(dbProductImages)
-      .where(eq(dbProductImages.productId, id))
+      .where(and(eq(dbProductImages.productId, id), eq(dbProductImages.tenantId, tenantId)))
       .orderBy(dbProductImages.position);
 
     return NextResponse.json({
@@ -82,14 +78,10 @@ export async function PUT(
     const product = await db
       .select()
       .from(dbProducts)
-      .where(eq(dbProducts.id, id))
+      .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
       .limit(1);
 
     if (product.length === 0) {
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
-    }
-
-    if (product[0].tenantId !== tenantId) {
       return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
@@ -152,9 +144,9 @@ export async function PUT(
       const category = await db
         .select()
         .from(dbCategories)
-        .where(eq(dbCategories.id, categoryId))
+        .where(and(eq(dbCategories.id, categoryId), eq(dbCategories.tenantId, tenantId)))
         .limit(1);
-      if (category.length === 0 || category[0].tenantId !== tenantId) {
+      if (category.length === 0) {
         return NextResponse.json(
           { error: "Categoría inválida" },
           { status: 400 }
@@ -226,7 +218,7 @@ export async function PUT(
     const existingVariants = await db
       .select()
       .from(dbProductVariants)
-      .where(eq(dbProductVariants.productId, id));
+      .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)));
 
     // If slug changed, regenerate SKU for all variants based on new slug
     if (slugChanged && existingVariants.length > 0) {
@@ -362,7 +354,7 @@ export async function PUT(
         await tx
           .update(dbProducts)
           .set(updateProductFields)
-          .where(eq(dbProducts.id, id));
+          .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)));
       }
 
       // Handle variant operations
@@ -378,7 +370,7 @@ export async function PUT(
             await tx
               .update(dbProductVariants)
               .set({ sku: newSku, updatedAt: now })
-              .where(eq(dbProductVariants.id, variant.id));
+              .where(and(eq(dbProductVariants.id, variant.id), eq(dbProductVariants.tenantId, tenantId)));
           }
         }
       } else if (variantOperation === 'update') {
@@ -387,7 +379,7 @@ export async function PUT(
         await tx
           .update(dbProductVariants)
           .set(variantFields)
-          .where(eq(dbProductVariants.productId, id));
+          .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)));
       } else if (variantOperation === 'insert') {
         logger.debug({ fields: variantFields }, "[PUT Product] Inserting new variant");
         await tx
@@ -399,13 +391,13 @@ export async function PUT(
     const updatedProduct = await db
       .select()
       .from(dbProducts)
-      .where(eq(dbProducts.id, id))
+      .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
       .limit(1);
 
     const variant = await db
       .select()
       .from(dbProductVariants)
-      .where(eq(dbProductVariants.productId, id))
+      .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)))
       .limit(1);
 
     return NextResponse.json({
@@ -441,14 +433,10 @@ export async function DELETE(
     const product = await db
       .select()
       .from(dbProducts)
-      .where(eq(dbProducts.id, id))
+      .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
       .limit(1);
 
     if (product.length === 0) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
-    if (product[0].tenantId !== tenantId) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
@@ -456,7 +444,7 @@ export async function DELETE(
     const variants = await db
       .select({ id: dbProductVariants.id })
       .from(dbProductVariants)
-      .where(eq(dbProductVariants.productId, id));
+      .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)));
 
     const variantIds = variants.map((v) => v.id);
     if (variantIds.length > 0) {
@@ -477,11 +465,11 @@ export async function DELETE(
     await db.transaction(async (tx) => {
       await tx
         .delete(dbProductVariants)
-        .where(eq(dbProductVariants.productId, id));
+        .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)));
 
       await tx
         .delete(dbProducts)
-        .where(eq(dbProducts.id, id));
+        .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)));
     });
 
     return new NextResponse(null, { status: 204 });

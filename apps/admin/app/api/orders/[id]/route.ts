@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, dbOrders, dbOrderItems, dbProductVariants, dbProducts } from "@repo/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { updateOrderStatusSchema } from "@repo/validation";
 
 export async function GET(
@@ -24,10 +24,15 @@ export async function GET(
     const [order] = await db
       .select()
       .from(dbOrders)
-      .where(eq(dbOrders.id, id))
+      .where(
+        and(
+          eq(dbOrders.id, id),
+          eq(dbOrders.tenantId, tenantId)
+        )
+      )
       .limit(1);
 
-    if (!order || order.tenantId !== tenantId) {
+    if (!order) {
       return NextResponse.json({ error: "Orden no encontrada" }, { status: 404 });
     }
 
@@ -39,7 +44,12 @@ export async function GET(
         unitPrice: dbOrderItems.unitPrice,
       })
       .from(dbOrderItems)
-      .where(eq(dbOrderItems.orderId, id));
+      .where(
+        and(
+          eq(dbOrderItems.orderId, id),
+          eq(dbOrderItems.tenantId, tenantId)
+        )
+      );
 
     const variantIds = orderItems.map((item) => item.productVariantId);
     const variants = await db
@@ -49,7 +59,12 @@ export async function GET(
         sku: dbProductVariants.sku,
       })
       .from(dbProductVariants)
-      .where(inArray(dbProductVariants.id, variantIds));
+      .where(
+        and(
+          inArray(dbProductVariants.id, variantIds),
+          eq(dbProductVariants.tenantId, tenantId)
+        )
+      );
 
     const productIds = variants.map((v) => v.productId);
     const products = await db
@@ -58,7 +73,12 @@ export async function GET(
         name: dbProducts.name,
       })
       .from(dbProducts)
-      .where(inArray(dbProducts.id, productIds));
+      .where(
+        and(
+          inArray(dbProducts.id, productIds),
+          eq(dbProducts.tenantId, tenantId)
+        )
+      );
 
     const productMap = new Map(products.map((p) => [p.id, p.name]));
     const variantProductMap = new Map(variants.map((v) => [v.id, v.productId]));
@@ -125,19 +145,29 @@ export async function PUT(
     const { status } = validation.data;
 
     const [existingOrder] = await db
-      .select({ id: dbOrders.id, tenantId: dbOrders.tenantId })
+      .select({ id: dbOrders.id })
       .from(dbOrders)
-      .where(eq(dbOrders.id, id))
+      .where(
+        and(
+          eq(dbOrders.id, id),
+          eq(dbOrders.tenantId, tenantId)
+        )
+      )
       .limit(1);
 
-    if (!existingOrder || existingOrder.tenantId !== tenantId) {
+    if (!existingOrder) {
       return NextResponse.json({ error: "Orden no encontrada" }, { status: 404 });
     }
 
     await db
       .update(dbOrders)
       .set({ status, updatedAt: new Date() })
-      .where(eq(dbOrders.id, id));
+      .where(
+        and(
+          eq(dbOrders.id, id),
+          eq(dbOrders.tenantId, tenantId)
+        )
+      );
 
     return NextResponse.json({ success: true, status });
   } catch (error) {

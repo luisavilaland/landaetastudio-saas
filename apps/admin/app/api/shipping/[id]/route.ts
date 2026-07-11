@@ -95,7 +95,12 @@ export async function PUT(
     const [method] = await db
       .update(dbShippingMethods)
       .set(updates)
-      .where(eq(dbShippingMethods.id, id))
+      .where(
+        and(
+          eq(dbShippingMethods.id, id),
+          eq(dbShippingMethods.tenantId, tenantId)
+        )
+      )
       .returning();
 
     return NextResponse.json({ method });
@@ -139,7 +144,12 @@ export async function DELETE(
 
     await db
       .delete(dbShippingMethods)
-      .where(eq(dbShippingMethods.id, id));
+      .where(
+        and(
+          eq(dbShippingMethods.id, id),
+          eq(dbShippingMethods.tenantId, tenantId)
+        )
+      );
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {

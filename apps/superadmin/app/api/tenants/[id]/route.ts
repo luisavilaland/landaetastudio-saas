@@ -30,6 +30,10 @@ export async function GET(
     return errorResponse("No autorizado", 401);
   }
 
+  if (session.user?.role !== "superadmin") {
+    return errorResponse("No autorizado", 403);
+  }
+
   const { id } = await params;
 
   const tenant = await db
@@ -50,10 +54,14 @@ export async function PUT(
   { params }: { params: Params }
 ) {
   try {
-    const session = await auth();
+  const session = await auth();
 
   if (!session) {
     return errorResponse("No autorizado", 401);
+  }
+
+  if (session.user?.role !== "superadmin") {
+    return errorResponse("No autorizado", 403);
   }
 
   const { id } = await params;
@@ -156,6 +164,10 @@ export async function DELETE(
 
     if (!session) {
       return errorResponse("No autorizado", 401);
+    }
+
+    if (session.user?.role !== "superadmin") {
+      return errorResponse("No autorizado", 403);
     }
 
     const { id } = await params;

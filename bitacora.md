@@ -122,9 +122,13 @@
 - **turbo.json:** declaradas todas las env vars en `tasks.build.env` (Turbo 2 no las expone sin esto).
 - **Vercel:** creados `apps/admin/vercel.json` y `apps/superadmin/vercel.json` con filtro monorepo.
 - **Documentación:** actualizadas todas las referencias de `MP_WEBHOOK_SECRET` → `MERCADOPAGO_WEBHOOK_SECRET`.
-- **Problemas conocidos:**
-  - Admin falla en Vercel: tiene `MP_WEBHOOK_SECRET` (nombre viejo), falta renombrar a `MERCADOPAGO_WEBHOOK_SECRET`.
-  - Superadmin falla en Vercel: le faltan la mayoría de las env vars cloud (`MERCADOPAGO_ACCESS_TOKEN`, `RESEND_API_KEY`, `R2_*`, `STOREFRONT_URL`).
+- **Problemas conocidos (resueltos):**
+  - ✅ Admin en Vercel: renombrado `MP_WEBHOOK_SECRET` → `MERCADOPAGO_WEBHOOK_SECRET`.
+  - ✅ Superadmin en Vercel: env vars cloud agregadas.
+
+**Deuda técnica pendiente:**
+  - ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/` con verificación individual por ADR.
+  - ❌ `withTenantContext` nunca se llama en runtime. RLS es decorativo. Pendiente wiring completo post-hotfixes.
 
 ## 2026-07-10 — Categories centralization
 
@@ -165,14 +169,33 @@
 | Admin | ✅ Deploy OK |
 | Superadmin | ✅ Deploy OK |
 
-**Deuda técnica resuelta en esta sesión:**
+**Deuda técnica resuelta:**
 - ✅ Proxy placeholders (`apps/admin/proxy.ts`, `apps/superadmin/proxy.ts`) eliminados
 - ✅ Vitest deprecation warning (`vite-tsconfig-paths` → `resolve.tsconfigPaths`) corregido
 - ✅ PROMPTS.md verificado: encoding UTF-8 correcto
 - ✅ Categories centralizadas en `@repo/commerce` (+2 tests, ahora 227)
+- ✅ P0 Security Hotfix: tenant isolation gaps cerrados en 12 handlers
 
 **Infraestructura completada (10 de julio 2026):**
 - ✅ `MP_WEBHOOK_SECRET` → `MERCADOPAGO_WEBHOOK_SECRET` renombrado en Vercel admin
 - ✅ Env vars faltantes agregadas al proyecto superadmin en Vercel
 - ✅ `default_branch` cambiado a `develop` en GitHub
 - ✅ Monorepo Change Detection configurado en Vercel (deploys selectivos)
+
+---
+
+## 2026-07-10 — P0 Security Hotfix: Tenant Isolation
+
+- **Auditoría de seguridad completa:** 31 rutas API analizadas por verbo HTTP. 12 rutas con gaps de aislamiento de tenant confirmados.
+- **Estado de RLS documentado:** `withTenantContext` definido en migración DB pero nunca llamado en handlers. Conexión DB usa `neondb_owner` (owner de tabla) que bypasses RLS. RLS es puramente decorativo — la app depende 100% de filtrado manual `tenantId`.
+- **Hotfix 1 (Webhook):** fail-closed sin HMAC, queries scoped por tenant, `x-test-order-id` deshabilitado (solo dev). `apps/storefront/app/api/webhooks/mercadopago/route.ts`
+- **Hotfix 2 (Checkout Preference):** IDOR patched, todas las queries scoped por tenant, logging estructurado (sin PII). `apps/storefront/app/api/checkout/preference/route.ts`
+- **Hotfix 3 (Cart):** `getTenantId` + filtro `tenantId` en queries de variantes e imágenes. `apps/storefront/app/api/cart/route.ts`
+- **Hotfix 4 (Checkout):** variant queries y stock UPDATE scoped por tenant. `apps/storefront/app/api/checkout/route.ts`
+- **Hotfix 5 (Admin products):** 8 handlers en 4 archivos — filtrado a nivel SQL con `and(eq(id), eq(tenantId))`. Checks post-query JS eliminados (previene TOCTOU). `apps/admin/app/api/products/[id]/route.ts` y subrutas
+- **Hotfix 6 (Admin orders):** 4 queries GET + 2 queries PUT scoped por tenant. `apps/admin/app/api/orders/[id]/route.ts`
+- **Hotfix 7 (Admin shipping):** UPDATE y DELETE scoped por tenant. `apps/admin/app/api/shipping/[id]/route.ts`
+- **Hotfix 8 (Register):** email lookup scoped por tenant con `and(eq(email), eq(tenantId))`. `apps/storefront/app/api/register/route.ts`
+- **Hotfix 9 (Superadmin role):** check `session.user.role === "superadmin"` en GET/POST/PUT/DELETE de `/api/tenants/*`. `apps/superadmin/app/api/tenants/route.ts` y `tenants/[id]/route.ts`
+- **227 tests pasando**, lint ✅, typecheck ✅
+- **Branch:** `fix/p0-tenant-isolation` desde `develop`

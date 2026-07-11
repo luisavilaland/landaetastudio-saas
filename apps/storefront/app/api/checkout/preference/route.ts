@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbOrders, dbOrderItems, dbProducts, dbProductVariants } from "@repo/db";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { checkoutPreferenceSchema } from "@repo/validation";
+import { getTenantId } from "@/lib/tenant";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("checkout-preference");
 
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
+  let orderId: string | undefined;
   try {
     const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
     if (!accessToken || accessToken.trim() === "") {
@@ -29,12 +34,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { orderId } = validation.data;
+    const data = validation.data;
+    orderId = data.orderId;
+
+    const tenantId = await getTenantId();
+    if (!tenantId) {
+      return NextResponse.json(
+        { error: "Tenant no encontrado" },
+        { status: 400 }
+      );
+    }
 
     const [order] = await db
       .select()
       .from(dbOrders)
-      .where(eq(dbOrders.id, orderId))
+      .where(and(eq(dbOrders.id, orderId), eq(dbOrders.tenantId, tenantId)))
       .limit(1);
 
     if (!order) {
@@ -86,7 +100,7 @@ export async function POST(request: NextRequest) {
         unitPrice: dbOrderItems.unitPrice,
       })
       .from(dbOrderItems)
-      .where(eq(dbOrderItems.orderId, orderId));
+      .where(and(eq(dbOrderItems.orderId, orderId), eq(dbOrderItems.tenantId, tenantId)));
 
     const variantIds = orderItems.map((item) => item.productVariantId);
     if (variantIds.length === 0) {
@@ -102,7 +116,7 @@ export async function POST(request: NextRequest) {
         productId: dbProductVariants.productId,
       })
       .from(dbProductVariants)
-      .where(inArray(dbProductVariants.id, variantIds));
+      .where(and(inArray(dbProductVariants.id, variantIds), eq(dbProductVariants.tenantId, tenantId)));
 
     if (variants.length === 0) {
       return NextResponse.json(
@@ -118,7 +132,7 @@ export async function POST(request: NextRequest) {
         name: dbProducts.name,
       })
       .from(dbProducts)
-      .where(inArray(dbProducts.id, productIds));
+      .where(and(inArray(dbProducts.id, productIds), eq(dbProducts.tenantId, tenantId)));
 
     const productMap = new Map(products.map((p) => [p.id, p.name]));
     const variantProductMap = new Map(variants.map((v) => [v.id, v.productId]));
@@ -143,11 +157,7 @@ export async function POST(request: NextRequest) {
       throw new Error("STOREFRONT_URL no está configurada. Define la URL pública del tienda (ej: https://...loca.lt)");
     }
 
-    console.log("[Preference] orderId:", orderId);
-    console.log("[Preference] items:", JSON.stringify(items));
-    console.log("[Preference] baseUrl:", baseUrl);
-    console.log("[Preference] accessToken:", accessToken.substring(0, 20) + "...");
-    console.log("[Preference] payer:", payer);
+    logger.info({ orderId, tenantId }, "Creating checkout preference");
 
     const preference = {
       items,
@@ -165,8 +175,6 @@ export async function POST(request: NextRequest) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    console.time("MP-request");
-
     let apiResponse: Response;
     try {
       apiResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
@@ -181,44 +189,36 @@ export async function POST(request: NextRequest) {
       });
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
-      console.timeEnd("MP-request");
       if (fetchError.name === "AbortError") {
-        console.error("[Preference] Timeout after 30s");
+        logger.error({ orderId, tenantId }, "MP preference creation timeout");
         return NextResponse.json(
           { error: "El servicio de pagos no está disponible temporalmente" },
           { status: 503 }
         );
       }
-      console.error("[Preference] Fetch error:", fetchError.message);
+      logger.error({ error: fetchError.message, orderId, tenantId }, "MP preference fetch error");
       throw fetchError;
     }
 
     clearTimeout(timeoutId);
-    console.timeEnd("MP-request");
 
     const responseData = await apiResponse.json();
 
-    console.log("[Preference] Status:", apiResponse.status);
-    console.log("[Preference] Response data:", JSON.stringify(responseData, null, 2));
-
     if (!apiResponse.ok) {
-      console.error("[Preference] API Error:", responseData);
+      logger.error({ status: apiResponse.status, orderId, tenantId }, "MP API error");
       return NextResponse.json(responseData, { status: apiResponse.status });
     }
 
     const useSandbox = accessToken.startsWith("TEST-");
     const initPoint = useSandbox ? responseData.sandbox_init_point : responseData.init_point;
 
-    console.log("[Preference] Preference ID:", responseData.id);
-    console.log("[Preference] Using sandbox:", useSandbox);
-    console.log("[Preference] --- CODIGO ACTUALIZADO: EXCLUSIONES ELIMINADAS ---");
-    console.log("[Preference] init_point:", initPoint);
+    logger.info({ preferenceId: responseData.id, useSandbox, orderId, tenantId }, "Preference created");
 
     return NextResponse.json({
       init_point: initPoint,
     });
   } catch (error: any) {
-    console.error("[Checkout Preference] Error:", error);
+    logger.error({ error: error?.message, orderId }, "Checkout preference error");
     const mpError = error?.message || error?.error?.message || "Error al crear preferencia de pago";
     return NextResponse.json(
       { error: mpError, code: error?.error?.code || "UNKNOWN" },

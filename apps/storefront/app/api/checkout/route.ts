@@ -71,6 +71,14 @@ export async function POST(request: NextRequest) {
 
     const { email, name, phone, address, shippingMethodId } = validation.data;
 
+    const tenantIdFromSlug = await getTenantId();
+    if (!tenantIdFromSlug) {
+      return NextResponse.json(
+        { error: "Tenant no válido" },
+        { status: 400 }
+      );
+    }
+
     const variantIds = cart.items.map((item) => item.variantId);
     const variants = await db
       .select({
@@ -80,7 +88,12 @@ export async function POST(request: NextRequest) {
         tenantId: dbProductVariants.tenantId,
       })
       .from(dbProductVariants)
-      .where(inArray(dbProductVariants.id, variantIds));
+      .where(
+        and(
+          inArray(dbProductVariants.id, variantIds),
+          eq(dbProductVariants.tenantId, tenantIdFromSlug)
+        )
+      );
 
     const variantMap = new Map(variants.map((v) => [v.id, v]));
 
@@ -115,39 +128,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tenantIdFromSlug = await getTenantId();
-    if (!tenantIdFromSlug) {
-      return NextResponse.json(
-        { error: "Tenant no válido" },
-        { status: 400 }
-      );
-    }
-
-    // Validate all variants belong to the same tenant as the slug
-    const tenantIds = new Set(variants.map((v) => v.tenantId));
-    if (tenantIds.size > 1) {
-      return NextResponse.json(
-        { error: "Items de diferentes tenants no permitidos" },
-        { status: 400 }
-      );
-    }
-
-    // Verify the variants are from the correct tenant
-    const variantTenantId = variants[0]?.tenantId;
-    if (variantTenantId !== tenantIdFromSlug) {
-      return NextResponse.json(
-        { error: "El producto no pertenece a esta tienda" },
-        { status: 400 }
-      );
-    }
-
-    if (!variantTenantId) {
-      return NextResponse.json(
-        { error: "No se pudo determinar el tenant" },
-        { status: 400 }
-      );
-    }
-
     const shippingDetails: ShippingDetails = { name, email, phone, address };
 
     let shippingCost = 0;
@@ -160,7 +140,7 @@ export async function POST(request: NextRequest) {
         .where(
           and(
             eq(dbShippingMethods.id, shippingMethodId),
-            eq(dbShippingMethods.tenantId, variantTenantId)
+            eq(dbShippingMethods.tenantId, tenantIdFromSlug)
           )
         )
         .limit(1);
@@ -187,8 +167,7 @@ export async function POST(request: NextRequest) {
       shippingDetails.shippingCost = shippingCost;
     }
 
-    // Use tenantIdFromSlug as the actual tenantId for the order
-    const orderTenantId = tenantIdFromSlug;
+
 
     // Get customer session if authenticated
     let customerId: string | null = null;
@@ -211,13 +190,18 @@ export async function POST(request: NextRequest) {
           .set({
             stock: (variant.stock ?? 0) - item.quantity,
           })
-          .where(eq(dbProductVariants.id, item.variantId));
+          .where(
+            and(
+              eq(dbProductVariants.id, item.variantId),
+              eq(dbProductVariants.tenantId, tenantIdFromSlug)
+            )
+          );
       }
 
       const [newOrder] = await tx
         .insert(dbOrders)
         .values({
-          tenantId: orderTenantId,
+          tenantId: tenantIdFromSlug,
           customerId: customerId,
           status: "pending_payment",
           total: orderTotal,
