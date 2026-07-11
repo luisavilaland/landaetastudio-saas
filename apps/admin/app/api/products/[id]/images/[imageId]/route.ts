@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbProductImages } from "@repo/db";
 import { auth } from "@/lib/auth";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { deleteImage } from "@repo/storage";
 
 type Params = Promise<{ id: string; imageId: string }>;
@@ -23,7 +23,7 @@ export async function DELETE(
     const images = await db
       .select()
       .from(dbProductImages)
-      .where(eq(dbProductImages.id, imageId))
+      .where(and(eq(dbProductImages.id, imageId), eq(dbProductImages.tenantId, tenantId)))
       .limit(1);
 
     if (images.length === 0) {
@@ -36,16 +36,12 @@ export async function DELETE(
       return NextResponse.json({ error: "Imagen no encontrada" }, { status: 404 });
     }
 
-    if (image.tenantId !== tenantId) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
-
     const fileName = image.url.replace(/^.*\//, "");
     await deleteImage(`products/${id}/${fileName}`);
 
     await db
       .delete(dbProductImages)
-      .where(eq(dbProductImages.id, imageId));
+      .where(and(eq(dbProductImages.id, imageId), eq(dbProductImages.tenantId, tenantId)));
 
     return NextResponse.json({ success: true });
   } catch (error) {

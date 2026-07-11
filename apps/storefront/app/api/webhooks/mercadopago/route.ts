@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbOrders, dbOrderItems, dbProductVariants } from "@repo/db";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { sendOrderConfirmationEmail } from "@/lib/email";
 import crypto from "crypto";
 import { webhookSchema } from "@repo/validation";
@@ -55,36 +55,31 @@ async function fetchPaymentDetails(paymentId: string, accessToken: string): Prom
 export async function POST(request: NextRequest) {
   try {
     const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
-    const isProduction = process.env.NODE_ENV === "production";
+
+    if (!webhookSecret) {
+      logger.error("MERCADOPAGO_WEBHOOK_SECRET not configured — rejecting webhook");
+      return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+    }
 
     const rawBody = await request.text();
+    const signature = request.headers.get("x-signature");
 
-    if (webhookSecret) {
-      const signature = request.headers.get("x-signature");
-
-      if (isProduction && !signature) {
-        logger.warn("Missing x-signature header");
-        return NextResponse.json({ error: "Missing signature" }, { status: 401 });
-      }
-
-      if (signature) {
-        const requestId = request.headers.get("x-request-id");
-        const dataToSign = requestId 
-          ? `${rawBody}.${requestId}` 
-          : rawBody;
-        const expectedSignature = crypto.createHmac("sha256", webhookSecret).update(dataToSign).digest("hex");
-        
-        if (signature !== expectedSignature) {
-          logger.warn({ expected: expectedSignature, received: signature }, "Invalid signature");
-          return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-        }
-        logger.debug("Signature verified");
-      } else {
-        logger.debug("Signature verification skipped (development mode)");
-      }
-    } else {
-      logger.debug("Signature verification disabled (no secret configured)");
+    if (!signature) {
+      logger.warn("Missing x-signature header");
+      return NextResponse.json({ error: "Missing signature" }, { status: 401 });
     }
+
+    const requestId = request.headers.get("x-request-id");
+    const dataToSign = requestId
+      ? `${rawBody}.${requestId}`
+      : rawBody;
+    const expectedSignature = crypto.createHmac("sha256", webhookSecret).update(dataToSign).digest("hex");
+
+    if (signature !== expectedSignature) {
+      logger.warn("Invalid signature");
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+    logger.debug("Signature verified");
 
     const parsedBody = JSON.parse(rawBody);
     const validation = webhookSchema.safeParse(parsedBody);
@@ -142,10 +137,7 @@ export async function POST(request: NextRequest) {
     logger.info({ paymentId, status: payment.status, statusDetail: payment.status_detail }, "Payment status");
     
     let orderId: string | null = mockExternalRef || payment.external_reference;
-    if (!orderId) {
-      orderId = request.headers.get("x-test-order-id");
-    }
-    
+
     if (!orderId) {
       logger.info({ paymentId }, "No external_reference found");
       return NextResponse.json({ received: true, message: "No external_reference found" });
@@ -167,6 +159,8 @@ export async function POST(request: NextRequest) {
       logger.warn({ orderId }, "Order not found");
       return NextResponse.json({ received: true });
     }
+
+    const tenantId = order.tenantId;
 
     let newStatus: string | null = null;
 
@@ -203,7 +197,7 @@ export async function POST(request: NextRequest) {
             webhookReceivedAt: new Date().toISOString(),
           },
         })
-        .where(eq(dbOrders.id, orderId));
+        .where(and(eq(dbOrders.id, orderId), eq(dbOrders.tenantId, tenantId)));
 
       logger.info({ orderId, newStatus }, "Order updated");
 
@@ -231,7 +225,7 @@ export async function POST(request: NextRequest) {
         const [variant] = await db
           .select({ stock: dbProductVariants.stock })
           .from(dbProductVariants)
-          .where(eq(dbProductVariants.id, item.productVariantId))
+          .where(and(eq(dbProductVariants.id, item.productVariantId), eq(dbProductVariants.tenantId, tenantId)))
           .limit(1);
 
         if (variant && variant.stock !== null) {
@@ -240,7 +234,7 @@ export async function POST(request: NextRequest) {
             .set({
               stock: variant.stock + item.quantity,
             })
-            .where(eq(dbProductVariants.id, item.productVariantId));
+            .where(and(eq(dbProductVariants.id, item.productVariantId), eq(dbProductVariants.tenantId, tenantId)));
 
           logger.info({ orderId, productVariantId: item.productVariantId, quantity: item.quantity }, "Stock restored");
         }
@@ -257,7 +251,7 @@ export async function POST(request: NextRequest) {
             stockRestored: true,
           },
         })
-        .where(eq(dbOrders.id, orderId));
+        .where(and(eq(dbOrders.id, orderId), eq(dbOrders.tenantId, tenantId)));
 
       logger.info({ orderId, newStatus }, "Order updated and stock restored");
     }

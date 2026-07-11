@@ -20,17 +20,17 @@ export async function GET(
     const product = await db
       .select({ tenantId: dbProducts.tenantId })
       .from(dbProducts)
-      .where(eq(dbProducts.id, productId))
+      .where(and(eq(dbProducts.id, productId), eq(dbProducts.tenantId, tenantId)))
       .limit(1);
 
-    if (product.length === 0 || product[0].tenantId !== tenantId) {
+    if (product.length === 0) {
     return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
   }
 
   const variants = await db
       .select()
       .from(dbProductVariants)
-      .where(eq(dbProductVariants.productId, productId))
+      .where(and(eq(dbProductVariants.productId, productId), eq(dbProductVariants.tenantId, tenantId)))
       .orderBy(dbProductVariants.createdAt);
 
     return NextResponse.json({ variants });
@@ -56,10 +56,10 @@ export async function POST(
     const product = await db
       .select({ tenantId: dbProducts.tenantId, slug: dbProducts.slug })
       .from(dbProducts)
-      .where(eq(dbProducts.id, productId))
+      .where(and(eq(dbProducts.id, productId), eq(dbProducts.tenantId, tenantId)))
       .limit(1);
 
-    if (product.length === 0 || product[0].tenantId !== tenantId) {
+    if (product.length === 0) {
       return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
@@ -82,7 +82,7 @@ export async function POST(
       const existingVariants = await tx
         .select()
         .from(dbProductVariants)
-        .where(eq(dbProductVariants.productId, productId));
+        .where(and(eq(dbProductVariants.productId, productId), eq(dbProductVariants.tenantId, tenantId)));
 
       // Check which variants have order_items (cannot be modified/deleted)
       const existingIds = existingVariants.map(v => v.id);
@@ -113,7 +113,7 @@ export async function POST(
             await tx
               .update(dbProductVariants)
               .set(updateData)
-              .where(eq(dbProductVariants.id, existingVariant.id));
+              .where(and(eq(dbProductVariants.id, existingVariant.id), eq(dbProductVariants.tenantId, tenantId)));
           } else {
             // Insert new variant
             const options = v.options || {};
@@ -156,7 +156,7 @@ export async function POST(
           if (!newSkus.includes(ev.sku) && !variantsWithOrders.has(ev.id)) {
             await tx
               .delete(dbProductVariants)
-              .where(eq(dbProductVariants.id, ev.id));
+              .where(and(eq(dbProductVariants.id, ev.id), eq(dbProductVariants.tenantId, tenantId)));
           }
         }
       } else {
@@ -198,7 +198,7 @@ export async function POST(
     const updatedVariants = await db
       .select()
       .from(dbProductVariants)
-      .where(eq(dbProductVariants.productId, productId))
+      .where(and(eq(dbProductVariants.productId, productId), eq(dbProductVariants.tenantId, tenantId)))
       .orderBy(dbProductVariants.createdAt);
 
     return NextResponse.json({ variants: updatedVariants });

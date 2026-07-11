@@ -30,7 +30,7 @@ import { superadminAuthFn as auth } from "@repo/auth";
 import { PUT } from "../route";
 
 const mockSession: Record<string, unknown> = {
-  user: { email: "super@admin.com" },
+  user: { email: "super@admin.com", role: "superadmin" },
   expires: "2099-01-01T00:00:00.000Z",
 };
 

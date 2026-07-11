@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbProducts, dbProductImages } from "@repo/db";
 import { auth } from "@/lib/auth";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { uploadImage } from "@repo/storage";
 import { productImageSchema } from "@repo/validation";
 import { createLogger } from "@/lib/logger";
@@ -27,21 +27,17 @@ export async function GET(
     const product = await db
       .select()
       .from(dbProducts)
-      .where(eq(dbProducts.id, id))
+      .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
       .limit(1);
 
     if (product.length === 0) {
       return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
-    if (product[0].tenantId !== tenantId) {
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
-    }
-
     const images = await db
       .select()
       .from(dbProductImages)
-      .where(eq(dbProductImages.productId, id))
+      .where(and(eq(dbProductImages.productId, id), eq(dbProductImages.tenantId, tenantId)))
       .orderBy(dbProductImages.position);
 
     return NextResponse.json({ images });
@@ -68,14 +64,10 @@ export async function POST(
     const product = await db
       .select()
       .from(dbProducts)
-      .where(eq(dbProducts.id, id))
+      .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
       .limit(1);
 
     if (product.length === 0) {
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
-    }
-
-    if (product[0].tenantId !== tenantId) {
       return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
     }
 
@@ -96,7 +88,7 @@ export async function POST(
     const existingImages = await db
       .select()
       .from(dbProductImages)
-      .where(eq(dbProductImages.productId, id))
+      .where(and(eq(dbProductImages.productId, id), eq(dbProductImages.tenantId, tenantId)))
       .orderBy(dbProductImages.position);
 
     const maxPosition = existingImages.length > 0

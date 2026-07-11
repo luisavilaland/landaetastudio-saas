@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { redisClient } from "@/lib/redis";
 import { db, dbProducts, dbProductVariants, dbProductImages } from "@repo/db";
-import { inArray, eq } from "drizzle-orm";
+import { inArray, eq, and } from "drizzle-orm";
 import { addCartItemSchema, updateCartItemSchema, deleteCartItemSchema } from "@repo/validation";
 import { createLogger } from "@/lib/logger";
+import { getTenantId } from "@/lib/tenant";
 
 const logger = createLogger("cart-api");
 
@@ -36,7 +37,7 @@ async function saveCart(sessionId: string, cart: Cart): Promise<void> {
   await redisClient.setex(`cart:${sessionId}`, CART_TTL, JSON.stringify(cart));
 }
 
-async function getEnrichedItems(cart: Cart, variants: any[]) {
+async function getEnrichedItems(cart: Cart, variants: any[], tenantId: string) {
   if (cart.items.length === 0) return [];
 
   const variantMap = new Map(variants.map((v) => [v.variantId, v]));
@@ -49,7 +50,12 @@ async function getEnrichedItems(cart: Cart, variants: any[]) {
           url: dbProductImages.url,
         })
         .from(dbProductImages)
-        .where(inArray(dbProductImages.productId, productIds))
+        .where(
+          and(
+            inArray(dbProductImages.productId, productIds),
+            eq(dbProductImages.tenantId, tenantId)
+          )
+        )
         .orderBy(dbProductImages.position)
     : [];
 
@@ -98,6 +104,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const tenantId = await getTenantId();
+    if (!tenantId) {
+      return NextResponse.json(
+        { error: "Tienda no encontrada" },
+        { status: 400 }
+      );
+    }
+
     const body = await request.json();
     const validation = addCartItemSchema.safeParse(body);
 
@@ -113,7 +127,12 @@ export async function POST(request: NextRequest) {
     const variant = await db
       .select()
       .from(dbProductVariants)
-      .where(eq(dbProductVariants.id, variantId))
+      .where(
+        and(
+          eq(dbProductVariants.id, variantId),
+          eq(dbProductVariants.tenantId, tenantId)
+        )
+      )
       .limit(1);
 
     if (variant.length === 0) {
@@ -171,6 +190,14 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    const tenantId = await getTenantId();
+    if (!tenantId) {
+      return NextResponse.json(
+        { error: "Tienda no encontrada" },
+        { status: 400 }
+      );
+    }
+
     const cart = await getCart(sessionId);
 
     const body = await request.json();
@@ -221,10 +248,15 @@ export async function PUT(request: NextRequest) {
           })
           .from(dbProductVariants)
           .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
-          .where(inArray(dbProductVariants.id, variantIds))
+          .where(
+            and(
+              inArray(dbProductVariants.id, variantIds),
+              eq(dbProductVariants.tenantId, tenantId)
+            )
+          )
       : [];
 
-    const items = getEnrichedItems(cart, variants);
+    const items = getEnrichedItems(cart, variants, tenantId);
 
     return NextResponse.json({ items });
   } catch (error) {
@@ -244,6 +276,14 @@ export async function DELETE(request: NextRequest) {
     if (!sessionId) {
       return NextResponse.json(
         { error: "Sesión de carrito no encontrada" },
+        { status: 400 }
+      );
+    }
+
+    const tenantId = await getTenantId();
+    if (!tenantId) {
+      return NextResponse.json(
+        { error: "Tienda no encontrada" },
         { status: 400 }
       );
     }
@@ -296,10 +336,15 @@ export async function DELETE(request: NextRequest) {
           })
           .from(dbProductVariants)
           .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
-          .where(inArray(dbProductVariants.id, variantIds))
+          .where(
+            and(
+              inArray(dbProductVariants.id, variantIds),
+              eq(dbProductVariants.tenantId, tenantId)
+            )
+          )
       : [];
 
-    const items = getEnrichedItems(cart, variants);
+    const items = getEnrichedItems(cart, variants, tenantId);
 
     return NextResponse.json({ items });
   } catch (error) {
@@ -318,6 +363,14 @@ export async function GET() {
 
     if (!sessionId) {
       return NextResponse.json({ items: [] });
+    }
+
+    const tenantId = await getTenantId();
+    if (!tenantId) {
+      return NextResponse.json(
+        { error: "Tienda no encontrada" },
+        { status: 400 }
+      );
     }
 
     const cart = await getCart(sessionId);
@@ -344,7 +397,10 @@ export async function GET() {
       .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
       .where(
         variantIds.length > 0
-          ? inArray(dbProductVariants.id, variantIds)
+          ? and(
+              inArray(dbProductVariants.id, variantIds),
+              eq(dbProductVariants.tenantId, tenantId)
+            )
           : undefined
       );
 
@@ -356,7 +412,12 @@ export async function GET() {
             url: dbProductImages.url,
           })
           .from(dbProductImages)
-          .where(inArray(dbProductImages.productId, productIds))
+          .where(
+            and(
+              inArray(dbProductImages.productId, productIds),
+              eq(dbProductImages.tenantId, tenantId)
+            )
+          )
           .orderBy(dbProductImages.position)
       : [];
 

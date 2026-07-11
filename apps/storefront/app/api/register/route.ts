@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, dbCustomers, dbTenants } from "@repo/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getTenantId } from "@/lib/tenant";
 import { registerSchema } from "@repo/validation";
@@ -34,12 +34,17 @@ export async function POST(request: NextRequest) {
 
     // Check if customer already exists for this tenant
     const [existing] = await db
-      .select({ id: dbCustomers.id, tenantId: dbCustomers.tenantId })
+      .select({ id: dbCustomers.id })
       .from(dbCustomers)
-      .where(eq(dbCustomers.email, email))
+      .where(
+        and(
+          eq(dbCustomers.email, email),
+          eq(dbCustomers.tenantId, tenantId)
+        )
+      )
       .limit(1);
 
-    if (existing && existing.tenantId === tenantId) {
+    if (existing) {
       return NextResponse.json(
         { error: "Email ya registrado", field: "email" },
         { status: 409 }
