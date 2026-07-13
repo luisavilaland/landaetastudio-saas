@@ -1,192 +1,248 @@
-import { describe, it, expect } from "vitest";
-import { NextResponse } from "next/server";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import crypto from "crypto";
 
-describe("POST /api/webhooks/mercadopago", () => {
-  describe("Webhook Simulation (Development Mode)", () => {
-    it("should approve payment with magic ID 123456789", async () => {
-      const handler = async (paymentId: string) => {
-        if (paymentId === "123456789") {
-          return NextResponse.json({ status: "approved" }, { status: 200 });
-        }
-        return NextResponse.json({ status: "pending" }, { status: 200 });
-      };
+vi.mock("@/lib/email", () => ({
+  sendOrderConfirmationEmail: vi.fn(),
+}));
 
-      const response = await handler("123456789");
-      const body = await response.json();
-      expect(body.status).toBe("approved");
-    });
+vi.mock("@/lib/logger", () => ({
+  createLogger: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
 
-    it("should reject payment with magic ID 000000", async () => {
-      const handler = async (paymentId: string) => {
-        if (paymentId === "000000") {
-          return NextResponse.json({ status: "rejected" }, { status: 200 });
-        }
-        return NextResponse.json({ status: "pending" }, { status: 200 });
-      };
+vi.mock("@repo/db", async () => {
+  const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
+  return {
+    ...actual,
+    db: { select: vi.fn(), update: vi.fn() },
+  };
+});
 
-      const response = await handler("000000");
-      const body = await response.json();
-      expect(body.status).toBe("rejected");
-    });
+import { NextRequest } from "next/server";
+import { db } from "@repo/db";
+import { POST } from "../route";
+
+const WEBHOOK_SECRET = "test-webhook-secret";
+const ACCESS_TOKEN = "TEST-98765_test_access_token";
+const RAW_BODY = JSON.stringify({ type: "payment", data: { id: "123456789" } });
+
+const MOCK_ORDER_ITEMS = [
+  { id: "item-1", productVariantId: "var-1", quantity: 2 },
+];
+
+const MOCK_ORDER = {
+  id: "order-dev-123",
+  tenantId: "tenant-123",
+  customerEmail: "buyer@test.com",
+  total: 10000,
+  status: "pending_payment",
+  shippingDetails: { name: "Test Buyer", email: "buyer@test.com", phone: "099111222", address: "Test 456" },
+  metadata: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  currency: "UYU",
+  customerId: null,
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createQuery<T>(resolveValue: T[]): any {
+  const q = {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue(resolveValue),
+    then: (onFulfilled: (v: T[]) => unknown) =>
+      Promise.resolve(resolveValue).then(onFulfilled),
+  };
+  return q;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeUpdateMock(): any {
+  return {
+    set: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    }),
+  };
+}
+
+function makeWebhookRequest(
+  rawBody: string,
+  overrides?: {
+    signature?: string;
+    requestId?: string;
+    testOrderId?: string;
+  }
+): NextRequest {
+  const headers = new Headers({ "content-type": "application/json" });
+
+  const requestId = overrides?.requestId || null;
+  const dataToSign = requestId ? `${rawBody}.${requestId}` : rawBody;
+  const signature = overrides?.signature ?? crypto.createHmac("sha256", WEBHOOK_SECRET).update(dataToSign).digest("hex");
+
+  headers.set("x-signature", signature);
+  if (requestId) {
+    headers.set("x-request-id", requestId);
+  }
+  if (overrides?.testOrderId) {
+    headers.set("x-test-order-id", overrides.testOrderId);
+  }
+
+  return {
+    text: async () => rawBody,
+    json: async () => JSON.parse(rawBody),
+    headers,
+    nextUrl: new URL("http://localhost"),
+    cookies: { get: vi.fn() },
+  } as unknown as NextRequest;
+}
+
+describe("POST /api/webhooks/mercadopago — HMAC verification", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.MERCADOPAGO_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    process.env.MERCADOPAGO_ACCESS_TOKEN = ACCESS_TOKEN;
+    vi.stubEnv("NODE_ENV", "development");
   });
 
-  describe("Webhook Headers", () => {
-    it("should use x-test-order-id header for test orders", async () => {
-      const handler = async (headers: Record<string, string>) => {
-        const testOrderId = headers["x-test-order-id"];
-        if (testOrderId) {
-          return NextResponse.json({ test: true, orderId: testOrderId });
-        }
-        return NextResponse.json({ error: "Missing x-test-order-id header" }, { status: 400 });
-      };
-
-      const response = await handler({ "x-test-order-id": "order-123" });
-      expect(response.status).toBe(200);
-    });
-
-    it("should require x-test-order-id for test mode", async () => {
-      const handler = async (headers: Record<string, string>) => {
-        const testOrderId = headers["x-test-order-id"];
-        if (!testOrderId) {
-          return NextResponse.json({ error: "Missing x-test-order-id header" }, { status: 400 });
-        }
-        return NextResponse.json({ test: true });
-      };
-
-      const response = await handler({});
-      expect(response.status).toBe(400);
-    });
+  afterEach(() => {
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    delete process.env.MERCADOPAGO_ACCESS_TOKEN;
+    vi.unstubAllEnvs();
   });
 
-  describe("Order Status Updates", () => {
-    it("should update order to confirmed on approved payment", () => {
-      const handler = (status: string) => {
-        if (status === "approved") {
-          return { orderStatus: "confirmed" };
-        }
-        return { orderStatus: "pending_payment" };
-      };
+  it("should return 503 when webhook secret is not configured", async () => {
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
 
-      const result = handler("approved");
-      expect(result.orderStatus).toBe("confirmed");
-    });
+    const res = await POST(makeWebhookRequest(RAW_BODY));
 
-    it("should update order to payment_failed on rejected payment", () => {
-      const handler = (status: string) => {
-        if (status === "rejected") {
-          return { orderStatus: "payment_failed" };
-        }
-        return { orderStatus: "pending_payment" };
-      };
-
-      const result = handler("rejected");
-      expect(result.orderStatus).toBe("payment_failed");
-    });
+    expect(res.status).toBe(503);
   });
 
-  describe("Idempotency", () => {
-    it("should prevent duplicate webhook processing using payment_id", () => {
-      const processedPayments = new Set<string>();
+  it("should return 401 when signature header is missing", async () => {
+    const req = {
+      text: async () => RAW_BODY,
+      json: async () => JSON.parse(RAW_BODY),
+      headers: new Headers({ "content-type": "application/json" }),
+      nextUrl: new URL("http://localhost"),
+      cookies: { get: vi.fn() },
+    } as unknown as NextRequest;
 
-      const handler = (paymentId: string) => {
-        if (processedPayments.has(paymentId)) {
-          return { error: "Already processed" };
-        }
-        processedPayments.add(paymentId);
-        return { success: true };
-      };
+    const res = await POST(req);
 
-      const result1 = handler("payment-123");
-      expect(result1).toHaveProperty("success", true);
-
-      const result2 = handler("payment-123");
-      expect(result2).toHaveProperty("error", "Already processed");
-    });
+    expect(res.status).toBe(401);
   });
 
-  describe("Payload Structure", () => {
-    it("should handle MP webhook payload structure", () => {
-      const validPayload = {
-        type: "payment",
-        data: { id: "payment-123" },
-      };
+  it("should return 401 when signature is invalid", async () => {
+    const res = await POST(makeWebhookRequest(RAW_BODY, { signature: "invalid-signature-value" }));
 
-      expect(validPayload).toHaveProperty("type");
-      expect(validPayload).toHaveProperty("data");
-      expect(validPayload.data).toHaveProperty("id");
-    });
+    expect(res.status).toBe(401);
+  });
+
+  it("should return 200 when signature is valid (no x-request-id)", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(createQuery([]));
+
+    const res = await POST(makeWebhookRequest(RAW_BODY));
+
+    expect(res.status).toBe(200);
+  });
+
+  it("should verify signature when x-request-id is present", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(createQuery([]));
+
+    const res = await POST(makeWebhookRequest(RAW_BODY, { requestId: "req-abc-123" }));
+
+    expect(res.status).toBe(200);
+  });
+
+  it("should reject when signature is wrong with x-request-id", async () => {
+    const res = await POST(
+      makeWebhookRequest(RAW_BODY, { requestId: "req-abc-123", signature: "totally-wrong" })
+    );
+
+    expect(res.status).toBe(401);
   });
 });
 
-describe("Checkout Flow", () => {
-  describe("Order Creation", () => {
-    it("should create order from cart", async () => {
-      const handler = async (cartItems: Array<{ variantId: string; quantity: number }>) => {
-        if (!cartItems || cartItems.length === 0) {
-          return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
-        }
-        return NextResponse.json({ orderId: "order-new", status: "pending_payment" });
-      };
+describe("POST /api/webhooks/mercadopago — Dev mode payment processing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.MERCADOPAGO_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    process.env.MERCADOPAGO_ACCESS_TOKEN = ACCESS_TOKEN;
+    vi.stubEnv("NODE_ENV", "development");
 
-      const response = await handler([{ variantId: "var-1", quantity: 2 }]);
-      expect(response.status).toBe(200);
-    });
-
-    it("should reject empty cart", async () => {
-      const handler = async (cartItems: Array<any>) => {
-        if (!cartItems || cartItems.length === 0) {
-          return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
-        }
-        return NextResponse.json({ orderId: "order-new" });
-      };
-
-      const response = await handler([]);
-      expect(response.status).toBe(400);
-    });
+    vi.mocked(db.update).mockReturnValue(makeUpdateMock());
   });
 
-  describe("Stock Management", () => {
-    it("should decrease stock on checkout", async () => {
-      const handler = async (currentStock: number, quantity: number) => {
-        const newStock = currentStock - quantity;
-        if (newStock < 0) {
-          return NextResponse.json({ error: "Insufficient stock" }, { status: 400 });
-        }
-        return NextResponse.json({ newStock });
-      };
-
-      const response = await handler(10, 2);
-      expect(response.status).toBe(200);
-    });
-
-    it("should reject when stock insufficient", async () => {
-      const handler = async (currentStock: number, quantity: number) => {
-        const newStock = currentStock - quantity;
-        if (newStock < 0) {
-          return NextResponse.json({ error: "Insufficient stock" }, { status: 400 });
-        }
-        return NextResponse.json({ newStock });
-      };
-
-      const response = await handler(3, 5);
-      expect(response.status).toBe(400);
-    });
+  afterEach(() => {
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    delete process.env.MERCADOPAGO_ACCESS_TOKEN;
+    vi.unstubAllEnvs();
   });
 
-  describe("Customer Association", () => {
-    it("should associate customerId from session if authenticated", async () => {
-      const handler = async (customerId: string | null) => {
-        if (customerId) {
-          return NextResponse.json({ customerId });
-        }
-        return NextResponse.json({ customerId: null });
-      };
+  it("should approve payment with magic ID 123456789", async () => {
+    vi.mocked(db.select).mockReturnValueOnce(createQuery([MOCK_ORDER]));
 
-      const withCustomer = await handler("customer-123");
-      const withoutCustomer = await handler(null);
+    const body = JSON.stringify({ type: "payment", data: { id: "123456789" } });
+    const res = await POST(makeWebhookRequest(body, { testOrderId: "order-dev-123" }));
 
-      expect(withCustomer.status).toBe(200);
-      expect(withoutCustomer.status).toBe(200);
-    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toEqual({ received: true });
+    expect(vi.mocked(db.update)).toHaveBeenCalled();
+  });
+
+  it("should reject payment with magic ID 000000", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(createQuery([MOCK_ORDER]))
+      .mockReturnValueOnce(createQuery(MOCK_ORDER_ITEMS))
+      .mockReturnValueOnce(createQuery([{ stock: 10 }]));
+
+    const body = JSON.stringify({ type: "payment", data: { id: "000000" } });
+    const res = await POST(makeWebhookRequest(body, { testOrderId: "order-dev-123" }));
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toEqual({ received: true });
+    expect(vi.mocked(db.update)).toHaveBeenCalled();
+  });
+
+  it("should return received when no orderId is provided for magic ID", async () => {
+    const body = JSON.stringify({ type: "payment", data: { id: "123456789" } });
+    const res = await POST(makeWebhookRequest(body));
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toHaveProperty("message", "No external_reference found");
+  });
+});
+
+describe("POST /api/webhooks/mercadopago — Validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.MERCADOPAGO_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    process.env.MERCADOPAGO_ACCESS_TOKEN = ACCESS_TOKEN;
+    vi.stubEnv("NODE_ENV", "development");
+  });
+
+  afterEach(() => {
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    delete process.env.MERCADOPAGO_ACCESS_TOKEN;
+    vi.unstubAllEnvs();
+  });
+
+  it("should return 400 when payload has invalid structure", async () => {
+    const res = await POST(makeWebhookRequest(JSON.stringify({ type: "payment" })));
+
+    expect(res.status).toBe(400);
+  });
+
+  it("should return 400 when payment id is missing from data", async () => {
+    const res = await POST(makeWebhookRequest(JSON.stringify({ type: "payment", data: {} })));
+
+    expect(res.status).toBe(400);
   });
 });

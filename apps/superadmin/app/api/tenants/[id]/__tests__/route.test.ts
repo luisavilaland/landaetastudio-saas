@@ -27,14 +27,14 @@ vi.mock("@repo/db", async () => {
 });
 
 import { superadminAuthFn as auth } from "@repo/auth";
-import { PUT } from "../route";
+import { GET, PUT, DELETE } from "../route";
 
 const mockSession: Record<string, unknown> = {
   user: { email: "super@admin.com", role: "superadmin" },
   expires: "2099-01-01T00:00:00.000Z",
 };
 
-function makeRequest(id: string, body: Record<string, unknown>) {
+function makePUTRequest(id: string, body: Record<string, unknown>) {
   return PUT(
     {
       json: async () => body,
@@ -57,6 +57,46 @@ const baseTenant: Tenant = {
   createdAt: new Date(),
   updatedAt: new Date(),
 };
+
+describe("GET /api/tenants/[id] — Role Check", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should return 403 when user is not superadmin", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (auth as any).mockResolvedValue({ user: { email: "admin@store.com", role: "admin" } });
+
+    const req = {
+      nextUrl: new URL("http://localhost"),
+      headers: new Headers(),
+      cookies: { get: () => undefined },
+    } as unknown as Parameters<typeof GET>[0];
+    const params: Parameters<typeof GET>[1] = { params: Promise.resolve({ id: "test-tenant-id" }) };
+    const res = await GET(req, params);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("DELETE /api/tenants/[id] — Role Check", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should return 403 when user is not superadmin", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (auth as any).mockResolvedValue({ user: { email: "admin@store.com", role: "admin" } });
+
+    const req = {
+      nextUrl: new URL("http://localhost"),
+      headers: new Headers(),
+      cookies: { get: () => undefined },
+    } as unknown as Parameters<typeof DELETE>[0];
+    const params: Parameters<typeof DELETE>[1] = { params: Promise.resolve({ id: "test-tenant-id" }) };
+    const res = await DELETE(req, params);
+    expect(res.status).toBe(403);
+  });
+});
 
 describe("PUT /api/tenants/[id]", () => {
   beforeEach(() => {
@@ -89,7 +129,7 @@ describe("PUT /api/tenants/[id]", () => {
       }),
     } as unknown as ReturnType<typeof db.update>);
 
-    const res = await makeRequest("test-tenant-id", { customDomain: "mitienda.com.uy" });
+    const res = await makePUTRequest("test-tenant-id", { customDomain: "mitienda.com.uy" });
 
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -97,7 +137,7 @@ describe("PUT /api/tenants/[id]", () => {
   });
 
   it("should reject invalid domain format", async () => {
-    const res = await makeRequest("test-tenant-id", { customDomain: "http://mitienda.com" });
+    const res = await makePUTRequest("test-tenant-id", { customDomain: "http://mitienda.com" });
 
     expect(res.status).toBe(400);
   });
@@ -118,7 +158,7 @@ describe("PUT /api/tenants/[id]", () => {
         limit: vi.fn().mockResolvedValue([duplicateTenant]),
       } as unknown as ReturnType<typeof db.select>);
 
-    const res = await makeRequest("test-tenant-id", { customDomain: "existing.com" });
+    const res = await makePUTRequest("test-tenant-id", { customDomain: "existing.com" });
 
     expect(res.status).toBe(409);
   });
@@ -141,7 +181,7 @@ describe("PUT /api/tenants/[id]", () => {
       }),
     } as unknown as ReturnType<typeof db.update>);
 
-    const res = await makeRequest("test-tenant-id", { customDomain: "" });
+    const res = await makePUTRequest("test-tenant-id", { customDomain: "" });
 
     expect(res.status).toBe(200);
     const data = await res.json();

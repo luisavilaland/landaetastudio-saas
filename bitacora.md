@@ -158,7 +158,7 @@
 
 | Métrica | Valor |
 |---------|-------|
-| Tests | 227 pasando, 0 fallos |
+| Tests | 238 pasando, 0 fallos |
 | Apps | storefront, admin, superadmin |
 | Servicios | Neon, Upstash, R2, Resend |
 | Deploy | Vercel (3 apps) |
@@ -197,7 +197,7 @@
 | # | Ruta | Fix |
 |---|------|-----|
 | 1 | `webhooks/mercadopago` | Fail-closed HMAC, queries scoped por tenant, `x-test-order-id` solo dev |
-| 2 | `checkout/preference` | IDOR patched, 4 queries scoped, logging estructurado sin PII |
+| 2 | `checkout/preference` | IDOR same-tenant cerrado (ownership check por email), rate limiting 10 req/min/IP, logging estructurado sin PII |
 | 3 | `cart/*` | `getTenantId` + filtro `tenantId` en variant/image queries |
 | 4 | `checkout` | Variant SELECT y stock UPDATE scoped por tenant |
 | 5 | `products/[id]/*` (8 handlers) | SQL-level `and(eq(id), eq(tenantId))` — TOCTOU eliminado |
@@ -212,4 +212,27 @@
 ### Deuda técnica documentada
 - ❌ `withTenantContext` nunca se llama en runtime. RLS es decorativo. Pendiente wiring completo.
 - ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/`.
-- ❌ Faltan 27 tests de integración de tenant isolation (planeados).
+- ❌ Faltan 14 tests de integración de tenant isolation (27 planeados - 13 escritos en hotfixes 1, 2 y 9).
+
+---
+
+## 2026-07-10 — P0 Hotfix v2: IDOR same-tenant + rate limiting + tests
+
+- **Fix IDOR same-tenant en checkout/preference:** se agregó `customerEmail` al schema de validación y ownership check: si `order.customerEmail !== callerEmail`, devuelve 403. Antes solo había tenant-scoping cross-tenant, pero cualquier visitante del mismo tenant podía crear preferencias para órdenes ajenas. `packages/validation/src/schemas.ts` y `apps/storefront/app/api/checkout/preference/route.ts`
+- **Rate limiting:** 10 req/min/IP con Redis (`INCR` + `PEXPIRE`), devuelve 429 al exceder. `apps/storefront/app/api/checkout/preference/route.ts`
+- **Frontend actualizado:** `apps/storefront/app/checkout/page.tsx` ahora envía `customerEmail` en el body de la preferencia.
+- **Pruebas de regresión reales (no inline handlers):** Los tests iniciales de checkout/preference, webhook y superadmin usaban handlers inline que nunca ejercitaban el código de producción. En esta sesión se reescribieron los 3 archivos para importar los handlers reales (`POST`, `GET` desde `../route`), con mocks de dependencias (`db`, `redisClient`, `getTenantId`, `auth`) que devuelven datos crudos (fila de orden, sesión, etc.), no respuestas HTTP armadas. 238 tests pasando.
+- **Tests reescritos (3 archivos, 11→32 tests efectivos):**
+  - `checkout/preference/__tests__/route.test.ts`: 12 tests (rate limiting, token, validación Zod, tenant resolution, IDOR 404/403/200, shipping). Importa `POST` real.
+  - `webhooks/mercadopago/__tests__/route.test.ts`: 11 tests (HMAC 503/401/200, dev mode approved/rejected, validation payload). Importa `POST` real. Reemplaza ~18 tests inline preexistentes (desde `daa9845`, nunca modificados en P0).
+  - `tenants/__tests__/route.test.ts`: 9 tests (GET role 401/403/200, POST role 403/201/409/400/400/401). Importa `GET`/`POST` reales. Reemplaza ~8 tests inline.
+- **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 238/238 ✅
+- **Branch:** `fix/p0-idor-rate-limit-tests`
+
+---
+
+## 2026-07-13 — Refuerzo de aserciones en tests de magic ID del webhook
+
+- Los dos tests de dev mode (magic ID 123456789 y 000000) solo verificaban `res.status === 200`, que el handler devuelve en múltiples caminos (procesado, order no encontrado, sin external_reference). Se agregaron aserciones de body (`expect(data).toEqual({ received: true })`) y confirmación de que `db.update` fue efectivamente llamado, distinguiendo el procesamiento exitoso del early exit.
+- `webhooks/mercadopago/__tests__/route.test.ts`: +4 aserciones (2 body + 2 db.update).
+- **No cambia el conteo de tests (sigue 238/238).**

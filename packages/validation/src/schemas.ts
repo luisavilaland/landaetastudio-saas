@@ -67,6 +67,7 @@ export const deleteCartItemSchema = z.object({
 
 export const checkoutPreferenceSchema = z.object({
   orderId: z.string().min(1),
+  customerEmail: z.string().email("Email inválido"),
 });
 
 export const shippingDetailsSchema = z.object({

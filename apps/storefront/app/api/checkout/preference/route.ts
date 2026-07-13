@@ -3,15 +3,41 @@ import { db, dbOrders, dbOrderItems, dbProducts, dbProductVariants } from "@repo
 import { and, eq, inArray } from "drizzle-orm";
 import { checkoutPreferenceSchema } from "@repo/validation";
 import { getTenantId } from "@/lib/tenant";
+import { redisClient } from "@/lib/redis";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("checkout-preference");
+
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 10;
+
+async function rateLimitKey(ip: string): Promise<number> {
+  const key = `rate_limit:checkout_preference:${ip}`;
+  const current = await redisClient.incr(key);
+  if (current === 1) {
+    await redisClient.pexpire(key, RATE_LIMIT_WINDOW_MS);
+  }
+  return current;
+}
 
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   let orderId: string | undefined;
   try {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+      || request.headers.get("x-real-ip")
+      || "unknown";
+
+    const count = await rateLimitKey(ip);
+    if (count > RATE_LIMIT_MAX) {
+      logger.warn({ ip, count }, "Rate limit exceeded for checkout preference");
+      return NextResponse.json(
+        { error: "Demasiadas solicitudes. Intenta de nuevo en un minuto." },
+        { status: 429 }
+      );
+    }
+
     const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
     if (!accessToken || accessToken.trim() === "") {
       return NextResponse.json(
@@ -21,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!accessToken.startsWith("TEST-") && !accessToken.startsWith("APP_USR-")) {
-      console.warn("[Preference] Token format may be invalid:", accessToken.substring(0, 20) + "...");
+      logger.warn({ tokenPrefix: accessToken.substring(0, 20) }, "Token format may be invalid");
     }
 
     const body = await request.json();
@@ -36,6 +62,7 @@ export async function POST(request: NextRequest) {
 
     const data = validation.data;
     orderId = data.orderId;
+    const callerEmail = data.customerEmail;
 
     const tenantId = await getTenantId();
     if (!tenantId) {
@@ -55,6 +82,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Orden no encontrada" },
         { status: 404 }
+      );
+    }
+
+    if (order.customerEmail !== callerEmail) {
+      logger.warn({ orderId, callerEmail, orderEmail: order.customerEmail }, "Email mismatch — IDOR attempt");
+      return NextResponse.json(
+        { error: "No autorizado" },
+        { status: 403 }
       );
     }
 
