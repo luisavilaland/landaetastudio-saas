@@ -228,3 +228,11 @@
   - `tenants/__tests__/route.test.ts`: 9 tests (GET role 401/403/200, POST role 403/201/409/400/400/401). Importa `GET`/`POST` reales. Reemplaza ~8 tests inline.
 - **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 238/238 ✅
 - **Branch:** `fix/p0-idor-rate-limit-tests`
+
+---
+
+## 2026-07-13 — Refuerzo de aserciones en tests de magic ID del webhook
+
+- Los dos tests de dev mode (magic ID 123456789 y 000000) solo verificaban `res.status === 200`, que el handler devuelve en múltiples caminos (procesado, order no encontrado, sin external_reference). Se agregaron aserciones de body (`expect(data).toEqual({ received: true })`) y confirmación de que `db.update` fue efectivamente llamado, distinguiendo el procesamiento exitoso del early exit.
+- `webhooks/mercadopago/__tests__/route.test.ts`: +4 aserciones (2 body + 2 db.update).
+- **No cambia el conteo de tests (sigue 238/238).**

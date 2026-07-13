@@ -190,6 +190,9 @@ describe("POST /api/webhooks/mercadopago — Dev mode payment processing", () =>
     const res = await POST(makeWebhookRequest(body, { testOrderId: "order-dev-123" }));
 
     expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toEqual({ received: true });
+    expect(vi.mocked(db.update)).toHaveBeenCalled();
   });
 
   it("should reject payment with magic ID 000000", async () => {
@@ -202,6 +205,9 @@ describe("POST /api/webhooks/mercadopago — Dev mode payment processing", () =>
     const res = await POST(makeWebhookRequest(body, { testOrderId: "order-dev-123" }));
 
     expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toEqual({ received: true });
+    expect(vi.mocked(db.update)).toHaveBeenCalled();
   });
 
   it("should return received when no orderId is provided for magic ID", async () => {
