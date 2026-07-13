@@ -158,7 +158,7 @@
 
 | Métrica | Valor |
 |---------|-------|
-| Tests | 233 pasando, 0 fallos |
+| Tests | 238 pasando, 0 fallos |
 | Apps | storefront, admin, superadmin |
 | Servicios | Neon, Upstash, R2, Resend |
 | Deploy | Vercel (3 apps) |
@@ -221,9 +221,10 @@
 - **Fix IDOR same-tenant en checkout/preference:** se agregó `customerEmail` al schema de validación y ownership check: si `order.customerEmail !== callerEmail`, devuelve 403. Antes solo había tenant-scoping cross-tenant, pero cualquier visitante del mismo tenant podía crear preferencias para órdenes ajenas. `packages/validation/src/schemas.ts` y `apps/storefront/app/api/checkout/preference/route.ts`
 - **Rate limiting:** 10 req/min/IP con Redis (`INCR` + `PEXPIRE`), devuelve 429 al exceder. `apps/storefront/app/api/checkout/preference/route.ts`
 - **Frontend actualizado:** `apps/storefront/app/checkout/page.tsx` ahora envía `customerEmail` en el body de la preferencia.
-- **Tests escritos (13 nuevos, 227→233):**
-  - Checkout preference: 8 tests (IDOR email mismatch/success, rate limiting, token missing)
-  - Webhook: 7 tests (HMAC secret/signature/validation, payment processing)
-  - Superadmin: +2 tests (POST role check), +2 tests (GET + DELETE role check en `[id]`)
-- **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 233/233 ✅
+- **Pruebas de regresión reales (no inline handlers):** Los tests iniciales de checkout/preference, webhook y superadmin usaban handlers inline que nunca ejercitaban el código de producción. En esta sesión se reescribieron los 3 archivos para importar los handlers reales (`POST`, `GET` desde `../route`), con mocks de dependencias (`db`, `redisClient`, `getTenantId`, `auth`) que devuelven datos crudos (fila de orden, sesión, etc.), no respuestas HTTP armadas. 238 tests pasando.
+- **Tests reescritos (3 archivos, 11→32 tests efectivos):**
+  - `checkout/preference/__tests__/route.test.ts`: 12 tests (rate limiting, token, validación Zod, tenant resolution, IDOR 404/403/200, shipping). Importa `POST` real.
+  - `webhooks/mercadopago/__tests__/route.test.ts`: 11 tests (HMAC 503/401/200, dev mode approved/rejected, validation payload). Importa `POST` real. Reemplaza ~18 tests inline preexistentes (desde `daa9845`, nunca modificados en P0).
+  - `tenants/__tests__/route.test.ts`: 9 tests (GET role 401/403/200, POST role 403/201/409/400/400/401). Importa `GET`/`POST` reales. Reemplaza ~8 tests inline.
+- **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 238/238 ✅
 - **Branch:** `fix/p0-idor-rate-limit-tests`
