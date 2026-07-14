@@ -8,10 +8,12 @@ export const db = drizzle(client, { schema });
 
 export async function withTenantContext<T>(
   tenantId: string,
-  callback: () => Promise<T>
+  callback: (tx: typeof db) => Promise<T>
 ): Promise<T> {
-  await db.execute(sql`SELECT set_tenant_id(${tenantId}::uuid)`);
-  return await callback();
+  return await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_tenant_id(${tenantId}::uuid)`);
+    return await callback(tx);
+  });
 }
 
 export { schema };
