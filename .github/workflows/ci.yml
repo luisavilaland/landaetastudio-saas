@@ -33,3 +33,5 @@ jobs:
           echo "MERCADOPAGO_ACCESS_TOKEN=dummy" >> .env.local
 
       - run: pnpm build
+
+      - run: pnpm test
