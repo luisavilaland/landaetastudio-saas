@@ -272,27 +272,38 @@
 
 ---
 
+---
+
+## 2026-07-14 — Fase 0: pnpm test en CI workflow
+
+- **Branch:** `ci-add-pnpm-test`
+- **Cambio:** una línea agregada en `.github/workflows/ci.yml` — `- run: pnpm test` después de `pnpm build`, reusando el `.env.local` del paso anterior.
+- **Verificación:** 289/289 tests pasan en CI local. `turbo.json` ya tenía el task `test` definido.
+- **PR:** https://github.com/luisavilaland/landaetastudio-saas/pull/new/ci-add-pnpm-test
+
+---
+
 ## Estado actual (14 de julio 2026)
 
 | Métrica | Valor |
 |---------|-------|
-| Tests | 229 pasando, 0 fallos (90 storefront, 139 admin) |
+| Tests | 289 pasando, 0 fallos |
 | Apps | storefront, admin, superadmin |
 | Servicios | Neon, Upstash, R2, Resend |
 | Deploy | Vercel (3 apps) |
 | Rama default | `develop` |
 | Build | Limpio (sin `ignoreBuildErrors`) |
-| CI | GitHub Actions (lint, typecheck, build) — **sin `pnpm test`** (Fase 0 pendiente) |
+| CI | GitHub Actions (lint, typecheck, build, **test**) |
 | RLS | Decorativo — `withTenantContext` roto (SET LOCAL en auto-commit). Plan P1-1 listo para ejecutar |
 
 **Deuda técnica resuelta:**
 - ✅ P0 Security Hotfix: 12 handlers con filtrado manual `tenantId`
-- ✅ P1-3: 7 archivos de test de regresión para 6 hotfixes P0 (229 tests)
+- ✅ P1-3: 7 archivos de test de regresión para 6 hotfixes P0
 - ✅ Bug `getEnrichedItems` sin `await` en cart PUT/DELETE (raíz de bug productivo)
 - ✅ Bug contaminación mocks webhooks (mockReturnValueOnce no consumido)
 - ✅ Plan P1-1 diseñado con 4-PR execution plan, transacciones angostas, validación contra DB real
+- ✅ Fase 0: `pnpm test` agregado al CI workflow
 
 **Deuda técnica pendiente:**
 - ❌ `withTenantContext` nunca se llama en runtime. RLS es decorativo. P1-1 en 4 PRs.
 - ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/`.
-- ❌ CI no corre `pnpm test` (Fase 0, PR1).
