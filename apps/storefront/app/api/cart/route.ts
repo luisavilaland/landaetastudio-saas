@@ -256,7 +256,7 @@ export async function PUT(request: NextRequest) {
           )
       : [];
 
-    const items = getEnrichedItems(cart, variants, tenantId);
+    const items = await getEnrichedItems(cart, variants, tenantId);
 
     return NextResponse.json({ items });
   } catch (error) {
@@ -344,7 +344,7 @@ export async function DELETE(request: NextRequest) {
           )
       : [];
 
-    const items = getEnrichedItems(cart, variants, tenantId);
+    const items = await getEnrichedItems(cart, variants, tenantId);
 
     return NextResponse.json({ items });
   } catch (error) {
