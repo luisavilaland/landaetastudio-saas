@@ -8,18 +8,31 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@repo/db", async () => {
   const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
-  return {
-    ...actual,
-    db: {
-      select: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-  };
+  return { ...actual, db: { transaction: vi.fn() } };
 });
 
 import { auth } from "@/lib/auth";
 import { GET, PUT, DELETE } from "../route";
+
+function makeTxMock() {
+  return {
+    select: vi.fn(),
+    insert: vi.fn().mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{}]),
+      }),
+    }),
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    }),
+    delete: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    }),
+    execute: vi.fn().mockResolvedValue(undefined),
+  };
+}
 
 function makeGETRequest(id: string) {
   return GET(
@@ -90,11 +103,14 @@ describe("GET /api/shipping/[id]", () => {
     vi.mocked(auth).mockResolvedValue({
       user: { tenantId: otherTenant, email: "admin@b.com" },
     });
-    vi.mocked(db.select).mockReturnValueOnce({
+
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([]),
-    } as unknown as ReturnType<typeof db.select>);
+    } as ReturnType<typeof db.select>);
+    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
 
     const res = await makeGETRequest(mockId);
     expect(res.status).toBe(404);
@@ -104,11 +120,14 @@ describe("GET /api/shipping/[id]", () => {
     vi.mocked(auth).mockResolvedValue({
       user: { tenantId: sessionTenant, email: "admin@test.com" },
     });
-    vi.mocked(db.select).mockReturnValueOnce({
+
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([mockMethod]),
-    } as unknown as ReturnType<typeof db.select>);
+    } as ReturnType<typeof db.select>);
+    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
 
     const res = await makeGETRequest(mockId);
     expect(res.status).toBe(200);
@@ -136,11 +155,14 @@ describe("PUT /api/shipping/[id]", () => {
     vi.mocked(auth).mockResolvedValue({
       user: { tenantId: otherTenant, email: "admin@b.com" },
     });
-    vi.mocked(db.select).mockReturnValueOnce({
+
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([]),
-    } as unknown as ReturnType<typeof db.select>);
+    } as ReturnType<typeof db.select>);
+    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
 
     const res = await makePUTRequest(mockId, { name: "Express" });
     expect(res.status).toBe(404);
@@ -150,11 +172,14 @@ describe("PUT /api/shipping/[id]", () => {
     vi.mocked(auth).mockResolvedValue({
       user: { tenantId: sessionTenant, email: "admin@test.com" },
     });
-    vi.mocked(db.select).mockReturnValueOnce({
+
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([mockMethod]),
-    } as unknown as ReturnType<typeof db.select>);
+    } as ReturnType<typeof db.select>);
+    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
 
     const res = await makePUTRequest(mockId, { price: -100 });
     expect(res.status).toBe(400);
@@ -166,18 +191,21 @@ describe("PUT /api/shipping/[id]", () => {
     vi.mocked(auth).mockResolvedValue({
       user: { tenantId: sessionTenant, email: "admin@test.com" },
     });
-    vi.mocked(db.select).mockReturnValueOnce({
+
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([mockMethod]),
-    } as unknown as ReturnType<typeof db.select>);
-    vi.mocked(db.update).mockReturnValueOnce({
+    } as ReturnType<typeof db.select>);
+    mockTx.update.mockReturnValueOnce({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([updatedMethod]),
         }),
       }),
-    } as unknown as ReturnType<typeof db.update>);
+    } as ReturnType<typeof db.update>);
+    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
 
     const res = await makePUTRequest(mockId, { name: "Express Shipping" });
     expect(res.status).toBe(200);
@@ -203,11 +231,14 @@ describe("DELETE /api/shipping/[id]", () => {
     vi.mocked(auth).mockResolvedValue({
       user: { tenantId: otherTenant, email: "admin@b.com" },
     });
-    vi.mocked(db.select).mockReturnValueOnce({
+
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([]),
-    } as unknown as ReturnType<typeof db.select>);
+    } as ReturnType<typeof db.select>);
+    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
 
     const res = await makeDELETERequest(mockId);
     expect(res.status).toBe(404);
@@ -217,14 +248,14 @@ describe("DELETE /api/shipping/[id]", () => {
     vi.mocked(auth).mockResolvedValue({
       user: { tenantId: sessionTenant, email: "admin@test.com" },
     });
-    vi.mocked(db.select).mockReturnValueOnce({
+
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([mockMethod]),
-    } as unknown as ReturnType<typeof db.select>);
-    vi.mocked(db.delete).mockReturnValueOnce({
-      where: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ReturnType<typeof db.delete>);
+    } as ReturnType<typeof db.select>);
+    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
 
     const res = await makeDELETERequest(mockId);
     expect(res.status).toBe(204);
