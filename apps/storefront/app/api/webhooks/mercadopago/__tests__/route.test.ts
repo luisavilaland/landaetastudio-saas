@@ -143,16 +143,12 @@ describe("POST /api/webhooks/mercadopago — HMAC verification", () => {
   });
 
   it("should return 200 when signature is valid (no x-request-id)", async () => {
-    vi.mocked(db.select).mockReturnValueOnce(createQuery([]));
-
     const res = await POST(makeWebhookRequest(RAW_BODY));
 
     expect(res.status).toBe(200);
   });
 
   it("should verify signature when x-request-id is present", async () => {
-    vi.mocked(db.select).mockReturnValueOnce(createQuery([]));
-
     const res = await POST(makeWebhookRequest(RAW_BODY, { requestId: "req-abc-123" }));
 
     expect(res.status).toBe(200);
@@ -173,8 +169,6 @@ describe("POST /api/webhooks/mercadopago — Dev mode payment processing", () =>
     process.env.MERCADOPAGO_WEBHOOK_SECRET = WEBHOOK_SECRET;
     process.env.MERCADOPAGO_ACCESS_TOKEN = ACCESS_TOKEN;
     vi.stubEnv("NODE_ENV", "development");
-
-    vi.mocked(db.update).mockReturnValue(makeUpdateMock());
   });
 
   afterEach(() => {
@@ -185,6 +179,7 @@ describe("POST /api/webhooks/mercadopago — Dev mode payment processing", () =>
 
   it("should approve payment with magic ID 123456789", async () => {
     vi.mocked(db.select).mockReturnValueOnce(createQuery([MOCK_ORDER]));
+    vi.mocked(db.update).mockReturnValue(makeUpdateMock());
 
     const body = JSON.stringify({ type: "payment", data: { id: "123456789" } });
     const res = await POST(makeWebhookRequest(body, { testOrderId: "order-dev-123" }));
@@ -192,6 +187,23 @@ describe("POST /api/webhooks/mercadopago — Dev mode payment processing", () =>
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data).toEqual({ received: true });
+    expect(vi.mocked(db.update)).toHaveBeenCalled();
+  });
+
+  it("should reject payment with magic ID 000000", async () => {
+    vi.mocked(db.select)
+      .mockReturnValueOnce(createQuery([MOCK_ORDER]))
+      .mockReturnValueOnce(createQuery(MOCK_ORDER_ITEMS))
+      .mockReturnValueOnce(createQuery([{ stock: 10 }]));
+    vi.mocked(db.update).mockReturnValue(makeUpdateMock());
+
+    const body = JSON.stringify({ type: "payment", data: { id: "000000" } });
+    const res = await POST(makeWebhookRequest(body, { testOrderId: "order-dev-123" }));
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toEqual({ received: true });
+    expect(vi.mocked(db.update)).toHaveBeenCalled();
   });
 
   it("should return received when no orderId is provided for magic ID", async () => {
