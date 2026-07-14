@@ -20,11 +20,12 @@ Se revisaron los logs de Vercel (storefront, admin, superadmin) durante la audit
 
 1. **No activar `FORCE ROW LEVEL SECURITY`** hasta que `withTenantContext` esté implementado en todos los handlers que tocan tablas de negocio. Activarlo ahora rompería todas las queries existentes.
 2. Los P0 hotfixes cierran los 12 gaps de filtrado manual encontrados en la auditoría.
-3. Como siguiente paso: implementar `withTenantContext` como middleware/helper global y migrar las queries a usar `sql` con `current_setting('app.tenant_id')` en lugar de parámetros explícitos.
+3. `withTenantContext` debe usar `db.transaction` internamente con `tx` pasado al callback — el SET LOCAL en auto-commit se pierde antes de las queries del callback.
 
 ## Estado
 
 - ✅ Filtrado manual `tenantId` en los 12 handlers con gaps (hotfixes 1–9)
-- ❌ `withTenantContext` sin implementar en runtime
+- ✅ Plan P1-1 diseñado: `withTenantContext` con `db.transaction` + `tx` callback. Ejecución en 4 PRs.
+- ❌ `withTenantContext` sin implementar en runtime (PR2 + PR3)
 - ❌ RLS decorativo, sin efecto real
-- ⏳ Pendiente: wiring completo de `withTenantContext` + activación `FORCE ROW LEVEL SECURITY`
+- ⏳ **Pendiente:** PR1 (CI con tests) → PR2 (18 handlers Patrón A) → PR3 (5 handlers Patrón B, transacción angosta) → validación contra Neon branch → PR4 (FORCE RLS)

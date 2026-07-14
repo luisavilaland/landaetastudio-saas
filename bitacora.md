@@ -248,4 +248,51 @@
 - **12 fallos resueltos en storefront:** register (5 — mock bcryptjs), cart (4 — await faltante + mock images), checkout (1 — total esperado), webhooks (2 — mock contamination).
 - **Bug de contaminación de mocks en webhooks:** los HMAC tests `"should return 200 when signature is valid"` y `"should verify signature when x-request-id is present"` usan `RAW_BODY` con `paymentId: "123456789"`. En dev mode, el handler entra al path magic ID y retorna antes de consumir `db.select` (porque `external_reference` es null). El `mockReturnValueOnce` no consumido persistía al siguiente test, haciendo que `db.select` devolviera `[]` y el handler no encontrara la orden. Fix: eliminar los `db.select.mockReturnValueOnce` innecesarios de esos dos tests. Las aserciones `expect(db.update).toHaveBeenCalled()` se restauraron en ambos tests de magic ID (approved + rejected).
 - **Verificación:** storefront 90/90 ✅ | admin 140/140 ✅ | lint ✅ | typecheck ✅
-- **Branch:** `p1/tenant-isolation-tests`**
+- **Branch:** `p1/tenant-isolation-tests`
+
+---
+
+## 2026-07-14 — P1-1 Plan: withTenantContext real + FORCE RLS
+
+- **PR #6 mergeado a develop:** P1-3 (tests de regresión P0 + bug await cart + bug contaminación webhooks). branch `p1/tenant-isolation-tests`
+- **Bug crítico descubierto en `withTenantContext`:** la implementación actual usa `set_config('app.tenant_id', ..., true)` (SET LOCAL) dentro de `db.execute()`, que es auto-commit. El setting se pierde antes de las queries del callback. RLS es 0% efectivo — ninguna query evalúa las políticas en runtime.
+- **Solución:** `withTenantContext` debe usar `db.transaction` internamente, pasando `tx` al callback. SET LOCAL + todas las queries viven en la misma transacción.
+- **Plan P1-1 diseñado** con 7 fases (A→G) y validación contra Neon branch real.
+- **3 correcciones del usuario aplicadas al plan:**
+  1. Webhook: email de confirmación movido fuera del `return withTenantContext(...)` — antes quedaba como código muerto
+  2. `checkout/preference`: ejemplo corregido (solo lee, no inserta órdenes)
+  3. CI (`pnpm test`) como Fase 0 — PR independiente antes del refactor
+- **Plan de ejecución en 4 PRs:**
+  - **PR1:** Fase 0 — `pnpm test` en CI workflow
+  - **PR2:** Patrón A (18 handlers sin I/O externo) + tests
+  - **PR3:** Patrón B (5 handlers con I/O externo) + tests — revisión aislada
+  - (validación manual: Neon branch + concurrencia)
+  - **PR4:** FORCE ROW LEVEL SECURITY — solo después de validación
+- **Deuda técnica:** 229 tests (90 storefront + 139 admin). Tras reescritura de tests de Fase B, subirá ~11 archivos
+
+---
+
+## Estado actual (14 de julio 2026)
+
+| Métrica | Valor |
+|---------|-------|
+| Tests | 229 pasando, 0 fallos (90 storefront, 139 admin) |
+| Apps | storefront, admin, superadmin |
+| Servicios | Neon, Upstash, R2, Resend |
+| Deploy | Vercel (3 apps) |
+| Rama default | `develop` |
+| Build | Limpio (sin `ignoreBuildErrors`) |
+| CI | GitHub Actions (lint, typecheck, build) — **sin `pnpm test`** (Fase 0 pendiente) |
+| RLS | Decorativo — `withTenantContext` roto (SET LOCAL en auto-commit). Plan P1-1 listo para ejecutar |
+
+**Deuda técnica resuelta:**
+- ✅ P0 Security Hotfix: 12 handlers con filtrado manual `tenantId`
+- ✅ P1-3: 7 archivos de test de regresión para 6 hotfixes P0 (229 tests)
+- ✅ Bug `getEnrichedItems` sin `await` en cart PUT/DELETE (raíz de bug productivo)
+- ✅ Bug contaminación mocks webhooks (mockReturnValueOnce no consumido)
+- ✅ Plan P1-1 diseñado con 4-PR execution plan, transacciones angostas, validación contra DB real
+
+**Deuda técnica pendiente:**
+- ❌ `withTenantContext` nunca se llama en runtime. RLS es decorativo. P1-1 en 4 PRs.
+- ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/`.
+- ❌ CI no corre `pnpm test` (Fase 0, PR1).

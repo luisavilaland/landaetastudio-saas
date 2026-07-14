@@ -21,7 +21,7 @@
 - **Carrito anónimo**: cookie `cart_session_id` + Redis (Upstash); 7 días TTL. Sin autenticación requerida.
 - **Imágenes**: usar `@repo/storage` (R2 en prod, MinIO local). Siempre subir con FormData y obtener URL pública.
 - **Webhook MercadoPago**: idempotencia con `payment_id` para evitar duplicados.
-- **RLS (Row Level Security)**: activado en todas las tablas de negocio. Toda query debe ejecutarse dentro de un contexto `withTenantContext(tenantId)` que establece `app.tenant_id` para PostgreSQL.
+- **RLS (Row Level Security)**: activado en todas las tablas de negocio. Toda query debe ejecutarse dentro de `withTenantContext(tenantId, callback(tx))` que abre una transacción `db.transaction`, ejecuta `SELECT set_tenant_id(${tenantId}::uuid)` (SET LOCAL), y pasa `tx` al callback. **No usar `db.execute()` directo para SET LOCAL** — es auto-commit y el setting se pierde antes de las queries. Dentro del callback, todas las queries usan `tx.` (ej: `tx.select()`, `tx.update()`).
 - **AUTH_SECRET obligatorio**: sin fallback hardcoded. La app no arranca si la variable no está configurada.
 - **CSRF protection**: manejado automáticamente por NextAuth v5 en producción. No se debe desactivar explícitamente en `next.config.mjs`.
 - **Validación de variables de entorno**: Zod valida todas las variables críticas al iniciar la app (`packages/validation/src/env.ts`). Si falta alguna en producción, la app falla inmediatamente con un error claro.
