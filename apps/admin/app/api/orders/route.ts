@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
-    return withTenantContext(tenantId, async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
       const whereConditions = [eq(dbOrders.tenantId, tenantId)];
       if (status && VALID_STATUSES.includes(status)) {
         whereConditions.push(eq(dbOrders.status, status));

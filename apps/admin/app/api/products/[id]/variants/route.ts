@@ -17,7 +17,7 @@ export async function GET(
     const { id: productId } = await params;
     const tenantId = session.user?.tenantId as string;
 
-    return withTenantContext(tenantId, async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
       const product = await tx
         .select({ tenantId: dbProducts.tenantId })
         .from(dbProducts)
@@ -55,31 +55,30 @@ export async function POST(
     const { id: productId } = await params;
     const tenantId = session.user?.tenantId as string;
 
-    const product = await db
-      .select({ tenantId: dbProducts.tenantId, slug: dbProducts.slug })
-      .from(dbProducts)
-      .where(and(eq(dbProducts.id, productId), eq(dbProducts.tenantId, tenantId)))
-      .limit(1);
-
-    if (product.length === 0) {
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
-    }
-
     const body = await request.json();
     const validation = variantsArraySchema.safeParse(body);
 
     if (!validation.success) {
-    return NextResponse.json(
-      { error: "Validación fallida", issues: validation.error.issues },
-      { status: 400 }
-    );
+      return NextResponse.json(
+        { error: "Validación fallida", issues: validation.error.issues },
+        { status: 400 }
+      );
     }
 
     const { variants } = validation.data;
 
     const now = new Date();
 
-    return withTenantContext(tenantId, async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
+      const product = await tx
+        .select({ tenantId: dbProducts.tenantId, slug: dbProducts.slug })
+        .from(dbProducts)
+        .where(and(eq(dbProducts.id, productId), eq(dbProducts.tenantId, tenantId)))
+        .limit(1);
+
+      if (product.length === 0) {
+        return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+      }
       // Get existing variants
       const existingVariants = await tx
         .select()

@@ -13,7 +13,7 @@ export async function GET() {
 
   const tenantId = session.user?.tenantId as string;
 
-  return withTenantContext(tenantId, async (tx) => {
+  return await withTenantContext(tenantId, async (tx) => {
     const methods = await tx
       .select()
       .from(dbShippingMethods)
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     const { name, description, price, freeShippingThreshold, estimatedDaysMin, estimatedDaysMax, isActive, sortOrder } = validation.data;
 
-    return withTenantContext(tenantId, async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
       const now = new Date();
 
       const [method] = await tx

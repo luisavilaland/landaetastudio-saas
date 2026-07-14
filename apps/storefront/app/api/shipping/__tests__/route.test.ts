@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { db } from "@repo/db";
+import { db, withTenantContext } from "@repo/db";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
@@ -7,13 +7,13 @@ vi.mock("next/headers", () => ({
 
 vi.mock("@repo/db", async () => {
   const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
-  return { ...actual, db: { transaction: vi.fn() }, dbShippingMethods: {} };
+  return { ...actual, withTenantContext: vi.fn(), db: { transaction: vi.fn() } };
 });
 
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  asc: vi.fn(),
-}));
+vi.mock("drizzle-orm", async () => {
+  const actual = await vi.importActual<typeof import("drizzle-orm")>("drizzle-orm");
+  return { ...actual, eq: vi.fn(), asc: vi.fn() };
+});
 
 import { headers } from "next/headers";
 import { GET } from "../route";
@@ -35,7 +35,7 @@ function makeTxMock() {
       where: vi.fn().mockResolvedValue(undefined),
     }),
     execute: vi.fn().mockResolvedValue(undefined),
-  };
+  } as any;
 }
 
 const mockActiveMethods = [
@@ -78,20 +78,21 @@ const mockInactiveMethod = {
 describe("GET /api/shipping (storefront)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(makeTxMock()));
   });
 
   it("retorna métodos activos cuando hay tenantId en headers", async () => {
     vi.mocked(headers).mockResolvedValue({
       get: (key: string) => (key === "x-tenant-id" ? "tenant-1" : null),
-    } as ReturnType<typeof headers> extends Promise<infer T> ? T : never);
+    } as unknown as Awaited<ReturnType<typeof headers>>);
 
     const mockTx = makeTxMock();
     mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       orderBy: vi.fn().mockResolvedValue(mockActiveMethods),
-    } as ReturnType<typeof db.select>);
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await GET();
     const data = await res.json();
@@ -104,7 +105,7 @@ describe("GET /api/shipping (storefront)", () => {
   it("retorna lista vacía si no hay tenantId en headers", async () => {
     vi.mocked(headers).mockResolvedValue({
       get: () => null,
-    } as ReturnType<typeof headers> extends Promise<infer T> ? T : never);
+    } as unknown as Awaited<ReturnType<typeof headers>>);
 
     const res = await GET();
     const data = await res.json();
@@ -116,15 +117,15 @@ describe("GET /api/shipping (storefront)", () => {
   it("filtra métodos inactivos", async () => {
     vi.mocked(headers).mockResolvedValue({
       get: (key: string) => (key === "x-tenant-id" ? "tenant-1" : null),
-    } as ReturnType<typeof headers> extends Promise<infer T> ? T : never);
+    } as unknown as Awaited<ReturnType<typeof headers>>);
 
     const mockTx = makeTxMock();
     mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       orderBy: vi.fn().mockResolvedValue([...mockActiveMethods, mockInactiveMethod]),
-    } as ReturnType<typeof db.select>);
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await GET();
     const data = await res.json();
@@ -136,15 +137,15 @@ describe("GET /api/shipping (storefront)", () => {
   it("retorna lista vacía si no hay métodos configurados", async () => {
     vi.mocked(headers).mockResolvedValue({
       get: (key: string) => (key === "x-tenant-id" ? "tenant-1" : null),
-    } as ReturnType<typeof headers> extends Promise<infer T> ? T : never);
+    } as unknown as Awaited<ReturnType<typeof headers>>);
 
     const mockTx = makeTxMock();
     mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       orderBy: vi.fn().mockResolvedValue([]),
-    } as ReturnType<typeof db.select>);
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await GET();
     const data = await res.json();

@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     console.log('[Dashboard GET] Start:', start, '| End:', end);
 
-    return withTenantContext(tenantId, async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
       const [revenueResult] = await tx
         .select({ total: sql<number>`COALESCE(SUM(${dbOrders.total}), 0)` })
         .from(dbOrders)

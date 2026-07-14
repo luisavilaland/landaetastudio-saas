@@ -12,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ methods: [] });
     }
 
-    return withTenantContext(tenantId, async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
       const methods = await tx
         .select()
         .from(dbShippingMethods)

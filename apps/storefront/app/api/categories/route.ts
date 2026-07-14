@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ categories: [] });
   }
 
-  return withTenantContext(tenantId, async (tx) => {
+  return await withTenantContext(tenantId, async (tx) => {
     const categories = await tx
       .select({
         id: dbCategories.id,

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Order, OrderItem, ProductVariant, Product } from "@repo/db";
-import { db } from "@repo/db";
+import { db, withTenantContext } from "@repo/db";
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
@@ -8,7 +8,7 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@repo/db", async () => {
   const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
-  return { ...actual, db: { transaction: vi.fn() } };
+  return { ...actual, withTenantContext: vi.fn(), db: { transaction: vi.fn() } };
 });
 
 import { auth } from "@/lib/auth";
@@ -120,6 +120,7 @@ const mockProducts: Product[] = [
 describe("GET /api/orders/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(makeTxMock()));
   });
 
   it("should return 401 when no session", async () => {
@@ -147,7 +148,7 @@ describe("GET /api/orders/[id]", () => {
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([]),
     } as ReturnType<typeof db.select>);
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await makeGETRequest(mockId);
     expect(res.status).toBe(404);
@@ -177,7 +178,7 @@ describe("GET /api/orders/[id]", () => {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue(mockProducts),
       } as ReturnType<typeof db.select>);
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await makeGETRequest(mockId);
     expect(res.status).toBe(200);
@@ -198,6 +199,7 @@ describe("GET /api/orders/[id]", () => {
 describe("PUT /api/orders/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(makeTxMock()));
   });
 
   it("should return 401 when no session", async () => {
@@ -218,7 +220,7 @@ describe("PUT /api/orders/[id]", () => {
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([]),
     } as ReturnType<typeof db.select>);
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await makePUTRequest(mockId, { status: "confirmed" });
     expect(res.status).toBe(404);
@@ -249,7 +251,7 @@ describe("PUT /api/orders/[id]", () => {
         where: vi.fn().mockResolvedValue(undefined),
       }),
     } as ReturnType<typeof db.update>);
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await makePUTRequest(mockId, { status: "confirmed" });
     expect(res.status).toBe(200);

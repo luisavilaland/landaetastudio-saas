@@ -21,7 +21,7 @@ export async function GET(
       return NextResponse.json({ error: "Tenant no encontrado" }, { status: 400 });
     }
 
-    return withTenantContext(tenantId, async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
       const [order] = await tx
         .select()
         .from(dbOrders)
@@ -146,7 +146,7 @@ export async function PUT(
 
     const { status } = validation.data;
 
-    return withTenantContext(tenantId, async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
       const [existingOrder] = await tx
         .select({ id: dbOrders.id })
         .from(dbOrders)

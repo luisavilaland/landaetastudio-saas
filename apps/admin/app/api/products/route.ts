@@ -17,7 +17,7 @@ export async function GET() {
 
   const tenantId = session.user?.tenantId as string;
 
-  return withTenantContext(tenantId, async (tx) => {
+  return await withTenantContext(tenantId, async (tx) => {
     const products = await tx
       .select()
       .from(dbProducts)

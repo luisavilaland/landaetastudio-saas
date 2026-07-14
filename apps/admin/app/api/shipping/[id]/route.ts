@@ -18,7 +18,7 @@ export async function GET(
     const tenantId = session.user?.tenantId as string;
     const { id } = await params;
 
-    return withTenantContext(tenantId, async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
       const [method] = await tx
         .select()
         .from(dbShippingMethods)
@@ -59,7 +59,7 @@ export async function PUT(
     const tenantId = session.user?.tenantId as string;
     const { id } = await params;
 
-    return withTenantContext(tenantId, async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
       const [existing] = await tx
         .select()
         .from(dbShippingMethods)
@@ -131,7 +131,7 @@ export async function DELETE(
     const tenantId = session.user?.tenantId as string;
     const { id } = await params;
 
-    return withTenantContext(tenantId, async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
       const [existing] = await tx
         .select()
         .from(dbShippingMethods)

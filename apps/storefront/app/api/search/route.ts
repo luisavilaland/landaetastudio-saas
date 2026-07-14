@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   const searchPattern = `%${query}%`;
 
-  return withTenantContext(tenantId, async (tx) => {
+  return await withTenantContext(tenantId, async (tx) => {
     const whereConditions = and(
       eq(dbProducts.tenantId, tenantId),
       eq(dbProducts.status, "active"),

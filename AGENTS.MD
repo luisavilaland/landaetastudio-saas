@@ -22,6 +22,7 @@
 - **Imágenes**: usar `@repo/storage` (R2 en prod, MinIO local). Siempre subir con FormData y obtener URL pública.
 - **Webhook MercadoPago**: idempotencia con `payment_id` para evitar duplicados.
 - **RLS (Row Level Security)**: activado en todas las tablas de negocio. Toda query debe ejecutarse dentro de `withTenantContext(tenantId, callback(tx))` que abre una transacción `db.transaction`, ejecuta `SELECT set_tenant_id(${tenantId}::uuid)` (SET LOCAL), y pasa `tx` al callback. **No usar `db.execute()` directo para SET LOCAL** — es auto-commit y el setting se pierde antes de las queries. Dentro del callback, todas las queries usan `tx.` (ej: `tx.select()`, `tx.update()`).
+- **return await con withTenantContext**: siempre usar `return await withTenantContext(...)` — NUNCA `return withTenantContext(...)`. Sin `await`, una rejection de `db.transaction` bypassea el `try/catch` del handler porque `async function return promiseRejected` no es capturado por catch.
 - **AUTH_SECRET obligatorio**: sin fallback hardcoded. La app no arranca si la variable no está configurada.
 - **CSRF protection**: manejado automáticamente por NextAuth v5 en producción. No se debe desactivar explícitamente en `next.config.mjs`.
 - **Validación de variables de entorno**: Zod valida todas las variables críticas al iniciar la app (`packages/validation/src/env.ts`). Si falta alguna en producción, la app falla inmediatamente con un error claro.
@@ -121,6 +122,12 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - [ ] Tipar props con `interface`
 - [ ] Alias `@/` o `@repo/*` para imports
 - [ ] Textos en español
+
+### Al testear un handler que usa withTenantContext
+- [ ] NO mockear `db.transaction` — `withTenantContext` cierra sobre el `db` real, no la exportación mockeada
+- [ ] Mockear `withTenantContext` directamente: `vi.mock("@repo/db", async () => ({ ...actual, withTenantContext: vi.fn() }))`
+- [ ] En beforeEach: `vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(makeTxMock()))`
+- [ ] `makeTxMock()` debe retornar `as any` para compatibilidad `DbLike`
 
 ### Antes de commit
 - [ ] `pnpm lint && pnpm typecheck && pnpm build && pnpm test`

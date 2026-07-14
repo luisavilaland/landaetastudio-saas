@@ -430,39 +430,38 @@ export async function DELETE(
     const { id } = await params;
     const tenantId = session.user?.tenantId as string;
 
-    const product = await db
-      .select()
-      .from(dbProducts)
-      .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
-      .limit(1);
-
-    if (product.length === 0) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
-    // Check for associated order_items before delete
-    const variants = await db
-      .select({ id: dbProductVariants.id })
-      .from(dbProductVariants)
-      .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)));
-
-    const variantIds = variants.map((v) => v.id);
-    if (variantIds.length > 0) {
-      const orderItems = await db
+    return await withTenantContext(tenantId, async (tx) => {
+      const product = await tx
         .select()
-        .from(dbOrderItems)
-        .where(inArray(dbOrderItems.productVariantId, variantIds))
+        .from(dbProducts)
+        .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
         .limit(1);
 
-      if (orderItems.length > 0) {
-        return NextResponse.json(
-          { error: "Producto tiene órdenes asociadas" },
-          { status: 409 }
-        );
+      if (product.length === 0) {
+        return NextResponse.json({ error: "Product not found" }, { status: 404 });
       }
-    }
 
-    return withTenantContext(tenantId, async (tx) => {
+      const variants = await tx
+        .select({ id: dbProductVariants.id })
+        .from(dbProductVariants)
+        .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)));
+
+      const variantIds = variants.map((v) => v.id);
+      if (variantIds.length > 0) {
+        const orderItems = await tx
+          .select()
+          .from(dbOrderItems)
+          .where(inArray(dbOrderItems.productVariantId, variantIds))
+          .limit(1);
+
+        if (orderItems.length > 0) {
+          return NextResponse.json(
+            { error: "Producto tiene órdenes asociadas" },
+            { status: 409 }
+          );
+        }
+      }
+
       await tx
         .delete(dbProductVariants)
         .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)));

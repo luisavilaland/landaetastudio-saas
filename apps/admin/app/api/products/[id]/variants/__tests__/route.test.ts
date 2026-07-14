@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Product, ProductVariant } from "@repo/db";
-import { db } from "@repo/db";
+import { db, withTenantContext } from "@repo/db";
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@repo/db", async () => {
   const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
-  return { ...actual, db: { transaction: vi.fn() } };
+  return { ...actual, withTenantContext: vi.fn(), db: { transaction: vi.fn() } };
 });
 
 import { auth } from "@/lib/auth";
@@ -107,6 +107,7 @@ function session(tenantId: string, email: string) {
 describe("GET /api/products/[id]/variants", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(makeTxMock()));
   });
 
   it("401 sin sesión", async () => {
@@ -120,7 +121,7 @@ describe("GET /api/products/[id]/variants", () => {
 
     const mockTx = makeTxMock();
     mockTx.select.mockReturnValueOnce(makeSelectChain([]));
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await GET(mockReq("GET"), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(404);
@@ -133,7 +134,7 @@ describe("GET /api/products/[id]/variants", () => {
     mockTx.select
       .mockReturnValueOnce(makeSelectChain([baseProduct]))
       .mockReturnValueOnce(makeSelectChain([baseVariant]));
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await GET(mockReq("GET"), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(200);
@@ -148,6 +149,7 @@ describe("GET /api/products/[id]/variants", () => {
 describe("POST /api/products/[id]/variants", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(makeTxMock()));
   });
 
   it("401 sin sesión", async () => {
@@ -163,7 +165,7 @@ describe("POST /api/products/[id]/variants", () => {
 
     const mockTx = makeTxMock();
     mockTx.select.mockReturnValueOnce(makeSelectChain([]));
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await POST(mockReq("POST", { variants: [{ price: 1999, stock: 5 }] }), {
       params: Promise.resolve({ id: PRODUCT_ID }),
@@ -176,7 +178,7 @@ describe("POST /api/products/[id]/variants", () => {
 
     const mockTx = makeTxMock();
     mockTx.select.mockReturnValueOnce(makeSelectChain([baseProduct]));
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await POST(mockReq("POST", { variants: [{ price: -1, stock: 5 }] }), {
       params: Promise.resolve({ id: PRODUCT_ID }),
@@ -191,7 +193,7 @@ describe("POST /api/products/[id]/variants", () => {
     mockTx.select.mockReturnValueOnce(makeSelectChain([baseProduct]));
     mockTx.select.mockReturnValueOnce(makeSelectChain([]));
     mockTx.select.mockReturnValueOnce(makeSelectChain([baseVariant]));
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => cb(mockTx));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await POST(mockReq("POST", { variants: [{ price: 2999, stock: 20 }] }), {
       params: Promise.resolve({ id: PRODUCT_ID }),
@@ -204,11 +206,9 @@ describe("POST /api/products/[id]/variants", () => {
   it("409 violación FK (variante tiene órdenes)", async () => {
     vi.mocked(auth).mockResolvedValue(session(TENANT_A, "admin@a.com"));
 
-    vi.mocked(db.transaction).mockImplementation(async () => {
-      const err = new Error("SQL foreign key violation");
-      (err as any).code = "23503";
-      throw err;
-    });
+    const err = new Error("SQL foreign key violation");
+    (err as any).code = "23503";
+    vi.mocked(withTenantContext).mockRejectedValueOnce(err);
 
     const res = await POST(mockReq("POST", { variants: [{ price: 2999, stock: 20 }] }), {
       params: Promise.resolve({ id: PRODUCT_ID }),
