@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbProducts, dbProductVariants, dbCategories } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbCategories, withTenantContext } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
 import { createLogger } from "@/lib/logger";
@@ -98,10 +98,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Cargar categorías del tenant para resolver category_slug
-    const categories = await db
-      .select()
-      .from(dbCategories)
-      .where(eq(dbCategories.tenantId, tenantId));
+    const categories = await withTenantContext(tenantId, async (tx) => {
+      return await tx
+        .select()
+        .from(dbCategories)
+        .where(eq(dbCategories.tenantId, tenantId));
+    });
 
     const categoryBySlug = categories.reduce((acc, cat) => {
       acc[cat.slug] = cat.id;
@@ -109,7 +111,6 @@ export async function POST(request: NextRequest) {
     }, {} as Record<string, string>);
 
     const results: ImportResult[] = [];
-    const now = new Date();
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -136,31 +137,31 @@ export async function POST(request: NextRequest) {
       const slug = row.slug?.trim() ? normalizeSlug(row.slug) : normalizeSlug(row.name);
       const sku = row.sku?.trim() || slug;
 
-      // Verificar slug duplicado
-      const existing = await db
-        .select()
-        .from(dbProducts)
-        .where(and(eq(dbProducts.slug, slug), eq(dbProducts.tenantId, tenantId)))
-        .limit(1);
-
-      if (existing.length > 0) {
-        results.push({ row: rowNum, name: row.name, status: "skipped", reason: `Slug '${slug}' ya existe` });
-        continue;
-      }
-
-      // Resolver categoría
-      let categoryId: string | null = null;
-      if (row.category_slug?.trim()) {
-        categoryId = categoryBySlug[row.category_slug.trim()] || null;
-        if (!categoryId) {
-          results.push({ row: rowNum, name: row.name, status: "error", reason: `Categoría '${row.category_slug}' no encontrada` });
-          continue;
-        }
-      }
-
-      // Crear producto y variante en transacción
+      // Cada fila en su propio withTenantContext (check + insert juntos)
       try {
-        await db.transaction(async (tx) => {
+        await withTenantContext(tenantId, async (tx) => {
+          // Verificar slug duplicado
+          const existing = await tx
+            .select()
+            .from(dbProducts)
+            .where(and(eq(dbProducts.slug, slug), eq(dbProducts.tenantId, tenantId)))
+            .limit(1);
+
+          if (existing.length > 0) {
+            throw new Error(`SKIPPED:Slug '${slug}' ya existe`);
+          }
+
+          // Resolver categoría
+          let categoryId: string | null = null;
+          if (row.category_slug?.trim()) {
+            categoryId = categoryBySlug[row.category_slug.trim()] || null;
+            if (!categoryId) {
+              throw new Error(`SKIPPED:Categoría '${row.category_slug}' no encontrada`);
+            }
+          }
+
+          const now = new Date();
+
           const [product] = await tx
             .insert(dbProducts)
             .values({
@@ -191,7 +192,12 @@ export async function POST(request: NextRequest) {
 
         results.push({ row: rowNum, name: row.name, status: "created" });
       } catch (err) {
-        results.push({ row: rowNum, name: row.name, status: "error", reason: "Error al guardar en base de datos" });
+        const message = err instanceof Error ? err.message : "";
+        if (message.startsWith("SKIPPED:")) {
+          results.push({ row: rowNum, name: row.name, status: "skipped", reason: message.slice(8) });
+        } else {
+          results.push({ row: rowNum, name: row.name, status: "error", reason: "Error al guardar en base de datos" });
+        }
       }
     }
 

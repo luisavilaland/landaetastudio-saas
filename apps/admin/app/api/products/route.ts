@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbProducts, dbProductVariants, dbProductImages, dbCategories } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbProductImages, dbCategories, withTenantContext } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
 import { uploadImage } from "@repo/storage";
@@ -17,31 +17,33 @@ export async function GET() {
 
   const tenantId = session.user?.tenantId as string;
 
-  const products = await db
-    .select()
-    .from(dbProducts)
-    .where(eq(dbProducts.tenantId, tenantId));
+  return withTenantContext(tenantId, async (tx) => {
+    const products = await tx
+      .select()
+      .from(dbProducts)
+      .where(eq(dbProducts.tenantId, tenantId));
 
-  const productIds = products.map((p) => p.id);
+    const productIds = products.map((p) => p.id);
 
-  const images = await db
-    .select()
-    .from(dbProductImages)
-    .where(eq(dbProductImages.tenantId, tenantId))
-    .orderBy(dbProductImages.position);
+    const images = await tx
+      .select()
+      .from(dbProductImages)
+      .where(eq(dbProductImages.tenantId, tenantId))
+      .orderBy(dbProductImages.position);
 
-  const imagesByProduct = images.reduce((acc, img) => {
-    if (!acc[img.productId]) acc[img.productId] = [];
-    acc[img.productId].push(img);
-    return acc;
-  }, {} as Record<string, typeof images>);
+    const imagesByProduct = images.reduce((acc, img) => {
+      if (!acc[img.productId]) acc[img.productId] = [];
+      acc[img.productId].push(img);
+      return acc;
+    }, {} as Record<string, typeof images>);
 
-  const productsWithImages = products.map((product) => ({
-    ...product,
-    images: imagesByProduct[product.id] || [],
-  }));
+    const productsWithImages = products.map((product) => ({
+      ...product,
+      images: imagesByProduct[product.id] || [],
+    }));
 
-  return NextResponse.json({ products: productsWithImages });
+    return NextResponse.json({ products: productsWithImages });
+  });
 }
 
 export async function POST(request: NextRequest) {

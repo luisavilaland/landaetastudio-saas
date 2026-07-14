@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbCategories } from "@repo/db";
+import { db, dbCategories, withTenantContext } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq, asc } from "drizzle-orm";
 import { createCategorySchema, normalizeSlug } from "@repo/validation";
@@ -16,13 +16,15 @@ export async function GET() {
 
   const tenantId = session.user?.tenantId as string;
 
-  const categories = await db
-    .select()
-    .from(dbCategories)
-    .where(eq(dbCategories.tenantId, tenantId))
-    .orderBy(asc(dbCategories.name));
+  return withTenantContext(tenantId, async (tx) => {
+    const categories = await tx
+      .select()
+      .from(dbCategories)
+      .where(eq(dbCategories.tenantId, tenantId))
+      .orderBy(asc(dbCategories.name));
 
-  return NextResponse.json({ categories });
+    return NextResponse.json({ categories });
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -47,39 +49,41 @@ export async function POST(request: NextRequest) {
 
     const { name, slug } = validation.data;
     const normalizedSlug = normalizeSlug(slug);
-    
-    const existingSlug = await db
-      .select()
-      .from(dbCategories)
-      .where(
-        and(
-          eq(dbCategories.slug, normalizedSlug),
-          eq(dbCategories.tenantId, tenantId)
+
+    return withTenantContext(tenantId, async (tx) => {
+      const existingSlug = await tx
+        .select()
+        .from(dbCategories)
+        .where(
+          and(
+            eq(dbCategories.slug, normalizedSlug),
+            eq(dbCategories.tenantId, tenantId)
+          )
         )
-      )
-      .limit(1);
-    
-    if (existingSlug.length > 0) {
-      return NextResponse.json(
-         { error: "Ya existe una categoría con ese slug", field: "slug" },
-        { status: 409 }
-      );
-    }
+        .limit(1);
 
-    const now = new Date();
+      if (existingSlug.length > 0) {
+        return NextResponse.json(
+           { error: "Ya existe una categoría con ese slug", field: "slug" },
+          { status: 409 }
+        );
+      }
 
-    const [category] = await db
-      .insert(dbCategories)
-      .values({
-        tenantId,
-        name,
-        slug: normalizedSlug,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning();
+      const now = new Date();
 
-    return NextResponse.json({ category }, { status: 201 });
+      const [category] = await tx
+        .insert(dbCategories)
+        .values({
+          tenantId,
+          name,
+          slug: normalizedSlug,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+
+      return NextResponse.json({ category }, { status: 201 });
+    });
   } catch (error) {
     logger.error({ error }, "Error creating category");
       return NextResponse.json(

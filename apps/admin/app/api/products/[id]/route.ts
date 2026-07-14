@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbProducts, dbProductVariants, dbProductImages, dbOrderItems, dbCategories } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbProductImages, dbOrderItems, dbCategories, withTenantContext } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq, inArray } from "drizzle-orm";
 import { uploadImage, deleteImage } from "@repo/storage";
@@ -462,7 +462,7 @@ export async function DELETE(
       }
     }
 
-    await db.transaction(async (tx) => {
+    return withTenantContext(tenantId, async (tx) => {
       await tx
         .delete(dbProductVariants)
         .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)));
@@ -470,9 +470,9 @@ export async function DELETE(
       await tx
         .delete(dbProducts)
         .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)));
-    });
 
-    return new NextResponse(null, { status: 204 });
+      return new NextResponse(null, { status: 204 });
+    });
   } catch (error) {
     logger.error({ error }, "Error deleting product");
     return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });

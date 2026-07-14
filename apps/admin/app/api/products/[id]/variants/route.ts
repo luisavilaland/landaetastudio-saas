@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbProducts, dbProductVariants, dbOrderItems } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbOrderItems, withTenantContext } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq, inArray } from "drizzle-orm";
 import { variantsArraySchema } from "@repo/validation";
@@ -17,23 +17,25 @@ export async function GET(
     const { id: productId } = await params;
     const tenantId = session.user?.tenantId as string;
 
-    const product = await db
-      .select({ tenantId: dbProducts.tenantId })
-      .from(dbProducts)
-      .where(and(eq(dbProducts.id, productId), eq(dbProducts.tenantId, tenantId)))
-      .limit(1);
+    return withTenantContext(tenantId, async (tx) => {
+      const product = await tx
+        .select({ tenantId: dbProducts.tenantId })
+        .from(dbProducts)
+        .where(and(eq(dbProducts.id, productId), eq(dbProducts.tenantId, tenantId)))
+        .limit(1);
 
-    if (product.length === 0) {
-    return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
-  }
+      if (product.length === 0) {
+        return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+      }
 
-  const variants = await db
-      .select()
-      .from(dbProductVariants)
-      .where(and(eq(dbProductVariants.productId, productId), eq(dbProductVariants.tenantId, tenantId)))
-      .orderBy(dbProductVariants.createdAt);
+      const variants = await tx
+        .select()
+        .from(dbProductVariants)
+        .where(and(eq(dbProductVariants.productId, productId), eq(dbProductVariants.tenantId, tenantId)))
+        .orderBy(dbProductVariants.createdAt);
 
-    return NextResponse.json({ variants });
+      return NextResponse.json({ variants });
+    });
   } catch (error) {
     console.error("Error fetching variants:", error);
     return NextResponse.json({ error: "Error al obtener variantes" }, { status: 500 });
@@ -77,7 +79,7 @@ export async function POST(
 
     const now = new Date();
 
-    await db.transaction(async (tx) => {
+    return withTenantContext(tenantId, async (tx) => {
       // Get existing variants
       const existingVariants = await tx
         .select()
@@ -193,15 +195,15 @@ export async function POST(
 
         await tx.insert(dbProductVariants).values(variantsToInsert);
       }
+
+      const updatedVariants = await tx
+        .select()
+        .from(dbProductVariants)
+        .where(and(eq(dbProductVariants.productId, productId), eq(dbProductVariants.tenantId, tenantId)))
+        .orderBy(dbProductVariants.createdAt);
+
+      return NextResponse.json({ variants: updatedVariants });
     });
-
-    const updatedVariants = await db
-      .select()
-      .from(dbProductVariants)
-      .where(and(eq(dbProductVariants.productId, productId), eq(dbProductVariants.tenantId, tenantId)))
-      .orderBy(dbProductVariants.createdAt);
-
-    return NextResponse.json({ variants: updatedVariants });
   } catch (error) {
     console.error("Error updating variants:", error);
     
