@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbShippingMethods } from "@repo/db";
+import { db, dbShippingMethods, withTenantContext } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 import { updateShippingMethodSchema } from "@repo/validation";
@@ -18,22 +18,24 @@ export async function GET(
     const tenantId = session.user?.tenantId as string;
     const { id } = await params;
 
-    const [method] = await db
-      .select()
-      .from(dbShippingMethods)
-      .where(
-        and(
-          eq(dbShippingMethods.id, id),
-          eq(dbShippingMethods.tenantId, tenantId)
+    return await withTenantContext(tenantId, async (tx) => {
+      const [method] = await tx
+        .select()
+        .from(dbShippingMethods)
+        .where(
+          and(
+            eq(dbShippingMethods.id, id),
+            eq(dbShippingMethods.tenantId, tenantId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!method) {
-      return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-    }
+      if (!method) {
+        return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+      }
 
-    return NextResponse.json({ method });
+      return NextResponse.json({ method });
+    });
   } catch (error) {
     console.error("Error getting shipping method:", error);
     return NextResponse.json(
@@ -57,53 +59,55 @@ export async function PUT(
     const tenantId = session.user?.tenantId as string;
     const { id } = await params;
 
-    const [existing] = await db
-      .select()
-      .from(dbShippingMethods)
-      .where(
-        and(
-          eq(dbShippingMethods.id, id),
-          eq(dbShippingMethods.tenantId, tenantId)
+    return await withTenantContext(tenantId, async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(dbShippingMethods)
+        .where(
+          and(
+            eq(dbShippingMethods.id, id),
+            eq(dbShippingMethods.tenantId, tenantId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!existing) {
-      return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-    }
+      if (!existing) {
+        return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+      }
 
-    const body = await request.json();
+      const body = await request.json();
 
-    const validation = updateShippingMethodSchema.safeParse(body);
+      const validation = updateShippingMethodSchema.safeParse(body);
 
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: "Validación fallida", issues: validation.error.issues },
-        { status: 400 }
-      );
-    }
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: "Validación fallida", issues: validation.error.issues },
+          { status: 400 }
+        );
+      }
 
-    const updates: Record<string, unknown> = {
-      ...validation.data,
-      updatedAt: new Date(),
-    };
+      const updates: Record<string, unknown> = {
+        ...validation.data,
+        updatedAt: new Date(),
+      };
 
-    if (updates.isActive !== undefined) {
-      updates.isActive = updates.isActive ? "true" : "false";
-    }
+      if (updates.isActive !== undefined) {
+        updates.isActive = updates.isActive ? "true" : "false";
+      }
 
-    const [method] = await db
-      .update(dbShippingMethods)
-      .set(updates)
-      .where(
-        and(
-          eq(dbShippingMethods.id, id),
-          eq(dbShippingMethods.tenantId, tenantId)
+      const [method] = await tx
+        .update(dbShippingMethods)
+        .set(updates)
+        .where(
+          and(
+            eq(dbShippingMethods.id, id),
+            eq(dbShippingMethods.tenantId, tenantId)
+          )
         )
-      )
-      .returning();
+        .returning();
 
-    return NextResponse.json({ method });
+      return NextResponse.json({ method });
+    });
   } catch (error) {
     console.error("Error updating shipping method:", error);
     return NextResponse.json(
@@ -127,31 +131,33 @@ export async function DELETE(
     const tenantId = session.user?.tenantId as string;
     const { id } = await params;
 
-    const [existing] = await db
-      .select()
-      .from(dbShippingMethods)
-      .where(
-        and(
-          eq(dbShippingMethods.id, id),
-          eq(dbShippingMethods.tenantId, tenantId)
+    return await withTenantContext(tenantId, async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(dbShippingMethods)
+        .where(
+          and(
+            eq(dbShippingMethods.id, id),
+            eq(dbShippingMethods.tenantId, tenantId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!existing) {
-      return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-    }
+      if (!existing) {
+        return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+      }
 
-    await db
-      .delete(dbShippingMethods)
-      .where(
-        and(
-          eq(dbShippingMethods.id, id),
-          eq(dbShippingMethods.tenantId, tenantId)
-        )
-      );
+      await tx
+        .delete(dbShippingMethods)
+        .where(
+          and(
+            eq(dbShippingMethods.id, id),
+            eq(dbShippingMethods.tenantId, tenantId)
+          )
+        );
 
-    return new NextResponse(null, { status: 204 });
+      return new NextResponse(null, { status: 204 });
+    });
   } catch (error) {
     console.error("Error deleting shipping method:", error);
     return NextResponse.json(

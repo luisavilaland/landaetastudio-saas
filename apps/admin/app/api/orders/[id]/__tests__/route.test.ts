@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Order, OrderItem, ProductVariant, Product } from "@repo/db";
-import { db } from "@repo/db";
+import { db, withTenantContext } from "@repo/db";
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
@@ -8,17 +8,31 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@repo/db", async () => {
   const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
-  return {
-    ...actual,
-    db: {
-      select: vi.fn(),
-      update: vi.fn(),
-    },
-  };
+  return { ...actual, withTenantContext: vi.fn(), db: { transaction: vi.fn() } };
 });
 
 import { auth } from "@/lib/auth";
 import { GET, PUT } from "../route";
+
+function makeTxMock() {
+  return {
+    select: vi.fn(),
+    insert: vi.fn().mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{}]),
+      }),
+    }),
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    }),
+    delete: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    }),
+    execute: vi.fn().mockResolvedValue(undefined),
+  };
+}
 
 function makeGETRequest(id: string) {
   return GET(
@@ -106,6 +120,7 @@ const mockProducts: Product[] = [
 describe("GET /api/orders/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(makeTxMock()));
   });
 
   it("should return 401 when no session", async () => {
@@ -126,14 +141,18 @@ describe("GET /api/orders/[id]", () => {
     vi.mocked(auth).mockResolvedValue({
       user: { tenantId: "tenant-b", email: "admin@b.com" },
     });
-    vi.mocked(db.select).mockReturnValueOnce({
+
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([]),
-    } as unknown as ReturnType<typeof db.select>);
+    } as ReturnType<typeof db.select>);
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await makeGETRequest(mockId);
     expect(res.status).toBe(404);
+    expect(withTenantContext).toHaveBeenCalledWith("tenant-b", expect.any(Function));
   });
 
   it("should return 200 with order and items", async () => {
@@ -141,24 +160,26 @@ describe("GET /api/orders/[id]", () => {
       user: { tenantId: sessionTenant, email: "admin@test.com" },
     });
 
-    vi.mocked(db.select)
+    const mockTx = makeTxMock();
+    mockTx.select
       .mockReturnValueOnce({
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
         limit: vi.fn().mockResolvedValue([mockOrder]),
-      } as unknown as ReturnType<typeof db.select>)
+      } as ReturnType<typeof db.select>)
       .mockReturnValueOnce({
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue(mockItems),
-      } as unknown as ReturnType<typeof db.select>)
+      } as ReturnType<typeof db.select>)
       .mockReturnValueOnce({
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue(mockVariants),
-      } as unknown as ReturnType<typeof db.select>)
+      } as ReturnType<typeof db.select>)
       .mockReturnValueOnce({
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockResolvedValue(mockProducts),
-      } as unknown as ReturnType<typeof db.select>);
+      } as ReturnType<typeof db.select>);
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await makeGETRequest(mockId);
     expect(res.status).toBe(200);
@@ -173,12 +194,14 @@ describe("GET /api/orders/[id]", () => {
     expect(data.items[0].sku).toBe("TEST-SKU");
     expect(data.items[0].quantity).toBe(2);
     expect(data.items[0].unitPrice).toBe(5000);
+    expect(withTenantContext).toHaveBeenCalledWith(sessionTenant, expect.any(Function));
   });
 });
 
 describe("PUT /api/orders/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(makeTxMock()));
   });
 
   it("should return 401 when no session", async () => {
@@ -192,14 +215,18 @@ describe("PUT /api/orders/[id]", () => {
     vi.mocked(auth).mockResolvedValue({
       user: { tenantId: "tenant-b", email: "admin@b.com" },
     });
-    vi.mocked(db.select).mockReturnValueOnce({
+
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([]),
-    } as unknown as ReturnType<typeof db.select>);
+    } as ReturnType<typeof db.select>);
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await makePUTRequest(mockId, { status: "confirmed" });
     expect(res.status).toBe(404);
+    expect(withTenantContext).toHaveBeenCalledWith("tenant-b", expect.any(Function));
   });
 
   it("should return 400 for invalid body", async () => {
@@ -215,16 +242,19 @@ describe("PUT /api/orders/[id]", () => {
     vi.mocked(auth).mockResolvedValue({
       user: { tenantId: sessionTenant, email: "admin@test.com" },
     });
-    vi.mocked(db.select).mockReturnValueOnce({
+
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([{ id: mockId }]),
-    } as unknown as ReturnType<typeof db.select>);
-    vi.mocked(db.update).mockReturnValueOnce({
+    } as ReturnType<typeof db.select>);
+    mockTx.update.mockReturnValueOnce({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue(undefined),
       }),
-    } as unknown as ReturnType<typeof db.update>);
+    } as ReturnType<typeof db.update>);
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await makePUTRequest(mockId, { status: "confirmed" });
     expect(res.status).toBe(200);
@@ -232,5 +262,6 @@ describe("PUT /api/orders/[id]", () => {
     const data = await res.json();
     expect(data.success).toBe(true);
     expect(data.status).toBe("confirmed");
+    expect(withTenantContext).toHaveBeenCalledWith(sessionTenant, expect.any(Function));
   });
 });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { db, dbOrders, dbCustomers } from "@repo/db";
+import { db, dbOrders, dbCustomers, withTenantContext } from "@repo/db";
 import { eq, and } from "drizzle-orm";
 import { createLogger } from "@/lib/logger";
 
@@ -32,37 +32,39 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
-    const whereConditions = [eq(dbOrders.tenantId, tenantId)];
-    if (status && VALID_STATUSES.includes(status)) {
-      whereConditions.push(eq(dbOrders.status, status));
-    }
+    return await withTenantContext(tenantId, async (tx) => {
+      const whereConditions = [eq(dbOrders.tenantId, tenantId)];
+      if (status && VALID_STATUSES.includes(status)) {
+        whereConditions.push(eq(dbOrders.status, status));
+      }
 
-    const orders = await db
-      .select({
-        id: dbOrders.id,
-        customerId: dbOrders.customerId,
-        customerEmail: dbOrders.customerEmail,
-        total: dbOrders.total,
-        status: dbOrders.status,
-        createdAt: dbOrders.createdAt,
-        updatedAt: dbOrders.updatedAt,
-      })
-      .from(dbOrders)
-      .leftJoin(dbCustomers, eq(dbOrders.customerId, dbCustomers.id))
-      .where(and(...whereConditions))
-      .orderBy(dbOrders.createdAt);
+      const orders = await tx
+        .select({
+          id: dbOrders.id,
+          customerId: dbOrders.customerId,
+          customerEmail: dbOrders.customerEmail,
+          total: dbOrders.total,
+          status: dbOrders.status,
+          createdAt: dbOrders.createdAt,
+          updatedAt: dbOrders.updatedAt,
+        })
+        .from(dbOrders)
+        .leftJoin(dbCustomers, eq(dbOrders.customerId, dbCustomers.id))
+        .where(and(...whereConditions))
+        .orderBy(dbOrders.createdAt);
 
-    const ordersWithCustomer = orders.map((order) => ({
-      id: order.id,
-      customerName: order.customerId ? null : null,
-      customerEmail: order.customerEmail,
-      total: order.total,
-      status: order.status,
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt,
-    }));
+      const ordersWithCustomer = orders.map((order) => ({
+        id: order.id,
+        customerName: order.customerId ? null : null,
+        customerEmail: order.customerEmail,
+        total: order.total,
+        status: order.status,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+      }));
 
-    return NextResponse.json(ordersWithCustomer);
+      return NextResponse.json(ordersWithCustomer);
+    });
   } catch (error) {
     logger.error({ error }, "[Orders GET] Error");
     return NextResponse.json({ error: "Error al obtener órdenes" }, { status: 500 });

@@ -304,6 +304,42 @@
 - ✅ Plan P1-1 diseñado con 4-PR execution plan, transacciones angostas, validación contra DB real
 - ✅ Fase 0: `pnpm test` agregado al CI workflow
 
+---
+
+## 2026-07-14 — PR2: Wire withTenantContext en handlers Patrón A + tests
+
+- **Branch:** `feat-p1-1-patron-a`
+- **withTenantContext corregido:** ahora usa `db.transaction(async (tx) => { tx.execute(SET LOCAL); return cb(tx); })` en lugar de `db.execute()` auto-commit. SET LOCAL + queries en misma transacción.
+- **21 handlers wireados con Patrón A** (sin I/O externo) — todos envueltos en `withTenantContext(tenantId, async (tx) => {...})`.
+- **products/import:** transacción POR FILA (cada fila su propio `withTenantContext`), preservando éxito parcial en CSV bulk import.
+- **Bug descubierto:** `return withTenantContext(...)` sin `await` hace que rejections de la transacción bypassean el `try/catch` del handler. En handlers con catch block (variants 409 FK, órdenes, etc.), las excepciones no se capturaban correctamente. Fix: `return await withTenantContext(...)` en los 21 handlers.
+- **Test fixes:** el approach original de mockear `db.transaction` no funciona porque `withTenantContext` cierra sobre el `db` real del módulo. Todos los tests ahora mockean `withTenantContext` directamente con `makeTxMock()`.
+- **MakeTxMock centralizado:** patrón con `select`, `insert`, `update`, `delete`, `execute` mockeados, casteado `as any` para compatibilidad con `DbLike`.
+- **Storefront shipping test fix:** el mock de `drizzle-orm` reemplazaba TODO el módulo solo con `eq` y `asc`, rompiendo la importación de `relations` en `@repo/db/schema`. Fix: `vi.mock("drizzle-orm", async () => ({ ...actual, eq: vi.fn(), asc: vi.fn() }))`.
+- **Assertions `toHaveBeenCalledWith`:** agregadas en tests cross-tenant de 3 archivos (orders `[id]`, shipping `[id]`, variants — 6 tests) para verificar que `withTenantContext` se llama con el tenant correcto. Única excepción: el test "400 validación falla" de variants, donde Zod rechaza el body antes de llegar a `withTenantContext`.
+- **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 289/289 ✅ (22 fix, 0 regresiones)
+- **22 tests resueltos** que antes fallaban por `ECONNREFUSED` o mock contamination.
+
+**Deuda técnica resuelta:**
+- ✅ `withTenantContext` wiring completo en 21 handlers Patrón A
+- ✅ Bug `return withTenantContext` sin `await` (bypass de try/catch en todos los handlers)
+- ✅ Storefront shipping test suite roto por mock de `drizzle-orm`
+- ✅ Tests de shipping/[id], orders/[id], variants, products/[id] DELETE con mock de `withTenantContext`
+
 **Deuda técnica pendiente:**
-- ❌ `withTenantContext` nunca se llama en runtime. RLS es decorativo. P1-1 en 4 PRs.
+- ❌ Patrón B (5 handlers con I/O externo: checkout/preference, webhooks, products/[id]/images, images/[imageId], register) + tests — PR3
 - ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/`.
+
+## Estado actual (14 de julio 2026)
+
+| Métrica | Valor |
+|---------|-------|
+| Tests | 289 pasando, 0 fallos |
+| Apps | storefront, admin, superadmin |
+| Servicios | Neon, Upstash, R2, Resend |
+| Deploy | Vercel (3 apps) |
+| Rama default | `develop` |
+| Build | Limpio (sin `ignoreBuildErrors`) |
+| CI | GitHub Actions (lint, typecheck, build, test) |
+| Patrón A | 21 handlers wireados con `withTenantContext` |
+| Patrón B | 5 handlers pendientes (PR3) |

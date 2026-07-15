@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Product, ProductVariant, ProductImage } from "@repo/db";
-import { db } from "@repo/db";
+import { db, withTenantContext } from "@repo/db";
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
@@ -24,6 +24,7 @@ vi.mock("@repo/db", async () => {
   const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
   return {
     ...actual,
+    withTenantContext: vi.fn(),
     db: {
       select: vi.fn(),
       update: vi.fn(),
@@ -93,16 +94,21 @@ function makeSelectChain<T>(value: T) {
 
 function makeTxMock() {
   return {
+    select: vi.fn(),
+    insert: vi.fn().mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{}]),
+      }),
+    }),
     update: vi.fn().mockReturnValue({
-      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
     }),
     delete: vi.fn().mockReturnValue({
       where: vi.fn().mockResolvedValue(undefined),
     }),
-    insert: vi.fn().mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    }),
-    select: vi.fn(),
+    execute: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -257,21 +263,24 @@ describe("DELETE /api/products/[id]", () => {
 
   it("404 cross-tenant", async () => {
     vi.mocked(auth).mockResolvedValue(session(TENANT_B, "admin@b.com"));
-    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([]));
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce(makeSelectChain([]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
     const res = await DELETE(mockReq("DELETE"), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(404);
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_B, expect.any(Function));
   });
 
   it("204 feliz", async () => {
     vi.mocked(auth).mockResolvedValue(session(TENANT_A, "admin@a.com"));
-    vi.mocked(db.select)
+    const mockTx = makeTxMock();
+    mockTx.select
       .mockReturnValueOnce(makeSelectChain([baseProduct]))
-      .mockReturnValueOnce(makeSelectChain([baseVariant]))
+      .mockReturnValueOnce(makeSelectChain([{ id: "variant-123" }]))
       .mockReturnValueOnce(makeSelectChain([]));
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => {
-      await cb(makeTxMock());
-    });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
     const res = await DELETE(mockReq("DELETE"), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(204);
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_A, expect.any(Function));
   });
 });

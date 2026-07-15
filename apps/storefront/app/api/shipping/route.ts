@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, dbShippingMethods } from "@repo/db";
+import { db, dbShippingMethods, withTenantContext } from "@repo/db";
 import { eq, asc } from "drizzle-orm";
 import { headers } from "next/headers";
 
@@ -12,15 +12,17 @@ export async function GET() {
       return NextResponse.json({ methods: [] });
     }
 
-    const methods = await db
-      .select()
-      .from(dbShippingMethods)
-      .where(eq(dbShippingMethods.tenantId, tenantId))
-      .orderBy(asc(dbShippingMethods.sortOrder));
+    return await withTenantContext(tenantId, async (tx) => {
+      const methods = await tx
+        .select()
+        .from(dbShippingMethods)
+        .where(eq(dbShippingMethods.tenantId, tenantId))
+        .orderBy(asc(dbShippingMethods.sortOrder));
 
-    const activeMethods = methods.filter((m) => m.isActive === "true");
+      const activeMethods = methods.filter((m) => m.isActive === "true");
 
-    return NextResponse.json({ methods: activeMethods });
+      return NextResponse.json({ methods: activeMethods });
+    });
   } catch (error) {
     console.error("Error fetching shipping methods:", error);
     return NextResponse.json({ methods: [] });

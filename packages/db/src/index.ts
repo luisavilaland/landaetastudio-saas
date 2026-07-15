@@ -6,12 +6,16 @@ import * as schema from './schema';
 const client = postgres(process.env.DATABASE_URL!);
 export const db = drizzle(client, { schema });
 
+type DbLike = Omit<typeof db, '$client'>;
+
 export async function withTenantContext<T>(
   tenantId: string,
-  callback: () => Promise<T>
+  callback: (tx: DbLike) => Promise<T>
 ): Promise<T> {
-  await db.execute(sql`SELECT set_tenant_id(${tenantId}::uuid)`);
-  return await callback();
+  return await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_tenant_id(${tenantId}::uuid)`);
+    return await callback(tx);
+  });
 }
 
 export { schema };
