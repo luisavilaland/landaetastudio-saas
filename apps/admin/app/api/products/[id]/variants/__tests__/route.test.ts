@@ -125,6 +125,7 @@ describe("GET /api/products/[id]/variants", () => {
 
     const res = await GET(mockReq("GET"), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(404);
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_B, expect.any(Function));
   });
 
   it("200 feliz", async () => {
@@ -141,6 +142,7 @@ describe("GET /api/products/[id]/variants", () => {
     const data = await res.json();
     expect(data.variants).toHaveLength(1);
     expect(data.variants[0].sku).toBe("test-product");
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_A, expect.any(Function));
   });
 });
 
@@ -171,6 +173,7 @@ describe("POST /api/products/[id]/variants", () => {
       params: Promise.resolve({ id: PRODUCT_ID }),
     });
     expect(res.status).toBe(404);
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_B, expect.any(Function));
   });
 
   it("400 validación falla", async () => {
@@ -201,6 +204,7 @@ describe("POST /api/products/[id]/variants", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.variants).toHaveLength(1);
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_A, expect.any(Function));
   });
 
   it("409 violación FK (variante tiene órdenes)", async () => {

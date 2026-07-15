@@ -152,6 +152,7 @@ describe("GET /api/orders/[id]", () => {
 
     const res = await makeGETRequest(mockId);
     expect(res.status).toBe(404);
+    expect(withTenantContext).toHaveBeenCalledWith("tenant-b", expect.any(Function));
   });
 
   it("should return 200 with order and items", async () => {
@@ -193,6 +194,7 @@ describe("GET /api/orders/[id]", () => {
     expect(data.items[0].sku).toBe("TEST-SKU");
     expect(data.items[0].quantity).toBe(2);
     expect(data.items[0].unitPrice).toBe(5000);
+    expect(withTenantContext).toHaveBeenCalledWith(sessionTenant, expect.any(Function));
   });
 });
 
@@ -224,6 +226,7 @@ describe("PUT /api/orders/[id]", () => {
 
     const res = await makePUTRequest(mockId, { status: "confirmed" });
     expect(res.status).toBe(404);
+    expect(withTenantContext).toHaveBeenCalledWith("tenant-b", expect.any(Function));
   });
 
   it("should return 400 for invalid body", async () => {
@@ -259,5 +262,6 @@ describe("PUT /api/orders/[id]", () => {
     const data = await res.json();
     expect(data.success).toBe(true);
     expect(data.status).toBe("confirmed");
+    expect(withTenantContext).toHaveBeenCalledWith(sessionTenant, expect.any(Function));
   });
 });

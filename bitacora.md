@@ -316,6 +316,7 @@
 - **Test fixes:** el approach original de mockear `db.transaction` no funciona porque `withTenantContext` cierra sobre el `db` real del módulo. Todos los tests ahora mockean `withTenantContext` directamente con `makeTxMock()`.
 - **MakeTxMock centralizado:** patrón con `select`, `insert`, `update`, `delete`, `execute` mockeados, casteado `as any` para compatibilidad con `DbLike`.
 - **Storefront shipping test fix:** el mock de `drizzle-orm` reemplazaba TODO el módulo solo con `eq` y `asc`, rompiendo la importación de `relations` en `@repo/db/schema`. Fix: `vi.mock("drizzle-orm", async () => ({ ...actual, eq: vi.fn(), asc: vi.fn() }))`.
+- **Assertions `toHaveBeenCalledWith`:** agregadas en tests cross-tenant de 3 archivos (orders `[id]`, shipping `[id]`, variants — 6 tests) para verificar que `withTenantContext` se llama con el tenant correcto. Única excepción: el test "400 validación falla" de variants, donde Zod rechaza el body antes de llegar a `withTenantContext`.
 - **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 289/289 ✅ (22 fix, 0 regresiones)
 - **22 tests resueltos** que antes fallaban por `ECONNREFUSED` o mock contamination.
 

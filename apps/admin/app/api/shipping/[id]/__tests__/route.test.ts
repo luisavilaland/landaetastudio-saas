@@ -115,6 +115,7 @@ describe("GET /api/shipping/[id]", () => {
 
     const res = await makeGETRequest(mockId);
     expect(res.status).toBe(404);
+    expect(withTenantContext).toHaveBeenCalledWith(otherTenant, expect.any(Function));
   });
 
   it("should return 200 with method", async () => {
@@ -137,6 +138,7 @@ describe("GET /api/shipping/[id]", () => {
     expect(data.method.id).toBe(mockId);
     expect(data.method.name).toBe("Standard Shipping");
     expect(data.method.price).toBe(500);
+    expect(withTenantContext).toHaveBeenCalledWith(sessionTenant, expect.any(Function));
   });
 });
 
@@ -168,6 +170,7 @@ describe("PUT /api/shipping/[id]", () => {
 
     const res = await makePUTRequest(mockId, { name: "Express" });
     expect(res.status).toBe(404);
+    expect(withTenantContext).toHaveBeenCalledWith(otherTenant, expect.any(Function));
   });
 
   it("should return 400 for invalid body", async () => {
@@ -185,6 +188,7 @@ describe("PUT /api/shipping/[id]", () => {
 
     const res = await makePUTRequest(mockId, { price: -100 });
     expect(res.status).toBe(400);
+    expect(withTenantContext).toHaveBeenCalledWith(sessionTenant, expect.any(Function));
   });
 
   it("should return 200 on successful update", async () => {
@@ -214,6 +218,7 @@ describe("PUT /api/shipping/[id]", () => {
 
     const data = await res.json();
     expect(data.method.name).toBe("Express Shipping");
+    expect(withTenantContext).toHaveBeenCalledWith(sessionTenant, expect.any(Function));
   });
 });
 
@@ -245,6 +250,7 @@ describe("DELETE /api/shipping/[id]", () => {
 
     const res = await makeDELETERequest(mockId);
     expect(res.status).toBe(404);
+    expect(withTenantContext).toHaveBeenCalledWith(otherTenant, expect.any(Function));
   });
 
   it("should return 204 on successful delete", async () => {
@@ -262,5 +268,6 @@ describe("DELETE /api/shipping/[id]", () => {
 
     const res = await makeDELETERequest(mockId);
     expect(res.status).toBe(204);
+    expect(withTenantContext).toHaveBeenCalledWith(sessionTenant, expect.any(Function));
   });
 });

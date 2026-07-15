@@ -268,6 +268,7 @@ describe("DELETE /api/products/[id]", () => {
     vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
     const res = await DELETE(mockReq("DELETE"), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(404);
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_B, expect.any(Function));
   });
 
   it("204 feliz", async () => {
@@ -280,5 +281,6 @@ describe("DELETE /api/products/[id]", () => {
     vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
     const res = await DELETE(mockReq("DELETE"), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(204);
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_A, expect.any(Function));
   });
 });
