@@ -364,6 +364,19 @@
 | Rama default | `develop` |
 | Build | Limpio (sin `ignoreBuildErrors`) |
 | CI | GitHub Actions (lint, typecheck, build, test) |
-| Patrón A | 21 handlers wireados con `withTenantContext` |
-| Patrón B | 5 handlers wireados con `withTenantContext` |
-| Pendiente PR4 | FORCE RLS + validación Neon branch |
+  | Patrón A | 21 handlers wireados con `withTenantContext` |
+  | Patrón B | 5 handlers wireados con `withTenantContext` |
+  | Pendiente PR4 | FORCE RLS + validación Neon branch |
+
+---
+
+## 2026-07-15 — Fase B: Seed con dos tenants para validación RLS cross-tenant
+
+- **Motivación:** La Fase C (validación RLS en Neon branch) requiere al menos 2 tenants con datos para probar que `set_tenant_id` dentro de transacción filtra correctamente.
+- **Seed modificado:** se agregó un segundo tenant (`tienda2` / "Tienda Premium") con productos distintos (Campera Premium, Zapatillas Runner, Mochila Urbana), su propio admin, categorías, variantes, imágenes, cliente, órdenes y métodos de envío.
+- **SKUs de tenant 2 diferenciados:** `CAMP-*`, `ZAPA-*`, `MOCH-*` — sin conflicto con tenant 1.
+- **Verificación:** lint ✅ | typecheck ✅ | build 3/3 ✅ | commit `2000107`
+- **Próximos pasos:**
+  - Fase C: correr `pnpm db:seed` contra Neon branch y re-ejecutar batches de verificación RLS
+  - Fase D: pruebas de concurrencia contra la branch
+  - PR4: `ALTER TABLE ... FORCE ROW LEVEL SECURITY`

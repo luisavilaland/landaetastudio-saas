@@ -50,6 +50,30 @@ async function seed() {
     .returning();
   console.log(`✅ Tenant creado: ${tenant.slug} (ID: ${tenant.id})`);
 
+  // 2b. Crear segundo tenant
+  const [tenant2] = await db
+    .insert(schema.dbTenants)
+    .values({
+      slug: "tienda2",
+      name: "Tienda Premium",
+      plan: "business",
+      status: "active",
+      customDomain: "tienda2.local",
+      settings: {
+        logoUrl: "https://picsum.photos/seed/premium-logo/200/80",
+        storeDescription:
+          "Productos premium para quienes buscan lo mejor.",
+        contactEmail: "contacto@tienda2.com",
+        contactPhone: "+598 99 654 321",
+        socialLinks: {
+          instagram: "https://instagram.com/tienda2",
+          facebook: "https://facebook.com/tienda2",
+        },
+      },
+    })
+    .returning();
+  console.log(`✅ Tenant creado: ${tenant2.slug} (ID: ${tenant2.id})`);
+
   // 3. Crear administrador (para admin y superadmin)
   const hashedPassword = await bcrypt.hash("123456", 10);
 
@@ -61,6 +85,14 @@ async function seed() {
     tenantId: tenant.id,
   });
 
+  // Admin de tenant 2
+  await db.insert(schema.dbAdminUsers).values({
+    email: "admin@tienda2.com",
+    password: hashedPassword,
+    role: "admin",
+    tenantId: tenant2.id,
+  });
+
   // Superadmin (sin tenant asociado)
   await db.insert(schema.dbAdminUsers).values({
     email: "super@admin.com",
@@ -69,7 +101,7 @@ async function seed() {
     tenantId: null,
   });
 
-  console.log("✅ Admin y Superadmin creados (contraseña: 123456)");
+  console.log("✅ Admins y Superadmin creados (contraseña: 123456)");
 
   // 4. Crear categorías
   const [catRemeras] = await db
@@ -100,6 +132,36 @@ async function seed() {
     .returning();
 
   console.log("✅ Categorías creadas: Remeras, Pantalones, Accesorios");
+
+  // 4b. Categorías para tenant 2
+  const [cat2Remeras] = await db
+    .insert(schema.dbCategories)
+    .values({
+      tenantId: tenant2.id,
+      name: "Remeras",
+      slug: "remeras",
+    })
+    .returning();
+
+  const [cat2Pantalones] = await db
+    .insert(schema.dbCategories)
+    .values({
+      tenantId: tenant2.id,
+      name: "Pantalones",
+      slug: "pantalones",
+    })
+    .returning();
+
+  const [cat2Accesorios] = await db
+    .insert(schema.dbCategories)
+    .values({
+      tenantId: tenant2.id,
+      name: "Accesorios",
+      slug: "accesorios",
+    })
+    .returning();
+
+  console.log("✅ Categorías para tienda2: Remeras, Pantalones, Accesorios");
 
   // 5. Crear productos de demostración
   const [product1] = await db
@@ -144,6 +206,51 @@ async function seed() {
     .returning();
 
   console.log("✅ Productos creados: Remera Básica, Pantalón Jeans, Gorra");
+
+  // 5b. Productos para tenant 2 (distintos a tenant 1)
+  const [product4] = await db
+    .insert(schema.dbProducts)
+    .values({
+      tenantId: tenant2.id,
+      categoryId: cat2Remeras.id,
+      name: "Campera Premium",
+      slug: "campera-premium",
+      description:
+        "Campera rompevientos con capucha desmontable, ideal para actividades al aire libre.",
+      status: "active",
+      metadata: {},
+    })
+    .returning();
+
+  const [product5] = await db
+    .insert(schema.dbProducts)
+    .values({
+      tenantId: tenant2.id,
+      categoryId: cat2Pantalones.id,
+      name: "Zapatillas Runner",
+      slug: "zapatillas-runner",
+      description:
+        "Zapatillas de running con amortiguación avanzada y suela antideslizante.",
+      status: "active",
+      metadata: {},
+    })
+    .returning();
+
+  const [product6] = await db
+    .insert(schema.dbProducts)
+    .values({
+      tenantId: tenant2.id,
+      categoryId: cat2Accesorios.id,
+      name: "Mochila Urbana",
+      slug: "mochila-urbana",
+      description:
+        "Mochila impermeable con compartimento para laptop de hasta 15 pulgadas.",
+      status: "active",
+      metadata: {},
+    })
+    .returning();
+
+  console.log("✅ Productos para tienda2: Campera Premium, Zapatillas Runner, Mochila Urbana");
 
   // 6. Crear variantes con combinaciones de opciones
   // Remera Básica: Talle (S, M, L) x Color (Rojo, Azul) = 6 variantes
@@ -200,6 +307,63 @@ async function seed() {
 
   console.log("✅ Variantes creadas para todos los productos");
 
+  // 6b. Variantes para tenant 2
+  // Campera Premium: Talle (S, M, L) x Color (Negro, Verde) = 6 variantes
+  const camperaVariants = [
+    { sku: "CAMP-S-NEG", talle: "S", color: "Negro", price: 15000, stock: 10 },
+    { sku: "CAMP-S-VER", talle: "S", color: "Verde", price: 15000, stock: 8 },
+    { sku: "CAMP-M-NEG", talle: "M", color: "Negro", price: 15000, stock: 15 },
+    { sku: "CAMP-M-VER", talle: "M", color: "Verde", price: 15000, stock: 12 },
+    { sku: "CAMP-L-NEG", talle: "L", color: "Negro", price: 16000, stock: 5 },
+    { sku: "CAMP-L-VER", talle: "L", color: "Verde", price: 16000, stock: 7 },
+  ];
+
+  for (const v of camperaVariants) {
+    await db.insert(schema.dbProductVariants).values({
+      tenantId: tenant2.id,
+      productId: product4.id,
+      sku: v.sku,
+      price: v.price,
+      stock: v.stock,
+      options: { Talle: v.talle, Color: v.color },
+    });
+  }
+
+  // Zapatillas Runner: Talle (38, 40, 42, 44) x Color (Blanco, Negro) = 8 variantes
+  const zapatillasVariants = [
+    { sku: "ZAPA-38-BLA", talle: "38", color: "Blanco", price: 12000, stock: 20 },
+    { sku: "ZAPA-38-NEG", talle: "38", color: "Negro", price: 12000, stock: 15 },
+    { sku: "ZAPA-40-BLA", talle: "40", color: "Blanco", price: 12000, stock: 25 },
+    { sku: "ZAPA-40-NEG", talle: "40", color: "Negro", price: 12000, stock: 18 },
+    { sku: "ZAPA-42-BLA", talle: "42", color: "Blanco", price: 12500, stock: 12 },
+    { sku: "ZAPA-42-NEG", talle: "42", color: "Negro", price: 12500, stock: 10 },
+    { sku: "ZAPA-44-BLA", talle: "44", color: "Blanco", price: 12500, stock: 6 },
+    { sku: "ZAPA-44-NEG", talle: "44", color: "Negro", price: 12500, stock: 4 },
+  ];
+
+  for (const v of zapatillasVariants) {
+    await db.insert(schema.dbProductVariants).values({
+      tenantId: tenant2.id,
+      productId: product5.id,
+      sku: v.sku,
+      price: v.price,
+      stock: v.stock,
+      options: { Talle: v.talle, Color: v.color },
+    });
+  }
+
+  // Mochila Urbana: Variante única
+  await db.insert(schema.dbProductVariants).values({
+    tenantId: tenant2.id,
+    productId: product6.id,
+    sku: "MOCH-UNI-GRI",
+    price: 8500,
+    stock: 25,
+    options: { Capacidad: "25L", Color: "Gris" },
+  });
+
+  console.log("✅ Variantes para tienda2 creadas (13 variantes)");
+
   // 7. Crear imágenes de productos (múltiples por producto)
   // Imágenes para Remera Básica
   await db.insert(schema.dbProductImages).values([
@@ -246,6 +410,47 @@ async function seed() {
 
   console.log("✅ Imágenes de productos creadas");
 
+  // 7b. Imágenes para tenant 2
+  await db.insert(schema.dbProductImages).values([
+    {
+      productId: product4.id,
+      tenantId: tenant2.id,
+      url: "https://picsum.photos/seed/campera1/800/600",
+      alt: "Campera Premium frente",
+      position: 0,
+    },
+    {
+      productId: product4.id,
+      tenantId: tenant2.id,
+      url: "https://picsum.photos/seed/campera2/800/600",
+      alt: "Campera Premium costado",
+      position: 1,
+    },
+    {
+      productId: product5.id,
+      tenantId: tenant2.id,
+      url: "https://picsum.photos/seed/zapatillas1/800/600",
+      alt: "Zapatillas Runner perfil",
+      position: 0,
+    },
+    {
+      productId: product5.id,
+      tenantId: tenant2.id,
+      url: "https://picsum.photos/seed/zapatillas2/800/600",
+      alt: "Zapatillas Runner frontal",
+      position: 1,
+    },
+    {
+      productId: product6.id,
+      tenantId: tenant2.id,
+      url: "https://picsum.photos/seed/mochila1/800/600",
+      alt: "Mochila Urbana vista frontal",
+      position: 0,
+    },
+  ]);
+
+  console.log("✅ Imágenes para tienda2 creadas (5 imágenes)");
+
   // 8. Crear cliente de prueba
   await db.insert(schema.dbCustomers).values({
     tenantId: tenant.id,
@@ -261,6 +466,22 @@ async function seed() {
     .where(sql`email = 'cliente@ejemplo.com'`);
 
   console.log("✅ Cliente de prueba creado");
+
+  // 8b. Cliente de tenant 2
+  await db.insert(schema.dbCustomers).values({
+    tenantId: tenant2.id,
+    email: "cliente2@ejemplo.com",
+    password: hashedPassword,
+    name: "Cliente Premium",
+    phone: "099654321",
+  });
+
+  const [customer2] = await db
+    .select()
+    .from(schema.dbCustomers)
+    .where(sql`email = 'cliente2@ejemplo.com'`);
+
+  console.log("✅ Cliente de tienda2 creado");
 
   // 9. Obtener algunas variantes para las órdenes
   const [varianteRemeraM] = await db
@@ -349,6 +570,92 @@ async function seed() {
 
   console.log("✅ Órdenes de ejemplo creadas (1 confirmada, 1 pendiente)");
 
+  // 10b. Órdenes para tenant 2
+  const [vCamperaM] = await db
+    .select()
+    .from(schema.dbProductVariants)
+    .where(sql`sku = 'CAMP-M-NEG'`);
+  const [vZapatillas40] = await db
+    .select()
+    .from(schema.dbProductVariants)
+    .where(sql`sku = 'ZAPA-40-BLA'`);
+  const [vMochila] = await db
+    .select()
+    .from(schema.dbProductVariants)
+    .where(sql`sku = 'MOCH-UNI-GRI'`);
+  const [vCamperaL] = await db
+    .select()
+    .from(schema.dbProductVariants)
+    .where(sql`sku = 'CAMP-L-VER'`);
+
+  // Orden 3: Confirmada (tenant 2)
+  const order3Total = vCamperaM.price * 1 + vZapatillas40.price * 1;
+  const [order3] = await db
+    .insert(schema.dbOrders)
+    .values({
+      tenantId: tenant2.id,
+      customerId: customer2.id,
+      customerEmail: customer2.email,
+      status: "confirmed",
+      total: order3Total,
+      currency: "UYU",
+      shippingDetails: { address: "Av. Principal 456", city: "Montevideo" },
+      metadata: { paymentId: "mp_test_003", paymentStatus: "approved" },
+    })
+    .returning();
+
+  await db.insert(schema.dbOrderItems).values([
+    {
+      tenantId: tenant2.id,
+      orderId: order3.id,
+      productVariantId: vCamperaM.id,
+      quantity: 1,
+      unitPrice: vCamperaM.price,
+    },
+    {
+      tenantId: tenant2.id,
+      orderId: order3.id,
+      productVariantId: vZapatillas40.id,
+      quantity: 1,
+      unitPrice: vZapatillas40.price,
+    },
+  ]);
+
+  // Orden 4: Pendiente de pago (tenant 2)
+  const order4Total = vMochila.price * 2 + vCamperaL.price * 1;
+  const [order4] = await db
+    .insert(schema.dbOrders)
+    .values({
+      tenantId: tenant2.id,
+      customerId: customer2.id,
+      customerEmail: customer2.email,
+      status: "pending_payment",
+      total: order4Total,
+      currency: "UYU",
+      shippingDetails: { address: "Av. Principal 456", city: "Montevideo", name: "Cliente Premium" },
+      metadata: { paymentStatus: "pending" },
+    })
+    .returning();
+
+  await db.insert(schema.dbOrderItems).values([
+    {
+      tenantId: tenant2.id,
+      orderId: order4.id,
+      productVariantId: vMochila.id,
+      quantity: 2,
+      unitPrice: vMochila.price,
+    },
+    {
+      tenantId: tenant2.id,
+      orderId: order4.id,
+      productVariantId: vCamperaL.id,
+      quantity: 1,
+      unitPrice: vCamperaL.price,
+    },
+  ]);
+
+  console.log("✅ Órdenes para tienda2 creadas (1 confirmada, 1 pendiente)");
+
   // 11. Verificar que todo está bien
   const tenantsCount = await db
     .select({ count: sql<number>`count(*)` })
@@ -399,6 +706,33 @@ await db.insert(schema.dbShippingMethods).values([
   },
 ]).onConflictDoNothing();
 console.log('✅ Métodos de envío creados: Estándar, Express');
+
+// Métodos de envío para tienda2
+await db.insert(schema.dbShippingMethods).values([
+  {
+    tenantId: tenant2.id,
+    name: "Envío estándar",
+    description: "Entrega en 3 a 5 días hábiles",
+    price: 19000,
+    freeShippingThreshold: 300000,
+    estimatedDaysMin: 3,
+    estimatedDaysMax: 5,
+    isActive: "true",
+    sortOrder: 0,
+  },
+  {
+    tenantId: tenant2.id,
+    name: "Envío premium",
+    description: "Entrega en 24 horas hábiles",
+    price: 45000,
+    freeShippingThreshold: null,
+    estimatedDaysMin: 1,
+    estimatedDaysMax: 1,
+    isActive: "true",
+    sortOrder: 1,
+  },
+]).onConflictDoNothing();
+console.log('✅ Métodos de envío para tienda2: Estándar, Premium');
 
   console.log("🎉 Seed completado con éxito");
   process.exit(0);
