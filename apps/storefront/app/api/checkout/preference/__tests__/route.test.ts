@@ -27,20 +27,31 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@repo/db", async () => {
   const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
-  return {
-    ...actual,
-    db: { select: vi.fn() },
-  };
+  return { ...actual, withTenantContext: vi.fn() };
 });
 
 import { NextRequest } from "next/server";
-import { db } from "@repo/db";
+import { withTenantContext } from "@repo/db";
 import { getTenantId } from "@/lib/tenant";
 import { POST } from "../route";
 
 const TENANT_ID = "tenant-123";
 const ORDER_ID = "order-abc";
 const CALLER_EMAIL = "comprador@test.com";
+
+function setupTx(results: { data: any[]; limit?: boolean }[]) {
+  const tx = { select: vi.fn() } as any;
+  for (const r of results) {
+    const fromObj = { where: vi.fn() };
+    tx.select.mockReturnValueOnce({ from: vi.fn().mockReturnValue(fromObj) });
+    if (r.limit) {
+      fromObj.where.mockReturnValue({ limit: vi.fn().mockResolvedValue(r.data) });
+    } else {
+      fromObj.where.mockResolvedValue(r.data);
+    }
+  }
+  return tx;
+}
 
 const MOCK_ORDER = {
   id: ORDER_ID,
@@ -75,18 +86,6 @@ const MOCK_PRODUCTS = [
   { id: "prod-1", name: "Producto 1" },
   { id: "prod-2", name: "Producto 2" },
 ];
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function createQuery<T>(resolveValue: T[]): any {
-  const q = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue(resolveValue),
-    then: (onFulfilled: (v: T[]) => unknown) =>
-      Promise.resolve(resolveValue).then(onFulfilled),
-  };
-  return q;
-}
 
 function makeRequest(
   body: Record<string, unknown>,
@@ -140,12 +139,13 @@ describe("POST /api/checkout/preference", () => {
       mockRedisIncr.mockResolvedValue(5);
       mockRedisPexpire.mockResolvedValue("OK");
 
-      vi.mocked(db.select)
-        .mockReturnValueOnce(createQuery([MOCK_ORDER]));
+      const tx = setupTx([{ data: [MOCK_ORDER], limit: true }]);
+      vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
       const res = await POST(makeRequest({ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }, { "x-forwarded-for": "5.6.7.8" }));
 
       expect(res.status).not.toBe(429);
+      expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
     });
   });
 
@@ -202,29 +202,40 @@ describe("POST /api/checkout/preference", () => {
   describe("IDOR protection", () => {
     it("should return 404 when order does not exist", async () => {
       mockRedisIncr.mockResolvedValue(1);
-      vi.mocked(db.select).mockReturnValueOnce(createQuery([]));
+      const tx = setupTx([{ data: [], limit: true }]);
+      vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
       const res = await POST(makeRequest({ orderId: "nonexistent", customerEmail: CALLER_EMAIL }));
 
       expect(res.status).toBe(404);
+      expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
     });
 
     it("should return 403 when caller email does not match order email", async () => {
       mockRedisIncr.mockResolvedValue(1);
-      vi.mocked(db.select).mockReturnValueOnce(createQuery([{ ...MOCK_ORDER, customerEmail: "otro@test.com" }]));
+      const tx = setupTx([
+        { data: [{ ...MOCK_ORDER, customerEmail: "otro@test.com" }], limit: true },
+        { data: [] },
+        { data: [] },
+        { data: [] },
+      ]);
+      vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
       const res = await POST(makeRequest({ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
 
       expect(res.status).toBe(403);
+      expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
     });
 
     it("should return 200 when caller email matches order email", async () => {
       mockRedisIncr.mockResolvedValue(1);
-      vi.mocked(db.select)
-        .mockReturnValueOnce(createQuery([MOCK_ORDER]))
-        .mockReturnValueOnce(createQuery(MOCK_ORDER_ITEMS))
-        .mockReturnValueOnce(createQuery(MOCK_VARIANTS))
-        .mockReturnValueOnce(createQuery(MOCK_PRODUCTS));
+      const tx = setupTx([
+        { data: [MOCK_ORDER], limit: true },
+        { data: MOCK_ORDER_ITEMS },
+        { data: MOCK_VARIANTS },
+        { data: MOCK_PRODUCTS },
+      ]);
+      vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
       const originalFetch = globalThis.fetch;
       globalThis.fetch = vi.fn().mockResolvedValue({
@@ -238,6 +249,7 @@ describe("POST /api/checkout/preference", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body).toHaveProperty("init_point");
+        expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
       } finally {
         globalThis.fetch = originalFetch;
       }
@@ -247,11 +259,18 @@ describe("POST /api/checkout/preference", () => {
   describe("Shipping details", () => {
     it("should return 400 when shipping details are missing", async () => {
       mockRedisIncr.mockResolvedValue(1);
-      vi.mocked(db.select).mockReturnValueOnce(createQuery([{ ...MOCK_ORDER, shippingDetails: null }]));
+      const tx = setupTx([
+        { data: [{ ...MOCK_ORDER, shippingDetails: null }], limit: true },
+        { data: [] },
+        { data: [] },
+        { data: [] },
+      ]);
+      vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
       const res = await POST(makeRequest({ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
 
       expect(res.status).toBe(400);
+      expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
     });
   });
 });

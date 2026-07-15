@@ -326,15 +326,38 @@
 - ✅ Storefront shipping test suite roto por mock de `drizzle-orm`
 - ✅ Tests de shipping/[id], orders/[id], variants, products/[id] DELETE con mock de `withTenantContext`
 
+---
+
+## 2026-07-15 — PR3: Wire withTenantContext en handlers Patrón B (I/O externo) + tests
+
+- **Branch:** `feat-p1-1-patron-b`
+- **5 handlers Patrón B wireados** — los que tienen I/O externo intercalado entre DB ops, requiriendo múltiples `withTenantContext`:
+  - **Webhook:** `external_reference` compuesto `${tenantId}:${orderId}`, email fuera del contexto, dev mode magic IDs preservados
+  - **Checkout/preference:** `external_reference` compuesto, single context para 4 lecturas, guard `orderId` (const) para TS closure
+  - **Images POST:** dos contextos (read → upload → read+insert), FK violation 23503 → 409 (TOCTOU entre contextos)
+  - **Images GET:** single context (Patrón A — se cayó entre PR2 y PR3, ahora incluido)
+  - **Images DELETE:** dos contextos (read → delete S3 → delete DB)
+  - **Register:** dos contextos (check email + tenant → hash → insert), `console.error` → `logger.error`, UK 23505 → 409
+- **`withTenantContext` assertions:** agregadas en checkout (5 tests), register (1 test), images (GET 1 test)
+- **Images test file reescrito completamente:** 11 tests (GET 3, POST 3, DELETE 5) — reemplaza 8 tests inline que nunca ejercitaban los handlers reales
+- **Tests checkout y register migrados** a mock de `withTenantContext` (11 + 5 tests)
+- **Verificación:** lint ✅ | typecheck ✅ | tests **290/290** ✅ (+1 vs baseline)
+- **Review de aprobación:** 4 hallazgos corregidos post-review:
+  1. `console.error` → `logger.error` en `images/[imageId]/route.ts` (bloqueante)
+  2. Magic ID por `withTenantContext` con `external_reference` compuesto — confirmado como desviación intencional (más seguro que bypass total)
+  3. Test FK 23503 → 409 agregado en images POST
+  4. Test UK 23505 → 409 agregado en register
+- **292 tests finales** (290 originales + FK + UK)
+
 **Deuda técnica pendiente:**
-- ❌ Patrón B (5 handlers con I/O externo: checkout/preference, webhooks, products/[id]/images, images/[imageId], register) + tests — PR3
+- ❌ FORCE ROW LEVEL SECURITY — PR4 (validación manual en Neon branch + concurrencia)
 - ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/`.
 
-## Estado actual (14 de julio 2026)
+## Estado actual (15 de julio 2026)
 
 | Métrica | Valor |
 |---------|-------|
-| Tests | 289 pasando, 0 fallos |
+| Tests | 292 pasando, 0 fallos |
 | Apps | storefront, admin, superadmin |
 | Servicios | Neon, Upstash, R2, Resend |
 | Deploy | Vercel (3 apps) |
@@ -342,4 +365,5 @@
 | Build | Limpio (sin `ignoreBuildErrors`) |
 | CI | GitHub Actions (lint, typecheck, build, test) |
 | Patrón A | 21 handlers wireados con `withTenantContext` |
-| Patrón B | 5 handlers pendientes (PR3) |
+| Patrón B | 5 handlers wireados con `withTenantContext` |
+| Pendiente PR4 | FORCE RLS + validación Neon branch |

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbOrders, dbOrderItems, dbProductVariants } from "@repo/db";
+import { db, dbOrders, dbOrderItems, dbProductVariants, withTenantContext } from "@repo/db";
 import { and, eq, sql } from "drizzle-orm";
 import { sendOrderConfirmationEmail } from "@/lib/email";
 import crypto from "crypto";
@@ -136,31 +136,25 @@ export async function POST(request: NextRequest) {
 
     logger.info({ paymentId, status: payment.status, statusDetail: payment.status_detail }, "Payment status");
     
-    let orderId: string | null = mockExternalRef || payment.external_reference;
+    const externalRef: string | null = mockExternalRef || payment.external_reference;
 
-    if (!orderId) {
+    if (!externalRef) {
       logger.info({ paymentId }, "No external_reference found");
       return NextResponse.json({ received: true, message: "No external_reference found" });
     }
 
-    if (mockExternalRef) {
-      logger.debug({ orderId }, "Using test order ID from header");
-    }
-
-    logger.debug({ orderId }, "Order ID from external_reference");
-
-    const [order] = await db
-      .select()
-      .from(dbOrders)
-      .where(eq(dbOrders.id, orderId))
-      .limit(1);
-
-    if (!order) {
-      logger.warn({ orderId }, "Order not found");
+    const refParts = externalRef.split(":");
+    if (refParts.length !== 2) {
+      logger.error({ externalRef }, "external_reference sin tenantId — orden pre-deploy, reconciliar manualmente");
       return NextResponse.json({ received: true });
     }
+    const [tenantId, orderId] = refParts;
 
-    const tenantId = order.tenantId;
+    if (mockExternalRef) {
+      logger.debug({ orderId, tenantId }, "Using test order ID from header");
+    }
+
+    logger.debug({ orderId, tenantId }, "Order ID and tenant from external_reference");
 
     let newStatus: string | null = null;
 
@@ -181,77 +175,99 @@ export async function POST(request: NextRequest) {
     }
 
     if (newStatus === "confirmed") {
-      const metadata = order.metadata as { paymentId?: string } | undefined;
-      if (metadata?.paymentId) {
-        logger.info({ orderId, paymentId }, "Payment already processed");
-        return NextResponse.json({ received: true });
-      }
+      const emailData = await withTenantContext(tenantId, async (tx) => {
+        const [order] = await tx
+          .select()
+          .from(dbOrders)
+          .where(and(eq(dbOrders.id, orderId), eq(dbOrders.tenantId, tenantId)))
+          .limit(1);
 
-      await db
-        .update(dbOrders)
-        .set({
-          status: newStatus,
-          metadata: {
-            paymentId,
-            paymentStatus: payment.status,
-            webhookReceivedAt: new Date().toISOString(),
-          },
-        })
-        .where(and(eq(dbOrders.id, orderId), eq(dbOrders.tenantId, tenantId)));
+        if (!order) {
+          logger.warn({ orderId, tenantId }, "Order not found");
+          return null;
+        }
+
+        const metadata = order.metadata as { paymentId?: string } | undefined;
+        if (metadata?.paymentId) {
+          logger.info({ orderId, paymentId }, "Payment already processed");
+          return null;
+        }
+
+        await tx
+          .update(dbOrders)
+          .set({
+            status: newStatus,
+            metadata: {
+              paymentId,
+              paymentStatus: payment.status,
+              webhookReceivedAt: new Date().toISOString(),
+            },
+          })
+          .where(and(eq(dbOrders.id, orderId), eq(dbOrders.tenantId, tenantId)));
+
+        return {
+          customerEmail: order.customerEmail,
+          total: order.total,
+          shippingName: (order.shippingDetails as { name?: string } | null)?.name || "Cliente",
+        };
+      });
 
       logger.info({ orderId, newStatus }, "Order updated");
 
-      if (order?.customerEmail && order?.total && order?.shippingDetails) {
-        const shippingDetails = order.shippingDetails as { name?: string };
+      if (emailData?.customerEmail && emailData?.total) {
         await sendOrderConfirmationEmail(
-          order.customerEmail,
+          emailData.customerEmail,
           orderId,
-          order.total,
-          shippingDetails.name || "Cliente"
+          emailData.total,
+          emailData.shippingName
         );
       }
     } else if (newStatus === "payment_failed") {
-      if (order.status === "payment_failed") {
-        logger.info({ orderId }, "Order already failed, skipping restoration");
-        return NextResponse.json({ received: true });
-      }
-
-      const orderItems = await db
-        .select()
-        .from(dbOrderItems)
-        .where(eq(dbOrderItems.orderId, orderId));
-
-      for (const item of orderItems) {
-        const [variant] = await db
-          .select({ stock: dbProductVariants.stock })
-          .from(dbProductVariants)
-          .where(and(eq(dbProductVariants.id, item.productVariantId), eq(dbProductVariants.tenantId, tenantId)))
+      await withTenantContext(tenantId, async (tx) => {
+        const [order] = await tx
+          .select({ status: dbOrders.status })
+          .from(dbOrders)
+          .where(and(eq(dbOrders.id, orderId), eq(dbOrders.tenantId, tenantId)))
           .limit(1);
 
-        if (variant && variant.stock !== null) {
-          await db
-            .update(dbProductVariants)
-            .set({
-              stock: variant.stock + item.quantity,
-            })
-            .where(and(eq(dbProductVariants.id, item.productVariantId), eq(dbProductVariants.tenantId, tenantId)));
-
-          logger.info({ orderId, productVariantId: item.productVariantId, quantity: item.quantity }, "Stock restored");
+        if (!order || order.status === "payment_failed") {
+          logger.info({ orderId }, "Order already failed, skipping restoration");
+          return;
         }
-      }
 
-      await db
-        .update(dbOrders)
-        .set({
-          status: newStatus,
-          metadata: {
-            paymentId,
-            paymentStatus: payment.status,
-            webhookReceivedAt: new Date().toISOString(),
-            stockRestored: true,
-          },
-        })
-        .where(and(eq(dbOrders.id, orderId), eq(dbOrders.tenantId, tenantId)));
+        const orderItems = await tx
+          .select()
+          .from(dbOrderItems)
+          .where(and(eq(dbOrderItems.orderId, orderId), eq(dbOrderItems.tenantId, tenantId)));
+
+        for (const item of orderItems) {
+          const [variant] = await tx
+            .select({ stock: dbProductVariants.stock })
+            .from(dbProductVariants)
+            .where(and(eq(dbProductVariants.id, item.productVariantId), eq(dbProductVariants.tenantId, tenantId)))
+            .limit(1);
+
+          if (variant && variant.stock !== null) {
+            await tx
+              .update(dbProductVariants)
+              .set({ stock: variant.stock + item.quantity })
+              .where(and(eq(dbProductVariants.id, item.productVariantId), eq(dbProductVariants.tenantId, tenantId)));
+          }
+        }
+
+        await tx
+          .update(dbOrders)
+          .set({
+            status: newStatus,
+            metadata: {
+              paymentId,
+              paymentStatus: payment.status,
+              webhookReceivedAt: new Date().toISOString(),
+              stockRestored: true,
+            },
+          })
+          .where(and(eq(dbOrders.id, orderId), eq(dbOrders.tenantId, tenantId)));
+      });
 
       logger.info({ orderId, newStatus }, "Order updated and stock restored");
     }

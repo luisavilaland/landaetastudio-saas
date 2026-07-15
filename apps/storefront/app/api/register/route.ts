@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbCustomers, dbTenants } from "@repo/db";
+import { withTenantContext, dbCustomers, dbTenants } from "@repo/db";
 import { eq, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getTenantId } from "@/lib/tenant";
@@ -23,7 +23,6 @@ export async function POST(request: NextRequest) {
 
     const { name, email, password } = validation.data;
 
-    // Get tenant from header
     const tenantId = await getTenantId();
     if (!tenantId) {
       return NextResponse.json(
@@ -32,17 +31,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if customer already exists for this tenant
-    const [existing] = await db
-      .select({ id: dbCustomers.id })
-      .from(dbCustomers)
-      .where(
-        and(
-          eq(dbCustomers.email, email),
-          eq(dbCustomers.tenantId, tenantId)
-        )
-      )
-      .limit(1);
+    const { existing, tenant } = await withTenantContext(tenantId, async (tx) => {
+      const [existing] = await tx
+        .select({ id: dbCustomers.id })
+        .from(dbCustomers)
+        .where(and(eq(dbCustomers.email, email), eq(dbCustomers.tenantId, tenantId)))
+        .limit(1);
+
+      const [tenant] = await tx
+        .select({ name: dbTenants.name })
+        .from(dbTenants)
+        .where(eq(dbTenants.id, tenantId))
+        .limit(1);
+
+      return { existing: existing ?? null, tenant: tenant ?? null };
+    });
 
     if (existing) {
       return NextResponse.json(
@@ -51,45 +54,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get tenant name for welcome email
-    const [tenant] = await db
-      .select({ name: dbTenants.name })
-      .from(dbTenants)
-      .where(eq(dbTenants.id, tenantId))
-      .limit(1);
-
     const storeName = tenant?.name || "la tienda";
-
-    // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
-
-    // Create customer
     const now = new Date();
-    await db.insert(dbCustomers).values({
-      tenantId,
-      name,
-      email,
-      password: passwordHash,
-      createdAt: now,
-      updatedAt: now,
+
+    await withTenantContext(tenantId, async (tx) => {
+      await tx.insert(dbCustomers).values({
+        tenantId,
+        name,
+        email,
+        password: passwordHash,
+        createdAt: now,
+        updatedAt: now,
+      });
     });
 
-    // Send welcome email (non-blocking)
     try {
       await sendWelcomeEmail(email, name, storeName, process.env.STOREFRONT_URL);
     } catch (error) {
       logger.error({ email, error }, "Failed to send welcome email");
     }
 
-    return NextResponse.json(
-      { success: true },
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {
-    console.error("[Register] Error:", error);
-    return NextResponse.json(
-      { error: "Error al registrar" },
-      { status: 500 }
-    );
+    if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+      return NextResponse.json(
+        { error: "Email ya registrado", field: "email" },
+        { status: 409 }
+      );
+    }
+    logger.error({ error }, "Register error");
+    return NextResponse.json({ error: "Error al registrar" }, { status: 500 });
   }
 }
