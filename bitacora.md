@@ -342,6 +342,12 @@
 - **Images test file reescrito completamente:** 11 tests (GET 3, POST 3, DELETE 5) — reemplaza 8 tests inline que nunca ejercitaban los handlers reales
 - **Tests checkout y register migrados** a mock de `withTenantContext` (11 + 5 tests)
 - **Verificación:** lint ✅ | typecheck ✅ | tests **290/290** ✅ (+1 vs baseline)
+- **Review de aprobación:** 4 hallazgos corregidos post-review:
+  1. `console.error` → `logger.error` en `images/[imageId]/route.ts` (bloqueante)
+  2. Magic ID por `withTenantContext` con `external_reference` compuesto — confirmado como desviación intencional (más seguro que bypass total)
+  3. Test FK 23503 → 409 agregado en images POST
+  4. Test UK 23505 → 409 agregado en register
+- **292 tests finales** (290 originales + FK + UK)
 
 **Deuda técnica pendiente:**
 - ❌ FORCE ROW LEVEL SECURITY — PR4 (validación manual en Neon branch + concurrencia)
@@ -351,7 +357,7 @@
 
 | Métrica | Valor |
 |---------|-------|
-| Tests | 290 pasando, 0 fallos |
+| Tests | 292 pasando, 0 fallos |
 | Apps | storefront, admin, superadmin |
 | Servicios | Neon, Upstash, R2, Resend |
 | Deploy | Vercel (3 apps) |
