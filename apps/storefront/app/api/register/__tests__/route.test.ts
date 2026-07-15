@@ -165,4 +165,24 @@ describe("POST /api/register", () => {
     );
     expect(withTenantContext).toHaveBeenCalledTimes(2);
   });
+
+  it("debe devolver 409 cuando el insert falla por unique violation (23505)", async () => {
+    const readTx = setupTxRead([], [{ name: "Test Store" }]);
+    const insertTx = makeTxMock();
+    insertTx.insert.mockReturnValue(insertTx);
+    insertTx.values.mockRejectedValue({ code: "23505" });
+
+    const mockCalls = [readTx, insertTx];
+    let callIndex = 0;
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(mockCalls[callIndex++]));
+
+    const res = await POST(
+      makeRequest({ name: "Test User", email: "test@test.com", password: "password123" })
+    );
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("Email ya registrado");
+    expect(body.field).toBe("email");
+  });
 });

@@ -3,6 +3,9 @@ import { withTenantContext, dbProductImages } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
 import { deleteImage } from "@repo/storage";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("admin-product-image-delete");
 
 type Params = Promise<{ id: string; imageId: string }>;
 
@@ -48,7 +51,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting product image:", error);
+    logger.error({ error }, "Error deleting product image");
     return NextResponse.json({ error: "Error al eliminar imagen" }, { status: 500 });
   }
 }

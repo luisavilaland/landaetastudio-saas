@@ -151,6 +151,33 @@ describe("POST /api/products/[id]/images", () => {
     expect(res.status).toBe(201);
     expect(withTenantContext).toHaveBeenCalledTimes(2);
   });
+
+  it("should return 409 when FK violation on insert (product deleted between contexts)", async () => {
+    vi.mocked(auth).mockResolvedValue(session(TENANT_A));
+    vi.mocked(uploadImage).mockResolvedValue("http://minio/img.png");
+
+    const productTx = setupTxSelect([{ id: PRODUCT_ID, tenantId: TENANT_A, slug: PRODUCT_SLUG, name: "Test Product" }]);
+    const insertTx = makeTxMock();
+    insertTx.select.mockReturnValue(insertTx);
+    insertTx.from.mockReturnValue(insertTx);
+    insertTx.where.mockReturnValue(insertTx);
+    insertTx.orderBy.mockResolvedValue([]);
+    insertTx.insert.mockReturnValue(insertTx);
+    insertTx.values.mockReturnValue(insertTx);
+    insertTx.returning.mockRejectedValue({ code: "23503" });
+
+    const mockCalls = [productTx, insertTx];
+    let callIndex = 0;
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(mockCalls[callIndex++]));
+
+    const fd = new FormData();
+    fd.append("image", new File(["data"], "test.png", { type: "image/png" }));
+    const res = await POST(makeRequest("POST", "http://localhost/api/products/prod-1/images", fd), { params: Promise.resolve({ id: PRODUCT_ID }) });
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("Producto no encontrado");
+  });
 });
 
 describe("DELETE /api/products/[id]/images/[imageId]", () => {
