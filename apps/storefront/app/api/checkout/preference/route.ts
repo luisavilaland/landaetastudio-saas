@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbOrders, dbOrderItems, dbProducts, dbProductVariants } from "@repo/db";
+import { withTenantContext, dbOrders, dbOrderItems, dbProducts, dbProductVariants } from "@repo/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { checkoutPreferenceSchema } from "@repo/validation";
 import { getTenantId } from "@/lib/tenant";
@@ -72,18 +72,69 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const [order] = await db
-      .select()
-      .from(dbOrders)
-      .where(and(eq(dbOrders.id, orderId), eq(dbOrders.tenantId, tenantId)))
-      .limit(1);
+    if (!orderId) {
+      return NextResponse.json(
+        { error: "ID de orden inválido" },
+        { status: 400 }
+      );
+    }
 
-    if (!order) {
+    const oid = orderId;
+
+    const ctxResult = await withTenantContext(tenantId, async (tx) => {
+      const [order] = await tx
+        .select()
+        .from(dbOrders)
+        .where(and(eq(dbOrders.id, oid), eq(dbOrders.tenantId, tenantId)))
+        .limit(1);
+
+      if (!order) return null;
+
+      const orderItems = await tx
+        .select({
+          id: dbOrderItems.id,
+          productVariantId: dbOrderItems.productVariantId,
+          quantity: dbOrderItems.quantity,
+          unitPrice: dbOrderItems.unitPrice,
+        })
+        .from(dbOrderItems)
+        .where(and(eq(dbOrderItems.orderId, oid), eq(dbOrderItems.tenantId, tenantId)));
+
+      const variantIds = orderItems.map((item) => item.productVariantId);
+
+      const variants = variantIds.length > 0
+        ? await tx
+            .select({
+              id: dbProductVariants.id,
+              productId: dbProductVariants.productId,
+            })
+            .from(dbProductVariants)
+            .where(and(inArray(dbProductVariants.id, variantIds), eq(dbProductVariants.tenantId, tenantId)))
+        : [];
+
+      const productIds = [...new Set(variants.map((v) => v.productId))];
+
+      const products = productIds.length > 0
+        ? await tx
+            .select({
+              id: dbProducts.id,
+              name: dbProducts.name,
+            })
+            .from(dbProducts)
+            .where(and(inArray(dbProducts.id, productIds), eq(dbProducts.tenantId, tenantId)))
+        : [];
+
+      return { order, orderItems, variants, products };
+    });
+
+    if (!ctxResult) {
       return NextResponse.json(
         { error: "Orden no encontrada" },
         { status: 404 }
       );
     }
+
+    const { order, orderItems, variants, products } = ctxResult;
 
     if (order.customerEmail !== callerEmail) {
       logger.warn({ orderId, callerEmail, orderEmail: order.customerEmail }, "Email mismatch — IDOR attempt");
@@ -127,31 +178,12 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    const orderItems = await db
-      .select({
-        id: dbOrderItems.id,
-        productVariantId: dbOrderItems.productVariantId,
-        quantity: dbOrderItems.quantity,
-        unitPrice: dbOrderItems.unitPrice,
-      })
-      .from(dbOrderItems)
-      .where(and(eq(dbOrderItems.orderId, orderId), eq(dbOrderItems.tenantId, tenantId)));
-
-    const variantIds = orderItems.map((item) => item.productVariantId);
-    if (variantIds.length === 0) {
+    if (orderItems.length === 0) {
       return NextResponse.json(
         { error: "No hay items para pagar" },
         { status: 400 }
       );
     }
-
-    const variants = await db
-      .select({
-        id: dbProductVariants.id,
-        productId: dbProductVariants.productId,
-      })
-      .from(dbProductVariants)
-      .where(and(inArray(dbProductVariants.id, variantIds), eq(dbProductVariants.tenantId, tenantId)));
 
     if (variants.length === 0) {
       return NextResponse.json(
@@ -159,15 +191,6 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
-
-    const productIds = [...new Set(variants.map((v) => v.productId))];
-    const products = await db
-      .select({
-        id: dbProducts.id,
-        name: dbProducts.name,
-      })
-      .from(dbProducts)
-      .where(and(inArray(dbProducts.id, productIds), eq(dbProducts.tenantId, tenantId)));
 
     const productMap = new Map(products.map((p) => [p.id, p.name]));
     const variantProductMap = new Map(variants.map((v) => [v.id, v.productId]));
@@ -204,7 +227,7 @@ export async function POST(request: NextRequest) {
         pending: `${baseUrl}/checkout/pending`,
       },
       auto_return: "approved",
-      external_reference: orderId,
+      external_reference: `${tenantId}:${orderId}`,
     };
 
     const controller = new AbortController();

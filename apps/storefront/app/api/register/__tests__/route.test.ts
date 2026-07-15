@@ -15,10 +15,7 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@repo/db", async () => {
   const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
-  return {
-    ...actual,
-    db: { select: vi.fn(), insert: vi.fn() },
-  };
+  return { ...actual, withTenantContext: vi.fn() };
 });
 
 vi.mock("bcryptjs", async (importOriginal) => {
@@ -35,7 +32,7 @@ vi.mock("@repo/commerce", () => ({
 }));
 
 import { NextRequest } from "next/server";
-import { db } from "@repo/db";
+import { withTenantContext } from "@repo/db";
 import { getTenantId } from "@/lib/tenant";
 import bcrypt from "bcryptjs";
 import { sendWelcomeEmail } from "@repo/commerce";
@@ -44,15 +41,38 @@ import { POST } from "../route";
 const TENANT_ID = "tenant-123";
 const CROSS_TENANT_ID = "tenant-b";
 
-function createQuery<T>(resolveValue: T[]): any {
-  const q = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue(resolveValue),
-    then: (onFulfilled: (v: T[]) => unknown) =>
-      Promise.resolve(resolveValue).then(onFulfilled),
-  };
-  return q;
+function makeTxMock() {
+  return { select: vi.fn(), insert: vi.fn(), from: vi.fn(), where: vi.fn(), limit: vi.fn(), values: vi.fn() } as any;
+}
+
+function setupTxRead(customerResult: any[], tenantResult: any[]) {
+  const tx = makeTxMock();
+
+  const whereLimit1 = { limit: vi.fn() };
+  const fromWhere1 = { where: vi.fn() };
+  const selectFrom1 = { from: vi.fn() };
+  selectFrom1.from.mockReturnValue(fromWhere1);
+  fromWhere1.where.mockReturnValue(whereLimit1);
+  whereLimit1.limit.mockResolvedValue(customerResult);
+
+  const whereLimit2 = { limit: vi.fn() };
+  const fromWhere2 = { where: vi.fn() };
+  const selectFrom2 = { from: vi.fn() };
+  selectFrom2.from.mockReturnValue(fromWhere2);
+  fromWhere2.where.mockReturnValue(whereLimit2);
+  whereLimit2.limit.mockResolvedValue(tenantResult);
+
+  tx.select.mockReturnValueOnce(selectFrom1);
+  tx.select.mockReturnValueOnce(selectFrom2);
+
+  return tx;
+}
+
+function setupTxInsert() {
+  const tx = makeTxMock();
+  tx.insert.mockReturnValue(tx);
+  tx.values.mockResolvedValue(undefined);
+  return tx;
 }
 
 function makeRequest(body: Record<string, unknown>): NextRequest {
@@ -93,7 +113,8 @@ describe("POST /api/register", () => {
   });
 
   it("debe devolver 409 cuando el email ya existe en el mismo tenant", async () => {
-    vi.mocked(db.select).mockReturnValueOnce(createQuery([{ id: "customer-1" }]));
+    const tx = setupTxRead([{ id: "customer-1" }], [{ name: "Test Store" }]);
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
     const res = await POST(
       makeRequest({ name: "Test User", email: "test@test.com", password: "password123" })
@@ -103,16 +124,16 @@ describe("POST /api/register", () => {
     const body = await res.json();
     expect(body.error).toBe("Email ya registrado");
     expect(body.field).toBe("email");
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
   });
 
   it("debe crear el usuario cuando el email existe en otro tenant (cross-tenant)", async () => {
     vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID);
-    vi.mocked(db.select)
-      .mockReturnValueOnce(createQuery([]))
-      .mockReturnValueOnce(createQuery([{ name: "Test Store" }]));
-    vi.mocked(db.insert).mockReturnValueOnce({
-      values: vi.fn().mockResolvedValue(undefined),
-    } as any);
+    const readTx = setupTxRead([], [{ name: "Test Store" }]);
+    const insertTx = setupTxInsert();
+    const mockCalls = [readTx, insertTx];
+    let callIndex = 0;
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(mockCalls[callIndex++]));
 
     const res = await POST(
       makeRequest({ name: "Test User", email: "test@test.com", password: "password123" })
@@ -121,15 +142,15 @@ describe("POST /api/register", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.success).toBe(true);
+    expect(withTenantContext).toHaveBeenCalledTimes(2);
   });
 
   it("debe crear el usuario exitosamente y enviar email de bienvenida", async () => {
-    vi.mocked(db.select)
-      .mockReturnValueOnce(createQuery([]))
-      .mockReturnValueOnce(createQuery([{ name: "Test Store" }]));
-    vi.mocked(db.insert).mockReturnValueOnce({
-      values: vi.fn().mockResolvedValue(undefined),
-    } as any);
+    const readTx = setupTxRead([], [{ name: "Test Store" }]);
+    const insertTx = setupTxInsert();
+    const mockCalls = [readTx, insertTx];
+    let callIndex = 0;
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(mockCalls[callIndex++]));
 
     const res = await POST(
       makeRequest({ name: "Test User", email: "test@test.com", password: "password123" })
@@ -142,5 +163,6 @@ describe("POST /api/register", () => {
       "Test Store",
       undefined
     );
+    expect(withTenantContext).toHaveBeenCalledTimes(2);
   });
 });
