@@ -83,11 +83,7 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
-    const debugInfo = error instanceof Error
-      ? { message: error.message, stack: error.stack?.slice(0, 500), name: error.name, code: (error as any).code }
-      : { raw: JSON.stringify(error) };
-    console.error('REGISTER_DEBUG', JSON.stringify(debugInfo));
-    logger.error({ error, debugInfo }, "Register error");
+    logger.error({ error }, "Register error");
     return NextResponse.json({ error: "Error al registrar" }, { status: 500 });
   }
 }
