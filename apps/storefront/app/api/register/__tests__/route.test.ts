@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@/lib/tenant", () => ({
   getTenantId: vi.fn(),
@@ -86,8 +86,13 @@ function makeRequest(body: Record<string, unknown>): NextRequest {
 describe("POST /api/register", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
     vi.mocked(getTenantId).mockResolvedValue(TENANT_ID);
     vi.mocked(bcrypt.hash).mockResolvedValue("hashed-password" as never);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("debe devolver 400 cuando el email es inválido", async () => {
@@ -146,7 +151,7 @@ describe("POST /api/register", () => {
   });
 
   it("debe crear el usuario exitosamente y enviar email de bienvenida", async () => {
-    process.env.STOREFRONT_URL = "https://test-store.lvh.me";
+    vi.stubEnv("STOREFRONT_URL", "https://test-store.lvh.me");
     const readTx = setupTxRead([], [{ name: "Test Store" }]);
     const insertTx = setupTxInsert();
     const mockCalls = [readTx, insertTx];
@@ -165,7 +170,6 @@ describe("POST /api/register", () => {
       "https://test-store.lvh.me"
     );
     expect(withTenantContext).toHaveBeenCalledTimes(2);
-    delete process.env.STOREFRONT_URL;
   });
 
   it("debe devolver 409 cuando el insert falla por unique violation (23505)", async () => {
