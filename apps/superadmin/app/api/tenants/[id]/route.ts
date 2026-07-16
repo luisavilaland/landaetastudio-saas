@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, dbTenants, dbProducts, dbProductImages, dbProductVariants, dbCategories, dbCustomers, dbOrders, dbOrderItems, dbShippingMethods, dbAdminUsers } from "@repo/db";
+import { db, withTenantContext, dbTenants, dbProducts, dbProductImages, dbProductVariants, dbCategories, dbCustomers, dbOrders, dbOrderItems, dbShippingMethods, dbAdminUsers } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { redisClient } from "@/lib/redis";
 import { eq, inArray } from "drizzle-orm";
@@ -184,9 +184,9 @@ export async function DELETE(
 
     const oldSlug = existing[0].slug;
 
-    await db.transaction(async (tx) => {
+    await withTenantContext(id, async (ctxTx) => {
       // Get all products for this tenant
-      const products = await tx
+      const products = await ctxTx
         .select({ id: dbProducts.id })
         .from(dbProducts)
         .where(eq(dbProducts.tenantId, id));
@@ -195,7 +195,7 @@ export async function DELETE(
 
       if (productIds.length > 0) {
         // Get all product variants for these products
-        const variants = await tx
+        const variants = await ctxTx
           .select({ id: dbProductVariants.id })
           .from(dbProductVariants)
           .where(inArray(dbProductVariants.productId, productIds));
@@ -204,55 +204,55 @@ export async function DELETE(
 
         // Delete order items that reference these variants
         if (variantIds.length > 0) {
-          await tx
+          await ctxTx
             .delete(dbOrderItems)
             .where(inArray(dbOrderItems.productVariantId, variantIds));
         }
 
         // Delete orders for this tenant
-        await tx
+        await ctxTx
           .delete(dbOrders)
           .where(eq(dbOrders.tenantId, id));
 
         // Delete product images
-        await tx
+        await ctxTx
           .delete(dbProductImages)
           .where(eq(dbProductImages.tenantId, id));
 
         // Delete product variants
-        await tx
+        await ctxTx
           .delete(dbProductVariants)
           .where(eq(dbProductVariants.tenantId, id));
 
         // Delete products
-        await tx
+        await ctxTx
           .delete(dbProducts)
           .where(eq(dbProducts.tenantId, id));
       }
 
       // Delete categories
-      await tx
+      await ctxTx
         .delete(dbCategories)
         .where(eq(dbCategories.tenantId, id));
 
       // Delete customers
-      await tx
+      await ctxTx
         .delete(dbCustomers)
         .where(eq(dbCustomers.tenantId, id));
 
       // Delete shipping methods
-      await tx
+      await ctxTx
         .delete(dbShippingMethods)
         .where(eq(dbShippingMethods.tenantId, id));
 
       // Set admin users' tenantId to null
-      await tx
+      await ctxTx
         .update(dbAdminUsers)
         .set({ tenantId: null })
         .where(eq(dbAdminUsers.tenantId, id));
 
       // Finally, delete the tenant
-      await tx
+      await ctxTx
         .delete(dbTenants)
         .where(eq(dbTenants.id, id));
     });

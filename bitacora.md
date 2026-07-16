@@ -380,3 +380,29 @@
   - Fase C: correr `pnpm db:seed` contra Neon branch y re-ejecutar batches de verificación RLS
   - Fase D: pruebas de concurrencia contra la branch
   - PR4: `ALTER TABLE ... FORCE ROW LEVEL SECURITY`
+
+---
+
+## 2026-07-15 — Fase C + R1: App User Role y FORCE RLS validados
+
+- **Hallazgo crítico:** `neondb_owner` tiene `rolbypassrls=true` — ni `ENABLE RLS` ni `FORCE ROW LEVEL SECURITY` tienen efecto porque el rol de conexión bypassea las políticas a nivel de rol, no de tabla. RLS era completamente decorativo.
+- **Solución documentada por Neon:** usar un rol de aplicación dedicado sin `BYPASSRLS`, manteniendo `neondb_owner` solo para tareas administrativas (migraciones, seed).
+- **Fase C (branch `fase-c-verificacion`):**
+  - Creado `app_user` con grants explícitos (tabla por tabla: 10 tablas de negocio) + `EXECUTE` sobre `set_tenant_id(UUID)`
+  - Verificado: `rolbypassrls=false`, `rolsuper=false` en el nuevo rol
+  - Aplicado `0010_force_rls.sql` (FORCE RLS en 8 tablas de negocio)
+  - **B2:** tenant 1 → 3 productos (Gorra, Pantalón Jeans, Remera Básica) ✅
+  - **B3:** tenant 2 → 3 productos distintos (Campera Premium, Mochila Urbana, Zapatillas Runner) ✅
+  - **B4:** app_user sin context → **0 productos** (el owner ya no bypassea) ✅
+  - **B5:** UUID inexistente → **0 productos** ✅
+- **R1 (rama `feat/app-user-role`):** 4 cambios preparatorios para usar `app_user` en runtime:
+  1. `packages/db/src/index.ts`: `DATABASE_APP_URL` requerida (sin fallback — `throw` si falta)
+  2. `packages/validation/src/env.ts`: `DATABASE_APP_URL: z.string().url()` requerida
+  3. `apps/superadmin/app/api/tenants/[id]/route.ts`: DELETE envuelto en `withTenantContext(params.id, ...)` — necesario porque al usar `app_user` con FORCE RLS, las queries sobre tablas protegidas necesitan el `tenantId` seteado para matchear las filas del tenant a eliminar. El callback usa `ctxTx` (alias consistente con el resto del codebase).
+  4. `.github/workflows/ci.yml`: agregado `echo "DATABASE_APP_URL=..."` al bloque de variables dummy para build
+- **`admin_users` sin RLS confirmado como intencional:** el `authorize()` de NextAuth busca por email global (sin tenant) porque no sabe a qué tenant pertenece el usuario hasta después de encontrarlo. Agregarle RLS crearía un huevo y la gallina.
+- **Superadmin GET/PUT confirmados sin tocar tablas RLS:** grep verifica que las 23 referencias a `dbProducts`, `dbProductVariants`, etc. están todas dentro del DELETE handler.
+- **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 291/292 ✅ (1 pre-existing failure en register)
+- **Próximos pasos:**
+  - Fase D: preview Vercel desde `feat/app-user-role` apuntando a `app_user`@`fase-c-verificacion`, requests concurrentes (10-15 por escenario, verificación post-ráfaga con query directa)
+  - Rollout: R3 (crear `app_user` en Neon producción) → R4 (setear `DATABASE_APP_URL` en Vercel) → merge R1 a `develop` → R2 (migración 0010 FORCE RLS) → R5 (seed)

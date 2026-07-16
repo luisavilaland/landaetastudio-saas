@@ -9,6 +9,7 @@ const isProduction = process.env.NODE_ENV === "production" && hasCloudVars;
 
 const coreSchema = z.object({
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid PostgreSQL URL"),
+  DATABASE_APP_URL: z.string().url("DATABASE_APP_URL must be a valid PostgreSQL URL (role without BYPASSRLS)"),
   AUTH_SECRET: z
     .string()
     .min(32, "AUTH_SECRET must be at least 32 characters (run: openssl rand -base64 32)"),
