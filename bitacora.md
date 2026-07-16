@@ -422,3 +422,15 @@
 - **Register test arreglado:** el 4to argumento de `sendWelcomeEmail` esperaba `undefined` pero recibía `process.env.STOREFRONT_URL` en CI. Se seteó `process.env.STOREFRONT_URL` en el test y se actualizó la expectativa.
 - **Verificación:** lint ✅ | typecheck 8/8 ✅ | build storefront ✅ | tests 292/292 ✅
 - **State:** develop — limpio, pasando todos los checks
+
+---
+
+## 2026-07-16 — Hotfix: checkout/route.ts sin withTenantContext (incidente en producción)
+
+- **Incidente confirmado:** `checkout/route.ts` usaba `db.select()` y `db.transaction()` sin `withTenantContext`. Con FORCE RLS + app_user (sin BYPASSRLS), `current_setting('app.tenant_id', true)` devuelve NULL, la política RLS evalúa `tenantId = NULL` para todas las filas, y cada query retorna 0 filas — todo intento de compra fallaba con "Stock insuficiente".
+- **Causa raíz:** el handler nunca apareció en los inventarios de PR2 (Patrón A) ni PR3 (Patrón B). Quedó fuera del wiring de `withTenantContext` desde el inicio de P1-1.
+- **Fix:** reemplazado `db.select().from()` + `db.transaction()` por un único `withTenantContext(tenantId, async (tx) => {...})` que envuelve todas las DB ops (lectura de variantes, lectura de shipping, stock update, inserción de orden + items). Dentro del callback, errores de negocio (stock, shipping) se retornan como objetos y se traducen afuera a `NextResponse.json()`.
+- **Tests migrados:** el test mockea `withTenantContext` en vez de `db.transaction`, con mock chain completa (`.select().from().where()` para variantes, `.select().from().where().limit()` para shipping, `.update().set().where()`, `.insert().values().returning()`).
+- **9 tests en checkout**, assertions de `withTenantContext` en happy paths.
+- **Verificación:** lint ✅ | typecheck 8/8 ✅ | build storefront ✅ | tests 292/292 ✅
+- **27 handlers wireados con withTenantContext** (21 Patrón A + 5 Patrón B + checkout). Ningún handler de storefront queda sin contexto de tenant.

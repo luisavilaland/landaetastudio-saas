@@ -23,15 +23,7 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@repo/db", async () => {
   const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
-  return {
-    ...actual,
-    db: {
-      select: vi.fn(),
-      update: vi.fn(),
-      insert: vi.fn(),
-      transaction: vi.fn(),
-    },
-  };
+  return { ...actual, withTenantContext: vi.fn() };
 });
 
 vi.mock("next/headers", () => ({
@@ -44,8 +36,8 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 import { NextRequest } from "next/server";
+import { withTenantContext } from "@repo/db";
 import { cookies } from "next/headers";
-import { db } from "@repo/db";
 import { redisClient } from "@/lib/redis";
 import { getTenantId } from "@/lib/tenant";
 import { auth } from "@/lib/auth";
@@ -108,16 +100,54 @@ const MOCK_ORDER = {
   updatedAt: new Date(),
 };
 
-function createQuery<T>(resolveValue: T[]): any {
-  const q = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue(resolveValue),
-    orderBy: vi.fn().mockReturnThis(),
-    then: (onFulfilled: (v: T[]) => unknown) =>
-      Promise.resolve(resolveValue).then(onFulfilled),
-  };
-  return q;
+function makeTxMock() {
+  return {
+    select: vi.fn(),
+    insert: vi.fn(),
+    from: vi.fn(),
+    where: vi.fn(),
+    limit: vi.fn(),
+    values: vi.fn(),
+    update: vi.fn(),
+    set: vi.fn(),
+    returning: vi.fn(),
+  } as any;
+}
+
+function setupTxWithVariants() {
+  const tx = makeTxMock();
+  tx.select.mockReturnValue(tx);
+  tx.from.mockReturnValue(tx);
+  tx.where.mockResolvedValue([MOCK_VARIANT]);
+  return tx;
+}
+
+function setupTxWithShipping(shippingMethod: any = MOCK_SHIPPING_METHOD) {
+  const tx = makeTxMock();
+  tx.select.mockReturnValue(tx);
+  tx.from.mockReturnValue({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([shippingMethod]) }) });
+  tx.where.mockResolvedValue([MOCK_VARIANT]);
+  return tx;
+}
+
+function setupTxFull() {
+  const tx = makeTxMock();
+  const whereResult = { limit: vi.fn() };
+  const fromWhere = { where: vi.fn() };
+  fromWhere.where.mockReturnValue(whereResult);
+  whereResult.limit.mockResolvedValue([MOCK_SHIPPING_METHOD]);
+  tx.select.mockReturnValueOnce(tx);
+  tx.from.mockReturnValueOnce(tx);
+  tx.where.mockResolvedValueOnce([MOCK_VARIANT]);
+  tx.select.mockReturnValueOnce(fromWhere);
+  tx.update.mockReturnValue(tx);
+  tx.set.mockReturnValue(tx);
+  tx.where.mockResolvedValueOnce(undefined);
+  tx.insert.mockReturnValue(tx);
+  tx.values.mockReturnValue(tx);
+  tx.returning.mockResolvedValue([MOCK_ORDER]);
+  vi.mocked(redisClient.del).mockResolvedValue(1);
+  return tx;
 }
 
 function makeRequest(body: Record<string, unknown>): NextRequest {
@@ -137,29 +167,10 @@ function setupCookie(sessionId: string | undefined) {
   });
 }
 
-function setupTransactionMock() {
-  vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
-    const tx = {
-      update: vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      }),
-      insert: vi.fn().mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([MOCK_ORDER]),
-        }),
-      }),
-    };
-    return callback(tx);
-  });
-}
-
 describe("POST /api/checkout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getTenantId).mockResolvedValue(TENANT_ID);
-    vi.mocked(redisClient.del).mockResolvedValue(1);
     vi.mocked(auth).mockRejectedValue(new Error("No session"));
   });
 
@@ -250,7 +261,12 @@ describe("POST /api/checkout", () => {
     setupCookie(SESSION_ID);
     vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
     vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID);
-    vi.mocked(db.select).mockReturnValueOnce(createQuery([]));
+
+    const tx = makeTxMock();
+    tx.select.mockReturnValue(tx);
+    tx.from.mockReturnValue(tx);
+    tx.where.mockResolvedValue([]);
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
     const res = await POST(
       makeRequest({
@@ -265,14 +281,22 @@ describe("POST /api/checkout", () => {
     const body = await res.json();
     expect(body.error).toBe("Stock insuficiente");
     expect(body.outOfStock).toContain(VARIANT_ID);
+    expect(withTenantContext).toHaveBeenCalledWith(CROSS_TENANT_ID, expect.any(Function));
   });
 
   it("debe devolver 400 cuando el método de envío no coincide con el tenant", async () => {
     setupCookie(SESSION_ID);
     vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
-    vi.mocked(db.select)
-      .mockReturnValueOnce(createQuery([MOCK_VARIANT]))
-      .mockReturnValueOnce(createQuery([]));
+
+    const tx = makeTxMock();
+    tx.select.mockReturnValueOnce(tx);
+    tx.from.mockReturnValueOnce(tx);
+    tx.where.mockResolvedValueOnce([MOCK_VARIANT]);
+    tx.select.mockReturnValueOnce(tx);
+    tx.from.mockReturnValueOnce(tx);
+    tx.where.mockReturnValueOnce(tx);
+    tx.limit.mockResolvedValueOnce([]);
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
     const res = await POST(
       makeRequest({
@@ -289,13 +313,26 @@ describe("POST /api/checkout", () => {
     expect(body.error).toBe("Método de envío inválido o inactivo");
   });
 
-  it("debe crear la orden exitosamente en caso feliz", async () => {
+  it("debe crear la orden exitosamente en caso feliz con envío", async () => {
     setupCookie(SESSION_ID);
     vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
-    vi.mocked(db.select)
-      .mockReturnValueOnce(createQuery([MOCK_VARIANT]))
-      .mockReturnValueOnce(createQuery([MOCK_SHIPPING_METHOD]));
-    setupTransactionMock();
+
+    const tx = makeTxMock();
+    const limitObj = { limit: vi.fn().mockResolvedValue([MOCK_SHIPPING_METHOD]) };
+    const whereObj = { where: vi.fn().mockReturnValue(limitObj) };
+    const fromObj = { from: vi.fn().mockReturnValue(whereObj) };
+    tx.select.mockReturnValueOnce(tx);
+    tx.from.mockReturnValueOnce(tx);
+    tx.where.mockResolvedValueOnce([MOCK_VARIANT]);
+    tx.select.mockReturnValueOnce(fromObj);
+    tx.update.mockReturnValue(tx);
+    tx.set.mockReturnValue(tx);
+    tx.where.mockResolvedValue(undefined);
+    tx.insert.mockReturnValue(tx);
+    tx.values.mockReturnValue(tx);
+    tx.returning.mockResolvedValue([MOCK_ORDER]);
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
+    vi.mocked(redisClient.del).mockResolvedValue(1);
 
     const res = await POST(
       makeRequest({
@@ -311,13 +348,25 @@ describe("POST /api/checkout", () => {
     const body = await res.json();
     expect(body).toHaveProperty("orderId");
     expect(body.status).toBe("pending_payment");
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
   });
 
   it("debe crear la orden sin método de envío en caso feliz", async () => {
     setupCookie(SESSION_ID);
     vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
-    vi.mocked(db.select).mockReturnValueOnce(createQuery([MOCK_VARIANT]));
-    setupTransactionMock();
+
+    const tx = makeTxMock();
+    tx.select.mockReturnValue(tx);
+    tx.from.mockReturnValue(tx);
+    tx.where.mockResolvedValueOnce([MOCK_VARIANT]);
+    tx.where.mockResolvedValue(undefined);
+    tx.update.mockReturnValue(tx);
+    tx.set.mockReturnValue(tx);
+    tx.insert.mockReturnValue(tx);
+    tx.values.mockReturnValue(tx);
+    tx.returning.mockResolvedValue([MOCK_ORDER]);
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
+    vi.mocked(redisClient.del).mockResolvedValue(1);
 
     const res = await POST(
       makeRequest({
@@ -332,5 +381,6 @@ describe("POST /api/checkout", () => {
     const body = await res.json();
     expect(body).toHaveProperty("orderId");
     expect(body.total).toBe(4498);
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
   });
 });

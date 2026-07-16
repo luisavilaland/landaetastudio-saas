@@ -3,7 +3,7 @@ import { cookies, headers } from "next/headers";
 import { redisClient } from "@/lib/redis";
 import { getTenantId } from "@/lib/tenant";
 import { auth } from "@/lib/auth";
-import { db, dbOrders, dbOrderItems, dbProductVariants, dbShippingMethods } from "@repo/db";
+import { withTenantContext, dbOrders, dbOrderItems, dbProductVariants, dbShippingMethods } from "@repo/db";
 import { eq, inArray, and } from "drizzle-orm";
 import { createCheckoutSchema } from "@repo/validation";
 import { createLogger } from "@/lib/logger";
@@ -80,105 +80,90 @@ export async function POST(request: NextRequest) {
     }
 
     const variantIds = cart.items.map((item) => item.variantId);
-    const variants = await db
-      .select({
-        id: dbProductVariants.id,
-        stock: dbProductVariants.stock,
-        price: dbProductVariants.price,
-        tenantId: dbProductVariants.tenantId,
-      })
-      .from(dbProductVariants)
-      .where(
-        and(
-          inArray(dbProductVariants.id, variantIds),
-          eq(dbProductVariants.tenantId, tenantIdFromSlug)
-        )
-      );
 
-    const variantMap = new Map(variants.map((v) => [v.id, v]));
-
-    const outOfStock: string[] = [];
-    for (const item of cart.items) {
-      const variant = variantMap.get(item.variantId);
-      if (!variant || (variant.stock ?? 0) < item.quantity) {
-        outOfStock.push(item.variantId);
-      }
-    }
-
-    if (outOfStock.length > 0) {
-      return NextResponse.json(
-        { error: "Stock insuficiente", outOfStock },
-        { status: 422 }
-      );
-    }
-
-    let cartTotal = 0;
-    for (const item of cart.items) {
-      const variant = variantMap.get(item.variantId);
-      if (!variant || variant.price === null) {
-        continue;
-      }
-      cartTotal += variant.price * item.quantity;
-    }
-
-    if (cartTotal === 0) {
-      return NextResponse.json(
-        { error: "El total del carrito no puede ser 0" },
-        { status: 400 }
-      );
-    }
-
-    const shippingDetails: ShippingDetails = { name, email, phone, address };
-
-    let shippingCost = 0;
-    let methodName: string | undefined;
-
-    if (shippingMethodId) {
-      const [method] = await db
-        .select()
-        .from(dbShippingMethods)
+    const result = await withTenantContext(tenantIdFromSlug, async (tx) => {
+      const variants = await tx
+        .select({
+          id: dbProductVariants.id,
+          stock: dbProductVariants.stock,
+          price: dbProductVariants.price,
+          tenantId: dbProductVariants.tenantId,
+        })
+        .from(dbProductVariants)
         .where(
           and(
-            eq(dbShippingMethods.id, shippingMethodId),
-            eq(dbShippingMethods.tenantId, tenantIdFromSlug)
+            inArray(dbProductVariants.id, variantIds),
+            eq(dbProductVariants.tenantId, tenantIdFromSlug)
           )
-        )
-        .limit(1);
-
-      if (!method || method.isActive !== "true") {
-        return NextResponse.json(
-          { error: "Método de envío inválido o inactivo" },
-          { status: 400 }
         );
+
+      const variantMap = new Map(variants.map((v) => [v.id, v]));
+
+      const outOfStock: string[] = [];
+      for (const item of cart.items) {
+        const variant = variantMap.get(item.variantId);
+        if (!variant || (variant.stock ?? 0) < item.quantity) {
+          outOfStock.push(item.variantId);
+        }
       }
 
-      if (
-        method.freeShippingThreshold &&
-        cartTotal >= method.freeShippingThreshold
-      ) {
-        shippingCost = 0;
-      } else {
-        shippingCost = method.price;
+      if (outOfStock.length > 0) {
+        return { error: "Stock insuficiente", outOfStock };
       }
 
-      methodName = method.name;
-      shippingDetails.methodId = shippingMethodId;
-      shippingDetails.methodName = methodName;
-      shippingDetails.shippingCost = shippingCost;
-    }
+      let cartTotal = 0;
+      for (const item of cart.items) {
+        const variant = variantMap.get(item.variantId);
+        if (!variant || variant.price === null) {
+          continue;
+        }
+        cartTotal += variant.price * item.quantity;
+      }
 
+      if (cartTotal === 0) {
+        return { error: "El total del carrito no puede ser 0" };
+      }
 
+      const shippingDetails: ShippingDetails = { name, email, phone, address };
+      let shippingCost = 0;
+      let methodName: string | undefined;
 
-    // Get customer session if authenticated
-    let customerId: string | null = null;
-    try {
-      const session = await auth();
-      customerId = session?.user?.id || null;
-    } catch {
-      // No session, continue as guest
-    }
+      if (shippingMethodId) {
+        const [method] = await tx
+          .select()
+          .from(dbShippingMethods)
+          .where(
+            and(
+              eq(dbShippingMethods.id, shippingMethodId),
+              eq(dbShippingMethods.tenantId, tenantIdFromSlug)
+            )
+          )
+          .limit(1);
 
-    const [order] = await db.transaction(async (tx) => {
+        if (!method || method.isActive !== "true") {
+          return { error: "Método de envío inválido o inactivo" };
+        }
+
+        if (method.freeShippingThreshold && cartTotal >= method.freeShippingThreshold) {
+          shippingCost = 0;
+        } else {
+          shippingCost = method.price;
+        }
+
+        methodName = method.name;
+        shippingDetails.methodId = shippingMethodId;
+        shippingDetails.methodName = methodName;
+        shippingDetails.shippingCost = shippingCost;
+      }
+
+      let customerId: string | null = null;
+      try {
+        const session = await auth();
+        customerId = session?.user?.id || null;
+      } catch {
+        // No session, continue as guest
+      }
+
       const orderTotal = cartTotal + shippingCost;
 
       for (const item of cart.items) {
@@ -187,9 +172,7 @@ export async function POST(request: NextRequest) {
 
         await tx
           .update(dbProductVariants)
-          .set({
-            stock: (variant.stock ?? 0) - item.quantity,
-          })
+          .set({ stock: (variant.stock ?? 0) - item.quantity })
           .where(
             and(
               eq(dbProductVariants.id, item.variantId),
@@ -198,11 +181,11 @@ export async function POST(request: NextRequest) {
           );
       }
 
-      const [newOrder] = await tx
+      const [order] = await tx
         .insert(dbOrders)
         .values({
           tenantId: tenantIdFromSlug,
-          customerId: customerId,
+          customerId,
           status: "pending_payment",
           total: orderTotal,
           currency: "UYU",
@@ -217,21 +200,35 @@ export async function POST(request: NextRequest) {
 
         await tx.insert(dbOrderItems).values({
           tenantId: variant.tenantId,
-          orderId: newOrder.id,
+          orderId: order.id,
           productVariantId: item.variantId,
           quantity: item.quantity,
           unitPrice: variant.price,
         });
       }
 
-      return [newOrder];
+      return { order };
     });
+
+    if ("outOfStock" in result) {
+      return NextResponse.json(
+        { error: result.error, outOfStock: result.outOfStock },
+        { status: 422 }
+      );
+    }
+
+    if ("error" in result) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: 400 }
+      );
+    }
 
     await redisClient.del(`cart:${sessionId}`);
 
     return NextResponse.json({
-      orderId: order.id,
-      total: order.total,
+      orderId: result.order.id,
+      total: result.order.total,
       status: "pending_payment",
     });
   } catch (error) {
