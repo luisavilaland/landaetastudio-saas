@@ -366,7 +366,8 @@
 | CI | GitHub Actions (lint, typecheck, build, test) |
   | Patrón A | 21 handlers wireados con `withTenantContext` |
   | Patrón B | 5 handlers wireados con `withTenantContext` |
-  | Pendiente PR4 | FORCE RLS + validación Neon branch |
+  | RLS | FORCE RLS en 8 tablas + `app_user` (sin BYPASSRLS) |
+  | Conexión runtime | `DATABASE_APP_URL` (app_user), `DATABASE_URL` (neondb_owner solo build/migraciones) |
 
 ---
 
@@ -380,3 +381,36 @@
   - Fase C: correr `pnpm db:seed` contra Neon branch y re-ejecutar batches de verificación RLS
   - Fase D: pruebas de concurrencia contra la branch
   - PR4: `ALTER TABLE ... FORCE ROW LEVEL SECURITY`
+
+---
+
+## 2026-07-15 — Fase C + R1: App User Role y FORCE RLS validados
+
+- **Hallazgo crítico:** `neondb_owner` tiene `rolbypassrls=true` — ni `ENABLE RLS` ni `FORCE ROW LEVEL SECURITY` tienen efecto porque el rol de conexión bypassea las políticas a nivel de rol, no de tabla. RLS era completamente decorativo.
+- **Solución documentada por Neon:** usar un rol de aplicación dedicado sin `BYPASSRLS`, manteniendo `neondb_owner` solo para tareas administrativas (migraciones, seed).
+- **Fase C (branch `fase-c-verificacion`):**
+  - Creado `app_user` con grants explícitos (tabla por tabla: 10 tablas de negocio) + `EXECUTE` sobre `set_tenant_id(UUID)`
+  - Verificado: `rolbypassrls=false`, `rolsuper=false` en el nuevo rol
+  - Aplicado `0010_force_rls.sql` (FORCE RLS en 8 tablas de negocio)
+  - **B2:** tenant 1 → 3 productos (Gorra, Pantalón Jeans, Remera Básica) ✅
+  - **B3:** tenant 2 → 3 productos distintos (Campera Premium, Mochila Urbana, Zapatillas Runner) ✅
+  - **B4:** app_user sin context → **0 productos** (el owner ya no bypassea) ✅
+  - **B5:** UUID inexistente → **0 productos** ✅
+- **R1 (rama `feat/app-user-role`):** 4 cambios preparatorios para usar `app_user` en runtime:
+  1. `packages/db/src/index.ts`: `DATABASE_APP_URL` requerida (sin fallback — `throw` si falta)
+  2. `packages/validation/src/env.ts`: `DATABASE_APP_URL: z.string().url()` requerida
+  3. `apps/superadmin/app/api/tenants/[id]/route.ts`: DELETE envuelto en `withTenantContext(params.id, ...)` — necesario porque al usar `app_user` con FORCE RLS, las queries sobre tablas protegidas necesitan el `tenantId` seteado para matchear las filas del tenant a eliminar. El callback usa `ctxTx` (alias consistente con el resto del codebase).
+  4. `.github/workflows/ci.yml`: agregado `echo "DATABASE_APP_URL=..."` al bloque de variables dummy para build
+- **`admin_users` sin RLS confirmado como intencional:** el `authorize()` de NextAuth busca por email global (sin tenant) porque no sabe a qué tenant pertenece el usuario hasta después de encontrarlo. Agregarle RLS crearía un huevo y la gallina.
+- **Superadmin GET/PUT confirmados sin tocar tablas RLS:** grep verifica que las 23 referencias a `dbProducts`, `dbProductVariants`, etc. están todas dentro del DELETE handler.
+- **Fase D (16 jul):** pruebas concurrentes contra preview Vercel con `app_user`@`fase-c-verificacion`. Todos los escenarios verificados:
+  - 10 GET concurrentes alternando tienda1/tienda2 → 200 ✅ ~330ms avg
+  - 10 search concurrentes alternando → 200 ✅ producto correcto por tenant
+  - POST imagen (dos contextos: read→upload→read+insert) + GET → 201 ✅, tenantId correcto
+  - Register POST (dos contextos: read→insert) → 201 ✅
+  - Aislamiento cross-tenant verificado sin data leak ✅
+- **R3 (16 jul):** `app_user` creado en Neon producción con password fuerte, `rolbypassrls=false`
+- **R4 (16 jul):** `DATABASE_APP_URL` seteada en Vercel (3 projects, Production+Preview+Development)
+- **Hallazgo de PowerShell:** el register devolvía 500 por JSON malformado al pasar strings inline desde PowerShell. Usar `-d @archivo.json` o `--data-raw` como workaround.
+- **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 291/292 ✅ (1 pre-existing failure en register — store URL)
+- **Pendiente:** mergear `feat/app-user-role` → `develop` (R1), aplicar migración 0010 FORCE RLS en producción (R2), re-seed (R5)
