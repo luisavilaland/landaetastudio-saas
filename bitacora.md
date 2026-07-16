@@ -366,7 +366,8 @@
 | CI | GitHub Actions (lint, typecheck, build, test) |
   | Patrón A | 21 handlers wireados con `withTenantContext` |
   | Patrón B | 5 handlers wireados con `withTenantContext` |
-  | Pendiente PR4 | FORCE RLS + validación Neon branch |
+  | RLS | FORCE RLS en 8 tablas + `app_user` (sin BYPASSRLS) |
+  | Conexión runtime | `DATABASE_APP_URL` (app_user), `DATABASE_URL` (neondb_owner solo build/migraciones) |
 
 ---
 
@@ -402,7 +403,14 @@
   4. `.github/workflows/ci.yml`: agregado `echo "DATABASE_APP_URL=..."` al bloque de variables dummy para build
 - **`admin_users` sin RLS confirmado como intencional:** el `authorize()` de NextAuth busca por email global (sin tenant) porque no sabe a qué tenant pertenece el usuario hasta después de encontrarlo. Agregarle RLS crearía un huevo y la gallina.
 - **Superadmin GET/PUT confirmados sin tocar tablas RLS:** grep verifica que las 23 referencias a `dbProducts`, `dbProductVariants`, etc. están todas dentro del DELETE handler.
-- **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 291/292 ✅ (1 pre-existing failure en register)
-- **Próximos pasos:**
-  - Fase D: preview Vercel desde `feat/app-user-role` apuntando a `app_user`@`fase-c-verificacion`, requests concurrentes (10-15 por escenario, verificación post-ráfaga con query directa)
-  - Rollout: R3 (crear `app_user` en Neon producción) → R4 (setear `DATABASE_APP_URL` en Vercel) → merge R1 a `develop` → R2 (migración 0010 FORCE RLS) → R5 (seed)
+- **Fase D (16 jul):** pruebas concurrentes contra preview Vercel con `app_user`@`fase-c-verificacion`. Todos los escenarios verificados:
+  - 10 GET concurrentes alternando tienda1/tienda2 → 200 ✅ ~330ms avg
+  - 10 search concurrentes alternando → 200 ✅ producto correcto por tenant
+  - POST imagen (dos contextos: read→upload→read+insert) + GET → 201 ✅, tenantId correcto
+  - Register POST (dos contextos: read→insert) → 201 ✅
+  - Aislamiento cross-tenant verificado sin data leak ✅
+- **R3 (16 jul):** `app_user` creado en Neon producción con password fuerte, `rolbypassrls=false`
+- **R4 (16 jul):** `DATABASE_APP_URL` seteada en Vercel (3 projects, Production+Preview+Development)
+- **Hallazgo de PowerShell:** el register devolvía 500 por JSON malformado al pasar strings inline desde PowerShell. Usar `-d @archivo.json` o `--data-raw` como workaround.
+- **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 291/292 ✅ (1 pre-existing failure en register — store URL)
+- **Pendiente:** mergear `feat/app-user-role` → `develop` (R1), aplicar migración 0010 FORCE RLS en producción (R2), re-seed (R5)
