@@ -414,3 +414,11 @@
 - **Hallazgo de PowerShell:** el register devolvía 500 por JSON malformado al pasar strings inline desde PowerShell. Usar `-d @archivo.json` o `--data-raw` como workaround.
 - **Verificación:** lint ✅ | typecheck 8/8 ✅ | tests 291/292 ✅ (1 pre-existing failure en register — store URL)
 - **Pendiente:** mergear `feat/app-user-role` → `develop` (R1), aplicar migración 0010 FORCE RLS en producción (R2), re-seed (R5)
+
+---
+
+## 2026-07-16 — Register test fix + DoD housekeeping
+
+- **Register test arreglado:** el 4to argumento de `sendWelcomeEmail` esperaba `undefined` pero recibía `process.env.STOREFRONT_URL` en CI. Se seteó `process.env.STOREFRONT_URL` en el test y se actualizó la expectativa.
+- **Verificación:** lint ✅ | typecheck 8/8 ✅ | build storefront ✅ | tests 292/292 ✅
+- **State:** develop — limpio, pasando todos los checks
