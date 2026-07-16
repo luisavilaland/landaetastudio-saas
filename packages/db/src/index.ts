@@ -5,7 +5,7 @@ import * as schema from './schema';
 
 const appUrl = process.env.DATABASE_APP_URL;
 if (!appUrl) {
-  throw new Error('DATABASE_APP_URL no está configurada. Usa un rol sin BYPASSRLS (ej: app_user).');
+  throw new Error('DATABASE_APP_URL no configurada. Usa un rol sin BYPASSRLS (ej: app_user).');
 }
 const client = postgres(appUrl);
 export const db = drizzle(client, { schema });

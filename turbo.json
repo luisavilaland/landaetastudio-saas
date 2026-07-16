@@ -7,6 +7,7 @@
       "outputs": [".next/**", "!.next/cache/**"],
       "env": [
         "AUTH_SECRET",
+        "DATABASE_APP_URL",
         "DATABASE_URL",
         "MERCADOPAGO_ACCESS_TOKEN",
         "MERCADOPAGO_WEBHOOK_SECRET",
