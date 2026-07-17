@@ -434,3 +434,19 @@
 - **9 tests en checkout**, assertions de `withTenantContext` en happy paths.
 - **Verificación:** lint ✅ | typecheck 8/8 ✅ | build storefront ✅ | tests 292/292 ✅
 - **27 handlers wireados con withTenantContext** (21 Patrón A + 5 Patrón B + checkout). Ningún handler de storefront queda sin contexto de tenant.
+
+---
+
+## 2026-07-17 — P1-2: Migración de ADRs + verificación contra código
+
+- **docs/arquitectura.md migrado a ADRs individuales:** 20 ADRs (ADR-001 a ADR-020) en `docs/adr/` con formato estándar (título, fecha, contexto, decisión, estado, consecuencias).
+- **Verificación contra código:** cada ADR fue verificada contra el código real. 14/20 aceptadas sin discrepancias, 6 con discrepancias documentadas (ninguna urgente):
+  - ADR-008: storeSettingsSchema local + CSV import sin Zod
+  - ADR-013: documentación desactualizada (store_settings vs inline JSONB)
+  - ADR-017: el patrón de tests evolucionó — 59% importan handlers reales (mejora)
+  - ADR-020: normalizeSlug duplicado en CSV import
+  - ADR-001: checkout hotfix documentado históricamente
+  - ADR-007: omisión menor de logger package
+- **docs/arquitectura.md** convertido a tabla índice con links a cada ADR + convenciones clave.
+- **Deuda del P0 completamente saldada:** migración de ADRs + verificación contra código completada.
+- **Branch:** `p1-2/adrs` (Paseo worktree)
