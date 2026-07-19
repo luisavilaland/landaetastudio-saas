@@ -12,7 +12,7 @@ Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada AD
 | [ADR-004](adr/ADR-004-r2-mercadopago.md) | R2 (Cloudflare) y MercadoPago | Aceptada |
 | [ADR-005](adr/ADR-005-redis-carrito.md) | Redis para el carrito | Aceptada |
 | [ADR-006](adr/ADR-006-no-medusajs.md) | No usar MedusaJS | Aceptada |
-| [ADR-007](adr/ADR-007-estructura-monorepo.md) | Estructura de monorepo | Aceptada |
+| [ADR-007](adr/ADR-007-estructura-monorepo.md) | Estructura de monorepo | Aceptada — ver discrepancia |
 | [ADR-008](adr/ADR-008-validacion-zod.md) | Validación con Zod en toda la API | Aceptada — ver discrepancia |
 | [ADR-009](adr/ADR-009-busqueda-ILike.md) | Búsqueda server-side con ILIKE | Aceptada |
 | [ADR-010](adr/ADR-010-variantes-jsonb.md) | Variantes con JSONB | Aceptada |
@@ -37,7 +37,6 @@ Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada AD
 - **return await con withTenantContext**: siempre usar `return await withTenantContext(...)`, nunca `return withTenantContext(...)`.
 - **DATABASE_APP_URL obligatorio**: sin fallback silencioso a DATABASE_URL.
 - **Precios siempre en centavos**: integer en DB, dividir/100 solo en frontend.
-- **Fechas en UTC**: timestamps en BD siempre en UTC.
 - **IDs**: UUIDs nativos de PostgreSQL (`gen_random_uuid()`).
-- **Logs con @repo/logger**: no usar `console.log`.
-- **Sentry condicional**: activo solo si SENTRY_DSN está configurado.
+- **Sentry condicional**: activo solo si SENTRY_DSN está configurado (`@sentry/nextjs` en las 3 apps, condicional en next.config.mjs).
+- **Logs con @repo/logger (mayoritario, con deuda)**: ~24 instancias de `console.error`/`console.log` sin migrar en admin/storefront. Convención vigente para código nuevo; barrido pendiente.

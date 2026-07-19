@@ -450,3 +450,7 @@
 - **docs/arquitectura.md** convertido a tabla índice con links a cada ADR + convenciones clave.
 - **Deuda del P0 completamente saldada:** migración de ADRs + verificación contra código completada.
 - **Branch:** `p1-2/adrs` (Paseo worktree)
+
+**Deuda técnica documentada (nueva):**
+- ❌ **Fechas sin UTC explícito:** el schema usa `timestamp` sin timezone. Funciona porque Neon/Vercel corren en UTC, pero no hay garantía a nivel de schema. Riesgo latente si cambia la zona del servidor. Pendiente: migrar a `timestamptz` o validación Zod de UTC en inserts.
+- ❌ **console.* sin migrar:** ~24 instancias de `console.error`/`console.log` en handlers de admin y storefront que aún no usan `@repo/logger`. Pendiente: barrido completo de apps/ (excluye seed.ts que es intencional).
