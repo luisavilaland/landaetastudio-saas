@@ -3,6 +3,9 @@ import { db, dbShippingMethods, withTenantContext } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { eq, asc } from "drizzle-orm";
 import { createShippingMethodSchema } from "@repo/validation";
+import { createLogger } from "@repo/logger";
+
+const logger = createLogger("shipping");
 
 export async function GET() {
   const session = await auth();
@@ -70,7 +73,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ method }, { status: 201 });
     });
   } catch (error) {
-    console.error("Error creating shipping method:", error);
+    logger.error({ error }, "Error creating shipping method");
     return NextResponse.json(
       { error: "Error al crear método de envío" },
       { status: 500 }

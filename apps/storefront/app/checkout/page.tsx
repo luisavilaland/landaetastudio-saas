@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { captureException } from "@sentry/nextjs";
 
 type CartItem = {
   variantId: string;
@@ -62,7 +63,7 @@ export default function CheckoutPage() {
           }
         }
       } catch (e) {
-        console.error("Error fetching data:", e);
+        captureException(e);
       } finally {
         setLoading(false);
       }

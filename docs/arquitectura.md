@@ -39,4 +39,4 @@ Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada AD
 - **Precios siempre en centavos**: integer en DB, dividir/100 solo en frontend.
 - **IDs**: UUIDs nativos de PostgreSQL (`gen_random_uuid()`).
 - **Sentry condicional**: activo solo si SENTRY_DSN está configurado (`@sentry/nextjs` en las 3 apps, condicional en next.config.mjs).
-- **Logs con @repo/logger (mayoritario, con deuda)**: ~24 instancias de `console.error`/`console.log` sin migrar en admin/storefront. Convención vigente para código nuevo; barrido pendiente.
+- **Logs con @repo/logger (mayoritario, con deuda)**: ~49 instancias de `console.error`/`console.log` sin migrar en apps/. Convención vigente para código nuevo; barrido pendiente.

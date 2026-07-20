@@ -3,6 +3,9 @@ import { db, dbShippingMethods, withTenantContext } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 import { updateShippingMethodSchema } from "@repo/validation";
+import { createLogger } from "@repo/logger";
+
+const logger = createLogger("shipping-id");
 
 export async function GET(
   request: NextRequest,
@@ -37,7 +40,7 @@ export async function GET(
       return NextResponse.json({ method });
     });
   } catch (error) {
-    console.error("Error getting shipping method:", error);
+    logger.error({ error }, "Error getting shipping method");
     return NextResponse.json(
       { error: "Error al obtener método de envío" },
       { status: 500 }
@@ -109,7 +112,7 @@ export async function PUT(
       return NextResponse.json({ method });
     });
   } catch (error) {
-    console.error("Error updating shipping method:", error);
+    logger.error({ error }, "Error updating shipping method");
     return NextResponse.json(
       { error: "Error al actualizar método de envío" },
       { status: 500 }
@@ -159,7 +162,7 @@ export async function DELETE(
       return new NextResponse(null, { status: 204 });
     });
   } catch (error) {
-    console.error("Error deleting shipping method:", error);
+    logger.error({ error }, "Error deleting shipping method");
     return NextResponse.json(
       { error: "Error al eliminar método de envío" },
       { status: 500 }

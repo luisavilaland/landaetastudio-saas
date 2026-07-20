@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, dbTenants } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
+import { createLogger } from "@repo/logger";
 
+const logger = createLogger("config-tenant");
 
 function jsonResponse(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
@@ -34,7 +36,7 @@ export async function GET() {
 
     return jsonResponse(tenant);
   } catch (error) {
-    console.error("Error getting tenant:", error);
+    logger.error({ error }, "Error getting tenant");
     return jsonResponse({ error: "Error al obtener tenant" }, 500);
   }
 }

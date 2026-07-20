@@ -452,5 +452,5 @@
 - **Branch:** `p1-2/adrs` (Paseo worktree)
 
 **Deuda técnica documentada (nueva):**
-- ❌ **Fechas sin UTC explícito:** el schema usa `timestamp` sin timezone. Funciona porque Neon/Vercel corren en UTC, pero no hay garantía a nivel de schema. Riesgo latente si cambia la zona del servidor. Pendiente: migrar a `timestamptz` o validación Zod de UTC en inserts.
-- ❌ **console.* sin migrar:** ~24 instancias de `console.error`/`console.log` en handlers de admin y storefront que aún no usan `@repo/logger`. Pendiente: barrido completo de apps/ (excluye seed.ts que es intencional).
+- ❌ **Fechas sin UTC explícito:** el schema usa `timestamp` sin timezone. Sin mitigación — depende de que el entorno de despliegue esté en UTC. Pendiente: migrar a `timestamptz` o validación Zod de UTC en inserts.
+- ❌ **console.* sin migrar:** ~49 instancias de `console.error`/`console.log` en apps/ que aún no usan `@repo/logger`. Pendiente: barrido completo de apps/ (excluye seed.ts que es intencional).

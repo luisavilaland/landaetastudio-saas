@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { captureException } from "@sentry/nextjs";
 
 type Props = {
   variantId: string;
@@ -32,7 +33,7 @@ export function AddToCartButton({ variantId, inStock }: Props) {
         }, 1500);
       }
     } catch (error) {
-      console.error("Error adding to cart:", error);
+      captureException(error);
     } finally {
       setLoading(false);
     }

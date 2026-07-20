@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { captureException } from "@sentry/nextjs";
 
 type CartItem = {
   variantId: string;
@@ -47,7 +48,7 @@ export function CartList({ initialItems }: Props) {
         setItems(Array.isArray(data.items) ? data.items : []);
       }
     } catch (error) {
-      console.error("Error fetching cart:", error);
+      captureException(error);
     }
   };
 
@@ -64,7 +65,7 @@ export function CartList({ initialItems }: Props) {
         await fetchCartItems();
       }
     } catch (error) {
-      console.error("Error updating quantity:", error);
+      captureException(error);
     } finally {
       setLoading(false);
     }
@@ -83,7 +84,7 @@ export function CartList({ initialItems }: Props) {
         await fetchCartItems();
       }
     } catch (error) {
-      console.error("Error removing item:", error);
+      captureException(error);
     } finally {
       setLoading(false);
     }
@@ -104,7 +105,7 @@ export function CartList({ initialItems }: Props) {
         setItems([]);
       }
     } catch (error) {
-      console.error("Error clearing cart:", error);
+      captureException(error);
     } finally {
       setLoading(false);
     }

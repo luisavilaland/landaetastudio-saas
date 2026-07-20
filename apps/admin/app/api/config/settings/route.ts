@@ -3,6 +3,9 @@ import { db, dbTenants } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { createLogger } from "@repo/logger";
+
+const logger = createLogger("config-settings");
 
 const hexColorRegex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
@@ -47,7 +50,7 @@ export async function GET() {
 
     return NextResponse.json({ settings });
   } catch (error) {
-    console.error("Error getting store settings:", error);
+    logger.error({ error }, "Error getting store settings");
     return NextResponse.json(
       { error: "Error al obtener configuración de tienda" },
       { status: 500 }
@@ -100,7 +103,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ settings: tenant.settings });
   } catch (error) {
-    console.error("Error updating store settings:", error);
+    logger.error({ error }, "Error updating store settings");
     return NextResponse.json(
       { error: "Error al actualizar configuración de tienda" },
       { status: 500 }

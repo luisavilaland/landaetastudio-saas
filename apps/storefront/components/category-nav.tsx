@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { captureException } from "@sentry/nextjs";
 
 interface Category {
   id: string;
@@ -20,7 +21,7 @@ export function CategoryNav() {
         const data = await res.json();
         setCategories(data.categories || []);
       } catch (error) {
-        console.error("Failed to fetch categories:", error);
+        captureException(error);
       } finally {
         setIsLoading(false);
       }

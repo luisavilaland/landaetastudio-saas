@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { captureException } from "@sentry/nextjs";
 
 type DashboardMetrics = {
   totalRevenue: number;
@@ -71,19 +72,16 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchMetrics() {
       try {
-        console.log("[Dashboard] Fetching metrics from /api/dashboard...");
         const res = await fetch("/api/dashboard");
-        console.log("[Dashboard] Response status:", res.status);
         if (res.ok) {
           const data = await res.json();
-          console.log("[Dashboard] Response data:", data);
           setMetrics(data);
         } else {
-          console.error("[Dashboard] Error response:", res.status);
+          captureException(new Error("Dashboard responded with " + res.status));
           setError("Error al cargar métricas");
         }
       } catch (err) {
-        console.error("Error de conexión:", err);
+        captureException(err);
         setError("Error de conexión");
       } finally {
         setLoading(false);
