@@ -3,6 +3,9 @@ import { db, dbProducts, dbProductVariants, dbOrderItems, withTenantContext } fr
 import { auth } from "@/lib/auth";
 import { and, eq, inArray } from "drizzle-orm";
 import { variantsArraySchema } from "@repo/validation";
+import { createLogger } from "@repo/logger";
+
+const logger = createLogger("products-variants");
 
 export async function GET(
   request: NextRequest,
@@ -37,7 +40,7 @@ export async function GET(
       return NextResponse.json({ variants });
     });
   } catch (error) {
-    console.error("Error fetching variants:", error);
+    logger.error({ error }, "Error fetching variants");
     return NextResponse.json({ error: "Error al obtener variantes" }, { status: 500 });
   }
 }
@@ -204,7 +207,7 @@ export async function POST(
       return NextResponse.json({ variants: updatedVariants });
     });
   } catch (error) {
-    console.error("Error updating variants:", error);
+    logger.error({ error }, "Error updating variants");
     
     // Handle foreign key violation (variant has order_items)
     if (error && typeof error === 'object' && 'code' in error && error.code === '23503') {

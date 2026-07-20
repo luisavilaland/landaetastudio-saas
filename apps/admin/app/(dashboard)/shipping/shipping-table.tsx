@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { captureException } from "@sentry/nextjs";
 
 type ShippingMethod = {
   id: string;
@@ -149,7 +150,7 @@ export function ShippingMethodsTable({ initialMethods }: { initialMethods: Shipp
 
       setShippingMethods((prev) => prev.filter((m) => m.id !== id));
     } catch (error) {
-      console.error("Error deleting shipping method:", error);
+      captureException(error);
     }
   };
 

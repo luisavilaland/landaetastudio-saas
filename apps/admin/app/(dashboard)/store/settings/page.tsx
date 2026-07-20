@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { captureException } from "@sentry/nextjs";
 
 type StoreSettings = {
   logoUrl?: string;
@@ -75,7 +76,7 @@ export default function SettingsPage() {
         });
       }
     } catch (err) {
-      console.error("Error loading settings:", err);
+      captureException(err);
     } finally {
       setLoading(false);
     }

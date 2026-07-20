@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth";
 import { db, dbOrders, dbOrderItems, dbProductVariants, dbProducts, withTenantContext } from "@repo/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { updateOrderStatusSchema } from "@repo/validation";
+import { createLogger } from "@repo/logger";
+
+const logger = createLogger("orders-id");
 
 export async function GET(
   request: NextRequest,
@@ -112,7 +115,7 @@ export async function GET(
       });
     });
   } catch (error) {
-    console.error("[Order GET] Error:", error);
+    logger.error({ error }, "[Order GET] Error");
     return NextResponse.json({ error: "Error al obtener orden" }, { status: 500 });
   }
 }
@@ -175,7 +178,7 @@ export async function PUT(
       return NextResponse.json({ success: true, status });
     });
   } catch (error) {
-    console.error("[Order PUT] Error:", error);
+    logger.error({ error }, "[Order PUT] Error");
     return NextResponse.json({ error: "Error al actualizar orden" }, { status: 500 });
   }
 }

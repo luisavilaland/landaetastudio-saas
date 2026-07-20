@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
+import { captureException } from "@sentry/nextjs";
 
 type Category = {
   id: string;
@@ -118,7 +119,7 @@ export function ProductForm({ initialProduct, categories = [], mode = "create" }
         setImages(data.images || []);
       }
     } catch (err) {
-      console.error("Error loading images:", err);
+      captureException(err);
     } finally {
       setImagesLoading(false);
     }

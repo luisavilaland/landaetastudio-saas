@@ -3,6 +3,9 @@ import { db, dbCategories, dbProducts, withTenantContext } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
 import { updateCategorySchema } from "@repo/validation";
+import { createLogger } from "@repo/logger";
+
+const logger = createLogger("categories-id");
 
 export async function GET(
   request: NextRequest,
@@ -37,7 +40,7 @@ export async function GET(
       return NextResponse.json({ category });
     });
   } catch (error) {
-    console.error("Error fetching category:", error);
+    logger.error({ error }, "Error fetching category");
     return NextResponse.json(
       { error: "Error al obtener categoría" },
       { status: 500 }
@@ -146,7 +149,7 @@ export async function PUT(
       return NextResponse.json({ category });
     });
   } catch (error) {
-    console.error("Error updating category:", error);
+    logger.error({ error }, "Error updating category");
     return NextResponse.json(
       { error: "Error al actualizar categoría" },
       { status: 500 }
@@ -214,7 +217,7 @@ export async function DELETE(
       return NextResponse.json({ success: true });
     });
   } catch (error) {
-    console.error("Error deleting category:", error);
+    logger.error({ error }, "Error deleting category");
     return NextResponse.json(
       { error: "Error al eliminar categoría" },
       { status: 500 }

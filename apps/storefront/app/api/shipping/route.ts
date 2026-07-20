@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { db, dbShippingMethods, withTenantContext } from "@repo/db";
 import { eq, asc } from "drizzle-orm";
 import { headers } from "next/headers";
+import { createLogger } from "@repo/logger";
+
+const logger = createLogger("storefront-shipping");
 
 export async function GET() {
   try {
@@ -24,7 +27,7 @@ export async function GET() {
       return NextResponse.json({ methods: activeMethods });
     });
   } catch (error) {
-    console.error("Error fetching shipping methods:", error);
+    logger.error({ error }, "Error fetching shipping methods");
     return NextResponse.json({ methods: [] });
   }
 }

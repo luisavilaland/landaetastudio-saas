@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CSVImport } from "./csv-import";
+import { captureException } from "@sentry/nextjs";
 
 type ProductVariant = {
   id: string;
@@ -42,7 +43,7 @@ export function ProductsTable({
         setProducts((prev) => prev.filter((p) => p.id !== id));
       }
     } catch (error) {
-      console.error("Error deleting product:", error);
+      captureException(error);
     }
   };
 

@@ -3,6 +3,9 @@ import { db, dbTenants } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { customDomainSchema } from "@repo/validation";
+import { createLogger } from "@repo/logger";
+
+const logger = createLogger("tenant-domain");
 
 function jsonResponse(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
@@ -60,7 +63,7 @@ export async function PUT(request: NextRequest) {
 
     return jsonResponse(updated);
   } catch (error) {
-    console.error("Error updating domain:", error);
+    logger.error({ error }, "Error updating domain");
      return jsonResponse({ error: "Error al actualizar dominio" }, 500);
   }
 }

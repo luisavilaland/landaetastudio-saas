@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { captureException } from "@sentry/nextjs";
 
 type Category = {
   id: string;
@@ -123,7 +124,7 @@ export function CategoriesTable({ initialCategories }: { initialCategories: Cate
 
       setCategories((prev) => prev.filter((c) => c.id !== id));
     } catch (error) {
-      console.error("Error deleting category:", error);
+      captureException(error);
     }
   };
 

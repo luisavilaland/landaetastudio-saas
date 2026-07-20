@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth";
 import { db, dbOrders, dbProductVariants, dbProducts, withTenantContext } from "@repo/db";
 import { eq, sql, and, lte, gte, desc } from "drizzle-orm";
 import { dashboardQuerySchema } from "@repo/validation";
+import { createLogger } from "@repo/logger";
+
+const logger = createLogger("dashboard");
 
 function jsonResponse(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
@@ -17,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const tenantId = session.user.tenantId;
     if (!tenantId) {
-      console.error("[Dashboard GET] Tenant ID no encontrado en sesión:", session.user);
+      logger.error({ userEmail: session.user?.email }, "[Dashboard GET] Tenant ID no encontrado en sesión");
       return jsonResponse({ error: "Tenant no encontrado" }, 400);
     }
 
@@ -28,7 +31,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!queryValidation.success) {
-      console.error("[Dashboard GET] Validation error:", queryValidation.error.issues);
+      logger.error({ issues: queryValidation.error.issues }, "[Dashboard GET] Validation error");
       return jsonResponse({ error: "Validación fallida" }, 400);
     }
 
@@ -40,8 +43,6 @@ export async function GET(request: NextRequest) {
     const end = (queryValidation.data.endDate && queryValidation.data.endDate !== 'null')
       ? new Date(queryValidation.data.endDate)
       : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
-
-    console.log('[Dashboard GET] Start:', start, '| End:', end);
 
     return await withTenantContext(tenantId, async (tx) => {
       const [revenueResult] = await tx
@@ -129,7 +130,7 @@ export async function GET(request: NextRequest) {
       });
     });
   } catch (error) {
-    console.error("[Dashboard GET] Error:", error);
+    logger.error({ error }, "[Dashboard GET] Error");
     return jsonResponse({ error: "Error al obtener métricas" }, 500);
   }
 }
