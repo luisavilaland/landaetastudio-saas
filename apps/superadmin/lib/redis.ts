@@ -11,5 +11,5 @@ export const redisClient = new Redis(redisUrl, {
 });
 
 redisClient.on("error", (err) => {
-  logger.error("[Redis] Error: " + err.message);
+  logger.error({ error: err }, "[Redis] Error");
 });
