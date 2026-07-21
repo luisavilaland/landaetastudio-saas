@@ -454,3 +454,24 @@
 **Deuda técnica documentada (nueva):**
 - ❌ **Fechas sin UTC explícito:** el schema usa `timestamp` sin timezone. Sin mitigación — depende de que el entorno de despliegue esté en UTC. Pendiente: migrar a `timestamptz` o validación Zod de UTC en inserts.
 - ❌ **console.* sin migrar:** ~49 instancias de `console.error`/`console.log` en apps/ que aún no usan `@repo/logger`. Pendiente: barrido completo de apps/ (excluye seed.ts que es intencional).
+
+---
+
+## 2026-07-20 — Migración UTC: timestamptz + deuda técnica de snapshots
+
+- **Fase 1 (validación) completa:** branch efímera `utc-validation` contra Neon. 18/18 columnas migradas a `timestamptz` en 1.6s sin pérdida de datos. ALTER es idempotente sobre columna ya `timestamptz`.
+- **Fase 2 (schema + migración) completa:**
+  - `packages/db/src/schema.ts`: 18 columnas con `{ withTimezone: true }`
+  - `packages/db/migrations/0011_timestamptz.sql`: SET TIME ZONE 'UTC' + SET statement_timeout = '10s' + 18 ALTER TYPE
+  - `meta/0011_snapshot.json` generado (parcheado desde 0008)
+  - `meta/_journal.json`: idx 11 registrado con `breakpoints: true`
+- **Snapshots 0003-0004 y 0009 confirmados perdidos** del historial de git (nunca trackeados). Snapshots 0005-0008 estaban en disco del repo principal pero no trackeados en git.
+- **`pnpm db:generate` produce migraciones incorrectas** si faltan snapshots intermedios. Al restaurar 0005-0008, genera solo ALTER TYPE (correcto).
+- **typecheck ✅, 292/292 tests ✅, lint ✅**
+- **Branch:** `feat/utc-migration` (Paseo worktree)
+
+**Deuda técnica documentada (nueva):**
+- ❌ **drizzle-kit snapshots 0003-0004 perdidos por gitignore:** causa raíz confirmada — `.gitignore` tenía `packages/db/migrations/*` y `packages/db/migrations/meta/*.json`, lo que excluía silenciosamente cualquier archivo nuevo de migraciones o snapshots de `git add`. Desde que esa regla se agregó, toda migración generada después quedaba fuera de control de versiones sin que quien la generara lo notara. Corregido en este mismo commit (líneas eliminadas). Los snapshots 0005-0008 (que estaban en disco pero no en git) y 0011 ya están agregados.
+
+**Deuda técnica resuelta:**
+- ✅ **Fechas sin UTC explícito:** schema migrado a `timestamptz`. Migración 0011 aplicada contra producción (Fase 3) el 2026-07-20 — 18 columnas en 1.3s, datos preservados, sin NULLs.

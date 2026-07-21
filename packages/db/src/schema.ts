@@ -9,8 +9,8 @@ export const dbTenants = pgTable("tenants", {
   plan: text("plan").default("starter"),
   status: text("status").default("active"),
   settings: jsonb("settings").default({}),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const dbProducts = pgTable("products", {
@@ -23,8 +23,8 @@ export const dbProducts = pgTable("products", {
   imageUrl: text("imageUrl"),
   status: text("status").default("draft"),
   metadata: jsonb("metadata").default({}),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
   }, (table) => {
     return {
       tenantSlugUnique: uniqueIndex("products_tenant_slug_idx").on(table.tenantId, table.slug),
@@ -39,7 +39,7 @@ export const dbProductImages = pgTable("product_images", {
   url: text("url").notNull(),
   alt: text("alt"),
   position: integer("position").default(0),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => {
   return {
     tenantIdIdx: index("product_images_tenant_id_idx").on(table.tenantId),
@@ -55,8 +55,8 @@ export const dbProductVariants = pgTable("product_variants", {
   price: integer("price").notNull(),
   stock: integer("stock").default(0),
   options: jsonb("options").default({}),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => {
   return {
     tenantSkuUnique: uniqueIndex("product_variants_tenant_sku_idx").on(table.tenantId, table.sku),
@@ -71,8 +71,8 @@ export const dbCustomers = pgTable("customers", {
   password: text("password").notNull(),
   name: text("name"),
   phone: text("phone"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => {
   return {
     tenantEmailUnique: uniqueIndex("customers_tenant_email_idx").on(table.tenantId, table.email),
@@ -86,8 +86,8 @@ export const dbAdminUsers = pgTable("admin_users", {
   password: text("password").notNull(),
   role: text("role").notNull().default("admin"),
   tenantId: uuid("tenantId").references(() => dbTenants.id, { onDelete: "set null" }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => {
   return {
     tenantIdIdx: index("admin_users_tenant_id_idx").on(table.tenantId),
@@ -104,8 +104,8 @@ export const dbOrders = pgTable("orders", {
   currency: text("currency").default("UYU"),
   shippingDetails: jsonb("shippingDetails").default({}),
   metadata: jsonb("metadata").default({}),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => {
   return {
     tenantIdIdx: index("orders_tenant_id_idx").on(table.tenantId),
@@ -120,7 +120,7 @@ export const dbOrderItems = pgTable("order_items", {
   productVariantId: uuid("productVariantId").notNull().references(() => dbProductVariants.id, { onDelete: "restrict" }),
   quantity: integer("quantity").notNull(),
   unitPrice: integer("unitPrice").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => {
   return {
     tenantIdIdx: index("order_items_tenant_id_idx").on(table.tenantId),
@@ -146,8 +146,8 @@ export const dbCategories = pgTable("categories", {
   tenantId: uuid("tenantId").notNull().references(() => dbTenants.id, { onDelete: "restrict" }),
   name: text("name").notNull(),
   slug: text("slug").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => {
   return {
     tenantSlugUnique: uniqueIndex("categories_tenant_slug_idx").on(table.tenantId, table.slug),
@@ -195,8 +195,8 @@ export const dbShippingMethods = pgTable("shipping_methods", {
   estimatedDaysMax: integer("estimatedDaysMax"),
   isActive: text("isActive").default("true"),
   sortOrder: integer("sortOrder").default(0),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => {
   return {
     tenantIdIdx: index("shipping_methods_tenant_id_idx").on(table.tenantId),
