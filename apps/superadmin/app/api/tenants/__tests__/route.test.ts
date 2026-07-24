@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
@@ -30,6 +29,7 @@ vi.mock("@repo/db", async () => {
 
 import { db } from "@repo/db";
 import { auth } from "@/lib/auth";
+import { mockReq } from "@repo/test-utils";
 import { GET, POST } from "../route";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,16 +43,6 @@ function mockQuery<T>(resolveValue: T[]): any {
       Promise.resolve(resolveValue).then(onFulfilled),
   };
   return q;
-}
-
-function makeRequest(body: Record<string, unknown>): NextRequest {
-  return {
-    json: async () => body,
-    text: async () => JSON.stringify(body),
-    headers: new Headers(),
-    nextUrl: new URL("http://localhost"),
-    cookies: { get: vi.fn() },
-  } as unknown as NextRequest;
 }
 
 const MOCK_TENANT = {
@@ -124,7 +114,7 @@ describe("POST /api/tenants", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (auth as any).mockResolvedValue(adminSession);
 
-    const res = await POST(makeRequest({ slug: "new-store", name: "New Store", plan: "starter", status: "active" }));
+    const res = await POST(mockReq("POST",{ slug: "new-store", name: "New Store", plan: "starter", status: "active" }));
 
     expect(res.status).toBe(403);
   });
@@ -141,7 +131,7 @@ describe("POST /api/tenants", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
-    const res = await POST(makeRequest({ slug: "test-store", name: "Test Store", plan: "starter", status: "active" }));
+    const res = await POST(mockReq("POST",{ slug: "test-store", name: "Test Store", plan: "starter", status: "active" }));
 
     expect(res.status).toBe(201);
     const data = await res.json();
@@ -154,7 +144,7 @@ describe("POST /api/tenants", () => {
 
     vi.mocked(db.select).mockReturnValueOnce(mockQuery([MOCK_TENANT]));
 
-    const res = await POST(makeRequest({ slug: "test-store", name: "Test Store", plan: "starter", status: "active" }));
+    const res = await POST(mockReq("POST",{ slug: "test-store", name: "Test Store", plan: "starter", status: "active" }));
 
     expect(res.status).toBe(409);
   });
@@ -163,7 +153,7 @@ describe("POST /api/tenants", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (auth as any).mockResolvedValue(superadminSession);
 
-    const res = await POST(makeRequest({ slug: "test-store" }));
+    const res = await POST(mockReq("POST",{ slug: "test-store" }));
 
     expect(res.status).toBe(400);
   });
@@ -172,7 +162,7 @@ describe("POST /api/tenants", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (auth as any).mockResolvedValue(superadminSession);
 
-    const res = await POST(makeRequest({ name: "Test Store" }));
+    const res = await POST(mockReq("POST",{ name: "Test Store" }));
 
     expect(res.status).toBe(400);
   });
@@ -181,7 +171,7 @@ describe("POST /api/tenants", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (auth as any).mockResolvedValue(null);
 
-    const res = await POST(makeRequest({ slug: "test-store", name: "Test Store", plan: "starter", status: "active" }));
+    const res = await POST(mockReq("POST",{ slug: "test-store", name: "Test Store", plan: "starter", status: "active" }));
 
     expect(res.status).toBe(401);
   });

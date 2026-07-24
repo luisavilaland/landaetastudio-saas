@@ -475,3 +475,20 @@
 
 **Deuda técnica resuelta:**
 - ✅ **Fechas sin UTC explícito:** schema migrado a `timestamptz`. Migración 0011 aplicada contra producción (Fase 3) el 2026-07-20 — 18 columnas en 1.3s, datos preservados, sin NULLs.
+
+---
+
+## 2026-07-24 — @repo/test-utils: helpers de test centralizados
+
+- **`packages/test-utils/` creado** con tres helpers: `makeTxMock(config?)`, `session(tenantId, email?)`, `mockReq(method, body?, headerOverrides?)`.
+- **12 archivos de test migrados** de helpers inline a `@repo/test-utils`:
+  - **storefront (6):** shipping, webhooks/mercadopago, cart, checkout, checkout/preference, register
+  - **admin (4):** orders/[id], shipping/[id], products/[id], products/[id]/variants, products/[id]/images
+  - **superadmin (1):** tenants
+- **Patrones migrados:** `makeTxMock` inline (9 archivos), `makeRequest`/`mockReq` inline (7 archivos), `session` inline (3 archivos), `setupTxRead`/`setupTxInsert`/`setupTx*` (2 archivos).
+- **`makeTxMock` con `{ select: [...] }`**: soporta config para selects secuenciales con `terminal: "where" | "limit" | "orderBy"`, probado contra casos reales de checkout/preference (4 selects heterogéneos) e images (limit + orderBy).
+- **`mockReq` con `headerOverrides`**: para tests que necesitan headers custom (x-forwarded-for en rate limiting).
+- **`mockReq` sin `NextRequest` en firma**: retorna `as any` para evitar conflicto de tipos entre next@14 y next@16.
+- **lint ✅, typecheck ✅, build ✅, 292/292 tests ✅**
+- **AGENTS.md actualizado** con sección de helpers de test.
+- **Branch:** `feat/test-utils` (Paseo worktree)

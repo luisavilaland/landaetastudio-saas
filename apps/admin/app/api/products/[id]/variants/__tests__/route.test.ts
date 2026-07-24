@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Product, ProductVariant } from "@repo/db";
 import { db, withTenantContext } from "@repo/db";
+import { makeTxMock, session, mockReq } from "@repo/test-utils";
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
@@ -65,41 +66,6 @@ function makeSelectChain<T>(value: T) {
     catch: promise.catch.bind(promise),
     finally: promise.finally.bind(promise),
   } as unknown as ReturnType<typeof db.select>;
-}
-
-function makeTxMock() {
-  return {
-    select: vi.fn(),
-    insert: vi.fn().mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{}]),
-      }),
-    }),
-    update: vi.fn().mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      }),
-    }),
-    delete: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    }),
-    execute: vi.fn().mockResolvedValue(undefined),
-  };
-}
-
-function mockReq(method: string, body?: Record<string, unknown>) {
-  const headers = new Headers();
-  if (body) headers.set("content-type", "application/json");
-  return {
-    method,
-    headers,
-    json: async () => body,
-    nextUrl: new URL("http://localhost"),
-  } as unknown as Parameters<typeof GET>[0];
-}
-
-function session(tenantId: string, email: string) {
-  return { user: { tenantId, email }, expires: "2099-01-01T00:00:00.000Z" };
 }
 
 // ──────── GET ────────

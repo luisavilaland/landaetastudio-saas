@@ -21,7 +21,7 @@ vi.mock("@repo/db", async () => {
 
 import { NextRequest } from "next/server";
 import { withTenantContext } from "@repo/db";
-import { POST } from "../route";
+import { makeTxMock } from "@repo/test-utils";
 
 const WEBHOOK_SECRET = "test-webhook-secret";
 const ACCESS_TOKEN = "TEST-98765_test_access_token";
@@ -29,19 +29,7 @@ const RAW_BODY = JSON.stringify({ type: "payment", data: { id: "123456789" } });
 
 const TENANT_ID = "tenant-123";
 
-function makeTxMock() {
-  return {
-    select: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnValue({
-      values: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([]) }),
-    }),
-    update: vi.fn().mockReturnValue({
-      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
-    }),
-    delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
-    execute: vi.fn().mockResolvedValue(undefined),
-  } as any;
-}
+import { POST } from "../route";
 
 function makeWebhookRequest(
   rawBody: string,
@@ -152,16 +140,11 @@ describe("POST /api/webhooks/mercadopago — Dev mode payment processing", () =>
   });
 
   it("should approve payment with magic ID 123456789", async () => {
-    const mockTx = makeTxMock();
-    mockTx.select.mockReturnValueOnce({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue([{
-        id: "order-dev-123", customerEmail: "buyer@test.com", total: 10000,
-        shippingDetails: { name: "Test Buyer" }, metadata: null,
-      }]),
-    } as any);
-    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
+    const tx = makeTxMock({ select: [{ data: [{
+      id: "order-dev-123", customerEmail: "buyer@test.com", total: 10000,
+      shippingDetails: { name: "Test Buyer" }, metadata: null,
+    }], terminal: "limit" }] });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(tx));
 
     const body = JSON.stringify({ type: "payment", data: { id: "123456789" } });
     const res = await POST(makeWebhookRequest(body, { testOrderId: `${TENANT_ID}:order-dev-123` }));
@@ -173,24 +156,12 @@ describe("POST /api/webhooks/mercadopago — Dev mode payment processing", () =>
   });
 
   it("should reject payment with magic ID 000000", async () => {
-    const mockTx = makeTxMock();
-    mockTx.select
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([{ status: "pending_payment" }]),
-      } as any)
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([{ id: "item-1", productVariantId: "var-1", quantity: 2 }]),
-      } as any)
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([{ stock: 10 }]),
-      } as any);
-    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
+    const tx = makeTxMock({ select: [
+      { data: [{ status: "pending_payment" }], terminal: "limit" },
+      { data: [{ id: "item-1", productVariantId: "var-1", quantity: 2 }], terminal: "limit" },
+      { data: [{ stock: 10 }], terminal: "limit" },
+    ] });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(tx));
 
     const body = JSON.stringify({ type: "payment", data: { id: "000000" } });
     const res = await POST(makeWebhookRequest(body, { testOrderId: `${TENANT_ID}:order-dev-123` }));

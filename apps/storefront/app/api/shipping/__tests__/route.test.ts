@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { db, withTenantContext } from "@repo/db";
+import { withTenantContext } from "@repo/db";
+import { makeTxMock } from "@repo/test-utils";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
@@ -17,26 +18,6 @@ vi.mock("drizzle-orm", async () => {
 
 import { headers } from "next/headers";
 import { GET } from "../route";
-
-function makeTxMock() {
-  return {
-    select: vi.fn(),
-    insert: vi.fn().mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{}]),
-      }),
-    }),
-    update: vi.fn().mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      }),
-    }),
-    delete: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    }),
-    execute: vi.fn().mockResolvedValue(undefined),
-  } as any;
-}
 
 const mockActiveMethods = [
   {
@@ -86,13 +67,8 @@ describe("GET /api/shipping (storefront)", () => {
       get: (key: string) => (key === "x-tenant-id" ? "tenant-1" : null),
     } as unknown as Awaited<ReturnType<typeof headers>>);
 
-    const mockTx = makeTxMock();
-    mockTx.select.mockReturnValueOnce({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      orderBy: vi.fn().mockResolvedValue(mockActiveMethods),
-    });
-    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
+    const tx = makeTxMock({ select: [{ data: mockActiveMethods, terminal: "orderBy" }] });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(tx));
 
     const res = await GET();
     const data = await res.json();
@@ -119,13 +95,8 @@ describe("GET /api/shipping (storefront)", () => {
       get: (key: string) => (key === "x-tenant-id" ? "tenant-1" : null),
     } as unknown as Awaited<ReturnType<typeof headers>>);
 
-    const mockTx = makeTxMock();
-    mockTx.select.mockReturnValueOnce({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      orderBy: vi.fn().mockResolvedValue([...mockActiveMethods, mockInactiveMethod]),
-    });
-    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
+    const tx = makeTxMock({ select: [{ data: [...mockActiveMethods, mockInactiveMethod], terminal: "orderBy" }] });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(tx));
 
     const res = await GET();
     const data = await res.json();
@@ -139,13 +110,8 @@ describe("GET /api/shipping (storefront)", () => {
       get: (key: string) => (key === "x-tenant-id" ? "tenant-1" : null),
     } as unknown as Awaited<ReturnType<typeof headers>>);
 
-    const mockTx = makeTxMock();
-    mockTx.select.mockReturnValueOnce({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      orderBy: vi.fn().mockResolvedValue([]),
-    });
-    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
+    const tx = makeTxMock({ select: [{ data: [], terminal: "orderBy" }] });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(tx));
 
     const res = await GET();
     const data = await res.json();

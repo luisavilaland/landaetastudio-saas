@@ -30,28 +30,14 @@ vi.mock("@repo/db", async () => {
   return { ...actual, withTenantContext: vi.fn() };
 });
 
-import { NextRequest } from "next/server";
 import { withTenantContext } from "@repo/db";
+import { makeTxMock, mockReq } from "@repo/test-utils";
 import { getTenantId } from "@/lib/tenant";
 import { POST } from "../route";
 
 const TENANT_ID = "tenant-123";
 const ORDER_ID = "order-abc";
 const CALLER_EMAIL = "comprador@test.com";
-
-function setupTx(results: { data: any[]; limit?: boolean }[]) {
-  const tx = { select: vi.fn() } as any;
-  for (const r of results) {
-    const fromObj = { where: vi.fn() };
-    tx.select.mockReturnValueOnce({ from: vi.fn().mockReturnValue(fromObj) });
-    if (r.limit) {
-      fromObj.where.mockReturnValue({ limit: vi.fn().mockResolvedValue(r.data) });
-    } else {
-      fromObj.where.mockResolvedValue(r.data);
-    }
-  }
-  return tx;
-}
 
 const MOCK_ORDER = {
   id: ORDER_ID,
@@ -87,25 +73,6 @@ const MOCK_PRODUCTS = [
   { id: "prod-2", name: "Producto 2" },
 ];
 
-function makeRequest(
-  body: Record<string, unknown>,
-  headerOverrides?: Record<string, string>
-): NextRequest {
-  const headers = new Headers({ "content-type": "application/json" });
-  if (headerOverrides) {
-    for (const [k, v] of Object.entries(headerOverrides)) {
-      headers.set(k, v);
-    }
-  }
-  return {
-    json: async () => body,
-    text: async () => JSON.stringify(body),
-    headers,
-    nextUrl: new URL("http://localhost"),
-    cookies: { get: vi.fn() },
-  } as unknown as NextRequest;
-}
-
 describe("POST /api/checkout/preference", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -128,7 +95,7 @@ describe("POST /api/checkout/preference", () => {
       mockRedisIncr.mockResolvedValue(11);
       mockRedisPexpire.mockResolvedValue("OK");
 
-      const res = await POST(makeRequest({ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }, { "x-forwarded-for": "1.2.3.4" }));
+      const res = await POST(mockReq("POST",{ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }, { "x-forwarded-for": "1.2.3.4" }));
 
       expect(res.status).toBe(429);
       const body = await res.json();
@@ -139,10 +106,10 @@ describe("POST /api/checkout/preference", () => {
       mockRedisIncr.mockResolvedValue(5);
       mockRedisPexpire.mockResolvedValue("OK");
 
-      const tx = setupTx([{ data: [MOCK_ORDER], limit: true }]);
+      const tx = makeTxMock({ select: [{ data: [MOCK_ORDER], terminal: "limit" }] });
       vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
-      const res = await POST(makeRequest({ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }, { "x-forwarded-for": "5.6.7.8" }));
+      const res = await POST(mockReq("POST",{ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }, { "x-forwarded-for": "5.6.7.8" }));
 
       expect(res.status).not.toBe(429);
       expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
@@ -154,7 +121,7 @@ describe("POST /api/checkout/preference", () => {
       delete process.env.MERCADOPAGO_ACCESS_TOKEN;
       mockRedisIncr.mockResolvedValue(1);
 
-      const res = await POST(makeRequest({ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
+      const res = await POST(mockReq("POST",{ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
 
       expect(res.status).toBe(500);
       const body = await res.json();
@@ -166,7 +133,7 @@ describe("POST /api/checkout/preference", () => {
     it("should return 400 when customerEmail is missing", async () => {
       mockRedisIncr.mockResolvedValue(1);
 
-      const res = await POST(makeRequest({ orderId: ORDER_ID }));
+      const res = await POST(mockReq("POST",{ orderId: ORDER_ID }));
 
       expect(res.status).toBe(400);
     });
@@ -174,7 +141,7 @@ describe("POST /api/checkout/preference", () => {
     it("should return 400 when customerEmail is invalid", async () => {
       mockRedisIncr.mockResolvedValue(1);
 
-      const res = await POST(makeRequest({ orderId: ORDER_ID, customerEmail: "not-an-email" }));
+      const res = await POST(mockReq("POST",{ orderId: ORDER_ID, customerEmail: "not-an-email" }));
 
       expect(res.status).toBe(400);
     });
@@ -182,7 +149,7 @@ describe("POST /api/checkout/preference", () => {
     it("should return 400 when orderId is missing", async () => {
       mockRedisIncr.mockResolvedValue(1);
 
-      const res = await POST(makeRequest({ customerEmail: CALLER_EMAIL }));
+      const res = await POST(mockReq("POST",{ customerEmail: CALLER_EMAIL }));
 
       expect(res.status).toBe(400);
     });
@@ -193,7 +160,7 @@ describe("POST /api/checkout/preference", () => {
       mockRedisIncr.mockResolvedValue(1);
       vi.mocked(getTenantId).mockResolvedValue(null);
 
-      const res = await POST(makeRequest({ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
+      const res = await POST(mockReq("POST",{ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
 
       expect(res.status).toBe(400);
     });
@@ -202,10 +169,10 @@ describe("POST /api/checkout/preference", () => {
   describe("IDOR protection", () => {
     it("should return 404 when order does not exist", async () => {
       mockRedisIncr.mockResolvedValue(1);
-      const tx = setupTx([{ data: [], limit: true }]);
+      const tx = makeTxMock({ select: [{ data: [], terminal: "limit" }] });
       vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
-      const res = await POST(makeRequest({ orderId: "nonexistent", customerEmail: CALLER_EMAIL }));
+      const res = await POST(mockReq("POST",{ orderId: "nonexistent", customerEmail: CALLER_EMAIL }));
 
       expect(res.status).toBe(404);
       expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
@@ -213,15 +180,15 @@ describe("POST /api/checkout/preference", () => {
 
     it("should return 403 when caller email does not match order email", async () => {
       mockRedisIncr.mockResolvedValue(1);
-      const tx = setupTx([
-        { data: [{ ...MOCK_ORDER, customerEmail: "otro@test.com" }], limit: true },
+      const tx = makeTxMock({ select: [
+        { data: [{ ...MOCK_ORDER, customerEmail: "otro@test.com" }], terminal: "limit" },
         { data: [] },
         { data: [] },
         { data: [] },
-      ]);
+      ] });
       vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
-      const res = await POST(makeRequest({ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
+      const res = await POST(mockReq("POST",{ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
 
       expect(res.status).toBe(403);
       expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
@@ -229,12 +196,12 @@ describe("POST /api/checkout/preference", () => {
 
     it("should return 200 when caller email matches order email", async () => {
       mockRedisIncr.mockResolvedValue(1);
-      const tx = setupTx([
-        { data: [MOCK_ORDER], limit: true },
+      const tx = makeTxMock({ select: [
+        { data: [MOCK_ORDER], terminal: "limit" },
         { data: MOCK_ORDER_ITEMS },
         { data: MOCK_VARIANTS },
         { data: MOCK_PRODUCTS },
-      ]);
+      ] });
       vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
       const originalFetch = globalThis.fetch;
@@ -244,7 +211,7 @@ describe("POST /api/checkout/preference", () => {
       });
 
       try {
-        const res = await POST(makeRequest({ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
+        const res = await POST(mockReq("POST",{ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
 
         expect(res.status).toBe(200);
         const body = await res.json();
@@ -259,15 +226,15 @@ describe("POST /api/checkout/preference", () => {
   describe("Shipping details", () => {
     it("should return 400 when shipping details are missing", async () => {
       mockRedisIncr.mockResolvedValue(1);
-      const tx = setupTx([
-        { data: [{ ...MOCK_ORDER, shippingDetails: null }], limit: true },
+      const tx = makeTxMock({ select: [
+        { data: [{ ...MOCK_ORDER, shippingDetails: null }], terminal: "limit" },
         { data: [] },
         { data: [] },
         { data: [] },
-      ]);
+      ] });
       vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
-      const res = await POST(makeRequest({ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
+      const res = await POST(mockReq("POST",{ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
 
       expect(res.status).toBe(400);
       expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));

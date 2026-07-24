@@ -39,6 +39,7 @@ import { headers } from "next/headers";
 import { db } from "@repo/db";
 import { redisClient } from "@/lib/redis";
 import { getTenantId } from "@/lib/tenant";
+import { mockReq } from "@repo/test-utils";
 import { GET, POST, PUT, DELETE } from "../route";
 
 const TENANT_ID = "tenant-123";
@@ -93,14 +94,6 @@ function createQuery<T>(resolveValue: T[]): any {
   return q;
 }
 
-function makeRequest(body?: Record<string, unknown>, sessionId?: string): NextRequest {
-  return {
-    json: async () => body || {},
-    headers: new Headers({ "content-type": "application/json" }),
-    nextUrl: new URL("http://localhost"),
-  } as unknown as NextRequest;
-}
-
 function setupHeaders(sessionId: string | undefined) {
   const mockHeaders = { get: vi.fn() };
   vi.mocked(headers).mockResolvedValue(mockHeaders as any);
@@ -121,7 +114,7 @@ describe("POST /api/cart", () => {
   it("debe devolver 400 cuando no hay session ID", async () => {
     setupHeaders(undefined);
 
-    const res = await POST(makeRequest({ variantId: VARIANT_ID, quantity: 1 }));
+    const res = await POST(mockReq("POST",{ variantId: VARIANT_ID, quantity: 1 }));
 
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -132,7 +125,7 @@ describe("POST /api/cart", () => {
     setupHeaders(SESSION_ID);
     vi.mocked(getTenantId).mockResolvedValue(null);
 
-    const res = await POST(makeRequest({ variantId: VARIANT_ID, quantity: 1 }));
+    const res = await POST(mockReq("POST",{ variantId: VARIANT_ID, quantity: 1 }));
 
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -142,7 +135,7 @@ describe("POST /api/cart", () => {
   it("debe devolver 400 cuando la validación Zod falla", async () => {
     setupHeaders(SESSION_ID);
 
-    const res = await POST(makeRequest({ quantity: -1 }));
+    const res = await POST(mockReq("POST",{ quantity: -1 }));
 
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -154,7 +147,7 @@ describe("POST /api/cart", () => {
     vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID);
     vi.mocked(db.select).mockReturnValueOnce(createQuery([]));
 
-    const res = await POST(makeRequest({ variantId: VARIANT_ID, quantity: 1 }));
+    const res = await POST(mockReq("POST",{ variantId: VARIANT_ID, quantity: 1 }));
 
     expect(res.status).toBe(404);
     const body = await res.json();
@@ -165,7 +158,7 @@ describe("POST /api/cart", () => {
     setupHeaders(SESSION_ID);
     vi.mocked(db.select).mockReturnValueOnce(createQuery([{ ...MOCK_VARIANT, stock: 0 }]));
 
-    const res = await POST(makeRequest({ variantId: VARIANT_ID, quantity: 1 }));
+    const res = await POST(mockReq("POST",{ variantId: VARIANT_ID, quantity: 1 }));
 
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -176,7 +169,7 @@ describe("POST /api/cart", () => {
     setupHeaders(SESSION_ID);
     vi.mocked(db.select).mockReturnValueOnce(createQuery([MOCK_VARIANT]));
 
-    const res = await POST(makeRequest({ variantId: VARIANT_ID, quantity: 1 }));
+    const res = await POST(mockReq("POST",{ variantId: VARIANT_ID, quantity: 1 }));
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -190,7 +183,7 @@ describe("POST /api/cart", () => {
     vi.mocked(db.select).mockReturnValueOnce(createQuery([MOCK_VARIANT]));
     vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
 
-    const res = await POST(makeRequest({ variantId: VARIANT_ID, quantity: 3 }));
+    const res = await POST(mockReq("POST",{ variantId: VARIANT_ID, quantity: 3 }));
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -264,7 +257,7 @@ describe("PUT /api/cart", () => {
   it("debe devolver 400 cuando no hay session ID", async () => {
     setupHeaders(undefined);
 
-    const res = await PUT(makeRequest({ variantId: VARIANT_ID, quantity: 3 }));
+    const res = await PUT(mockReq("PUT",{ variantId: VARIANT_ID, quantity: 3 }));
 
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -275,7 +268,7 @@ describe("PUT /api/cart", () => {
     setupHeaders(SESSION_ID);
     vi.mocked(getTenantId).mockResolvedValue(null);
 
-    const res = await PUT(makeRequest({ variantId: VARIANT_ID, quantity: 3 }));
+    const res = await PUT(mockReq("PUT",{ variantId: VARIANT_ID, quantity: 3 }));
 
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -285,7 +278,7 @@ describe("PUT /api/cart", () => {
   it("debe devolver 400 cuando la validación Zod falla", async () => {
     setupHeaders(SESSION_ID);
 
-    const res = await PUT(makeRequest({}));
+    const res = await PUT(mockReq("PUT",{}));
 
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -298,7 +291,7 @@ describe("PUT /api/cart", () => {
       .mockReturnValueOnce(createQuery([MOCK_ENRICHED_VARIANT]))
       .mockReturnValueOnce(createQuery([]));
 
-    const res = await PUT(makeRequest({ variantId: VARIANT_ID, quantity: 5 }));
+    const res = await PUT(mockReq("PUT",{ variantId: VARIANT_ID, quantity: 5 }));
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -313,7 +306,7 @@ describe("PUT /api/cart", () => {
       .mockReturnValueOnce(createQuery([]))
       .mockReturnValueOnce(createQuery([]));
 
-    const res = await PUT(makeRequest({ variantId: VARIANT_ID, quantity: 3 }));
+    const res = await PUT(mockReq("PUT",{ variantId: VARIANT_ID, quantity: 3 }));
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -333,7 +326,7 @@ describe("DELETE /api/cart", () => {
   it("debe devolver 400 cuando no hay session ID", async () => {
     setupHeaders(undefined);
 
-    const res = await DELETE(makeRequest({ variantId: VARIANT_ID }));
+    const res = await DELETE(mockReq("DELETE",{ variantId: VARIANT_ID }));
 
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -344,7 +337,7 @@ describe("DELETE /api/cart", () => {
     setupHeaders(SESSION_ID);
     vi.mocked(getTenantId).mockResolvedValue(null);
 
-    const res = await DELETE(makeRequest({ variantId: VARIANT_ID }));
+    const res = await DELETE(mockReq("DELETE",{ variantId: VARIANT_ID }));
 
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -354,7 +347,7 @@ describe("DELETE /api/cart", () => {
   it("debe devolver 400 cuando la validación Zod falla", async () => {
     setupHeaders(SESSION_ID);
 
-    const res = await DELETE(makeRequest({}));
+    const res = await DELETE(mockReq("DELETE",{}));
 
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -364,7 +357,7 @@ describe("DELETE /api/cart", () => {
   it("debe limpiar todo el carrito cuando clearAll es true", async () => {
     setupHeaders(SESSION_ID);
 
-    const res = await DELETE(makeRequest({ clearAll: true }));
+    const res = await DELETE(mockReq("DELETE",{ clearAll: true }));
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -375,7 +368,7 @@ describe("DELETE /api/cart", () => {
     setupHeaders(SESSION_ID);
     vi.mocked(db.select).mockReturnValueOnce(createQuery([]));
 
-    const res = await DELETE(makeRequest({ variantId: VARIANT_ID }));
+    const res = await DELETE(mockReq("DELETE",{ variantId: VARIANT_ID }));
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -387,7 +380,7 @@ describe("DELETE /api/cart", () => {
     vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID);
     vi.mocked(db.select).mockReturnValueOnce(createQuery([]));
 
-    const res = await DELETE(makeRequest({ variantId: VARIANT_ID }));
+    const res = await DELETE(mockReq("DELETE",{ variantId: VARIANT_ID }));
 
     expect(res.status).toBe(200);
     const body = await res.json();

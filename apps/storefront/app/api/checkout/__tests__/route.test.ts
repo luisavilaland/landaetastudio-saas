@@ -35,8 +35,8 @@ vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
 }));
 
-import { NextRequest } from "next/server";
 import { withTenantContext } from "@repo/db";
+import { makeTxMock, mockReq } from "@repo/test-utils";
 import { cookies } from "next/headers";
 import { redisClient } from "@/lib/redis";
 import { getTenantId } from "@/lib/tenant";
@@ -100,64 +100,6 @@ const MOCK_ORDER = {
   updatedAt: new Date(),
 };
 
-function makeTxMock() {
-  return {
-    select: vi.fn(),
-    insert: vi.fn(),
-    from: vi.fn(),
-    where: vi.fn(),
-    limit: vi.fn(),
-    values: vi.fn(),
-    update: vi.fn(),
-    set: vi.fn(),
-    returning: vi.fn(),
-  } as any;
-}
-
-function setupTxWithVariants() {
-  const tx = makeTxMock();
-  tx.select.mockReturnValue(tx);
-  tx.from.mockReturnValue(tx);
-  tx.where.mockResolvedValue([MOCK_VARIANT]);
-  return tx;
-}
-
-function setupTxWithShipping(shippingMethod: any = MOCK_SHIPPING_METHOD) {
-  const tx = makeTxMock();
-  tx.select.mockReturnValue(tx);
-  tx.from.mockReturnValue({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([shippingMethod]) }) });
-  tx.where.mockResolvedValue([MOCK_VARIANT]);
-  return tx;
-}
-
-function setupTxFull() {
-  const tx = makeTxMock();
-  const whereResult = { limit: vi.fn() };
-  const fromWhere = { where: vi.fn() };
-  fromWhere.where.mockReturnValue(whereResult);
-  whereResult.limit.mockResolvedValue([MOCK_SHIPPING_METHOD]);
-  tx.select.mockReturnValueOnce(tx);
-  tx.from.mockReturnValueOnce(tx);
-  tx.where.mockResolvedValueOnce([MOCK_VARIANT]);
-  tx.select.mockReturnValueOnce(fromWhere);
-  tx.update.mockReturnValue(tx);
-  tx.set.mockReturnValue(tx);
-  tx.where.mockResolvedValueOnce(undefined);
-  tx.insert.mockReturnValue(tx);
-  tx.values.mockReturnValue(tx);
-  tx.returning.mockResolvedValue([MOCK_ORDER]);
-  vi.mocked(redisClient.del).mockResolvedValue(1);
-  return tx;
-}
-
-function makeRequest(body: Record<string, unknown>): NextRequest {
-  return {
-    json: async () => body,
-    headers: new Headers({ "content-type": "application/json" }),
-    nextUrl: new URL("http://localhost"),
-  } as unknown as NextRequest;
-}
-
 function setupCookie(sessionId: string | undefined) {
   const mockCookieStore = { get: vi.fn() };
   vi.mocked(cookies).mockResolvedValue(mockCookieStore as any);
@@ -178,7 +120,7 @@ describe("POST /api/checkout", () => {
     setupCookie(undefined);
 
     const res = await POST(
-      makeRequest({
+      mockReq("POST",{
         email: "test@test.com",
         name: "Juan Perez",
         phone: "099123456",
@@ -196,7 +138,7 @@ describe("POST /api/checkout", () => {
     vi.mocked(redisClient.get).mockResolvedValue(null);
 
     const res = await POST(
-      makeRequest({
+      mockReq("POST",{
         email: "test@test.com",
         name: "Juan Perez",
         phone: "099123456",
@@ -214,7 +156,7 @@ describe("POST /api/checkout", () => {
     vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_EMPTY_CART));
 
     const res = await POST(
-      makeRequest({
+      mockReq("POST",{
         email: "test@test.com",
         name: "Juan Perez",
         phone: "099123456",
@@ -231,7 +173,7 @@ describe("POST /api/checkout", () => {
     setupCookie(SESSION_ID);
     vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
 
-    const res = await POST(makeRequest({ email: "invalido" }));
+    const res = await POST(mockReq("POST",{ email: "invalido" }));
 
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -244,7 +186,7 @@ describe("POST /api/checkout", () => {
     vi.mocked(getTenantId).mockResolvedValue(null);
 
     const res = await POST(
-      makeRequest({
+      mockReq("POST",{
         email: "test@test.com",
         name: "Juan Perez",
         phone: "099123456",
@@ -269,7 +211,7 @@ describe("POST /api/checkout", () => {
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
     const res = await POST(
-      makeRequest({
+      mockReq("POST",{
         email: "test@test.com",
         name: "Juan Perez",
         phone: "099123456",
@@ -299,7 +241,7 @@ describe("POST /api/checkout", () => {
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
     const res = await POST(
-      makeRequest({
+      mockReq("POST",{
         email: "test@test.com",
         name: "Juan Perez",
         phone: "099123456",
@@ -335,7 +277,7 @@ describe("POST /api/checkout", () => {
     vi.mocked(redisClient.del).mockResolvedValue(1);
 
     const res = await POST(
-      makeRequest({
+      mockReq("POST",{
         email: "test@test.com",
         name: "Juan Perez",
         phone: "099123456",
@@ -369,7 +311,7 @@ describe("POST /api/checkout", () => {
     vi.mocked(redisClient.del).mockResolvedValue(1);
 
     const res = await POST(
-      makeRequest({
+      mockReq("POST",{
         email: "test@test.com",
         name: "Juan Perez",
         phone: "099123456",
