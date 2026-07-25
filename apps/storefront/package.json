@@ -25,6 +25,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@repo/test-utils": "workspace:*",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^6.4.17",

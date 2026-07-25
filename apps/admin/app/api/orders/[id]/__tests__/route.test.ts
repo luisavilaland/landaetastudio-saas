@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Order, OrderItem, ProductVariant, Product } from "@repo/db";
-import { db, withTenantContext } from "@repo/db";
+import { withTenantContext } from "@repo/db";
+import { makeTxMock } from "@repo/test-utils";
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
@@ -13,26 +14,6 @@ vi.mock("@repo/db", async () => {
 
 import { auth } from "@/lib/auth";
 import { GET, PUT } from "../route";
-
-function makeTxMock() {
-  return {
-    select: vi.fn(),
-    insert: vi.fn().mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{}]),
-      }),
-    }),
-    update: vi.fn().mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      }),
-    }),
-    delete: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    }),
-    execute: vi.fn().mockResolvedValue(undefined),
-  };
-}
 
 function makeGETRequest(id: string) {
   return GET(
@@ -142,13 +123,8 @@ describe("GET /api/orders/[id]", () => {
       user: { tenantId: "tenant-b", email: "admin@b.com" },
     });
 
-    const mockTx = makeTxMock();
-    mockTx.select.mockReturnValueOnce({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue([]),
-    } as ReturnType<typeof db.select>);
-    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
+    const tx = makeTxMock({ select: [{ data: [], terminal: "limit" }] });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(tx));
 
     const res = await makeGETRequest(mockId);
     expect(res.status).toBe(404);
@@ -160,26 +136,13 @@ describe("GET /api/orders/[id]", () => {
       user: { tenantId: sessionTenant, email: "admin@test.com" },
     });
 
-    const mockTx = makeTxMock();
-    mockTx.select
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([mockOrder]),
-      } as ReturnType<typeof db.select>)
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockItems),
-      } as ReturnType<typeof db.select>)
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockVariants),
-      } as ReturnType<typeof db.select>)
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockResolvedValue(mockProducts),
-      } as ReturnType<typeof db.select>);
-    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
+    const tx = makeTxMock({ select: [
+      { data: [mockOrder], terminal: "limit" },
+      { data: mockItems },
+      { data: mockVariants },
+      { data: mockProducts },
+    ] });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(tx));
 
     const res = await makeGETRequest(mockId);
     expect(res.status).toBe(200);
@@ -216,13 +179,8 @@ describe("PUT /api/orders/[id]", () => {
       user: { tenantId: "tenant-b", email: "admin@b.com" },
     });
 
-    const mockTx = makeTxMock();
-    mockTx.select.mockReturnValueOnce({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue([]),
-    } as ReturnType<typeof db.select>);
-    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
+    const tx = makeTxMock({ select: [{ data: [], terminal: "limit" }] });
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(tx));
 
     const res = await makePUTRequest(mockId, { status: "confirmed" });
     expect(res.status).toBe(404);
@@ -243,18 +201,13 @@ describe("PUT /api/orders/[id]", () => {
       user: { tenantId: sessionTenant, email: "admin@test.com" },
     });
 
-    const mockTx = makeTxMock();
-    mockTx.select.mockReturnValueOnce({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue([{ id: mockId }]),
-    } as ReturnType<typeof db.select>);
-    mockTx.update.mockReturnValueOnce({
+    const tx = makeTxMock({ select: [{ data: [{ id: mockId }], terminal: "limit" }] });
+    tx.update.mockReturnValueOnce({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue(undefined),
       }),
     } as ReturnType<typeof db.update>);
-    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(tx));
 
     const res = await makePUTRequest(mockId, { status: "confirmed" });
     expect(res.status).toBe(200);

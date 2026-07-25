@@ -130,6 +130,15 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - [ ] En beforeEach: `vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(makeTxMock()))`
 - [ ] `makeTxMock()` debe retornar `as any` para compatibilidad `DbLike`
 
+### Helpers de test (`@repo/test-utils`)
+
+Los helpers de test están centralizados en `packages/test-utils` como `@repo/test-utils`:
+- **`makeTxMock(config?)`**: mock de transacción Drizzle. Sin config, auto-encadena (`select().from().where()` retorna `tx`). Con `config.select: [{ data, terminal }]` configura selects secuenciales con `mockResolvedValueOnce`. `terminal` puede ser `"where"` (default), `"limit"`, `"orderBy"`. Si se excede la cola de `select`/`from`, lanza error (usa `repeatLastSelect: true` para repetir la última entrada). `where`/`limit`/`orderBy` siempre retornan `tx` (son compartidos con `delete()`/`update()` chains).
+- **`session(tenantId, email?)`**: objeto de sesión NextAuth con `{ user: { tenantId, email }, expires }`. `email` default `"admin@test.com"`.
+- **`mockReq(method, body?, headerOverrides?)`**: mock de `NextRequest` tipado. `body` puede ser `Record<string, unknown>` o `FormData`. `headerOverrides` para headers custom (ej: `{ "x-forwarded-for": "1.2.3.4" }`). Retorna `NextRequest` (tipado real, no `as any`).
+
+Ver checklists específicas en cada sección de endpoint.
+
 ### Antes de commit
 - [ ] `pnpm lint && pnpm typecheck && pnpm build && pnpm test`
 - [ ] Sin `any` ni `console.log` fuera del logger

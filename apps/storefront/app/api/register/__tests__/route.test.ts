@@ -31,8 +31,8 @@ vi.mock("@repo/commerce", () => ({
   sendWelcomeEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { NextRequest } from "next/server";
 import { withTenantContext } from "@repo/db";
+import { makeTxMock, mockReq } from "@repo/test-utils";
 import { getTenantId } from "@/lib/tenant";
 import bcrypt from "bcryptjs";
 import { sendWelcomeEmail } from "@repo/commerce";
@@ -40,48 +40,6 @@ import { POST } from "../route";
 
 const TENANT_ID = "tenant-123";
 const CROSS_TENANT_ID = "tenant-b";
-
-function makeTxMock() {
-  return { select: vi.fn(), insert: vi.fn(), from: vi.fn(), where: vi.fn(), limit: vi.fn(), values: vi.fn() } as any;
-}
-
-function setupTxRead(customerResult: any[], tenantResult: any[]) {
-  const tx = makeTxMock();
-
-  const whereLimit1 = { limit: vi.fn() };
-  const fromWhere1 = { where: vi.fn() };
-  const selectFrom1 = { from: vi.fn() };
-  selectFrom1.from.mockReturnValue(fromWhere1);
-  fromWhere1.where.mockReturnValue(whereLimit1);
-  whereLimit1.limit.mockResolvedValue(customerResult);
-
-  const whereLimit2 = { limit: vi.fn() };
-  const fromWhere2 = { where: vi.fn() };
-  const selectFrom2 = { from: vi.fn() };
-  selectFrom2.from.mockReturnValue(fromWhere2);
-  fromWhere2.where.mockReturnValue(whereLimit2);
-  whereLimit2.limit.mockResolvedValue(tenantResult);
-
-  tx.select.mockReturnValueOnce(selectFrom1);
-  tx.select.mockReturnValueOnce(selectFrom2);
-
-  return tx;
-}
-
-function setupTxInsert() {
-  const tx = makeTxMock();
-  tx.insert.mockReturnValue(tx);
-  tx.values.mockResolvedValue(undefined);
-  return tx;
-}
-
-function makeRequest(body: Record<string, unknown>): NextRequest {
-  return {
-    json: async () => body,
-    headers: new Headers({ "content-type": "application/json" }),
-    nextUrl: new URL("http://localhost"),
-  } as unknown as NextRequest;
-}
 
 describe("POST /api/register", () => {
   beforeEach(() => {
@@ -97,7 +55,7 @@ describe("POST /api/register", () => {
 
   it("debe devolver 400 cuando el email es inválido", async () => {
     const res = await POST(
-      makeRequest({ name: "Test User", email: "invalido", password: "password123" })
+      mockReq("POST", { name: "Test User", email: "invalido", password: "password123" })
     );
 
     expect(res.status).toBe(400);
@@ -109,7 +67,7 @@ describe("POST /api/register", () => {
     vi.mocked(getTenantId).mockResolvedValue(null);
 
     const res = await POST(
-      makeRequest({ name: "Test User", email: "test@test.com", password: "password123" })
+      mockReq("POST", { name: "Test User", email: "test@test.com", password: "password123" })
     );
 
     expect(res.status).toBe(400);
@@ -118,11 +76,11 @@ describe("POST /api/register", () => {
   });
 
   it("debe devolver 409 cuando el email ya existe en el mismo tenant", async () => {
-    const tx = setupTxRead([{ id: "customer-1" }], [{ name: "Test Store" }]);
+    const tx = makeTxMock({ select: [{ data: [{ id: "customer-1" }], terminal: "limit" }, { data: [{ name: "Test Store" }], terminal: "limit" }] });
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
     const res = await POST(
-      makeRequest({ name: "Test User", email: "test@test.com", password: "password123" })
+      mockReq("POST", { name: "Test User", email: "test@test.com", password: "password123" })
     );
 
     expect(res.status).toBe(409);
@@ -134,14 +92,16 @@ describe("POST /api/register", () => {
 
   it("debe crear el usuario cuando el email existe en otro tenant (cross-tenant)", async () => {
     vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID);
-    const readTx = setupTxRead([], [{ name: "Test Store" }]);
-    const insertTx = setupTxInsert();
+    const readTx = makeTxMock({ select: [{ data: [], terminal: "limit" }, { data: [{ name: "Test Store" }], terminal: "limit" }] });
+    const insertTx = makeTxMock();
+    insertTx.insert.mockReturnValue(insertTx);
+    insertTx.values.mockResolvedValue(undefined);
     const mockCalls = [readTx, insertTx];
     let callIndex = 0;
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(mockCalls[callIndex++]));
 
     const res = await POST(
-      makeRequest({ name: "Test User", email: "test@test.com", password: "password123" })
+      mockReq("POST", { name: "Test User", email: "test@test.com", password: "password123" })
     );
 
     expect(res.status).toBe(201);
@@ -152,14 +112,16 @@ describe("POST /api/register", () => {
 
   it("debe crear el usuario exitosamente y enviar email de bienvenida", async () => {
     vi.stubEnv("STOREFRONT_URL", "https://test-store.lvh.me");
-    const readTx = setupTxRead([], [{ name: "Test Store" }]);
-    const insertTx = setupTxInsert();
+    const readTx = makeTxMock({ select: [{ data: [], terminal: "limit" }, { data: [{ name: "Test Store" }], terminal: "limit" }] });
+    const insertTx = makeTxMock();
+    insertTx.insert.mockReturnValue(insertTx);
+    insertTx.values.mockResolvedValue(undefined);
     const mockCalls = [readTx, insertTx];
     let callIndex = 0;
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(mockCalls[callIndex++]));
 
     const res = await POST(
-      makeRequest({ name: "Test User", email: "test@test.com", password: "password123" })
+      mockReq("POST", { name: "Test User", email: "test@test.com", password: "password123" })
     );
 
     expect(res.status).toBe(201);
@@ -173,7 +135,7 @@ describe("POST /api/register", () => {
   });
 
   it("debe devolver 409 cuando el insert falla por unique violation (23505)", async () => {
-    const readTx = setupTxRead([], [{ name: "Test Store" }]);
+    const readTx = makeTxMock({ select: [{ data: [], terminal: "limit" }, { data: [{ name: "Test Store" }], terminal: "limit" }] });
     const insertTx = makeTxMock();
     insertTx.insert.mockReturnValue(insertTx);
     insertTx.values.mockRejectedValue({ code: "23505" });
@@ -183,7 +145,7 @@ describe("POST /api/register", () => {
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(mockCalls[callIndex++]));
 
     const res = await POST(
-      makeRequest({ name: "Test User", email: "test@test.com", password: "password123" })
+      mockReq("POST", { name: "Test User", email: "test@test.com", password: "password123" })
     );
 
     expect(res.status).toBe(409);
