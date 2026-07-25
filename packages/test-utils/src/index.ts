@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { NextRequest } from "next/server";
 
 interface TxSelectEntry {
   data: any[];
@@ -7,7 +8,6 @@ interface TxSelectEntry {
 
 interface MakeTxMockConfig {
   select?: TxSelectEntry[];
-  insert?: { returningData: any[] };
   repeatLastSelect?: boolean;
 }
 
@@ -55,15 +55,33 @@ export function makeTxMock(config?: MakeTxMockConfig) {
         tx.orderBy.mockResolvedValueOnce(entry.data);
       }
     }
-  }
 
-  if (config?.insert) {
-    tx.insert.mockReset();
-    tx.values.mockReset();
-    tx.returning.mockReset();
-    tx.insert.mockReturnValue(tx);
-    tx.values.mockReturnValue(tx);
-    tx.returning.mockResolvedValue(config.insert.returningData);
+    tx.where.mockReturnValue(tx);
+    tx.limit.mockReturnValue(tx);
+    tx.orderBy.mockReturnValue(tx);
+
+    if (config.repeatLastSelect) {
+      tx.select.mockReturnValue(tx);
+      tx.from.mockReturnValue(tx);
+      const lastEntry = config.select[config.select.length - 1];
+      const lastTerminal = lastEntry.terminal || "where";
+      if (lastTerminal === "limit") {
+        tx.limit.mockResolvedValue(lastEntry.data);
+      } else if (lastTerminal === "orderBy") {
+        tx.orderBy.mockResolvedValue(lastEntry.data);
+      } else {
+        tx.where.mockResolvedValue(lastEntry.data);
+      }
+    } else {
+      const msg = (m: string) =>
+        `queue exhausted for ${m}(): more select() calls than entries configured (use repeatLastSelect to repeat the last)`;
+      tx.select.mockImplementation(() => {
+        throw new Error(msg("select"));
+      });
+      tx.from.mockImplementation(() => {
+        throw new Error(msg("from"));
+      });
+    }
   }
 
   return tx;
@@ -76,7 +94,7 @@ export function session(tenantId: string, email = "admin@test.com") {
   };
 }
 
-export function mockReq(method: string, body?: Record<string, unknown> | FormData, headerOverrides?: Record<string, string>) {
+export function mockReq(method: string, body?: Record<string, unknown> | FormData, headerOverrides?: Record<string, string>): NextRequest {
   const isFormData = body instanceof FormData;
   const headers = new Headers({
     "content-type": isFormData ? "multipart/form-data" : "application/json",
@@ -94,5 +112,5 @@ export function mockReq(method: string, body?: Record<string, unknown> | FormDat
     nextUrl: new URL("http://localhost"),
     cookies: { get: vi.fn() },
     method,
-  } as any;
+  } as unknown as NextRequest;
 }

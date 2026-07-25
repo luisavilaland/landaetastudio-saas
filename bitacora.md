@@ -483,7 +483,7 @@
 - **`packages/test-utils/` creado** con tres helpers: `makeTxMock(config?)`, `session(tenantId, email?)`, `mockReq(method, body?, headerOverrides?)`.
 - **12 archivos de test migrados** de helpers inline a `@repo/test-utils`:
   - **storefront (6):** shipping, webhooks/mercadopago, cart, checkout, checkout/preference, register
-  - **admin (4):** orders/[id], shipping/[id], products/[id], products/[id]/variants, products/[id]/images
+  - **admin (5):** orders/[id], shipping/[id], products/[id], products/[id]/variants, products/[id]/images
   - **superadmin (1):** tenants
 - **Patrones migrados:** `makeTxMock` inline (9 archivos), `makeRequest`/`mockReq` inline (7 archivos), `session` inline (3 archivos), `setupTxRead`/`setupTxInsert`/`setupTx*` (2 archivos).
 - **`makeTxMock` con `{ select: [...] }`**: soporta config para selects secuenciales con `terminal: "where" | "limit" | "orderBy"`, probado contra casos reales de checkout/preference (4 selects heterogéneos) e images (limit + orderBy).
@@ -492,3 +492,14 @@
 - **lint ✅, typecheck ✅, build ✅, 292/292 tests ✅**
 - **AGENTS.md actualizado** con sección de helpers de test.
 - **Branch:** `feat/test-utils` (Paseo worktree)
+
+---
+
+## 2026-07-25 — @repo/test-utils post-review: 3 bugs corregidos
+
+- **Bug 1 (versiones):** `packages/test-utils/package.json` tenía `next: ^14` y `vitest: ^2` — el monorepo usa next@16 y vitest@4. Corregido: `^16.0.0` y `^4`.
+- **Bug 2 (queue exhaustion):** `repeatLastSelect` declarado en `MakeTxMockConfig` pero nunca leído. Cuando se excede la cola de `select()`, ahora lanza `Error("queue exhausted for select()...")`. Solo `select`/`from` lanzan error (no `where`/`limit`/`orderBy`, que son compartidos con `delete()`/`update()`).
+- **Bug 3 (insert huérfano):** opción `insert` en `MakeTxMockConfig` pero 0 de 12 archivos migrados la usaban. Eliminada.
+- **`mockReq` restaurado con `NextRequest` real**: al alinear versiones de next, desaparece el conflicto de tipos. Ahora retorna `NextRequest` (no `as any`).
+- **Unit test agregado:** `packages/test-utils/src/__tests__/makeTxMock.test.ts` — 9 tests: auto-encadenamiento, queue exhaustion (select/from), repeatLastSelect, múltiples entradas secuenciales.
+- **Verificación:** lint ✅, typecheck ✅, build ✅, **301/301 tests** (era 292, +9 del unit test nuevo). **33/33 test files** (era 32).

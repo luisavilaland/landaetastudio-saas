@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "next": "^14",
-    "vitest": "^2"
+    "next": "^16.0.0",
+    "vitest": "^4"
   }
 }
