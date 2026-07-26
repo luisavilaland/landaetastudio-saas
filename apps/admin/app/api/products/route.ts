@@ -84,41 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { price: validPrice, stock: validStock } = validation.data;
-
-    if (categoryId) {
-      const category = await db
-        .select()
-        .from(dbCategories)
-        .where(eq(dbCategories.id, categoryId))
-        .limit(1);
-      if (category.length === 0 || category[0].tenantId !== tenantId) {
-        return NextResponse.json(
-          { error: "Categoría inválida" },
-          { status: 400 }
-        );
-      }
-    }
-
     const normalizedSlug = normalizeSlug(slug);
-    
-    const existingSlug = await db
-      .select()
-      .from(dbProducts)
-      .where(
-        and(
-          eq(dbProducts.slug, normalizedSlug),
-          eq(dbProducts.tenantId, tenantId)
-        )
-      )
-      .limit(1);
-
-    if (existingSlug.length > 0) {
-      return NextResponse.json(
-        { error: "Ya existe un producto con ese slug", field: "slug" },
-        { status: 409 }
-      );
-    }
-
     const now = new Date();
 
     let imageUrl: string | null = null;
@@ -129,7 +95,39 @@ export async function POST(request: NextRequest) {
       imageUrl = await uploadImage(buffer, `products/${Date.now()}-${normalizedSlug}.${ext}`, image.type);
     }
 
-    const newProduct = await db.transaction(async (tx) => {
+    return await withTenantContext(tenantId, async (tx) => {
+      if (categoryId) {
+        const category = await tx
+          .select()
+          .from(dbCategories)
+          .where(eq(dbCategories.id, categoryId))
+          .limit(1);
+        if (category.length === 0 || category[0].tenantId !== tenantId) {
+          return NextResponse.json(
+            { error: "Categoría inválida" },
+            { status: 400 }
+          );
+        }
+      }
+
+      const existingSlug = await tx
+        .select()
+        .from(dbProducts)
+        .where(
+          and(
+            eq(dbProducts.slug, normalizedSlug),
+            eq(dbProducts.tenantId, tenantId)
+          )
+        )
+        .limit(1);
+
+      if (existingSlug.length > 0) {
+        return NextResponse.json(
+          { error: "Ya existe un producto con ese slug", field: "slug" },
+          { status: 409 }
+        );
+      }
+
       const [product] = await tx
         .insert(dbProducts)
         .values({
@@ -161,18 +159,16 @@ export async function POST(request: NextRequest) {
           updatedAt: now,
         });
 
-      return product;
+      const variants = await tx
+        .select()
+        .from(dbProductVariants)
+        .where(eq(dbProductVariants.productId, product.id));
+
+      return NextResponse.json(
+        { product: { ...product, variants } },
+        { status: 201 }
+      );
     });
-
-    const variants = await db
-      .select()
-      .from(dbProductVariants)
-      .where(eq(dbProductVariants.productId, newProduct.id));
-
-    return NextResponse.json(
-      { product: { ...newProduct, variants } },
-      { status: 201 }
-    );
   } catch (error) {
     logger.error({ error }, "Error creating product");
     return NextResponse.json(

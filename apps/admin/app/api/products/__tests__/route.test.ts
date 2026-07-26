@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { db, withTenantContext } from "@repo/db";
+import { withTenantContext } from "@repo/db";
 import { makeTxMock, session } from "@repo/test-utils";
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
@@ -51,19 +51,6 @@ function mockReqForm(method: string, formData: FormData) {
     cookies: { get: vi.fn() },
     method,
   } as any;
-}
-
-function dbSelectChain(value: any[], terminal: "limit" | "where" = "limit") {
-  const chain = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockImplementation(() =>
-      terminal === "where" ? Promise.resolve(value) : chain
-    ),
-    limit: vi.fn().mockResolvedValue(value),
-    orderBy: vi.fn().mockResolvedValue(value),
-    leftJoin: vi.fn().mockReturnThis(),
-  };
-  return chain as any;
 }
 
 const NOW = new Date("2026-01-01T00:00:00.000Z");
@@ -159,7 +146,12 @@ describe("POST /api/products", () => {
 
   it("should return 409 when slug already exists", async () => {
     vi.mocked(auth).mockResolvedValue(session("tenant-1"));
-    vi.mocked(db.select).mockReturnValueOnce(dbSelectChain([baseProduct]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      const tx = makeTxMock({
+        select: [{ data: [baseProduct], terminal: "limit" }],
+      });
+      return cb(tx);
+    });
 
     const fd = makeFormData({ name: "Producto Test", slug: "producto-test", price: "1999", stock: "10" });
     const response = await POST(mockReqForm("POST", fd));
@@ -171,11 +163,13 @@ describe("POST /api/products", () => {
 
   it("should create product successfully", async () => {
     vi.mocked(auth).mockResolvedValue(session("tenant-1"));
-    vi.mocked(db.select)
-      .mockReturnValueOnce(dbSelectChain([]))
-      .mockReturnValueOnce(dbSelectChain([], "where"));
-    vi.mocked(db.transaction).mockImplementation(async (cb: any) => {
-      const tx = makeTxMock();
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      const tx = makeTxMock({
+        select: [
+          { data: [], terminal: "limit" },
+          { data: [{ id: "v1", productId: "new-prod", sku: "nuevo-producto", price: 2999, stock: 5, options: {}, createdAt: NOW, updatedAt: NOW }], terminal: "where" },
+        ],
+      });
       tx.returning.mockResolvedValue([{ id: "new-prod", tenantId: "tenant-1", name: "Nuevo Producto", slug: "nuevo-producto", description: null, imageUrl: null, status: "draft", categoryId: null, metadata: {}, createdAt: NOW, updatedAt: NOW }]);
       return cb(tx);
     });
