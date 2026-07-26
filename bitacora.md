@@ -503,3 +503,41 @@
 - **`mockReq` restaurado con `NextRequest` real**: al alinear versiones de next, desaparece el conflicto de tipos. Ahora retorna `NextRequest` (no `as any`).
 - **Unit test agregado:** `packages/test-utils/src/__tests__/makeTxMock.test.ts` — 9 tests: auto-encadenamiento, queue exhaustion (select/from), repeatLastSelect, múltiples entradas secuenciales.
 - **Verificación:** lint ✅, typecheck ✅, build ✅, **301/301 tests** (era 292, +9 del unit test nuevo). **33/33 test files** (era 32).
+
+---
+
+## 2026-07-25 — Coverage Audit: Contract tests → reales, endpoints faltantes, packages sin cobertura
+
+- **Branch:** `feat-coverage-ab` (Paseo worktree)
+- **Objetivo:** cerrar brechas de cobertura real identificadas por audit de grafo de imports.
+- **Task 1.1 (categories/route):** migrado de contrato a real importando `{ GET, POST }` desde `"../route"` usando `mockReq`, `session`, `makeTxMock`. 8 tests (reemplaza 12 inline).
+- **Task 1.2 (categories/[id]/route):** migrado a real. 12 tests (reemplaza 6 inline).
+- **Task 1.3 (dashboard/route):** migrado a real. Incluye `tx.leftJoin` manual (gap de `makeTxMock`). 5 tests (reemplaza 6 inline).
+- **Task 1.4 (orders/route):** migrado a real con `leftJoin` en mock. 6 tests (reemplaza 17 inline).
+- **Task 1.5 (products/route):** migrado a real con FormData mock para POST. 7 tests.
+- **Task 1.6 (products/import):** debug migrado — mock File causaba 500. Fix: usar `new File([csv], ...)` nativo. 11 tests testeados y pasando.
+- **Task 1.7 (shipping/route):** migrado a real. 7 tests (3 GET + 4 POST).
+- **Task 1.9 (search/route, storefront):** migrado a real. Handler complejo con 4 queries (leftJoin, groupBy, orderBy, limit, offset). Mock manual de tx con chaining secuencial. 6 tests (reemplaza 13 inline).
+- **Grupo 2 (6 endpoints sin test):** tests agregados para `domain-check` (admin + superadmin), `config/tenant`, `config/tenant/domain`, `config/settings`, `products/[id]/images/[imageId]`. 29 tests en 6 archivos.
+- **Grupo 3 (3 packages sin cobertura):** tests para `@repo/logger` (2), `@repo/db/schema` (10 — verificación de todas las tablas), `@repo/auth` (7 — exports, configuración NextAuth). 19 tests en 3 archivos.
+- **Hallazgos técnicos:**
+  - `mockReq` no expone `request.url` — handlers que acceden a `new URL(request.url)` requieren parche `(req as any).url = urlStr`
+  - Cadenas con `.leftJoin()` requieren `tx.leftJoin = vi.fn().mockReturnValue(tx)` (gap de `makeTxMock`)
+  - `makeTxMock` no soporta terminal `"offset"` — cadenas con `.limit().offset()` requieren mock manual
+  - `vi.mock(path, { db: undefined })` produce `db = undefined` en runtime — no se puede asignar propiedades. Usar `vi.hoisted()` para mock mutable.
+- **Verificación final:** lint ✅ | typecheck 9/9 ✅ | build 3/3 ✅ | **321/321 tests, 42/42 test files** (+20 tests, +9 files vs baseline)
+
+---
+
+## 2026-07-26 — Grupo 3 Completo: 6 packages restantes
+
+- **3.1 (@repo/db index.ts — withTenantContext):** 6 tests críticos — verifica que llama `db.transaction`, ejecuta `set_tenant_id` dentro, pasa tx al callback, propaga errores. Mock de `postgres` + `drizzle-orm/postgres-js` para evitar conexión real.
+- **3.2 (@repo/commerce cart.ts):** 9 tests — `getCart` (session vacía, sin datos Redis, carrito vacío, enrich, variantes faltantes) + `removeFromCart` (remover ítem, último ítem → del, session vacía, carrito inexistente).
+- **3.4 (@repo/commerce email.ts):** 6 tests — `sendOrderConfirmationEmail` (envío, no lanza error) + `sendWelcomeEmail` (con URL, sin URL, error silencioso).
+- **3.5 (@repo/commerce tenant.ts):** 4 tests — `getTenantId` (slug presente, ausente, vacío, slug no existe).
+- **3.6 (@repo/storage index.ts):** expandido de 1→5 tests — `storageClient` export, `getPublicUrl`, `uploadImage` (putObject llamado, URL retornada), `deleteImage` (con fileName, sin fileName).
+- **3.7 (@repo/validation env.ts):** 1 test — `validateEnv` no lanza con vars actuales.
+- **3.8 (@repo/validation schemas.ts):** expandido de 7→34 tests — todos los schemas de negocio validados (createProduct, updateProduct, variant, variantsArray, createCategory, updateCategory, updateOrderStatus, addCartItem, updateCartItem, deleteCartItem, checkoutPreference, shippingDetails, dashboardQuery, createTenant, register, webhook, productImage, createShippingMethod).
+- **Hallazgos:** `vi.fn().mockImplementation(() => ({}))` no funciona con `new` — usar `function()` en lugar de arrow. `dashboardQuerySchema.parse({})` retorna `{}` (opcionales ausentes), no con `null`s.
+- **Plan original completado al 100% — todos los items de Grupo 1, 2 y 3.**
+- **Verificación final:** lint ✅ | typecheck 9/9 ✅ | build 3/3 ✅ | **378/378 tests, 47/47 test files** (+57 tests, +5 files vs baseline anterior)

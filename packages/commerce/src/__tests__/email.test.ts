@@ -1,0 +1,84 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const mockResendSend = vi.hoisted(() => vi.fn().mockResolvedValue({}));
+const mockNodemailerSend = vi.hoisted(() => vi.fn().mockResolvedValue({}));
+
+vi.mock("resend", () => ({
+  Resend: vi.fn().mockImplementation(function () {
+    return { emails: { send: mockResendSend } };
+  }),
+}));
+
+vi.mock("nodemailer", () => ({
+  default: {
+    createTransport: vi.fn().mockImplementation(() => ({
+      sendMail: mockNodemailerSend,
+    })),
+  },
+}));
+
+vi.mock("@repo/logger", () => ({
+  createLogger: vi.fn(() => ({
+    info: vi.fn(),
+    error: vi.fn(),
+  })),
+}));
+
+import { sendOrderConfirmationEmail, sendWelcomeEmail } from "../email";
+
+describe("sendOrderConfirmationEmail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should send confirmation email with order details", async () => {
+    await sendOrderConfirmationEmail("test@example.com", "order-123", 15000, "Juan");
+
+    expect(mockResendSend).toHaveBeenCalledOnce();
+    const callArg = mockResendSend.mock.calls[0][0];
+    expect(callArg.to).toBe("test@example.com");
+    expect(callArg.subject).toContain("order-123");
+    expect(callArg.html).toContain("$150.00");
+  });
+
+  it("should not throw when email sending fails", async () => {
+    mockResendSend.mockRejectedValueOnce(new Error("send failed"));
+
+    await expect(
+      sendOrderConfirmationEmail("test@example.com", "order-123", 1000, "Maria"),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe("sendWelcomeEmail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should send welcome email with store name", async () => {
+    await sendWelcomeEmail("user@example.com", "Pedro", "Mi Tienda", "https://mitienda.com");
+
+    expect(mockResendSend).toHaveBeenCalledOnce();
+    const callArg = mockResendSend.mock.calls[0][0];
+    expect(callArg.to).toBe("user@example.com");
+    expect(callArg.subject).toBe("¡Bienvenido a Mi Tienda!");
+    expect(callArg.html).toContain("https://mitienda.com");
+  });
+
+  it("should send welcome email without storefront URL", async () => {
+    await sendWelcomeEmail("user@example.com", "Ana", "Tienda X");
+
+    expect(mockResendSend).toHaveBeenCalledOnce();
+    const callArg = mockResendSend.mock.calls[0][0];
+    expect(callArg.subject).toBe("¡Bienvenido a Tienda X!");
+    expect(callArg.html).not.toContain("href=");
+  });
+
+  it("should not throw when sending fails", async () => {
+    mockResendSend.mockRejectedValueOnce(new Error("network error"));
+
+    await expect(
+      sendWelcomeEmail("user@example.com", "Luis", "Tienda"),
+    ).resolves.toBeUndefined();
+  });
+});

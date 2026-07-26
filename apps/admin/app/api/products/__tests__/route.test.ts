@@ -1,127 +1,191 @@
-import { describe, it, expect } from "vitest";
-import { NextResponse } from "next/server";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { db, withTenantContext } from "@repo/db";
+import { makeTxMock, session } from "@repo/test-utils";
+
+vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
+
+vi.mock("@/lib/logger", () => ({
+  createLogger: vi.fn().mockReturnValue({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
+vi.mock("@repo/storage", () => ({
+  uploadImage: vi.fn().mockResolvedValue("https://cdn.example.com/img.png"),
+}));
+
+vi.mock("@repo/db", async () => {
+  const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
+  return {
+    ...actual,
+    withTenantContext: vi.fn(),
+    db: {
+      select: vi.fn(),
+      insert: vi.fn(),
+      transaction: vi.fn(),
+    },
+  };
+});
+
+import { auth } from "@/lib/auth";
+import { GET, POST } from "../route";
+
+function makeFormData(data: Record<string, string>): FormData {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(data)) {
+    fd.append(key, value);
+  }
+  return fd;
+}
+
+function mockReqForm(method: string, formData: FormData) {
+  return {
+    json: async () => ({}),
+    text: async () => "",
+    formData: async () => formData,
+    headers: new Headers({ "content-type": "multipart/form-data" }),
+    nextUrl: new URL("http://localhost"),
+    cookies: { get: vi.fn() },
+    method,
+  } as any;
+}
+
+function dbSelectChain(value: any[], terminal: "limit" | "where" = "limit") {
+  const chain = {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockImplementation(() =>
+      terminal === "where" ? Promise.resolve(value) : chain
+    ),
+    limit: vi.fn().mockResolvedValue(value),
+    orderBy: vi.fn().mockResolvedValue(value),
+    leftJoin: vi.fn().mockReturnThis(),
+  };
+  return chain as any;
+}
+
+const NOW = new Date("2026-01-01T00:00:00.000Z");
+const baseProduct = {
+  id: "prod-1",
+  tenantId: "tenant-1",
+  categoryId: null,
+  name: "Producto Test",
+  slug: "producto-test",
+  description: null,
+  imageUrl: null,
+  status: "draft",
+  metadata: {},
+  createdAt: NOW,
+  updatedAt: NOW,
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("GET /api/products", () => {
-  describe("Authentication & Authorization", () => {
-    it("should return 401 when no session", async () => {
-      const session = null;
-      const handler = async (s: typeof session) => {
-        if (!s) {
-          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+  it("should return 401 when no session", async () => {
+    vi.mocked(auth).mockResolvedValue(null);
 
-      const response = await handler(session);
-      expect(response.status).toBe(401);
-    });
+    const response = await GET();
+    const body = await response.json();
 
-    it("should filter products by tenantId in query", () => {
-      const tenantId = "tenant-123";
-      expect(tenantId).toBeDefined();
-    });
+    expect(response.status).toBe(401);
+    expect(body.error).toBe("No autorizado");
   });
 
-  describe("Product List Response", () => {
-    it("should return products with variant data", () => {
-      const mockProduct = {
-        id: "prod-1",
-        name: "Product 1",
-        slug: "product-1",
-        variantId: "var-1",
-        variantPrice: 1999,
-        variantStock: 10,
-      };
+  it("should return products list with images for authenticated tenant", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(makeTxMock({
+        select: [
+          { data: [baseProduct] },
+          { data: [{ id: "img-1", productId: "prod-1", url: "https://cdn.example.com/img.png", position: 0 }], terminal: "orderBy" },
+        ],
+      }))
+    );
 
-      expect(mockProduct).toHaveProperty("variantId");
-      expect(mockProduct).toHaveProperty("variantPrice");
-    });
+    const response = await GET();
+    const body = await response.json();
 
-    it("should use cents (integer) for prices", () => {
-      const price = 1999;
-      expect(Number.isInteger(price)).toBe(true);
-      expect(price).toBeGreaterThan(0);
-    });
+    expect(response.status).toBe(200);
+    expect(body.products).toHaveLength(1);
+    expect(body.products[0].name).toBe("Producto Test");
+    expect(body.products[0].images).toHaveLength(1);
+  });
 
-    it("should return stock as integer", () => {
-      const stock = 10;
-      expect(Number.isInteger(stock)).toBe(true);
-    });
+  it("should return empty list when no products exist", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(makeTxMock({
+        select: [
+          { data: [] },
+          { data: [], terminal: "orderBy" },
+        ],
+      }))
+    );
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.products).toHaveLength(0);
   });
 });
 
-describe("POST /api/products - Product Creation", () => {
-  describe("Validation", () => {
-    it("should require name", async () => {
-      const body = { name: undefined };
-      const handler = async (b: typeof body) => {
-        if (!b.name) {
-          return NextResponse.json({ error: "Name is required" }, { status: 400 });
-        }
-        return NextResponse.json({ success: true });
-      };
+describe("POST /api/products", () => {
+  it("should return 401 when no session", async () => {
+    vi.mocked(auth).mockResolvedValue(null);
 
-      const response = await handler(body);
-      expect(response.status).toBe(400);
-    });
+    const fd = makeFormData({ name: "Test", slug: "test", price: "1999", stock: "10" });
+    const response = await POST(mockReqForm("POST", fd));
+    const body = await response.json();
 
-    it("should require slug", async () => {
-      const body = { name: "Test", slug: undefined };
-      const handler = async (b: typeof body) => {
-        if (!b.slug) {
-          return NextResponse.json({ error: "Slug is required" }, { status: 400 });
-        }
-        return NextResponse.json({ success: true });
-      };
-
-      const response = await handler(body);
-      expect(response.status).toBe(400);
-    });
-
-    it("should require price greater than 0", async () => {
-      const handler = async (price: number) => {
-        if (!price || price <= 0) {
-          return NextResponse.json({ error: "Price must be greater than 0" }, { status: 400 });
-        }
-        return NextResponse.json({ success: true });
-      };
-
-      const response = await handler(0);
-      expect(response.status).toBe(400);
-    });
-
-    it("should require stock >= 0", async () => {
-      const handler = async (stock: number) => {
-        if (stock < 0) {
-          return NextResponse.json({ error: "Stock cannot be negative" }, { status: 400 });
-        }
-        return NextResponse.json({ success: true });
-      };
-
-      const response = await handler(-1);
-      expect(response.status).toBe(400);
-    });
+    expect(response.status).toBe(401);
+    expect(body.error).toBe("No autorizado");
   });
 
-  describe("Price in Cents", () => {
-    it("should handle price in cents (integer)", () => {
-      const priceInCents = 1999;
-      expect(Number.isInteger(priceInCents)).toBe(true);
-      expect(priceInCents / 100).toBe(19.99);
-    });
+  it("should return 400 when required fields missing", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+
+    const response = await POST(mockReqForm("POST", new FormData()));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Validación fallida");
   });
 
-  describe("SKU Generation", () => {
-    it("should generate SKU from slug", () => {
-      const slug = "my-product-name";
-      const sku = slug.replace(/\s+/g, "-").toLowerCase();
-      expect(sku).toBe("my-product-name");
+  it("should return 409 when slug already exists", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    vi.mocked(db.select).mockReturnValueOnce(dbSelectChain([baseProduct]));
+
+    const fd = makeFormData({ name: "Producto Test", slug: "producto-test", price: "1999", stock: "10" });
+    const response = await POST(mockReqForm("POST", fd));
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("Ya existe un producto con ese slug");
+  });
+
+  it("should create product successfully", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    vi.mocked(db.select)
+      .mockReturnValueOnce(dbSelectChain([]))
+      .mockReturnValueOnce(dbSelectChain([], "where"));
+    vi.mocked(db.transaction).mockImplementation(async (cb: any) => {
+      const tx = makeTxMock();
+      tx.returning.mockResolvedValue([{ id: "new-prod", tenantId: "tenant-1", name: "Nuevo Producto", slug: "nuevo-producto", description: null, imageUrl: null, status: "draft", categoryId: null, metadata: {}, createdAt: NOW, updatedAt: NOW }]);
+      return cb(tx);
     });
 
-    it("should normalize slug to lowercase", () => {
-      const slug = "My-Product";
-      const normalized = slug.toLowerCase().replace(/\s+/g, "-");
-      expect(normalized).toBe("my-product");
-    });
+    const fd = makeFormData({ name: "Nuevo Producto", slug: "nuevo-producto", price: "2999", stock: "5" });
+    const response = await POST(mockReqForm("POST", fd));
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body.product).toBeDefined();
+    expect(body.product.name).toBe("Nuevo Producto");
   });
 });
