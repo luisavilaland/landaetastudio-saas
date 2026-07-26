@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.hoisted(() => {
+  process.env.RESEND_API_KEY = "test-key-for-ci";
+  process.env.RESEND_FROM = "test@example.com";
+});
+
 const mockResendSend = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 const mockNodemailerSend = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 
