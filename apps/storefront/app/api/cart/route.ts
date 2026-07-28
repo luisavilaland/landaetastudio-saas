@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { redisClient } from "@/lib/redis";
-import { db, dbProducts, dbProductVariants, dbProductImages, withTenantContext } from "@repo/db";
+import { dbProducts, dbProductVariants, dbProductImages, withTenantContext } from "@repo/db";
 import { inArray, eq, and } from "drizzle-orm";
 import { addCartItemSchema, updateCartItemSchema, deleteCartItemSchema } from "@repo/validation";
 import { createLogger } from "@/lib/logger";
@@ -37,16 +37,14 @@ async function saveCart(sessionId: string, cart: Cart): Promise<void> {
   await redisClient.setex(`cart:${sessionId}`, CART_TTL, JSON.stringify(cart));
 }
 
-async function getEnrichedItems(cart: Cart, variants: any[], tenantId: string, tx?: any) {
+async function getEnrichedItems(cart: Cart, variants: any[], tenantId: string, tx: any) {
   if (cart.items.length === 0) return [];
-
-  const queryDb = tx || db;
 
   const variantMap = new Map(variants.map((v) => [v.variantId, v]));
 
   const productIds = variants.map((v) => v.productId);
   const images = productIds.length > 0
-    ? await queryDb
+    ? await tx
         .select({
           productId: dbProductImages.productId,
           url: dbProductImages.url,

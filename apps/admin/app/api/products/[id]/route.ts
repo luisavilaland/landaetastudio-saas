@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Product, ProductVariant } from "@repo/db";
 import { db, dbProducts, dbProductVariants, dbProductImages, dbOrderItems, dbCategories, withTenantContext } from "@repo/db";
 import { auth } from "@/lib/auth";
 import { and, eq, inArray } from "drizzle-orm";
@@ -59,14 +60,24 @@ export async function GET(
   }
 }
 
+interface ReadPhaseResult {
+  ok: true;
+  product: Product;
+  existingVariants: ProductVariant[];
+  normalizedSlug: string | undefined;
+  slugChanged: boolean;
+  now: Date;
+  safeSlug: string;
+  currentImageUrl: string | null;
+  baseUpdateFields: Record<string, unknown>;
+  variantFields: Record<string, unknown>;
+  variantOperation: "update" | "insert" | "none";
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Params }
 ) {
-  let updateProductFields: Record<string, unknown> = {};
-  let variantOperation: 'update' | 'insert' | 'none' = 'none';
-  let variantFields: Record<string, unknown> = {};
-  
   try {
     const session = await auth();
 
@@ -132,7 +143,8 @@ export async function PUT(
 
     const { price: validPrice, stock: validStock } = validation.data;
 
-    return await withTenantContext(tenantId, async (tx) => {
+    // ── Phase 1: Read + validate (inside withTenantContext) ──
+    const readResult = await withTenantContext(tenantId, async (tx) => {
       const product = await tx
         .select()
         .from(dbProducts)
@@ -140,7 +152,7 @@ export async function PUT(
         .limit(1);
 
       if (product.length === 0) {
-        return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+        return { ok: false as const, error: "Producto no encontrado", status: 404 };
       }
 
       if (categoryId !== undefined && categoryId !== null) {
@@ -150,72 +162,27 @@ export async function PUT(
           .where(and(eq(dbCategories.id, categoryId), eq(dbCategories.tenantId, tenantId)))
           .limit(1);
         if (category.length === 0) {
-          return NextResponse.json(
-            { error: "Categoría inválida" },
-            { status: 400 }
-          );
+          return { ok: false as const, error: "Categoría inválida", status: 400 };
         }
       }
 
       const normalizedSlug = slug ? normalizeSlug(slug) : undefined;
       const slugChanged = normalizedSlug && normalizedSlug !== product[0].slug;
-      
+
       if (slugChanged && normalizedSlug) {
         const existingSlug = await tx
           .select()
           .from(dbProducts)
-          .where(
-            and(
-              eq(dbProducts.slug, normalizedSlug),
-              eq(dbProducts.tenantId, tenantId)
-            )
-          )
+          .where(and(eq(dbProducts.slug, normalizedSlug), eq(dbProducts.tenantId, tenantId)))
           .limit(1);
-        
+
         if (existingSlug.length > 0) {
-          return NextResponse.json({ error: "Ya existe un producto con ese slug", field: "slug" }, { status: 409 });
+          return { ok: false as const, error: "Ya existe un producto con ese slug", field: "slug" as const, status: 409 };
         }
       }
 
       const now = new Date();
       const safeSlug = normalizedSlug ?? product[0].slug;
-
-      let imageUrl = product[0].imageUrl;
-      let newImageUrl = imageUrl;
-
-      if (image && image.size > 0) {
-        try {
-          if (product[0].imageUrl) {
-            await deleteImage(product[0].imageUrl);
-          }
-          const buffer = Buffer.from(await image.arrayBuffer());
-          const ext = image.name.split(".").pop() || "png";
-          newImageUrl = await uploadImage(buffer, `products/${Date.now()}-${safeSlug}.${ext}`, image.type);
-        } catch (uploadError) {
-          logger.error({ error: uploadError }, "[PUT Product] Error uploading image");
-          return NextResponse.json({ error: "Error al subir imagen" }, { status: 500 });
-        }
-      } else if (removeImage && product[0].imageUrl) {
-        try {
-          await deleteImage(product[0].imageUrl);
-          newImageUrl = null;
-        } catch (deleteError) {
-          logger.error({ error: deleteError }, "[PUT Product] Error deleting image");
-        }
-      }
-
-      const metadata = product[0].metadata;
-
-      updateProductFields = {
-        updatedAt: now,
-      };
-      if (name) updateProductFields.name = name;
-      if (slug) updateProductFields.slug = slug;
-      if (description !== undefined) updateProductFields.description = description;
-      if (status) updateProductFields.status = status;
-      if (categoryId !== undefined) updateProductFields.categoryId = categoryId || null;
-      if (metadata) updateProductFields.metadata = metadata;
-      if (newImageUrl !== imageUrl) updateProductFields.imageUrl = newImageUrl;
 
       const existingVariants = await tx
         .select()
@@ -233,23 +200,29 @@ export async function PUT(
             const existingSku = await tx
               .select()
               .from(dbProductVariants)
-              .where(
-                and(
-                  eq(dbProductVariants.sku, newSku),
-                  eq(dbProductVariants.tenantId, tenantId)
-                )
-              )
+              .where(and(eq(dbProductVariants.sku, newSku), eq(dbProductVariants.tenantId, tenantId)))
               .limit(1);
 
             if (existingSku.length > 0) {
-              return NextResponse.json(
-                { error: `El SKU generado "${newSku}" ya existe en otra variante del mismo producto`, field: "sku" },
-                { status: 409 }
-              );
+              return { ok: false as const, error: `El SKU generado "${newSku}" ya existe en otra variante del mismo producto`, field: "sku" as const, status: 409 };
             }
           }
         }
       }
+
+      const metadata = product[0].metadata;
+      const baseUpdateFields: Record<string, unknown> = {
+        updatedAt: now,
+      };
+      if (name) baseUpdateFields.name = name;
+      if (slug) baseUpdateFields.slug = slug;
+      if (description !== undefined) baseUpdateFields.description = description;
+      if (status) baseUpdateFields.status = status;
+      if (categoryId !== undefined) baseUpdateFields.categoryId = categoryId || null;
+      if (metadata) baseUpdateFields.metadata = metadata;
+
+      let variantOperation: "update" | "insert" | "none" = "none";
+      let variantFields: Record<string, unknown> = {};
 
       if (existingVariants.length > 0) {
         const currentVariant = existingVariants[0];
@@ -267,24 +240,19 @@ export async function PUT(
         }
 
         let skuFromBody = validation.data.sku || null;
-        
+
         if (skuFromBody && skuFromBody !== currentVariant.sku) {
           const newSku = skuFromBody.replace(/\s+/g, "-").toLowerCase();
           logger.debug({ from: currentVariant.sku, to: newSku }, "[PUT Product] SKU changing");
-          
+
           const existingSku = await tx
             .select()
             .from(dbProductVariants)
-            .where(
-              and(
-                eq(dbProductVariants.sku, newSku),
-                eq(dbProductVariants.tenantId, tenantId)
-              )
-            )
+            .where(and(eq(dbProductVariants.sku, newSku), eq(dbProductVariants.tenantId, tenantId)))
             .limit(1);
 
           if (existingSku.length > 0) {
-            return NextResponse.json({ error: "El SKU ya existe en otra variante", field: "sku" }, { status: 409 });
+            return { ok: false as const, error: "El SKU ya existe en otra variante", field: "sku" as const, status: 409 };
           }
 
           variantFields.sku = newSku;
@@ -302,28 +270,23 @@ export async function PUT(
         }
 
         if (Object.keys(variantFields).length > 1) {
-          variantOperation = 'update';
+          variantOperation = "update";
         }
       } else {
         logger.debug({ productId: id }, "[PUT Product] No variant found, creating new variant");
-        variantOperation = 'insert';
-        
+        variantOperation = "insert";
+
         const baseSlug = normalizedSlug ?? product[0].slug;
         const newSku = baseSlug.replace(/\s+/g, "-").toLowerCase();
-      
+
         const existingSku = await tx
           .select()
           .from(dbProductVariants)
-          .where(
-            and(
-              eq(dbProductVariants.sku, newSku),
-              eq(dbProductVariants.tenantId, tenantId)
-            )
-          )
+          .where(and(eq(dbProductVariants.sku, newSku), eq(dbProductVariants.tenantId, tenantId)))
           .limit(1);
 
         if (existingSku.length > 0) {
-          return NextResponse.json({ error: "El SKU ya existe", field: "sku" }, { status: 409 });
+          return { ok: false as const, error: "El SKU ya existe", field: "sku" as const, status: 409 };
         }
 
         variantFields = {
@@ -338,16 +301,78 @@ export async function PUT(
         };
       }
 
-      if (Object.keys(updateProductFields).length > 1) {
-        logger.debug({ fields: updateProductFields }, "[PUT Product] Updating product fields");
+      return {
+        ok: true as const,
+        product: product[0],
+        existingVariants,
+        normalizedSlug,
+        slugChanged: normalizedSlug ? normalizedSlug !== product[0].slug : false,
+        now,
+        safeSlug,
+        currentImageUrl: product[0].imageUrl,
+        baseUpdateFields,
+        variantFields,
+        variantOperation,
+      } satisfies ReadPhaseResult;
+    });
+
+    if (!readResult.ok) {
+      const err = readResult as { ok: false; error: string; status: number; field?: string };
+      return NextResponse.json({ error: err.error, field: err.field }, { status: err.status });
+    }
+
+    const {
+      product,
+      existingVariants,
+      slugChanged,
+      now,
+      safeSlug,
+      currentImageUrl,
+      baseUpdateFields,
+      variantFields,
+      variantOperation,
+    } = readResult as ReadPhaseResult;
+
+    // ── Phase 2: R2 operations (outside any transaction) ──
+    let newImageUrl = currentImageUrl;
+
+    if (image && image.size > 0) {
+      try {
+        if (product.imageUrl) {
+          await deleteImage(product.imageUrl);
+        }
+        const buffer = Buffer.from(await image.arrayBuffer());
+        const ext = image.name.split(".").pop() || "png";
+        newImageUrl = await uploadImage(buffer, `products/${Date.now()}-${safeSlug}.${ext}`, image.type);
+      } catch (uploadError) {
+        logger.error({ error: uploadError }, "[PUT Product] Error uploading image");
+        return NextResponse.json({ error: "Error al subir imagen" }, { status: 500 });
+      }
+    } else if (removeImage && product.imageUrl) {
+      try {
+        await deleteImage(product.imageUrl);
+        newImageUrl = null;
+      } catch (deleteError) {
+        logger.error({ error: deleteError }, "[PUT Product] Error deleting image");
+      }
+    }
+
+    if (newImageUrl !== currentImageUrl) {
+      baseUpdateFields.imageUrl = newImageUrl;
+    }
+
+    // ── Phase 3: Write (inside withTenantContext) ──
+    return await withTenantContext(tenantId, async (tx) => {
+      if (Object.keys(baseUpdateFields).length > 1) {
+        logger.debug({ fields: baseUpdateFields }, "[PUT Product] Updating product fields");
         await tx
           .update(dbProducts)
-          .set(updateProductFields)
+          .set(baseUpdateFields)
           .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)));
       }
 
       if (slugChanged && existingVariants.length > 0) {
-        const newSlug = slug ?? product[0].slug;
+        const newSlug = slug ?? product.slug;
         for (const variant of existingVariants) {
           const options = variant.options as Record<string, string> || {};
           const optionValues = Object.values(options);
@@ -360,13 +385,13 @@ export async function PUT(
               .where(and(eq(dbProductVariants.id, variant.id), eq(dbProductVariants.tenantId, tenantId)));
           }
         }
-      } else if (variantOperation === 'update') {
+      } else if (variantOperation === "update") {
         logger.debug({ fields: variantFields }, "[PUT Product] Updating variant");
         await tx
           .update(dbProductVariants)
           .set(variantFields)
           .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)));
-      } else if (variantOperation === 'insert') {
+      } else if (variantOperation === "insert") {
         logger.debug({ fields: variantFields }, "[PUT Product] Inserting new variant");
         await tx
           .insert(dbProductVariants)
@@ -391,12 +416,12 @@ export async function PUT(
       });
     });
   } catch (error) {
-    logger.error({ error, updateProductFields, variantFields, variantOperation }, "[PUT Product] Failed to update product");
-    
-    if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+    logger.error({ error }, "[PUT Product] Failed to update product");
+
+    if (error && typeof error === "object" && "code" in error && error.code === "23505") {
       return NextResponse.json({ error: "El SKU ya existe en otra variante", field: "sku" }, { status: 409 });
     }
-    
+
     return NextResponse.json({ error: "Failed to update product", details: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
