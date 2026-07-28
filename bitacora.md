@@ -541,3 +541,21 @@
 - **Hallazgos:** `vi.fn().mockImplementation(() => ({}))` no funciona con `new` — usar `function()` en lugar de arrow. `dashboardQuerySchema.parse({})` retorna `{}` (opcionales ausentes), no con `null`s.
 - **Plan original completado al 100% — todos los items de Grupo 1, 2 y 3.**
 - **Verificación final:** lint ✅ | typecheck 9/9 ✅ | build 3/3 ✅ | **378/378 tests, 47/47 test files** (+57 tests, +5 files vs baseline anterior)
+
+---
+
+## 2026-07-28 — RLS Coverage Fix: withTenantContext en 6 archivos + tests
+
+- **Branch:** `feat/coverage-ab` (Paseo worktree, continuado)
+- **Contexto:** Auditoría profunda reveló que 6 archivos usaban `db.*` directo en tablas RLS sin `withTenantContext`. RLS con `missing_ok=true` (NULL) bloquea TODAS las filas → storefront completamente roto en `develop`. Sin tráfico real, sin explotación cross-tenant.
+- **Fase 1 (categories.ts):** `getCategoriesForTenant` envuelto en `withTenantContext`.
+- **Fase 2 (products.ts):** `getProducts`, `getProductBySlug` envueltos. L173/L179: agregado `eq(dbProductVariants.tenantId, tenantId)` y `eq(dbProductImages.tenantId, tenantId)` — no depender solo de RLS.
+- **Fase 3 (cart.ts):** `getCart(sessionId, tenantId)`, `removeFromCart(sessionId, variantId, tenantId)` — nuevo parámetro `tenantId`, DB envuelto. Caller `cart/page.tsx` resuelve tenantId desde header `x-tenant-slug` + lookup `dbTenants`.
+- **Fase 4 (admin/products/[id]/route.ts):** GET + PUT envueltos. PUT: `db.transaction` propio eliminado (redundante con `withTenantContext`). R2 uploads/deletes quedan dentro del callback.
+- **Fase 5 (storefront/cart/route.ts):** POST, PUT, DELETE, GET envueltos. `getEnrichedItems` recibe `tx` opcional (tipo `any` para compatibilidad DbLike vs PostgresJsDatabase).
+- **Fase 6 (tests):** 3 test files migrados (`cart.test.ts`, `products.test.ts`, `categories.test.ts`) de mock `db.select` a `withTenantContext` + `makeTxMock`. Además `admin/products/[id]/route.test.ts` (GET/PUT) y `storefront/cart/route.test.ts` (7 tests).
+- **Hallazgos:**
+  - `makeTxMock` no tiene `innerJoin` — usar `createQuery` local como fallback para cadenas con join
+  - `withTenantContext` ya mockeado en DELETE tests desde PR3; GET/PUT no
+  - `removeFromCart` sin callers de producción — cambio de firma seguro
+- **Verificación final:** lint 6/6 ✅ | typecheck 9/9 ✅ | tests 47/47, **379/379** (+1 test vs baseline: tenantId vacío en cart.test.ts)

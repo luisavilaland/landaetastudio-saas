@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { redisClient } from "@/lib/redis";
-import { db, dbProducts, dbProductVariants, dbProductImages } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbProductImages, withTenantContext } from "@repo/db";
 import { inArray, eq, and } from "drizzle-orm";
 import { addCartItemSchema, updateCartItemSchema, deleteCartItemSchema } from "@repo/validation";
 import { createLogger } from "@/lib/logger";
@@ -37,14 +37,16 @@ async function saveCart(sessionId: string, cart: Cart): Promise<void> {
   await redisClient.setex(`cart:${sessionId}`, CART_TTL, JSON.stringify(cart));
 }
 
-async function getEnrichedItems(cart: Cart, variants: any[], tenantId: string) {
+async function getEnrichedItems(cart: Cart, variants: any[], tenantId: string, tx?: any) {
   if (cart.items.length === 0) return [];
+
+  const queryDb = tx || db;
 
   const variantMap = new Map(variants.map((v) => [v.variantId, v]));
 
   const productIds = variants.map((v) => v.productId);
   const images = productIds.length > 0
-    ? await db
+    ? await queryDb
         .select({
           productId: dbProductImages.productId,
           url: dbProductImages.url,
@@ -59,7 +61,7 @@ async function getEnrichedItems(cart: Cart, variants: any[], tenantId: string) {
         .orderBy(dbProductImages.position)
     : [];
 
-  const firstImageByProduct = images.reduce((acc, img) => {
+  const firstImageByProduct = images.reduce((acc: Record<string, string>, img: { productId: string; url: string }) => {
     if (!acc[img.productId]) acc[img.productId] = img.url;
     return acc;
   }, {} as Record<string, string>);
@@ -124,51 +126,53 @@ export async function POST(request: NextRequest) {
 
     const { variantId, quantity } = validation.data;
 
-    const variant = await db
-      .select()
-      .from(dbProductVariants)
-      .where(
-        and(
-          eq(dbProductVariants.id, variantId),
-          eq(dbProductVariants.tenantId, tenantId)
+    return await withTenantContext(tenantId, async (tx) => {
+      const variant = await tx
+        .select()
+        .from(dbProductVariants)
+        .where(
+          and(
+            eq(dbProductVariants.id, variantId),
+            eq(dbProductVariants.tenantId, tenantId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (variant.length === 0) {
-      return NextResponse.json(
-        { error: "Variante no encontrada" },
-        { status: 404 }
+      if (variant.length === 0) {
+        return NextResponse.json(
+          { error: "Variante no encontrada" },
+          { status: 404 }
+        );
+      }
+
+      const variantStock = variant[0].stock ?? 0;
+      if (variantStock < quantity) {
+        return NextResponse.json(
+          { error: "Stock insuficiente" },
+          { status: 400 }
+        );
+      }
+
+      const cart = await getCart(sessionId);
+
+      const existingIndex = cart.items.findIndex(
+        (item) => item.variantId === variantId
       );
-    }
 
-    const variantStock = variant[0].stock ?? 0;
-    if (variantStock < quantity) {
-      return NextResponse.json(
-        { error: "Stock insuficiente" },
-        { status: 400 }
-      );
-    }
+      if (existingIndex >= 0) {
+        cart.items[existingIndex].quantity += quantity;
+      } else {
+        cart.items.push({
+          variantId,
+          quantity,
+          addedAt: new Date().toISOString(),
+        });
+      }
 
-    const cart = await getCart(sessionId);
+      await saveCart(sessionId, cart);
 
-    const existingIndex = cart.items.findIndex(
-      (item) => item.variantId === variantId
-    );
-
-    if (existingIndex >= 0) {
-      cart.items[existingIndex].quantity += quantity;
-    } else {
-      cart.items.push({
-        variantId,
-        quantity,
-        addedAt: new Date().toISOString(),
-      });
-    }
-
-    await saveCart(sessionId, cart);
-
-    return NextResponse.json({ cart, success: true });
+      return NextResponse.json({ cart, success: true });
+    });
   } catch (error) {
     logger.error({ error }, "Cart API error");
     return NextResponse.json(
@@ -233,32 +237,35 @@ export async function PUT(request: NextRequest) {
     await saveCart(sessionId, cart);
 
     const variantIds = cart.items.map((item) => item.variantId);
-    const variants = variantIds.length > 0
-      ? await db
-          .select({
-            variantId: dbProductVariants.id,
-            variantPrice: dbProductVariants.price,
-            variantStock: dbProductVariants.stock,
-            variantSku: dbProductVariants.sku,
-            variantOptions: dbProductVariants.options,
-            productId: dbProducts.id,
-            productName: dbProducts.name,
-            productSlug: dbProducts.slug,
-            productImage: dbProducts.imageUrl,
-          })
-          .from(dbProductVariants)
-          .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
-          .where(
-            and(
-              inArray(dbProductVariants.id, variantIds),
-              eq(dbProductVariants.tenantId, tenantId)
-            )
-          )
+
+    const enrichedItems = variantIds.length > 0
+      ? await withTenantContext(tenantId, async (tx) => {
+          const variants = await tx
+            .select({
+              variantId: dbProductVariants.id,
+              variantPrice: dbProductVariants.price,
+              variantStock: dbProductVariants.stock,
+              variantSku: dbProductVariants.sku,
+              variantOptions: dbProductVariants.options,
+              productId: dbProducts.id,
+              productName: dbProducts.name,
+              productSlug: dbProducts.slug,
+              productImage: dbProducts.imageUrl,
+            })
+            .from(dbProductVariants)
+            .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
+            .where(
+              and(
+                inArray(dbProductVariants.id, variantIds),
+                eq(dbProductVariants.tenantId, tenantId)
+              )
+            );
+
+          return await getEnrichedItems(cart, variants, tenantId, tx);
+        })
       : [];
 
-    const items = await getEnrichedItems(cart, variants, tenantId);
-
-    return NextResponse.json({ items });
+    return NextResponse.json({ items: enrichedItems });
   } catch (error) {
     logger.error({ error }, "Cart API PUT error");
     return NextResponse.json(
@@ -321,32 +328,35 @@ export async function DELETE(request: NextRequest) {
     await saveCart(sessionId, cart);
 
     const variantIds = cart.items.map((item) => item.variantId);
-    const variants = variantIds.length > 0
-      ? await db
-          .select({
-            variantId: dbProductVariants.id,
-            variantPrice: dbProductVariants.price,
-            variantStock: dbProductVariants.stock,
-            variantSku: dbProductVariants.sku,
-            variantOptions: dbProductVariants.options,
-            productId: dbProducts.id,
-            productName: dbProducts.name,
-            productSlug: dbProducts.slug,
-            productImage: dbProducts.imageUrl,
-          })
-          .from(dbProductVariants)
-          .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
-          .where(
-            and(
-              inArray(dbProductVariants.id, variantIds),
-              eq(dbProductVariants.tenantId, tenantId)
-            )
-          )
+
+    const enrichedItems = variantIds.length > 0
+      ? await withTenantContext(tenantId, async (tx) => {
+          const variants = await tx
+            .select({
+              variantId: dbProductVariants.id,
+              variantPrice: dbProductVariants.price,
+              variantStock: dbProductVariants.stock,
+              variantSku: dbProductVariants.sku,
+              variantOptions: dbProductVariants.options,
+              productId: dbProducts.id,
+              productName: dbProducts.name,
+              productSlug: dbProducts.slug,
+              productImage: dbProducts.imageUrl,
+            })
+            .from(dbProductVariants)
+            .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
+            .where(
+              and(
+                inArray(dbProductVariants.id, variantIds),
+                eq(dbProductVariants.tenantId, tenantId)
+              )
+            );
+
+          return await getEnrichedItems(cart, variants, tenantId, tx);
+        })
       : [];
 
-    const items = await getEnrichedItems(cart, variants, tenantId);
-
-    return NextResponse.json({ items });
+    return NextResponse.json({ items: enrichedItems });
   } catch (error) {
     logger.error({ error }, "Cart API DELETE error");
     return NextResponse.json(
@@ -381,77 +391,79 @@ export async function GET() {
 
     const variantIds = cart.items.map((item) => item.variantId);
 
-    const variants = await db
-      .select({
-        variantId: dbProductVariants.id,
-        variantPrice: dbProductVariants.price,
-        variantStock: dbProductVariants.stock,
-        variantSku: dbProductVariants.sku,
-        variantOptions: dbProductVariants.options,
-        productId: dbProducts.id,
-        productName: dbProducts.name,
-        productSlug: dbProducts.slug,
-        productImage: dbProducts.imageUrl,
-      })
-      .from(dbProductVariants)
-      .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
-      .where(
-        variantIds.length > 0
-          ? and(
-              inArray(dbProductVariants.id, variantIds),
-              eq(dbProductVariants.tenantId, tenantId)
+    const itemsWithProduct = await withTenantContext(tenantId, async (tx) => {
+      const variants = await tx
+        .select({
+          variantId: dbProductVariants.id,
+          variantPrice: dbProductVariants.price,
+          variantStock: dbProductVariants.stock,
+          variantSku: dbProductVariants.sku,
+          variantOptions: dbProductVariants.options,
+          productId: dbProducts.id,
+          productName: dbProducts.name,
+          productSlug: dbProducts.slug,
+          productImage: dbProducts.imageUrl,
+        })
+        .from(dbProductVariants)
+        .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
+        .where(
+          variantIds.length > 0
+            ? and(
+                inArray(dbProductVariants.id, variantIds),
+                eq(dbProductVariants.tenantId, tenantId)
+              )
+            : undefined
+        );
+
+      const productIds = variants.map((v) => v.productId);
+      const images = productIds.length > 0
+        ? await tx
+            .select({
+              productId: dbProductImages.productId,
+              url: dbProductImages.url,
+            })
+            .from(dbProductImages)
+            .where(
+              and(
+                inArray(dbProductImages.productId, productIds),
+                eq(dbProductImages.tenantId, tenantId)
+              )
             )
-          : undefined
-      );
+            .orderBy(dbProductImages.position)
+        : [];
 
-    const productIds = variants.map((v) => v.productId);
-    const images = productIds.length > 0
-      ? await db
-          .select({
-            productId: dbProductImages.productId,
-            url: dbProductImages.url,
-          })
-          .from(dbProductImages)
-          .where(
-            and(
-              inArray(dbProductImages.productId, productIds),
-              eq(dbProductImages.tenantId, tenantId)
-            )
-          )
-          .orderBy(dbProductImages.position)
-      : [];
+      const firstImageByProduct = images.reduce((acc: Record<string, string>, img: { productId: string; url: string }) => {
+        if (!acc[img.productId]) acc[img.productId] = img.url;
+        return acc;
+      }, {} as Record<string, string>);
 
-    const firstImageByProduct = images.reduce((acc, img) => {
-      if (!acc[img.productId]) acc[img.productId] = img.url;
-      return acc;
-    }, {} as Record<string, string>);
+      const variantMap = new Map(variants.map((v) => [v.variantId, v]));
 
-    const variantMap = new Map(variants.map((v) => [v.variantId, v]));
+      return cart.items
+        .map((item) => {
+          const variant = variantMap.get(item.variantId);
+          if (!variant) return null;
 
-    const itemsWithProduct = cart.items
-      .map((item) => {
-        const variant = variantMap.get(item.variantId);
-        if (!variant) return null;
+          const firstImage = firstImageByProduct[variant.productId];
 
-        const firstImage = firstImageByProduct[variant.productId];
-
-        return {
-          ...item,
-          product: {
-            id: variant.productId,
-            name: variant.productName,
-            slug: variant.productSlug,
-            imageUrl: firstImage || variant.productImage,
-            price: variant.variantPrice,
-            stock: variant.variantStock,
-          },
-          variant: {
-            sku: variant.variantSku,
-            options: variant.variantOptions || {},
-          },
-        };
-      })
-      .filter(Boolean);
+          return {
+            ...item,
+            product: {
+              id: variant.productId,
+              name: variant.productName,
+              slug: variant.productSlug,
+              imageUrl: firstImage || variant.productImage,
+              price: variant.variantPrice,
+              stock: variant.variantStock,
+            },
+            variant: {
+              sku: variant.variantSku,
+              options: variant.variantOptions || {},
+            },
+          };
+        })
+        .filter(Boolean);
+    });
 
     return NextResponse.json({ items: itemsWithProduct });
   } catch (error) {

@@ -24,32 +24,34 @@ export async function GET(
     const { id } = await params;
     const tenantId = session.user?.tenantId as string;
 
-    const product = await db
-      .select()
-      .from(dbProducts)
-      .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
-      .limit(1);
+    return await withTenantContext(tenantId, async (tx) => {
+      const product = await tx
+        .select()
+        .from(dbProducts)
+        .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
+        .limit(1);
 
-    if (product.length === 0) {
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
-    }
+      if (product.length === 0) {
+        return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+      }
 
-    const variant = await db
-      .select()
-      .from(dbProductVariants)
-      .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)))
-      .limit(1);
+      const variant = await tx
+        .select()
+        .from(dbProductVariants)
+        .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)))
+        .limit(1);
 
-    const images = await db
-      .select()
-      .from(dbProductImages)
-      .where(and(eq(dbProductImages.productId, id), eq(dbProductImages.tenantId, tenantId)))
-      .orderBy(dbProductImages.position);
+      const images = await tx
+        .select()
+        .from(dbProductImages)
+        .where(and(eq(dbProductImages.productId, id), eq(dbProductImages.tenantId, tenantId)))
+        .orderBy(dbProductImages.position);
 
-    return NextResponse.json({
-      ...product[0],
-      variant: variant[0] || null,
-      images,
+      return NextResponse.json({
+        ...product[0],
+        variant: variant[0] || null,
+        images,
+      });
     });
   } catch (error) {
     logger.error({ error }, "Error getting product");
@@ -74,16 +76,6 @@ export async function PUT(
 
     const { id } = await params;
     const tenantId = session.user?.tenantId as string;
-
-    const product = await db
-      .select()
-      .from(dbProducts)
-      .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
-      .limit(1);
-
-    if (product.length === 0) {
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
-    }
 
     const contentType = request.headers.get("content-type") || "";
 
@@ -140,97 +132,147 @@ export async function PUT(
 
     const { price: validPrice, stock: validStock } = validation.data;
 
-    if (categoryId !== undefined && categoryId !== null) {
-      const category = await db
-        .select()
-        .from(dbCategories)
-        .where(and(eq(dbCategories.id, categoryId), eq(dbCategories.tenantId, tenantId)))
-        .limit(1);
-      if (category.length === 0) {
-        return NextResponse.json(
-          { error: "Categoría inválida" },
-          { status: 400 }
-        );
-      }
-    }
-
-    const normalizedSlug = slug ? normalizeSlug(slug) : undefined;
-    const slugChanged = normalizedSlug && normalizedSlug !== product[0].slug;
-    
-    if (slugChanged && normalizedSlug) {
-      const existingSlug = await db
+    return await withTenantContext(tenantId, async (tx) => {
+      const product = await tx
         .select()
         .from(dbProducts)
-        .where(
-          and(
-            eq(dbProducts.slug, normalizedSlug),
-            eq(dbProducts.tenantId, tenantId)
-          )
-        )
+        .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
         .limit(1);
-      
-      if (existingSlug.length > 0) {
-        return NextResponse.json({ error: "Ya existe un producto con ese slug", field: "slug" }, { status: 409 });
+
+      if (product.length === 0) {
+        return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
       }
-    }
 
-    const now = new Date();
-    const safeSlug = normalizedSlug ?? product[0].slug;
-
-    let imageUrl = product[0].imageUrl;
-    let newImageUrl = imageUrl;
-
-    if (image && image.size > 0) {
-      try {
-        if (product[0].imageUrl) {
-          await deleteImage(product[0].imageUrl);
+      if (categoryId !== undefined && categoryId !== null) {
+        const category = await tx
+          .select()
+          .from(dbCategories)
+          .where(and(eq(dbCategories.id, categoryId), eq(dbCategories.tenantId, tenantId)))
+          .limit(1);
+        if (category.length === 0) {
+          return NextResponse.json(
+            { error: "Categoría inválida" },
+            { status: 400 }
+          );
         }
-        const buffer = Buffer.from(await image.arrayBuffer());
-        const ext = image.name.split(".").pop() || "png";
-        newImageUrl = await uploadImage(buffer, `products/${Date.now()}-${safeSlug}.${ext}`, image.type);
-      } catch (uploadError) {
-        logger.error({ error: uploadError }, "[PUT Product] Error uploading image");
-        return NextResponse.json({ error: "Error al subir imagen" }, { status: 500 });
       }
-    } else if (removeImage && product[0].imageUrl) {
-      try {
-        await deleteImage(product[0].imageUrl);
-        newImageUrl = null;
-      } catch (deleteError) {
-        logger.error({ error: deleteError }, "[PUT Product] Error deleting image");
+
+      const normalizedSlug = slug ? normalizeSlug(slug) : undefined;
+      const slugChanged = normalizedSlug && normalizedSlug !== product[0].slug;
+      
+      if (slugChanged && normalizedSlug) {
+        const existingSlug = await tx
+          .select()
+          .from(dbProducts)
+          .where(
+            and(
+              eq(dbProducts.slug, normalizedSlug),
+              eq(dbProducts.tenantId, tenantId)
+            )
+          )
+          .limit(1);
+        
+        if (existingSlug.length > 0) {
+          return NextResponse.json({ error: "Ya existe un producto con ese slug", field: "slug" }, { status: 409 });
+        }
       }
-    }
 
-    const metadata = product[0].metadata;
+      const now = new Date();
+      const safeSlug = normalizedSlug ?? product[0].slug;
 
-    updateProductFields = {
-      updatedAt: now,
-    };
-    if (name) updateProductFields.name = name;
-    if (slug) updateProductFields.slug = slug;
-    if (description !== undefined) updateProductFields.description = description;
-    if (status) updateProductFields.status = status;
-    if (categoryId !== undefined) updateProductFields.categoryId = categoryId || null;
-    if (metadata) updateProductFields.metadata = metadata;
-    if (newImageUrl !== imageUrl) updateProductFields.imageUrl = newImageUrl;
+      let imageUrl = product[0].imageUrl;
+      let newImageUrl = imageUrl;
 
-    // Get existing variants to check if SKU needs regeneration
-    const existingVariants = await db
-      .select()
-      .from(dbProductVariants)
-      .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)));
+      if (image && image.size > 0) {
+        try {
+          if (product[0].imageUrl) {
+            await deleteImage(product[0].imageUrl);
+          }
+          const buffer = Buffer.from(await image.arrayBuffer());
+          const ext = image.name.split(".").pop() || "png";
+          newImageUrl = await uploadImage(buffer, `products/${Date.now()}-${safeSlug}.${ext}`, image.type);
+        } catch (uploadError) {
+          logger.error({ error: uploadError }, "[PUT Product] Error uploading image");
+          return NextResponse.json({ error: "Error al subir imagen" }, { status: 500 });
+        }
+      } else if (removeImage && product[0].imageUrl) {
+        try {
+          await deleteImage(product[0].imageUrl);
+          newImageUrl = null;
+        } catch (deleteError) {
+          logger.error({ error: deleteError }, "[PUT Product] Error deleting image");
+        }
+      }
 
-    // If slug changed, regenerate SKU for all variants based on new slug
-    if (slugChanged && existingVariants.length > 0) {
-      const newSlug = normalizedSlug ?? product[0].slug;
-      for (const variant of existingVariants) {
-        const options = variant.options as Record<string, string> || {};
-        const optionValues = Object.values(options);
-        const newSku = `${newSlug}-${optionValues.join("-").toLowerCase()}`;
+      const metadata = product[0].metadata;
 
-        // Check if new SKU already exists for this tenant (in another variant)
-        if (newSku !== variant.sku) {
-          const existingSku = await db
+      updateProductFields = {
+        updatedAt: now,
+      };
+      if (name) updateProductFields.name = name;
+      if (slug) updateProductFields.slug = slug;
+      if (description !== undefined) updateProductFields.description = description;
+      if (status) updateProductFields.status = status;
+      if (categoryId !== undefined) updateProductFields.categoryId = categoryId || null;
+      if (metadata) updateProductFields.metadata = metadata;
+      if (newImageUrl !== imageUrl) updateProductFields.imageUrl = newImageUrl;
+
+      const existingVariants = await tx
+        .select()
+        .from(dbProductVariants)
+        .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)));
+
+      if (slugChanged && existingVariants.length > 0) {
+        const newSlug = normalizedSlug ?? product[0].slug;
+        for (const variant of existingVariants) {
+          const options = variant.options as Record<string, string> || {};
+          const optionValues = Object.values(options);
+          const newSku = `${newSlug}-${optionValues.join("-").toLowerCase()}`;
+
+          if (newSku !== variant.sku) {
+            const existingSku = await tx
+              .select()
+              .from(dbProductVariants)
+              .where(
+                and(
+                  eq(dbProductVariants.sku, newSku),
+                  eq(dbProductVariants.tenantId, tenantId)
+                )
+              )
+              .limit(1);
+
+            if (existingSku.length > 0) {
+              return NextResponse.json(
+                { error: `El SKU generado "${newSku}" ya existe en otra variante del mismo producto`, field: "sku" },
+                { status: 409 }
+              );
+            }
+          }
+        }
+      }
+
+      if (existingVariants.length > 0) {
+        const currentVariant = existingVariants[0];
+        variantFields = { updatedAt: now };
+
+        if (slugChanged) {
+          const newSlug = normalizedSlug ?? product[0].slug;
+          const options = currentVariant.options as Record<string, string> || {};
+          const optionValues = Object.values(options);
+          const newSku = `${newSlug}-${optionValues.join("-").toLowerCase()}`;
+
+          if (newSku !== currentVariant.sku) {
+            variantFields.sku = newSku;
+          }
+        }
+
+        let skuFromBody = validation.data.sku || null;
+        
+        if (skuFromBody && skuFromBody !== currentVariant.sku) {
+          const newSku = skuFromBody.replace(/\s+/g, "-").toLowerCase();
+          logger.debug({ from: currentVariant.sku, to: newSku }, "[PUT Product] SKU changing");
+          
+          const existingSku = await tx
             .select()
             .from(dbProductVariants)
             .where(
@@ -242,42 +284,34 @@ export async function PUT(
             .limit(1);
 
           if (existingSku.length > 0) {
-            return NextResponse.json(
-              { error: `El SKU generado "${newSku}" ya existe en otra variante del mismo producto`, field: "sku" },
-              { status: 409 }
-            );
+            return NextResponse.json({ error: "El SKU ya existe en otra variante", field: "sku" }, { status: 409 });
           }
-        }
-      }
-    }
 
-    // Determine if we need to update variant
-    if (existingVariants.length > 0) {
-      // Variant exists - UPDATE
-      const currentVariant = existingVariants[0];
-      variantFields = { updatedAt: now };
-
-      // Handle SKU regeneration if slug changed
-      if (slugChanged) {
-        const newSlug = normalizedSlug ?? product[0].slug;
-        const options = currentVariant.options as Record<string, string> || {};
-        const optionValues = Object.values(options);
-        const newSku = `${newSlug}-${optionValues.join("-").toLowerCase()}`;
-
-        if (newSku !== currentVariant.sku) {
           variantFields.sku = newSku;
+        } else if (skuFromBody && skuFromBody === currentVariant.sku) {
+          logger.debug({ sku: skuFromBody }, "[PUT Product] SKU unchanged, skipping update");
+        } else {
+          logger.debug({ sku: currentVariant.sku }, "[PUT Product] No SKU sent, keeping current");
         }
-      }
 
-      // Handle SKU from body: only update if explicitly sent and different from current
-      let skuFromBody = validation.data.sku || null;
-      
-      if (skuFromBody && skuFromBody !== currentVariant.sku) {
-        const newSku = skuFromBody.replace(/\s+/g, "-").toLowerCase();
-        logger.debug({ from: currentVariant.sku, to: newSku }, "[PUT Product] SKU changing");
+        if (validPrice !== undefined && validPrice !== currentVariant.price) {
+          variantFields.price = validPrice;
+        }
+        if (validStock !== undefined && validStock !== currentVariant.stock) {
+          variantFields.stock = validStock;
+        }
+
+        if (Object.keys(variantFields).length > 1) {
+          variantOperation = 'update';
+        }
+      } else {
+        logger.debug({ productId: id }, "[PUT Product] No variant found, creating new variant");
+        variantOperation = 'insert';
         
-        // Check if new SKU already exists for this tenant (in another variant)
-        const existingSku = await db
+        const baseSlug = normalizedSlug ?? product[0].slug;
+        const newSku = baseSlug.replace(/\s+/g, "-").toLowerCase();
+      
+        const existingSku = await tx
           .select()
           .from(dbProductVariants)
           .where(
@@ -289,66 +323,21 @@ export async function PUT(
           .limit(1);
 
         if (existingSku.length > 0) {
-          return NextResponse.json({ error: "El SKU ya existe en otra variante", field: "sku" }, { status: 409 });
+          return NextResponse.json({ error: "El SKU ya existe", field: "sku" }, { status: 409 });
         }
 
-        variantFields.sku = newSku;
-      } else if (skuFromBody && skuFromBody === currentVariant.sku) {
-        logger.debug({ sku: skuFromBody }, "[PUT Product] SKU unchanged, skipping update");
-      } else {
-        logger.debug({ sku: currentVariant.sku }, "[PUT Product] No SKU sent, keeping current");
+        variantFields = {
+          id: crypto.randomUUID(),
+          productId: id,
+          tenantId: tenantId,
+          sku: newSku,
+          price: validPrice || 0,
+          stock: validStock || 0,
+          createdAt: now,
+          updatedAt: now,
+        };
       }
 
-      // Only add price/stock if they actually changed
-      if (validPrice !== undefined && validPrice !== currentVariant.price) {
-        variantFields.price = validPrice;
-      }
-      if (validStock !== undefined && validStock !== currentVariant.stock) {
-        variantFields.stock = validStock;
-      }
-
-      // Only update if there are fields to update (besides updatedAt)
-      if (Object.keys(variantFields).length > 1) {
-        variantOperation = 'update';
-      }
-      } else {
-        // No variant exists - INSERT (rare case)
-        logger.debug({ productId: id }, "[PUT Product] No variant found, creating new variant");
-        variantOperation = 'insert';
-        
-        const baseSlug = normalizedSlug ?? product[0].slug;
-        const newSku = baseSlug.replace(/\s+/g, "-").toLowerCase();
-      
-      // Check SKU uniqueness for new variant
-      const existingSku = await db
-        .select()
-        .from(dbProductVariants)
-        .where(
-          and(
-            eq(dbProductVariants.sku, newSku),
-            eq(dbProductVariants.tenantId, tenantId)
-          )
-        )
-        .limit(1);
-
-      if (existingSku.length > 0) {
-        return NextResponse.json({ error: "El SKU ya existe", field: "sku" }, { status: 409 });
-      }
-
-      variantFields = {
-        id: crypto.randomUUID(),
-        productId: id,
-        tenantId: tenantId,
-        sku: newSku,
-        price: validPrice || 0,
-        stock: validStock || 0,
-        createdAt: now,
-        updatedAt: now,
-      };
-    }
-
-    await db.transaction(async (tx) => {
-      // Update product
       if (Object.keys(updateProductFields).length > 1) {
         logger.debug({ fields: updateProductFields }, "[PUT Product] Updating product fields");
         await tx
@@ -357,9 +346,7 @@ export async function PUT(
           .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)));
       }
 
-      // Handle variant operations
       if (slugChanged && existingVariants.length > 0) {
-        // Regenerate SKU for all variants when slug changes
         const newSlug = slug ?? product[0].slug;
         for (const variant of existingVariants) {
           const options = variant.options as Record<string, string> || {};
@@ -374,7 +361,6 @@ export async function PUT(
           }
         }
       } else if (variantOperation === 'update') {
-        // Update single variant fields (price, stock, etc.)
         logger.debug({ fields: variantFields }, "[PUT Product] Updating variant");
         await tx
           .update(dbProductVariants)
@@ -386,28 +372,27 @@ export async function PUT(
           .insert(dbProductVariants)
           .values(variantFields as any);
       }
-    });
 
-    const updatedProduct = await db
-      .select()
-      .from(dbProducts)
-      .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
-      .limit(1);
+      const updatedProduct = await tx
+        .select()
+        .from(dbProducts)
+        .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
+        .limit(1);
 
-    const variant = await db
-      .select()
-      .from(dbProductVariants)
-      .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)))
-      .limit(1);
+      const variant = await tx
+        .select()
+        .from(dbProductVariants)
+        .where(and(eq(dbProductVariants.productId, id), eq(dbProductVariants.tenantId, tenantId)))
+        .limit(1);
 
-    return NextResponse.json({
-      ...updatedProduct[0],
-      variant: variant[0] || null,
+      return NextResponse.json({
+        ...updatedProduct[0],
+        variant: variant[0] || null,
+      });
     });
   } catch (error) {
     logger.error({ error, updateProductFields, variantFields, variantOperation }, "[PUT Product] Failed to update product");
     
-    // Handle Postgres unique violation (duplicate SKU)
     if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
       return NextResponse.json({ error: "El SKU ya existe en otra variante", field: "sku" }, { status: 409 });
     }

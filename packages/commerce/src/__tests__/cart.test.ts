@@ -25,13 +25,16 @@ vi.mock("../redis", () => ({
   },
 }));
 
-const mockSelect = vi.hoisted(() => vi.fn());
+const mockTxSelect = vi.hoisted(() => vi.fn());
 const mockDbProducts = vi.hoisted(() => ({}));
 const mockDbProductVariants = vi.hoisted(() => ({}));
 const mockDbProductImages = vi.hoisted(() => ({}));
 
 vi.mock("@repo/db", () => ({
-  db: { select: mockSelect },
+  db: {},
+  withTenantContext: vi.fn(async (_tenantId: string, cb: (tx: any) => any) =>
+    cb({ select: mockTxSelect })
+  ),
   dbProducts: mockDbProducts,
   dbProductVariants: mockDbProductVariants,
   dbProductImages: mockDbProductImages,
@@ -39,13 +42,22 @@ vi.mock("@repo/db", () => ({
 
 import { getCart, removeFromCart } from "../cart";
 
+const tenantId = "tenant-123";
+
 describe("getCart", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("should return empty array when sessionId is empty", async () => {
-    const result = await getCart("");
+    const result = await getCart("", tenantId);
+
+    expect(result).toEqual([]);
+    expect(mockRedisGet).not.toHaveBeenCalled();
+  });
+
+  it("should return empty array when tenantId is empty", async () => {
+    const result = await getCart("session-1", "");
 
     expect(result).toEqual([]);
     expect(mockRedisGet).not.toHaveBeenCalled();
@@ -54,7 +66,7 @@ describe("getCart", () => {
   it("should return empty array when no cart data in redis", async () => {
     mockRedisGet.mockResolvedValue(null);
 
-    const result = await getCart("session-1");
+    const result = await getCart("session-1", tenantId);
 
     expect(result).toEqual([]);
   });
@@ -64,7 +76,7 @@ describe("getCart", () => {
       JSON.stringify({ items: [], updatedAt: new Date().toISOString() }),
     );
 
-    const result = await getCart("session-empty");
+    const result = await getCart("session-empty", tenantId);
 
     expect(result).toEqual([]);
   });
@@ -94,9 +106,9 @@ describe("getCart", () => {
       { productId: "p1", url: "images/1.jpg" },
     ]);
 
-    mockSelect.mockReturnValueOnce(variantChain).mockReturnValueOnce(imageChain);
+    mockTxSelect.mockReturnValueOnce(variantChain).mockReturnValueOnce(imageChain);
 
-    const result = await getCart("session-1");
+    const result = await getCart("session-1", tenantId);
 
     expect(result).toHaveLength(1);
     expect(result[0].variantId).toBe("v1");
@@ -132,9 +144,9 @@ describe("getCart", () => {
     ]);
     const imageChain = makeResolvableChain([]);
 
-    mockSelect.mockReturnValueOnce(variantChain).mockReturnValueOnce(imageChain);
+    mockTxSelect.mockReturnValueOnce(variantChain).mockReturnValueOnce(imageChain);
 
-    const result = await getCart("session-1");
+    const result = await getCart("session-1", tenantId);
 
     expect(result).toHaveLength(1);
     expect(result[0].product?.name).toBe("Solo existente");
@@ -172,9 +184,9 @@ describe("removeFromCart", () => {
     ]);
     const imageChain = makeResolvableChain([]);
 
-    mockSelect.mockReturnValueOnce(variantChain).mockReturnValueOnce(imageChain);
+    mockTxSelect.mockReturnValueOnce(variantChain).mockReturnValueOnce(imageChain);
 
-    const result = await removeFromCart("session-1", "v2");
+    const result = await removeFromCart("session-1", "v2", tenantId);
 
     expect(result).toHaveLength(1);
     expect(result[0].variantId).toBe("v1");
@@ -190,7 +202,7 @@ describe("removeFromCart", () => {
 
     mockRedisDel.mockResolvedValue(1);
 
-    const result = await removeFromCart("session-1", "v1");
+    const result = await removeFromCart("session-1", "v1", tenantId);
 
     expect(result).toEqual([]);
     expect(mockRedisDel).toHaveBeenCalledWith("cart:session-1");
@@ -198,7 +210,7 @@ describe("removeFromCart", () => {
   });
 
   it("should return empty array when sessionId is empty", async () => {
-    const result = await removeFromCart("", "v1");
+    const result = await removeFromCart("", "v1", tenantId);
 
     expect(result).toEqual([]);
   });
@@ -206,7 +218,7 @@ describe("removeFromCart", () => {
   it("should return empty array when cart does not exist", async () => {
     mockRedisGet.mockResolvedValue(null);
 
-    const result = await removeFromCart("session-nonexistent", "v1");
+    const result = await removeFromCart("session-nonexistent", "v1", tenantId);
 
     expect(result).toEqual([]);
   });
