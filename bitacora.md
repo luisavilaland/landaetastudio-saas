@@ -559,3 +559,16 @@
   - `withTenantContext` ya mockeado en DELETE tests desde PR3; GET/PUT no
   - `removeFromCart` sin callers de producción — cambio de firma seguro
 - **Verificación final:** lint 6/6 ✅ | typecheck 9/9 ✅ | tests 47/47, **379/379** (+1 test vs baseline: tenantId vacío en cart.test.ts)
+
+---
+
+## 2026-07-28 — Fix: R2 fuera de withTenantContext en products/[id] PUT
+
+- **Problema detectado en code review:** `uploadImage`/`deleteImage` quedaron dentro del `withTenantContext`, dejando una transacción PG abierta durante operaciones R2 (mismo anti-pattern que ya corregimos en `images/route.ts`).
+- **Solución:** Separar PUT en tres fases:
+  1. **Phase 1** (read + validate): `withTenantContext` → fetch product, validar categoría/slug/SKU, computar fields plan
+  2. **Phase 2** (R2): fuera de toda transacción → `uploadImage`/`deleteImage`
+  3. **Phase 3** (write): `withTenantContext` → ejecutar updates/inserts + refetch
+- **Adicional:** `tx` en `getEnrichedItems` cambió de opcional a obligatorio, eliminando el fallback silencioso a `db` global. Removido `import { db }` del cart route.
+- **Grep ampliado:** cubrió `packages/auth/`, `packages/storage/`, `packages/validation/`, `packages/logger/`, `packages/test-utils/`, `packages/commerce/`, `apps/superadmin/` — 0 matches.
+- **Verificación final:** lint 6/6 ✅ | typecheck 9/9 ✅ | tests 47/47, 379/379 ✅
