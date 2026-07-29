@@ -52,6 +52,7 @@ export default function RegisterForm() {
           <input
             id="name"
             type="text"
+            data-testid="register-name"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             required
@@ -66,6 +67,7 @@ export default function RegisterForm() {
           <input
             id="email"
             type="email"
+            data-testid="register-email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
@@ -80,6 +82,7 @@ export default function RegisterForm() {
           <input
             id="password"
             type="password"
+            data-testid="register-password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required
@@ -89,11 +92,12 @@ export default function RegisterForm() {
         </div>
 
         {error && (
-          <div style={{ color: "#dc2626", marginBottom: "1rem" }}>{error}</div>
+          <div data-testid="register-error" style={{ color: "#dc2626", marginBottom: "1rem" }}>{error}</div>
         )}
 
         <button
           type="submit"
+          data-testid="register-submit"
           disabled={loading}
           style={{
             width: "100%",

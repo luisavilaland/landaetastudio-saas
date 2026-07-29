@@ -39,6 +39,7 @@ export function CategoryNav() {
       {categories.map((category) => (
         <Link
           key={category.id}
+          data-testid="category-link"
           href={`/categoria/${category.slug}`}
           className="text-sm text-zinc-600 hover:text-zinc-900"
         >

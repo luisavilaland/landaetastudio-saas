@@ -44,7 +44,7 @@ export function VariantSelector({
 
   return (
     <div className="flex flex-col">
-      <p className="mt-4 text-3xl font-bold text-zinc-900">
+      <p data-testid="product-price" className="mt-4 text-3xl font-bold text-zinc-900">
         {formatPrice(price)}
       </p>
 
@@ -65,7 +65,7 @@ export function VariantSelector({
           {attributes.map(attr => (
             <div key={attr.name}>
               <h3 className="text-sm font-medium text-zinc-700 mb-2">{attr.name}</h3>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2" data-testid="variant-selector">
                 {attr.values.map(value => {
                   const isSelected = selected[attr.name] === value;
                   return (

@@ -162,25 +162,27 @@ export default function CheckoutPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Nombre completo</label>
-                  <input
-                    type="text"
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="Juan Pérez"
-                  />
+                    <input
+                      type="text"
+                      data-testid="checkout-name"
+                      required
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="Juan Pérez"
+                    />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="juan@ejemplo.com"
-                  />
+                    <input
+                      type="email"
+                      data-testid="checkout-email"
+                      required
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="juan@ejemplo.com"
+                    />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Teléfono</label>
@@ -195,14 +197,15 @@ export default function CheckoutPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Dirección</label>
-                  <input
-                    type="text"
-                    required
-                    value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="Av. Italia 1234"
-                  />
+                    <input
+                      type="text"
+                      data-testid="checkout-address"
+                      required
+                      value={form.address}
+                      onChange={(e) => setForm({ ...form, address: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="Av. Italia 1234"
+                    />
                 </div>
               </div>
               </div>
@@ -220,6 +223,7 @@ export default function CheckoutPage() {
                       return (
                         <label
                           key={method.id}
+                          data-testid="shipping-method"
                           className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${
                             selectedShippingId === method.id
                               ? "border-blue-600 bg-blue-50"
@@ -272,13 +276,14 @@ export default function CheckoutPage() {
 
               {error && <p className="text-red-600 text-sm">{error}</p>}
 
-               <button
-                 type="submit"
-                 disabled={processing || items.length === 0}
-                 className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
-               >
-                 {processing ? "Procesando..." : `Pagar $${(total / 100).toFixed(2)}`}
-               </button>
+                <button
+                  type="submit"
+                  data-testid="checkout-submit"
+                  disabled={processing || items.length === 0}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
+                >
+                  {processing ? "Procesando..." : `Pagar $${(total / 100).toFixed(2)}`}
+                </button>
              </form>
             </div>
 

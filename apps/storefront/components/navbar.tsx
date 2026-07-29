@@ -62,6 +62,7 @@ export default function Navbar({
             <div className="relative">
               <button
                 onClick={() => setIsCategoriesOpen(!isCategoriesOpen)}
+                data-testid="nav-categories"
                 className="flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900"
                 onBlur={() => setTimeout(() => setIsCategoriesOpen(false), 200)}
               >
@@ -94,10 +95,12 @@ export default function Navbar({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar productos..."
+                data-testid="search-input"
                 className="w-full px-4 py-2 pr-10 text-sm border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
               />
               <button
                 type="submit"
+                data-testid="search-submit"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
               >
                 <Search className="w-4 h-4" />
@@ -107,7 +110,7 @@ export default function Navbar({
         </div>
 
         <div className="flex items-center gap-4 whitespace-nowrap">
-          <Link href="/cart" className="relative">
+          <Link href="/cart" className="relative" data-testid="nav-cart">
             <ShoppingCart className="w-6 h-6" />
           </Link>
 
