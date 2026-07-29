@@ -16,7 +16,7 @@ importers:
     dependencies:
       '@auth/drizzle-adapter':
         specifier: ^1.11.2
-        version: 1.11.2(nodemailer@8.0.7)
+        version: 1.11.2(nodemailer@9.0.3)
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
@@ -40,10 +40,10 @@ importers:
         version: 8.0.7
       next-auth:
         specifier: 5.0.0-beta.31
-        version: 5.0.0-beta.31(next@16.2.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@8.0.7)(react@19.2.4)
+        version: 5.0.0-beta.31(next@16.2.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@9.0.3)(react@19.2.4)
       nodemailer:
-        specifier: ^8.0.5
-        version: 8.0.7
+        specifier: ^9.0.3
+        version: 9.0.3
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
@@ -143,7 +143,7 @@ importers:
         version: 16.2.12(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       next-auth:
         specifier: 5.0.0-beta.31
-        version: 5.0.0-beta.31(next@16.2.12(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@8.0.7)(react@19.2.4)
+        version: 5.0.0-beta.31(next@16.2.12(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@9.0.3)(react@19.2.4)
       react:
         specifier: 19.2.4
         version: 19.2.4
@@ -218,8 +218,8 @@ importers:
         specifier: 16.2.12
         version: 16.2.12(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       nodemailer:
-        specifier: ^6.10.0
-        version: 6.10.1
+        specifier: ^9.0.3
+        version: 9.0.3
       react:
         specifier: 19.2.4
         version: 19.2.4
@@ -289,7 +289,7 @@ importers:
         version: 16.2.12(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       next-auth:
         specifier: 5.0.0-beta.31
-        version: 5.0.0-beta.31(next@16.2.12(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@8.0.7)(react@19.2.4)
+        version: 5.0.0-beta.31(next@16.2.12(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@9.0.3)(react@19.2.4)
       react:
         specifier: 19.2.4
         version: 19.2.4
@@ -341,7 +341,7 @@ importers:
         version: 3.0.3
       next-auth:
         specifier: 5.0.0-beta.31
-        version: 5.0.0-beta.31(next@16.2.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@8.0.7)(react@19.2.4)
+        version: 5.0.0-beta.31(next@16.2.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@9.0.3)(react@19.2.4)
     devDependencies:
       '@types/bcryptjs':
         specifier: ^3.0.0
@@ -368,8 +368,8 @@ importers:
         specifier: ^16.2.12
         version: 16.2.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       nodemailer:
-        specifier: ^8.0.5
-        version: 8.0.7
+        specifier: ^9.0.3
+        version: 9.0.3
       resend:
         specifier: ^6.12.2
         version: 6.12.2
@@ -3607,12 +3607,8 @@ packages:
     resolution: {integrity: sha512-wRNIrw4DmVLKQlbgOMdkMx27Wrpzes2hh5Jtbi2bjPd+4wJstWIqP5A+lscnqbm0xxmT5Bpg8Lec5ItEBwx6BQ==}
     engines: {node: '>=18'}
 
-  nodemailer@6.10.1:
-    resolution: {integrity: sha512-Z+iLaBGVaSjbIzQ4pX6XV41HrooLsQ10ZWPUehGmuantvzWoDVBnmsdUcOIDM1t+yPor5pDhVlDESgOMEGxhHA==}
-    engines: {node: '>=6.0.0'}
-
-  nodemailer@8.0.7:
-    resolution: {integrity: sha512-pkjE4mkBzQjdJT4/UmlKl3pX0rC9fZmjh7c6C9o7lv66Ac6w9WCnzPzhbPNxwZAzlF4mdq4CSWB5+FbK6FWCow==}
+  nodemailer@9.0.3:
+    resolution: {integrity: sha512-n+YP+NKwR5zRWa60k3GiQ6Q3B4KXCoAw40dAKeCtYn020iNN74aWK2liXIC3ZEATeGql7we3tE3t8QwhY0eskw==}
     engines: {node: '>=6.0.0'}
 
   oauth4webapi@3.8.6:
@@ -4517,7 +4513,7 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@auth/core@0.41.2(nodemailer@8.0.7)':
+  '@auth/core@0.41.2(nodemailer@9.0.3)':
     dependencies:
       '@panva/hkdf': 1.2.1
       jose: 6.2.3
@@ -4525,11 +4521,11 @@ snapshots:
       preact: 10.24.3
       preact-render-to-string: 6.5.11(preact@10.24.3)
     optionalDependencies:
-      nodemailer: 8.0.7
+      nodemailer: 9.0.3
 
-  '@auth/drizzle-adapter@1.11.2(nodemailer@8.0.7)':
+  '@auth/drizzle-adapter@1.11.2(nodemailer@9.0.3)':
     dependencies:
-      '@auth/core': 0.41.2(nodemailer@8.0.7)
+      '@auth/core': 0.41.2(nodemailer@9.0.3)
     transitivePeerDependencies:
       - '@simplewebauthn/browser'
       - '@simplewebauthn/server'
@@ -7737,21 +7733,21 @@ snapshots:
 
   neo-async@2.6.2: {}
 
-  next-auth@5.0.0-beta.31(next@16.2.12(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@8.0.7)(react@19.2.4):
+  next-auth@5.0.0-beta.31(next@16.2.12(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@9.0.3)(react@19.2.4):
     dependencies:
-      '@auth/core': 0.41.2(nodemailer@8.0.7)
+      '@auth/core': 0.41.2(nodemailer@9.0.3)
       next: 16.2.12(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
     optionalDependencies:
-      nodemailer: 8.0.7
+      nodemailer: 9.0.3
 
-  next-auth@5.0.0-beta.31(next@16.2.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@8.0.7)(react@19.2.4):
+  next-auth@5.0.0-beta.31(next@16.2.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(nodemailer@9.0.3)(react@19.2.4):
     dependencies:
-      '@auth/core': 0.41.2(nodemailer@8.0.7)
+      '@auth/core': 0.41.2(nodemailer@9.0.3)
       next: 16.2.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
     optionalDependencies:
-      nodemailer: 8.0.7
+      nodemailer: 9.0.3
 
   next@16.2.12(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
     dependencies:
@@ -7818,9 +7814,7 @@ snapshots:
 
   node-releases@2.0.51: {}
 
-  nodemailer@6.10.1: {}
-
-  nodemailer@8.0.7: {}
+  nodemailer@9.0.3: {}
 
   oauth4webapi@3.8.6: {}
 
