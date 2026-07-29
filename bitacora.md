@@ -562,7 +562,33 @@
 
 ---
 
-## 2026-07-28 — Fix: R2 fuera de withTenantContext en products/[id] PUT
+## 2026-07-29 — Fase 1: Infraestructura E2E con Playwright
+
+- **Branch:** `feat/e2e-playwright` (Paseo worktree, branch off develop)
+- **Instalación:** `pnpm add -D -w @playwright/test` (v1.62.0)
+- **`e2e/playwright.config.ts`:** 6 projects (setup, storefront, checkout, admin, superadmin, security) con `baseURL` por proyecto, `storageState` para admin/superadmin/security, `fullyParallel: false`, `workers: 1`
+- **`e2e/global-setup.ts`:** login real admin en `http://localhost:3001/login` y superadmin en `http://localhost:3002/login`, guarda `storageState` en `e2e/.auth/admin.json` y `e2e/.auth/superadmin.json`
+- **Directorios creados:** `e2e/storefront/`, `e2e/checkout/`, `e2e/admin/`, `e2e/superadmin/`, `e2e/security/`, `e2e/setup/`
+- **Scripts en root package.json:** `test:e2e`, `test:e2e:ui`, `test:e2e:debug`, `test:e2e:report`
+- **.gitignore:** `e2e/.auth/`, `e2e/test-results/`, `e2e/playwright-report/`
+- **.env.local:** `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`
+- **Commit:** `4c5fde2` — "feat: E2E infraestructura Playwright — config, global-setup, scripts"
+
+---
+
+## Estado actual (29 de julio 2026)
+
+| Métrica | Valor |
+|---------|-------|
+| Tests | 379 pasando, 0 fallos |
+| E2E | Infraestructura lista (0 specs aún) |
+| Apps | storefront, admin, superadmin |
+| Servicios | Neon, Upstash, R2, Resend |
+| Deploy | Vercel (3 apps) |
+| Rama default | `develop` |
+| Build | Limpio (sin `ignoreBuildErrors`) |
+| CI | GitHub Actions (lint, typecheck, build, test) |
+| RLS | Activo con `app_user`, 27 handlers wireados con `withTenantContext` |
 
 - **Problema detectado en code review:** `uploadImage`/`deleteImage` quedaron dentro del `withTenantContext`, dejando una transacción PG abierta durante operaciones R2 (mismo anti-pattern que ya corregimos en `images/route.ts`).
 - **Solución:** Separar PUT en tres fases:
