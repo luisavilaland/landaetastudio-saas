@@ -176,6 +176,7 @@ export function CategoriesTable({ initialCategories }: { initialCategories: Cate
                     </button>
                     <button
                       onClick={() => handleDelete(category.id)}
+                      data-testid="delete-category"
                       className="px-3 py-1 text-sm text-red-600 hover:text-red-800"
                     >
                       Eliminar
@@ -201,6 +202,7 @@ export function CategoriesTable({ initialCategories }: { initialCategories: Cate
                 </label>
                 <input
                   type="text"
+                  data-testid="category-form-name"
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md"
@@ -238,6 +240,7 @@ export function CategoriesTable({ initialCategories }: { initialCategories: Cate
                 </button>
                 <button
                   type="submit"
+                  data-testid="category-form-submit"
                   disabled={saving}
                   className="px-4 py-2 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 disabled:opacity-50"
                 >

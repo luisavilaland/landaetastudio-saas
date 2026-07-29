@@ -58,7 +58,7 @@ export function TenantsTable({ initialTenants }: { initialTenants: Tenant[] }) {
       )}
 
       <div className="border rounded-lg overflow-hidden">
-        <table className="w-full">
+        <table className="w-full" data-testid="tenant-table">
            <thead className="bg-zinc-100">
              <tr>
                <th className="px-4 py-3 text-left text-sm font-medium text-zinc-600">Slug</th>

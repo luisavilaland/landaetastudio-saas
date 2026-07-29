@@ -203,6 +203,7 @@ export function ProductsTable({
                       </button>
                       <button
                         onClick={() => handleDelete(product.id)}
+                        data-testid="delete-product"
                         className="px-3 py-1 text-sm text-red-600 hover:text-red-800"
                       >
                         Eliminar
