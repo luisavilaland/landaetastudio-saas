@@ -25,6 +25,7 @@ vi.mock("@repo/db", async () => {
   const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
   return {
     ...actual,
+    withTenantContext: vi.fn(),
     db: { select: vi.fn(), update: vi.fn(), insert: vi.fn(), delete: vi.fn() },
   };
 });
@@ -36,10 +37,10 @@ vi.mock("next/headers", () => ({
 
 import { NextRequest } from "next/server";
 import { headers } from "next/headers";
-import { db } from "@repo/db";
+import { db, withTenantContext } from "@repo/db";
 import { redisClient } from "@/lib/redis";
 import { getTenantId } from "@/lib/tenant";
-import { mockReq } from "@repo/test-utils";
+import { makeTxMock, mockReq } from "@repo/test-utils";
 import { GET, POST, PUT, DELETE } from "../route";
 
 const TENANT_ID = "tenant-123";
@@ -145,7 +146,9 @@ describe("POST /api/cart", () => {
   it("debe devolver 404 cross-tenant cuando la variante no pertenece al tenant", async () => {
     setupHeaders(SESSION_ID);
     vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID);
-    vi.mocked(db.select).mockReturnValueOnce(createQuery([]));
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce(createQuery([]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await POST(mockReq("POST",{ variantId: VARIANT_ID, quantity: 1 }));
 
@@ -156,7 +159,9 @@ describe("POST /api/cart", () => {
 
   it("debe devolver 400 cuando el stock es insuficiente", async () => {
     setupHeaders(SESSION_ID);
-    vi.mocked(db.select).mockReturnValueOnce(createQuery([{ ...MOCK_VARIANT, stock: 0 }]));
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce(createQuery([{ ...MOCK_VARIANT, stock: 0 }]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await POST(mockReq("POST",{ variantId: VARIANT_ID, quantity: 1 }));
 
@@ -167,7 +172,9 @@ describe("POST /api/cart", () => {
 
   it("debe agregar un ítem al carrito en caso feliz", async () => {
     setupHeaders(SESSION_ID);
-    vi.mocked(db.select).mockReturnValueOnce(createQuery([MOCK_VARIANT]));
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce(createQuery([MOCK_VARIANT]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await POST(mockReq("POST",{ variantId: VARIANT_ID, quantity: 1 }));
 
@@ -180,7 +187,9 @@ describe("POST /api/cart", () => {
 
   it("debe incrementar cantidad cuando la variante ya existe en el carrito", async () => {
     setupHeaders(SESSION_ID);
-    vi.mocked(db.select).mockReturnValueOnce(createQuery([MOCK_VARIANT]));
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce(createQuery([MOCK_VARIANT]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
     vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
 
     const res = await POST(mockReq("POST",{ variantId: VARIANT_ID, quantity: 3 }));
@@ -232,9 +241,11 @@ describe("GET /api/cart", () => {
   it("debe devolver items enriquecidos en caso feliz", async () => {
     setupHeaders(SESSION_ID);
     vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
-    vi.mocked(db.select)
+    const mockTx = makeTxMock();
+    mockTx.select
       .mockReturnValueOnce(createQuery([MOCK_ENRICHED_VARIANT]))
       .mockReturnValueOnce(createQuery([]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await GET();
 
@@ -287,9 +298,11 @@ describe("PUT /api/cart", () => {
 
   it("debe actualizar cantidad en caso feliz", async () => {
     setupHeaders(SESSION_ID);
-    vi.mocked(db.select)
+    const mockTx = makeTxMock();
+    mockTx.select
       .mockReturnValueOnce(createQuery([MOCK_ENRICHED_VARIANT]))
       .mockReturnValueOnce(createQuery([]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await PUT(mockReq("PUT",{ variantId: VARIANT_ID, quantity: 5 }));
 
@@ -302,9 +315,11 @@ describe("PUT /api/cart", () => {
   it("debe devolver items vacíos cuando ninguna variante coincide con el tenant (cross-tenant)", async () => {
     setupHeaders(SESSION_ID);
     vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID);
-    vi.mocked(db.select)
+    const mockTx = makeTxMock();
+    mockTx.select
       .mockReturnValueOnce(createQuery([]))
       .mockReturnValueOnce(createQuery([]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
 
     const res = await PUT(mockReq("PUT",{ variantId: VARIANT_ID, quantity: 3 }));
 

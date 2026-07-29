@@ -56,7 +56,7 @@ export default function SettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch("/api/store/settings");
+      const res = await fetch("/api/config/settings");
       const data = await res.json();
       if (res.ok) {
         setSettings(data.settings || {});
@@ -96,7 +96,7 @@ export default function SettingsPage() {
         delete payload.socialLinks;
       }
 
-      const res = await fetch("/api/store/settings", {
+      const res = await fetch("/api/config/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

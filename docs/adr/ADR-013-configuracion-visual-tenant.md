@@ -12,7 +12,7 @@ La configuración visual se almacena como un campo `settings` de tipo JSONB dire
 **Aceptada — ver discrepancia**
 
 - ✅ Implementado: `settings: jsonb("settings").default({})` en tabla `tenants` (`packages/db/src/schema.ts:11`)
-- ✅ API en `apps/admin/app/api/store/settings/route.ts` y `config/settings/route.ts`
+- ✅ API en `apps/admin/app/api/config/settings/route.ts`
 - ⚠️ La documentación original menciona una tabla separada `store_settings` que nunca se creó — la implementación real usa un JSONB inline en `tenants`. Esta ADR refleja la implementación real, no la documentación desactualizada.
 
 ## Consecuencias
