@@ -12,7 +12,8 @@ El proyecto tiene 379 tests unitarios/de integración (vitest) pero cero tests e
 | Decisión | Opción elegida | Alternativa descartada |
 |---|---|---|
 | Framework | Playwright | Cypress (más lento, menos integración TypeScript) |
-| Auth | Híbrido: `auth.spec.ts` login real + `storageState` reutilizado | Login en cada spec (más lento, duplica asserts) |
+| Auth | Híbrido: `auth.spec.ts` login real + `storageState` reutilizado (solo admin y superadmin) | Login en cada spec (más lento, duplica asserts) |
+| Cliente storefront | Sin autenticación — carrito anónimo vía cookie, checkout sin cuenta | Login de cliente (no hay consumidor real, oculta flujo guest) |
 | data-testid | Incremental por spec | Barrido global previo (nunca pasa) |
 | CI | Fase 2 con fecha explícita | Sin CI (nunca se agrega) o CI inmediato (entrena a ignorar rojo) |
 | Checkout MP | Hasta redirect a MP | Sin checkout (se posterga indefinidamente) |
@@ -57,7 +58,6 @@ projects: [
     name: "storefront",
     use: {
       baseURL: "http://tienda1.lvh.me:3000",
-      storageState: "e2e/.auth/storefront.json",
     },
     testMatch: "e2e/storefront/*.spec.ts",
     dependencies: ["setup"],
@@ -66,7 +66,6 @@ projects: [
     name: "checkout",
     use: {
       baseURL: "http://tienda1.lvh.me:3000",
-      storageState: "e2e/.auth/storefront.json",
     },
     testMatch: "e2e/checkout/*.spec.ts",
     dependencies: ["setup"],
@@ -106,14 +105,17 @@ projects: [
 ### Global setup (`global-setup.ts`)
 
 - Se ejecuta una vez antes de la suite completa
-- Crea 3 archivos `storageState`: `storefront.json`, `admin.json`, `superadmin.json`
+- Crea 2 archivos `storageState`: `admin.json`, `superadmin.json`
+- **No** hay login de cliente storefront — todos los specs de storefront/checkout corren sin autenticación (carrito anónimo, checkout sin cuenta)
 - Cada uno navega al login correspondiente, completa credenciales, espera redirect exitoso, guarda cookies
 - Almacenados en `e2e/.auth/` (gitignored)
 
 ### Specs
 
-- **`auth.spec.ts`** (storefront): prueba el login real — form submit, validación de campos, error en credenciales inválidas, redirect exitoso. Esta spec NO usa storageState; corre sin autenticación previa.
-- **Resto de specs**: heredan `storageState` desde el proyecto correspondiente. No repiten login.
+- **`auth.spec.ts`** (storefront): prueba el login real — form submit, validación de campos, error en credenciales inválidas, redirect exitoso. Corre sin storageState.
+- **`register.spec.ts`** (storefront): prueba el registro como visitante. Corre sin storageState (igual que `auth.spec.ts`).
+- **Resto de specs de storefront/checkout**: corren sin autenticación (sin storageState).
+- **Admin/superadmin/security**: heredan `storageState` desde el proyecto correspondiente. No repiten login.
 
 ## data-testid
 
@@ -247,7 +249,7 @@ export default defineConfig({
 import { chromium, type FullConfig } from "@playwright/test";
 
 async function globalSetup(config: FullConfig) {
-  // Login admin
+  // Login admin (T1)
   const adminBrowser = await chromium.launch();
   const adminPage = await adminBrowser.newPage();
   await adminPage.goto("http://localhost:3001/login");
@@ -269,16 +271,8 @@ async function globalSetup(config: FullConfig) {
   await saPage.context().storageState({ path: "e2e/.auth/superadmin.json" });
   await saBrowser.close();
 
-  // Login storefront
-  const sfBrowser = await chromium.launch();
-  const sfPage = await sfBrowser.newPage();
-  await sfPage.goto("http://tienda1.lvh.me:3000/login");
-  await sfPage.fill("[name=email]", process.env.E2E_STOREFRONT_EMAIL!);
-  await sfPage.fill("[name=password]", process.env.E2E_STOREFRONT_PASSWORD!);
-  await sfPage.click("button[type=submit]");
-  await sfPage.waitForURL("http://tienda1.lvh.me:3000/");
-  await sfPage.context().storageState({ path: "e2e/.auth/storefront.json" });
-  await sfBrowser.close();
+  // Sin login de cliente storefront — ningún spec lo necesita
+  // (carrito anónimo vía cookie, checkout sin cuenta)
 }
 ```
 
@@ -286,14 +280,12 @@ async function globalSetup(config: FullConfig) {
 
 ```
 E2E_ADMIN_EMAIL=admin@tienda1.com
-E2E_ADMIN_PASSWORD=admin123
-E2E_SUPERADMIN_EMAIL=superadmin@saas.com
-E2E_SUPERADMIN_PASSWORD=superadmin123
-E2E_STOREFRONT_EMAIL=cliente@test.com
-E2E_STOREFRONT_PASSWORD=cliente123
+E2E_ADMIN_PASSWORD=123456
+E2E_SUPERADMIN_EMAIL=super@admin.com
+E2E_SUPERADMIN_PASSWORD=123456
 ```
 
-Se agregan `.env.local` local y como secrets de GitHub Actions.
+Storefront/checkout no necesitan variables — corren sin autenticación.
 
 ## CI (Fase 2, con fecha)
 
