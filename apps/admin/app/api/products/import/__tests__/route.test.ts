@@ -1,119 +1,42 @@
-import { describe, it, expect } from "vitest";
-import { NextResponse } from "next/server";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { withTenantContext } from "@repo/db";
+import { makeTxMock, session } from "@repo/test-utils";
 
-type ImportResult = {
-  row: number;
-  name: string;
-  status: "created" | "skipped" | "error";
-  reason?: string;
-};
+vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 
-type ImportSummary = {
-  total: number;
-  created: number;
-  skipped: number;
-  errors: number;
-};
+vi.mock("@/lib/logger", () => ({
+  createLogger: vi.fn().mockReturnValue({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
 
-function normalizeSlug(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
-}
+vi.mock("@repo/db", async () => {
+  const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
+  return { ...actual, withTenantContext: vi.fn(), db: undefined };
+});
 
-function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.trim().split("\n");
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/"/g, ""));
-  return lines.slice(1).map((line) => {
-    const values = line.split(",").map((v) => v.trim().replace(/"/g, ""));
-    const row: Record<string, string> = {};
-    headers.forEach((header, i) => { row[header] = values[i] ?? ""; });
-    return row;
-  });
-}
+import { auth } from "@/lib/auth";
+import { POST } from "../route";
 
-async function handleImport(
-  session: { user: { tenantId: string } } | null,
-  csvText: string | null,
-  existingSlugs: string[] = [],
-  categories: { slug: string; id: string }[] = []
-): Promise<Response> {
-  if (!session) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+function makeImportReq(csvContent: string | null) {
+  const fd = new FormData();
+  if (csvContent !== null) {
+    const file = new File([csvContent], "products.csv", { type: "text/csv" });
+    fd.append("file", file);
   }
-
-  if (!csvText) {
-    return NextResponse.json({ error: "No se proporcionó un archivo CSV" }, { status: 400 });
-  }
-
-  const rows = parseCSV(csvText);
-
-  if (rows.length === 0) {
-    return NextResponse.json({ error: "El CSV está vacío o no tiene filas válidas" }, { status: 400 });
-  }
-
-  const firstRow = rows[0];
-  if (!("name" in firstRow) || !("price" in firstRow) || !("stock" in firstRow)) {
-    return NextResponse.json({ error: "El CSV debe tener las columnas: name, price, stock" }, { status: 400 });
-  }
-
-  const categoryBySlug = categories.reduce((acc, cat) => {
-    acc[cat.slug] = cat.id;
-    return acc;
-  }, {} as Record<string, string>);
-
-  const results: ImportResult[] = [];
-
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const rowNum = i + 2;
-
-    if (!row.name?.trim()) {
-      results.push({ row: rowNum, name: row.name || "(vacío)", status: "error", reason: "Nombre requerido" });
-      continue;
-    }
-
-    const price = parseInt(row.price, 10);
-    if (isNaN(price) || price < 0) {
-      results.push({ row: rowNum, name: row.name, status: "error", reason: "Precio inválido (debe ser número >= 0)" });
-      continue;
-    }
-
-    const stock = parseInt(row.stock, 10);
-    if (isNaN(stock) || stock < 0) {
-      results.push({ row: rowNum, name: row.name, status: "error", reason: "Stock inválido (debe ser número >= 0)" });
-      continue;
-    }
-
-    const slug = row.slug?.trim() ? normalizeSlug(row.slug) : normalizeSlug(row.name);
-
-    if (existingSlugs.includes(slug)) {
-      results.push({ row: rowNum, name: row.name, status: "skipped", reason: `Slug '${slug}' ya existe` });
-      continue;
-    }
-
-    if (row.category_slug?.trim() && !categoryBySlug[row.category_slug.trim()]) {
-      results.push({ row: rowNum, name: row.name, status: "error", reason: `Categoría '${row.category_slug}' no encontrada` });
-      continue;
-    }
-
-    results.push({ row: rowNum, name: row.name, status: "created" });
-  }
-
-  const created = results.filter((r) => r.status === "created").length;
-  const skipped = results.filter((r) => r.status === "skipped").length;
-  const errors = results.filter((r) => r.status === "error").length;
-
-  return NextResponse.json({
-    summary: { total: rows.length, created, skipped, errors },
-    results,
-  });
+  return {
+    json: async () => ({}),
+    text: async () => csvContent ?? "",
+    formData: async () => fd,
+    headers: new Headers({ "content-type": "multipart/form-data" }),
+    nextUrl: new URL("http://localhost"),
+    url: "http://localhost",
+    cookies: { get: vi.fn() },
+    method: "POST",
+  } as any;
 }
 
 const validCSV = `name,slug,description,price,stock,status,category_slug,sku
@@ -123,50 +46,86 @@ Pantalón Jeans,pantalon-jeans,Jeans clásico,5000,5,active,pantalones,jeans-001
 const csvMissingColumns = `name,description
 Remera,Descripción`;
 
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
 describe("POST /api/products/import", () => {
   it("should return 401 when no session", async () => {
-    const res = await handleImport(null, validCSV);
-    expect(res.status).toBe(401);
+    vi.mocked(auth).mockResolvedValue(null);
+
+    const response = await POST(makeImportReq(validCSV));
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe("No autorizado");
   });
 
   it("should return 400 when no file provided", async () => {
-    const res = await handleImport({ user: { tenantId: "tenant-1" } }, null);
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toContain("No se proporcionó");
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+
+    const response = await POST(makeImportReq(null));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("No se proporcionó un archivo CSV");
   });
 
   it("should return 400 when CSV missing required columns", async () => {
-    const res = await handleImport({ user: { tenantId: "tenant-1" } }, csvMissingColumns);
-    expect(res.status).toBe(400);
-    const body = await res.json();
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+
+    const response = await POST(makeImportReq(csvMissingColumns));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
     expect(body.error).toContain("columnas");
   });
 
   it("should create products from valid CSV", async () => {
-    const res = await handleImport(
-      { user: { tenantId: "tenant-1" } },
-      validCSV,
-      [],
-      [
-        { slug: "remeras", id: "cat-1" },
-        { slug: "pantalones", id: "cat-2" },
-      ]
-    );
-    expect(res.status).toBe(200);
-    const body = await res.json();
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    let callCount = 0;
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      callCount++;
+      if (callCount === 1) {
+        const tx = makeTxMock({
+          select: [{ data: [{ id: "cat-1", slug: "remeras", tenantId: "tenant-1" }, { id: "cat-2", slug: "pantalones", tenantId: "tenant-1" }] }],
+        });
+        return cb(tx);
+      }
+      const tx = makeTxMock({ select: [{ data: [], terminal: "limit" }], repeatLastSelect: true });
+      tx.returning.mockResolvedValue([{ id: `prod-${callCount}` }]);
+      return cb(tx);
+    });
+
+    const response = await POST(makeImportReq(validCSV));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
     expect(body.summary.created).toBe(2);
     expect(body.summary.errors).toBe(0);
   });
 
   it("should skip products with duplicate slug", async () => {
-    const res = await handleImport(
-      { user: { tenantId: "tenant-1" } },
-      validCSV,
-      ["remera-basica"],
-      [{ slug: "remeras", id: "cat-1" }, { slug: "pantalones", id: "cat-2" }]
-    );
-    const body = await res.json();
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    let callCount = 0;
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      callCount++;
+      if (callCount === 1) {
+        const tx = makeTxMock({
+          select: [{ data: [{ id: "cat-1", slug: "remeras", tenantId: "tenant-1" }, { id: "cat-2", slug: "pantalones", tenantId: "tenant-1" }] }],
+        });
+        return cb(tx);
+      }
+      const existing = callCount === 2 ? [{}] : [];
+      const tx = makeTxMock({ select: [{ data: existing, terminal: "limit" }], repeatLastSelect: true });
+      tx.returning.mockResolvedValue([{ id: `prod-${callCount}` }]);
+      return cb(tx);
+    });
+
+    const response = await POST(makeImportReq(validCSV));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
     expect(body.summary.skipped).toBe(1);
     expect(body.summary.created).toBe(1);
     expect(body.results[0].status).toBe("skipped");
@@ -174,54 +133,111 @@ describe("POST /api/products/import", () => {
   });
 
   it("should return error for invalid price", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(makeTxMock({ select: [{ data: [] }] }))
+    );
+
     const csv = `name,price,stock\nRemera,-100,10`;
-    const res = await handleImport({ user: { tenantId: "tenant-1" } }, csv);
-    const body = await res.json();
+    const response = await POST(makeImportReq(csv));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
     expect(body.summary.errors).toBe(1);
     expect(body.results[0].reason).toContain("Precio inválido");
   });
 
   it("should return error for invalid stock", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(makeTxMock({ select: [{ data: [] }] }))
+    );
+
     const csv = `name,price,stock\nRemera,2500,-5`;
-    const res = await handleImport({ user: { tenantId: "tenant-1" } }, csv);
-    const body = await res.json();
+    const response = await POST(makeImportReq(csv));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
     expect(body.summary.errors).toBe(1);
     expect(body.results[0].reason).toContain("Stock inválido");
   });
 
   it("should return error for missing name", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(makeTxMock({ select: [{ data: [] }] }))
+    );
+
     const csv = `name,price,stock\n,2500,10`;
-    const res = await handleImport({ user: { tenantId: "tenant-1" } }, csv);
-    const body = await res.json();
+    const response = await POST(makeImportReq(csv));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
     expect(body.summary.errors).toBe(1);
     expect(body.results[0].reason).toContain("Nombre requerido");
   });
 
   it("should return error for invalid category", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    let catCallCount = 0;
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      catCallCount++;
+      const tx = catCallCount === 1
+        ? makeTxMock({ select: [{ data: [] }] })
+        : makeTxMock({ select: [{ data: [], terminal: "limit" }] });
+      return cb(tx);
+    });
+
     const csv = `name,price,stock,category_slug\nRemera,2500,10,inexistente`;
-    const res = await handleImport({ user: { tenantId: "tenant-1" } }, csv, [], []);
-    const body = await res.json();
-    expect(body.summary.errors).toBe(1);
+    const response = await POST(makeImportReq(csv));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.summary.skipped).toBe(1);
     expect(body.results[0].reason).toContain("Categoría");
   });
 
   it("should auto-generate slug from name if not provided", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    let callCount = 0;
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      callCount++;
+      if (callCount === 1) {
+        return cb(makeTxMock({ select: [{ data: [] }] }));
+      }
+      const tx = makeTxMock({ select: [{ data: [], terminal: "limit" }] });
+      tx.returning.mockResolvedValue([{ id: "new-prod" }]);
+      return cb(tx);
+    });
+
     const csv = `name,price,stock\nRemera Básica Ñoña,2500,10`;
-    const res = await handleImport({ user: { tenantId: "tenant-1" } }, csv);
-    const body = await res.json();
+    const response = await POST(makeImportReq(csv));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
     expect(body.summary.created).toBe(1);
-    // El slug se genera internamente, verificamos que no hubo error
     expect(body.results[0].status).toBe("created");
   });
 
   it("should handle mixed results correctly", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    let callCount = 0;
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      callCount++;
+      if (callCount === 1) {
+        return cb(makeTxMock({ select: [{ data: [] }] }));
+      }
+      const existing = callCount === 3 ? [{}] : [];
+      const tx = makeTxMock({ select: [{ data: existing, terminal: "limit" }], repeatLastSelect: true });
+      tx.returning.mockResolvedValue([{ id: `prod-${callCount}` }]);
+      return cb(tx);
+    });
+
     const csv = `name,price,stock\nProducto OK,2500,10\n,500,5\nDuplicado,1000,3`;
-    const res = await handleImport(
-      { user: { tenantId: "tenant-1" } },
-      csv,
-      ["duplicado"]
-    );
-    const body = await res.json();
+    const response = await POST(makeImportReq(csv));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
     expect(body.summary.total).toBe(3);
     expect(body.summary.created).toBe(1);
     expect(body.summary.skipped).toBe(1);

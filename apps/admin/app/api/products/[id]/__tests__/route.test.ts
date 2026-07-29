@@ -108,17 +108,21 @@ describe("GET /api/products/[id]", () => {
 
   it("404 cross-tenant", async () => {
     vi.mocked(auth).mockResolvedValue(session(TENANT_B, "admin@b.com"));
-    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([]));
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce(makeSelectChain([]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
     const res = await GET(mockReq("GET"), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(404);
   });
 
   it("200 feliz con variant e images", async () => {
     vi.mocked(auth).mockResolvedValue(session(TENANT_A, "admin@a.com"));
-    vi.mocked(db.select)
+    const mockTx = makeTxMock();
+    mockTx.select
       .mockReturnValueOnce(makeSelectChain([baseProduct]))
       .mockReturnValueOnce(makeSelectChain([baseVariant]))
       .mockReturnValueOnce(makeSelectChain([baseImage]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
     const res = await GET(mockReq("GET"), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -144,23 +148,26 @@ describe("PUT /api/products/[id]", () => {
 
   it("404 cross-tenant", async () => {
     vi.mocked(auth).mockResolvedValue(session(TENANT_B, "admin@b.com"));
-    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([]));
+    const mockTx = makeTxMock();
+    mockTx.select.mockReturnValueOnce(makeSelectChain([]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
     const res = await PUT(mockReq("PUT", { name: "X" }), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(404);
   });
 
   it("400 validación Zod falla", async () => {
     vi.mocked(auth).mockResolvedValue(session(TENANT_A, "admin@a.com"));
-    vi.mocked(db.select).mockReturnValueOnce(makeSelectChain([baseProduct]));
     const res = await PUT(mockReq("PUT", { price: -1 }), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(400);
   });
 
   it("409 slug duplicado", async () => {
     vi.mocked(auth).mockResolvedValue(session(TENANT_A, "admin@a.com"));
-    vi.mocked(db.select)
+    const mockTx = makeTxMock();
+    mockTx.select
       .mockReturnValueOnce(makeSelectChain([baseProduct]))
       .mockReturnValueOnce(makeSelectChain([{ ...baseProduct, id: "other" }]));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
     const res = await PUT(mockReq("PUT", { slug: "other-slug" }), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(409);
     const body = await res.json();
@@ -174,11 +181,13 @@ describe("PUT /api/products/[id]", () => {
       options: { color: "rojo" },
       sku: "test-product-rojo",
     };
-    vi.mocked(db.select)
-      .mockReturnValueOnce(makeSelectChain([baseProduct]))
-      .mockReturnValueOnce(makeSelectChain([]))                  // slug uniqueness — ok
-      .mockReturnValueOnce(makeSelectChain([variantWithOptions])) // existing variants
-      .mockReturnValueOnce(makeSelectChain([{ ...variantWithOptions, id: "other-variant" }])); // SKU dup
+    const mockTx = makeTxMock();
+    mockTx.select
+      .mockReturnValueOnce(makeSelectChain([baseProduct]))           // 1. get product
+      .mockReturnValueOnce(makeSelectChain([]))                      // 2. slug uniqueness — ok
+      .mockReturnValueOnce(makeSelectChain([variantWithOptions]))     // 3. existing variants
+      .mockReturnValueOnce(makeSelectChain([{ ...variantWithOptions, id: "other-variant" }])); // 4. SKU dup
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
     const res = await PUT(mockReq("PUT", { slug: "new-slug" }), { params: Promise.resolve({ id: PRODUCT_ID }) });
     expect(res.status).toBe(409);
     const body = await res.json();
@@ -187,23 +196,14 @@ describe("PUT /api/products/[id]", () => {
 
   it("200 feliz", async () => {
     vi.mocked(auth).mockResolvedValue(session(TENANT_A, "admin@a.com"));
-
-    // Pre-transaction queries
-    vi.mocked(db.select)
-      .mockReturnValueOnce(makeSelectChain([baseProduct]))
-      .mockReturnValueOnce(makeSelectChain([baseVariant]));
-
-    // Transaction mock
-    vi.mocked(db.transaction).mockImplementation(async (cb: Function) => {
-      await cb(makeTxMock());
-    });
-
-    // Post-transaction queries (updated product fetch)
     const updatedProduct = { ...baseProduct, name: "Updated Product" };
-    vi.mocked(db.select)
-      .mockReturnValueOnce(makeSelectChain([updatedProduct]))
-      .mockReturnValueOnce(makeSelectChain([baseVariant]));
-
+    const mockTx = makeTxMock();
+    mockTx.select
+      .mockReturnValueOnce(makeSelectChain([baseProduct]))           // 1. get product
+      .mockReturnValueOnce(makeSelectChain([baseVariant]))            // 2. get variants (no limit)
+      .mockReturnValueOnce(makeSelectChain([updatedProduct]))         // 3. refetch product
+      .mockReturnValueOnce(makeSelectChain([baseVariant]));           // 4. refetch variant
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
     const res = await PUT(mockReq("PUT", { name: "Updated Product" }), {
       params: Promise.resolve({ id: PRODUCT_ID }),
     });

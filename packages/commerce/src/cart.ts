@@ -1,4 +1,4 @@
-import { db, dbProducts, dbProductVariants, dbProductImages } from "@repo/db";
+import { db, dbProducts, dbProductVariants, dbProductImages, withTenantContext } from "@repo/db";
 import { eq, inArray } from "drizzle-orm";
 import { redisClient } from "./redis";
 
@@ -28,8 +28,9 @@ export type EnrichedCartItem = CartItem & {
   };
 };
 
-export async function getCart(sessionId: string): Promise<EnrichedCartItem[]> {
+export async function getCart(sessionId: string, tenantId: string): Promise<EnrichedCartItem[]> {
   if (!sessionId) return [];
+  if (!tenantId) return [];
 
   const data = await redisClient.get(`cart:${sessionId}`);
   if (!data) return [];
@@ -41,72 +42,75 @@ export async function getCart(sessionId: string): Promise<EnrichedCartItem[]> {
 
   if (variantIds.length === 0) return [];
 
-  const variants = await db
-    .select({
-      variantId: dbProductVariants.id,
-      variantPrice: dbProductVariants.price,
-      variantStock: dbProductVariants.stock,
-      variantSku: dbProductVariants.sku,
-      variantOptions: dbProductVariants.options,
-      productId: dbProducts.id,
-      productName: dbProducts.name,
-      productSlug: dbProducts.slug,
-      productImage: dbProducts.imageUrl,
-    })
-    .from(dbProductVariants)
-    .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
-    .where(inArray(dbProductVariants.id, variantIds));
+  return await withTenantContext(tenantId, async (tx) => {
+    const variants = await tx
+      .select({
+        variantId: dbProductVariants.id,
+        variantPrice: dbProductVariants.price,
+        variantStock: dbProductVariants.stock,
+        variantSku: dbProductVariants.sku,
+        variantOptions: dbProductVariants.options,
+        productId: dbProducts.id,
+        productName: dbProducts.name,
+        productSlug: dbProducts.slug,
+        productImage: dbProducts.imageUrl,
+      })
+      .from(dbProductVariants)
+      .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
+      .where(inArray(dbProductVariants.id, variantIds));
 
-  const variantMap = new Map(variants.map((v) => [v.variantId, v]));
+    const variantMap = new Map(variants.map((v) => [v.variantId, v]));
 
-  const productIds = variants.map((v) => v.productId);
-  const images = productIds.length > 0
-    ? await db
-          .select({
-            productId: dbProductImages.productId,
-            url: dbProductImages.url,
-          })
-          .from(dbProductImages)
-          .where(inArray(dbProductImages.productId, productIds))
-          .orderBy(dbProductImages.position)
-    : [];
+    const productIds = variants.map((v) => v.productId);
+    const images = productIds.length > 0
+      ? await tx
+            .select({
+              productId: dbProductImages.productId,
+              url: dbProductImages.url,
+            })
+            .from(dbProductImages)
+            .where(inArray(dbProductImages.productId, productIds))
+            .orderBy(dbProductImages.position)
+      : [];
 
-  const firstImageByProduct = images.reduce((acc, img) => {
-    if (!acc[img.productId]) acc[img.productId] = img.url;
-    return acc;
-  }, {} as Record<string, string>);
+    const firstImageByProduct = images.reduce((acc, img) => {
+      if (!acc[img.productId]) acc[img.productId] = img.url;
+      return acc;
+    }, {} as Record<string, string>);
 
-  const enrichedItems: EnrichedCartItem[] = [];
+    const enrichedItems: EnrichedCartItem[] = [];
 
-  for (const item of cart.items) {
-    const variant = variantMap.get(item.variantId);
-    if (!variant) continue;
+    for (const item of cart.items) {
+      const variant = variantMap.get(item.variantId);
+      if (!variant) continue;
 
-    const firstImage = firstImageByProduct[variant.productId];
+      const firstImage = firstImageByProduct[variant.productId];
 
-    enrichedItems.push({
-      ...item,
-      product: {
-        id: variant.productId,
-        name: variant.productName,
-        slug: variant.productSlug,
-        imageUrl: firstImage || variant.productImage,
-        price: variant.variantPrice,
-        stock: variant.variantStock,
-      },
-      variant: {
-        sku: variant.variantSku,
-        options: (variant.variantOptions as Record<string, string>) || {},
-      },
-    });
-  }
+      enrichedItems.push({
+        ...item,
+        product: {
+          id: variant.productId,
+          name: variant.productName,
+          slug: variant.productSlug,
+          imageUrl: firstImage || variant.productImage,
+          price: variant.variantPrice,
+          stock: variant.variantStock,
+        },
+        variant: {
+          sku: variant.variantSku,
+          options: (variant.variantOptions as Record<string, string>) || {},
+        },
+      });
+    }
 
-  return enrichedItems;
+    return enrichedItems;
+  });
 }
 
 export async function removeFromCart(
   sessionId: string,
-  variantId: string
+  variantId: string,
+  tenantId: string
 ): Promise<EnrichedCartItem[]> {
   if (!sessionId) return [];
 
@@ -125,5 +129,5 @@ export async function removeFromCart(
   cart.updatedAt = new Date().toISOString();
   await redisClient.setex(`cart:${sessionId}`, 60 * 60 * 24 * 7, JSON.stringify(cart));
 
-  return getCart(sessionId);
+  return getCart(sessionId, tenantId);
 }

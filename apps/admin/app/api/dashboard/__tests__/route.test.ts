@@ -1,83 +1,124 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextResponse } from "next/server";
+import { withTenantContext } from "@repo/db";
+import { makeTxMock, session, mockReq } from "@repo/test-utils";
+
+vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
+
+vi.mock("@repo/logger", () => ({
+  createLogger: vi.fn().mockReturnValue({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
+vi.mock("@repo/db", async () => {
+  const actual = await vi.importActual<typeof import("@repo/db")>("@repo/db");
+  return { ...actual, withTenantContext: vi.fn(), db: undefined };
+});
+
+import { auth } from "@/lib/auth";
+import { GET } from "../route";
+
+function mockDashboardReq(urlStr: string) {
+  const req = mockReq("GET");
+  (req as any).nextUrl = new URL(urlStr);
+  (req as any).url = urlStr;
+  return req;
+}
+
+function mockDashboardTx() {
+  const tx = makeTxMock({
+    select: [
+      { data: [{ total: 150000 }] },
+      { data: [{ count: 5 }] },
+      { data: [{ count: 3 }] },
+      { data: [{ count: 2 }] },
+      {
+        data: [
+          {
+            id: "order-1",
+            customerEmail: "test@test.com",
+            total: 50000,
+            status: "confirmed",
+            createdAt: new Date("2026-01-15"),
+          },
+        ],
+        terminal: "limit",
+      },
+      {
+        data: [
+          { id: "prod-1", name: "Producto Bajo Stock", sku: "prod-1", stock: 3 },
+        ],
+        terminal: "limit",
+      },
+    ],
+  });
+  tx.leftJoin = vi.fn().mockReturnValue(tx);
+  return tx;
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("GET /api/dashboard", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it("should return 401 when no session", async () => {
+    vi.mocked(auth).mockResolvedValue(null);
+
+    const response = await GET(mockDashboardReq("http://localhost"));
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe("No autorizado");
   });
 
-  describe("Authentication", () => {
-    it("should return 401 when no session exists", async () => {
-      const session = null;
-      const handler = async (s: typeof session) => {
-        if (!s) {
-          return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+  it("should return 400 when tenant not found in session", async () => {
+    vi.mocked(auth).mockResolvedValue({ user: {} as any, expires: "2099-01-01" });
 
-      const response = await handler(session);
-      expect(response.status).toBe(401);
-    });
+    const response = await GET(mockDashboardReq("http://localhost"));
+    const body = await response.json();
 
-    it("should return 400 when tenant not found in session", async () => {
-      const session = { user: { tenantId: undefined } };
-      const handler = async (s: typeof session) => {
-        if (!s?.user?.tenantId) {
-          return NextResponse.json({ error: "Tenant no encontrado" }, { status: 400 });
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
-
-      const response = await handler(session);
-      expect(response.status).toBe(400);
-    });
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Tenant no encontrado");
   });
 
-  describe("Response Structure", () => {
-    it("should return metrics with correct structure", async () => {
-      const mockMetrics = {
-        totalRevenue: 150000,
-        pendingOrders: 5,
-        lowStockProducts: 3,
-        outOfStockProducts: 2,
-        recentOrders: [],
-        lowStockProductsList: [],
-      };
+  it("should return 400 for invalid query params", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
 
-      const response = NextResponse.json(mockMetrics);
-      expect(response.status).toBe(200);
+    const response = await GET(mockDashboardReq("http://localhost?startDate=invalid"));
+    const body = await response.json();
 
-      const body = mockMetrics;
-      expect(body).toHaveProperty("totalRevenue");
-      expect(body).toHaveProperty("pendingOrders");
-      expect(body).toHaveProperty("lowStockProducts");
-      expect(body).toHaveProperty("outOfStockProducts");
-      expect(body).toHaveProperty("recentOrders");
-      expect(body).toHaveProperty("lowStockProductsList");
-    });
-
-    it("should use cents (integer) for revenue", () => {
-      const mockMetrics = { totalRevenue: 150000 };
-      expect(typeof mockMetrics.totalRevenue).toBe("number");
-      expect(Number.isInteger(mockMetrics.totalRevenue)).toBe(true);
-    });
-
-    it("should return recent orders as array", () => {
-      const mockMetrics = {
-        recentOrders: [{ id: "order-1", customerName: "Test", total: 10000, status: "pending_payment", createdAt: new Date() }],
-      };
-      expect(Array.isArray(mockMetrics.recentOrders)).toBe(true);
-    });
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Validación fallida");
   });
 
-  describe("Stock Alerts", () => {
-    it("should include lowStockProductsList for alerts section", () => {
-      const mockMetrics = {
-        lowStockProductsList: [{ id: "p1", name: "Low Stock", sku: "sku-1", stock: 3 }],
-      };
-      expect(Array.isArray(mockMetrics.lowStockProductsList)).toBe(true);
-      expect(mockMetrics.lowStockProductsList[0]).toHaveProperty("name");
-    });
+  it("should return metrics with correct structure", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockDashboardTx()));
+
+    const response = await GET(mockDashboardReq("http://localhost"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.totalRevenue).toBe(150000);
+    expect(body.pendingOrders).toBe(5);
+    expect(body.lowStockProducts).toBe(3);
+    expect(body.outOfStockProducts).toBe(2);
+    expect(body.recentOrders).toHaveLength(1);
+    expect(body.recentOrders[0].customerName).toBe("test@test.com");
+    expect(body.lowStockProductsList).toHaveLength(1);
+    expect(body.lowStockProductsList[0].name).toBe("Producto Bajo Stock");
+  });
+
+  it("should use cents (integer) for revenue", async () => {
+    vi.mocked(auth).mockResolvedValue(session("tenant-1"));
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockDashboardTx()));
+
+    const response = await GET(mockDashboardReq("http://localhost"));
+    const body = await response.json();
+
+    expect(Number.isInteger(body.totalRevenue)).toBe(true);
   });
 });

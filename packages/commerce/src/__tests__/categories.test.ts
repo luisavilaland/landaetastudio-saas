@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockSelect, mockFrom, mockWhere, mockOrderBy, mockCategories } = vi.hoisted(
+const { mockTxSelect, mockFrom, mockWhere, mockOrderBy, mockCategories } = vi.hoisted(
   () => {
     const mockCategories = [
       { id: "cat-1", name: "Electrónicos", slug: "electronicos" },
@@ -9,13 +9,16 @@ const { mockSelect, mockFrom, mockWhere, mockOrderBy, mockCategories } = vi.hois
     const mockOrderBy = vi.fn().mockResolvedValue(mockCategories);
     const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
     const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
-    const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
-    return { mockSelect, mockFrom, mockWhere, mockOrderBy, mockCategories };
+    const mockTxSelect = vi.fn().mockReturnValue({ from: mockFrom });
+    return { mockTxSelect, mockFrom, mockWhere, mockOrderBy, mockCategories };
   },
 );
 
 vi.mock("@repo/db", () => ({
-  db: { select: mockSelect },
+  db: {},
+  withTenantContext: vi.fn(async (_tenantId: string, cb: (tx: any) => any) =>
+    cb({ select: mockTxSelect })
+  ),
   dbCategories: {
     id: "id",
     name: "name",
@@ -29,7 +32,7 @@ import { getCategoriesForTenant } from "../categories";
 describe("getCategoriesForTenant", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSelect.mockReturnValue({ from: mockFrom });
+    mockTxSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
     mockWhere.mockReturnValue({ orderBy: mockOrderBy });
     mockOrderBy.mockResolvedValue(mockCategories);
@@ -39,7 +42,7 @@ describe("getCategoriesForTenant", () => {
     const result = await getCategoriesForTenant("tenant-1");
 
     expect(result).toEqual(mockCategories);
-    expect(mockSelect).toHaveBeenCalledWith({
+    expect(mockTxSelect).toHaveBeenCalledWith({
       id: expect.any(String),
       name: expect.any(String),
       slug: expect.any(String),

@@ -13,7 +13,7 @@ Usamos Zod para validar todos los endpoints porque ofrece tipos TypeScript autom
 
 - ✅ 18 schemas definidos en `packages/validation/src/schemas.ts`
 - ✅ 16+ endpoints usan `safeParse()` desde `@repo/validation`
-- ⚠️ `storeSettingsSchema` está definido localmente en `apps/admin/app/api/store/settings/route.ts:9` en lugar de importarse desde `@repo/validation`
+- ⚠️ `storeSettingsSchema` está definido localmente en `apps/admin/app/api/config/settings/route.ts:9` en lugar de importarse desde `@repo/validation`
 - ⚠️ CSV import (`apps/admin/app/api/products/import/route.ts`) parsea manualmente sin Zod — heredado del prototipo inicial, pendiente de migración
 
 ## Consecuencias

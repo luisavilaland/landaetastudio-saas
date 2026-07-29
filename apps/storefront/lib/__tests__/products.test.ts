@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getProducts, getProductBySlug } from "@repo/commerce/products";
-import * as dbModule from "@repo/db";
+
+const mockTxSelect = vi.fn();
 
 vi.mock("@repo/db", () => ({
-  db: {
-    select: vi.fn(),
-  },
+  db: {},
+  withTenantContext: vi.fn(async (_tenantId: string, cb: (tx: any) => any) =>
+    cb({ select: mockTxSelect })
+  ),
   dbProducts: {},
   dbProductVariants: {},
   dbProductImages: {},
@@ -66,7 +68,7 @@ const createQueryBuilder = (finalResult: any) => {
 
 describe("products lib", () => {
   beforeEach(() => {
-    vi.mocked(dbModule.db.select).mockReset();
+    mockTxSelect.mockReset();
   });
 
   describe("getProducts", () => {
@@ -77,7 +79,7 @@ describe("products lib", () => {
       const variantsBuilder = createQueryBuilder(mockVariants);
       const imagesBuilder = createQueryBuilder(mockImages);
 
-      vi.mocked(dbModule.db.select)
+      mockTxSelect
         .mockReturnValueOnce(productsBuilder as any)
         .mockReturnValueOnce(variantsBuilder as any)
         .mockReturnValueOnce(imagesBuilder as any);
@@ -99,7 +101,7 @@ describe("products lib", () => {
       const variantsBuilder = createQueryBuilder(mockVariants);
       const imagesBuilder = createQueryBuilder(mockImages);
 
-      vi.mocked(dbModule.db.select)
+      mockTxSelect
         .mockReturnValueOnce(productsBuilder as any)
         .mockReturnValueOnce(variantsBuilder as any)
         .mockReturnValueOnce(imagesBuilder as any);
@@ -116,7 +118,7 @@ describe("products lib", () => {
       const variantsBuilder = createQueryBuilder([]);
       const imagesBuilder = createQueryBuilder([]);
 
-      vi.mocked(dbModule.db.select)
+      mockTxSelect
         .mockReturnValueOnce(productsBuilder as any)
         .mockReturnValueOnce(variantsBuilder as any)
         .mockReturnValueOnce(imagesBuilder as any);
@@ -135,7 +137,7 @@ describe("products lib", () => {
       const variantsBuilder = createQueryBuilder([]);
       const imagesBuilder = createQueryBuilder([]);
 
-      vi.mocked(dbModule.db.select)
+      mockTxSelect
         .mockReturnValueOnce(productsBuilder as any)
         .mockReturnValueOnce(variantsBuilder as any)
         .mockReturnValueOnce(imagesBuilder as any);
@@ -152,7 +154,7 @@ describe("products lib", () => {
       const variantsBuilder = createQueryBuilder(mockVariants);
       const imagesBuilder = createQueryBuilder(mockImages);
 
-      vi.mocked(dbModule.db.select)
+      mockTxSelect
         .mockReturnValueOnce(productsBuilder as any)
         .mockReturnValueOnce(variantsBuilder as any)
         .mockReturnValueOnce(imagesBuilder as any);
@@ -175,7 +177,7 @@ describe("products lib", () => {
       const variantsBuilder = createQueryBuilder([]);
       const imagesBuilder = createQueryBuilder([]);
 
-      vi.mocked(dbModule.db.select)
+      mockTxSelect
         .mockReturnValueOnce(productsBuilder as any)
         .mockReturnValueOnce(variantsBuilder as any)
         .mockReturnValueOnce(imagesBuilder as any);
