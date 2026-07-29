@@ -572,3 +572,4 @@
 - **Adicional:** `tx` en `getEnrichedItems` cambió de opcional a obligatorio, eliminando el fallback silencioso a `db` global. Removido `import { db }` del cart route.
 - **Grep ampliado:** cubrió `packages/auth/`, `packages/storage/`, `packages/validation/`, `packages/logger/`, `packages/test-utils/`, `packages/commerce/`, `apps/superadmin/` — 0 matches.
 - **Verificación final:** lint 6/6 ✅ | typecheck 9/9 ✅ | tests 47/47, 379/379 ✅
+- **Deuda técnica (TOCTOU):** Entre Phase 1 (read) y Phase 3 (write) del PUT de `products/[id]` hay una ventana donde el producto pudo haber sido borrado — el UPDATE afecta 0 filas sin error, y el re-fetch devuelve array vacío, terminando en 200 con cuerpo vacío. Probabilidad baja (admin de 1 tenant, ventana de segundos), pero no hay catch de FK violation (`23503`) como sí tiene `images/route.ts`. Queda pendiente para una sesión futura de hardening.
