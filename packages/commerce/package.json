@@ -24,7 +24,7 @@
     "resend": "^6.12.2"
   },
   "devDependencies": {
-    "@types/nodemailer": "^8.0.0",
+    "@types/nodemailer": "^8.0.1",
     "typescript": "^5"
   }
 }
