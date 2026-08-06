@@ -599,3 +599,21 @@
 - **Grep ampliado:** cubrió `packages/auth/`, `packages/storage/`, `packages/validation/`, `packages/logger/`, `packages/test-utils/`, `packages/commerce/`, `apps/superadmin/` — 0 matches.
 - **Verificación final:** lint 6/6 ✅ | typecheck 9/9 ✅ | tests 47/47, 379/379 ✅
 - **Deuda técnica (TOCTOU):** Entre Phase 1 (read) y Phase 3 (write) del PUT de `products/[id]` hay una ventana donde el producto pudo haber sido borrado — el UPDATE afecta 0 filas sin error, y el re-fetch devuelve array vacío, terminando en 200 con cuerpo vacío. Probabilidad baja (admin de 1 tenant, ventana de segundos), pero no hay catch de FK violation (`23503`) como sí tiene `images/route.ts`. Queda pendiente para una sesión futura de hardening.
+
+---
+
+## 2026-07-30 — E2E Vercel-ready + CI workflow
+
+- **Parametrización URLs:** `playwright.config.ts` y `global-setup.ts` leen `E2E_STOREFRONT_URL`, `E2E_ADMIN_URL`, `E2E_SUPERADMIN_URL` de env vars con fallback a localhost.
+- **CI workflow:** `.github/workflows/e2e.yml` — trigger en PR a develop, espera previews Vercel, seed en Neon, ejecuta E2E, comenta resultado en PR.
+- **Helper script:** `scripts/get-vercel-preview-url.js` — obtiene URL del preview deployment vía API de Vercel.
+- **Env vars documentadas:** en `.env.local.example` y `.env.local`.
+
+## 2026-08-06 — E2E con dominios custom asignados a la rama
+
+- **Estrategia cambiada:** se asignan `*.landaetastudio.com`, `admin.landaetastudio.com` y `superadmin.landaetastudio.com` al branch `feat/e2e-playwright` en Vercel. URLs fijas en CI; el proxy resuelve tenant por subdominio (`tienda1.landaetastudio.com`), sin `DEFAULT_TENANT_SLUG`.
+- **playwright.config.ts movido a la raíz** y `testMatch` corregidos (eran relativos a `testDir`). Se eliminó el proyecto `setup` vacío que causaba "No tests found".
+- **Fix cross-tenant:** `e2e/security/cross-tenant.spec.ts` reescrito para testear el diseño original (admin T1 → GET/PUT/DELETE de producto T2 vía API admin → 403/404). Agregada `E2E_STOREFRONT_T2_URL`.
+- **CI simplificado:** eliminado `scripts/get-vercel-preview-url.js` y el job de Vercel API. Reemplazado por job `wait-for-deployments` (poll de los 3 dominios custom).
+- **NEXTAUTH_URL confirmada como no requerida:** Auth.js v5 auto-activa `trustHost` en Vercel; solo Credentials + JWT.
+- **Secrets GitHub necesarios:** `NEON_DATABASE_URL`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`. Ya no hace falta `VERCEL_TOKEN`.
