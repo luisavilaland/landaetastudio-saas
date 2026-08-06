@@ -9,7 +9,7 @@ const SUPERADMIN_URL =
     ? "https://superadmin.landaetastudio.com"
     : "http://localhost:3002");
 
-async function globalSetup(config: FullConfig) {
+export default async function globalSetup(config: FullConfig) {
   const adminBrowser = await chromium.launch();
   const adminPage = await adminBrowser.newPage();
   await adminPage.goto(`${ADMIN_URL}/login`);

@@ -11,6 +11,11 @@ on:
       - "e2e/**"
       - ".github/workflows/e2e.yml"
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 env:
   E2E_STOREFRONT_URL: https://tienda1.landaetastudio.com
   E2E_STOREFRONT_T2_URL: https://tienda2.landaetastudio.com
