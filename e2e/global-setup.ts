@@ -16,7 +16,7 @@ export default async function globalSetup(config: FullConfig) {
   await adminPage.fill("[name=email]", process.env.E2E_ADMIN_EMAIL!);
   await adminPage.fill("[name=password]", process.env.E2E_ADMIN_PASSWORD!);
   await adminPage.click("button[type=submit]");
-  await adminPage.waitForURL(`${ADMIN_URL}/`);
+  await adminPage.waitForURL("**/dashboard");
   await adminPage.context().storageState({ path: "e2e/.auth/admin.json" });
   await adminBrowser.close();
 
@@ -26,7 +26,7 @@ export default async function globalSetup(config: FullConfig) {
   await saPage.fill("[name=email]", process.env.E2E_SUPERADMIN_EMAIL!);
   await saPage.fill("[name=password]", process.env.E2E_SUPERADMIN_PASSWORD!);
   await saPage.click("button[type=submit]");
-  await saPage.waitForURL(`${SUPERADMIN_URL}/`);
+  await saPage.waitForURL("**/tenants");
   await saPage.context().storageState({ path: "e2e/.auth/superadmin.json" });
   await saBrowser.close();
 }
