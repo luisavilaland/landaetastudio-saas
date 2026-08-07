@@ -89,23 +89,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Diagnose DB connectivity
-        run: |
-          if [[ -z "$DATABASE_URL" ]]; then
-            echo "DATABASE_URL is EMPTY/NOT SET"
-          else
-            echo "DATABASE_URL is set"
-            host=$(node -e "console.log(new URL(process.env.DATABASE_URL).hostname)")
-            echo "Host: $host"
-            getent hosts "$host" || echo "DNS resolution failed for $host"
-            if timeout 8 bash -c "</dev/tcp/$host/5432" 2>/dev/null; then
-              echo "TCP connect OK to $host:5432"
-            else
-              echo "TCP connect FAILED to $host:5432"
-            fi
-          fi
-        env:
-          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: pnpm db:migrate && pnpm db:seed
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
@@ -123,8 +106,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Install Playwright Chromium (con deps del sistema para AlmaLinux)
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Install Playwright Chromium
+        # Sin --with-deps: en AlmaLinux Playwright cae al fallback Ubuntu y usa apt-get (inexistente).
+        # Las libs del sistema se instalan una vez en el runner vía dnf; Playwright 1.62 ya tiene
+        # el build chromium-1234 cacheado en el runner y `install chromium` valida sin descargar.
+        run: pnpm exec playwright install chromium
       - name: Run E2E tests
         run: pnpm test:e2e
         env:

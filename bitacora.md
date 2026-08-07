@@ -660,3 +660,22 @@ Tras re-run del round 1 quedaron 6 fallos: `auth`, `register`, `cart`, `checkout
   - **Guard anti-fork** en cada job self-hosted: `if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository`. El repo es público y un runner self-hosted en repos públicos es vector RCE si corren PRs de forks; este guard los salta (push/workflow_dispatch/PR mismo repo corren normal).
   - Prerequisitos del runner: Node 22, pnpm, git, red a Neon + los 3 dominios Vercel.
 - **Branch:** `feat/e2e-playwright`
+
+## 2026-08-07 — Cierre de infra del seed en el runner self-hosted (mj20)
+
+Los jobs `seed` y `e2e` del runner self-hosted (AlmaLinux, máquina `mj20`) quedaron bloqueados por 3 problemas de **infra del host** (no de código). Diagnóstico y resolución:
+
+- **1. Resolución DNS solo IPv6 + sin ruta IPv6.** `getent hosts` del endpoint Neon devolvía solo `AAAA` y el runner no enruta IPv6 → `postgres(process.env.DATABASE_URL!)` daba `ECONNREFUSED` (`[errors] ×3`). El host **sí** tiene IPv4; la causa era puramente de conectividad. Fix operativo: pin IPv4 en `/etc/hosts` del runner:
+  ```bash
+  echo '54.209.204.248 ep-dawn-hat-amtrizsw.c-5.us-east-1.aws.neon.tech' >> /etc/hosts
+  ```
+  Caveat: si el endpoint Neon cambia de IP hay que re-pinarlo y no se replica a otros runners.
+- **Egress IPv4 al puerto 5432 bloqueado.** Tras el pin, `seed` resolvía IPv4 pero seguía en `ECONNREFUSED`. Clasificación con `/dev/tcp`: `:443` OK, `:5432` FAIL contra la **misma IP** → firewall/NAT del host bloquea la **salida TCP 5432**. Se abre egress en el host (p. ej. firewalld):
+  ```bash
+  firewall-cmd --permanent --add-rich-rule='rule family="ipv4" port port="5432" protocol="tcp" accept'
+  firewall-cmd --reload
+  ```
+- **Playwright no soporta AlmaLinux de forma oficial.** `playwright install --with-deps chromium` cae al fallback Ubuntu y ejecuta `apt-get` (inexistente en RHEL-family) → `command not found`, exit 127. Fix: **quitar `--with-deps`** del job `e2e` del workflow; las libs del sistema se instalan una vez en el runner vía `dnf`, y Playwright 1.62.0 ya tiene el build `chromium-1234` (Chrome 151.0.7922.34) cacheado en `~/.cache/ms-playwright`, así que `playwright install chromium` valida sin descargar (la revisión 1234 es exactamente la que espera 1.62.0).
+- **Diagnóstico anexo revertido:** se eliminó el paso "Diagnose DB connectivity" del job `seed` (solo servía para clasificar el bloqueo; quedó ruido una vez resuelto).
+- **Prerequisitos documentados del runner self-hosted:** Node 22, pnpm, git, **egress TCP a Neon en 5432** (IPv4 o IPv6), pin IPv4 del endpoint Neon en `/etc/hosts` si no hay ruta IPv6, y las libs del sistema de chromium instaladas vía `dnf` (nss, atk, at-spi2-atk, cups-libs, libdrm, libxkbcommon, libXcomposite, libXdamage, libXfixes, libXrandr, mesa-libgbm, alsa-lib, pango, cairo, gtk3).
+- **Branch:** `feat/e2e-playwright`
