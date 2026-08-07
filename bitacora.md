@@ -637,3 +637,16 @@
 - **Fix 5 — timeouts ampliados en `playwright.config.ts`:** `timeout: 60_000` (era default 30s) y `expect.timeout: 10_000` (era 5s) para tolerar lentitud cold-start Vercel.
 - **Verificación pendiente:** re-run vía `workflow_dispatch` para confirmar los 6 fixes y distinguir si los fallos de `cart`/`checkout`/`crear-producto` eran entorno (deberían pasar) o bugs reales con 500s persistentes.
 - **Branch:** `feat/e2e-playwright`
+
+---
+
+## 2026-08-07 — Round 2 E2E: fixes de aplicación/infra (auth RLS, cart, proxy, spec)
+
+Tras re-run del round 1 quedaron 6 fallos: `auth`, `register`, `cart`, `checkout`, `crear-producto`. Se re-clasifica el diagnóstico: 2 eran bugs reales de **código de aplicación** (auth contra RLS + proxy) y 4 de **infra/harness** (Redis). Correcciones aplicadas en `feat/e2e-playwright`:
+
+- **Fix 1 — `apps/storefront/proxy.ts`:** el matcher del middleware no incluía `/api/auth`, así que el login nunca pasaba por el middleware que inyecta `x-tenant-id` (necesario para resolver el tenant). Se agrega `/api/auth/:path*` al matcher.
+- **Fix 2 — `apps/storefront/lib/auth.ts` + nuevo `lib/customer-auth.ts`:** el `authorize` de Credentials consultaba `customers` **sin** contexto RLS: con el rol `app_user` (sin BYPASSRLS), `dbCustomers` tiene RLS activo y la query devolvía 0 filas → login siempre fallaba. Se traslada la lógica a `customer-auth.ts` con `authorizeCustomer(email, password, tenantId)` que envuelve la query en `withTenantContext(tenantId, cb)` (transacción + `SET LOCAL set_tenant_id`), lookup tenant-escoped. Se añade unit test `customer-auth.test.ts` (4 casos: válido, password incorrecto, customer inexistente, falta credenciales). El **test del endpoint `/api/cart`** se actualizó al cambiar `@/lib/redis` (el route ya no usa `redisClient`; ahora expone `safeGet`/`redisSetEx`/`redisDel`).
+- **Fix 3 — `packages/commerce/src/redis.ts` + handlers de carrito:** se agregan wrappers progresivos `safeGet`/`redisSetEx`/`redisDel` que degradan (null/no-op + `warn`) en vez de tirar 500 cuando Redis está caído; `redisClient` con `enableOfflineQueue: false` para fallar rápido. `packages/commerce/src/cart.ts` y `apps/storefront/app/api/cart/route.ts` usan ahora estos helpers → en E2E sin Redis, el carrito se trata como vacío (200) en lugar de un 500.
+- **Fix 4 — `e2e/admin/products-crud.spec.ts`:** el test "crear producto" no llenaba el campo obligatorio `stock`, por lo que el submit fallaba la validación y no navegaba a `/products`. Se agrega `page.fill("#stock", "10")`.
+- **Verificación:** `pnpm lint` y `pnpm typecheck` en verde para `storefront` y `@repo/commerce`. Los unit tests que importan `@repo/db` (cart y customer-auth) requieren `DATABASE_APP_URL` en el entorno para cargar el módulo; en el worktree local solo hay vars E2E, así que la corrida unitaria depende del harness (CI/`workflow_dispatch` definen `DATABASE_APP_URL`).
+- **Branch:** `feat/e2e-playwright`

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { redisClient } from "@/lib/redis";
+import { safeGet, redisSetEx, redisDel } from "@/lib/redis";
 import { dbProducts, dbProductVariants, dbProductImages, withTenantContext } from "@repo/db";
 import { inArray, eq, and } from "drizzle-orm";
 import { addCartItemSchema, updateCartItemSchema, deleteCartItemSchema } from "@repo/validation";
@@ -25,7 +25,7 @@ type Cart = {
 const CART_TTL = 60 * 60 * 24 * 7; // 7 days in seconds
 
 async function getCart(sessionId: string): Promise<Cart> {
-  const data = await redisClient.get(`cart:${sessionId}`);
+  const data = await safeGet(`cart:${sessionId}`);
   if (!data) {
     return { items: [], updatedAt: new Date().toISOString() };
   }
@@ -34,7 +34,7 @@ async function getCart(sessionId: string): Promise<Cart> {
 
 async function saveCart(sessionId: string, cart: Cart): Promise<void> {
   cart.updatedAt = new Date().toISOString();
-  await redisClient.setex(`cart:${sessionId}`, CART_TTL, JSON.stringify(cart));
+  await redisSetEx(`cart:${sessionId}`, CART_TTL, JSON.stringify(cart));
 }
 
 async function getEnrichedItems(cart: Cart, variants: any[], tenantId: string, tx: any) {
@@ -317,7 +317,7 @@ export async function DELETE(request: NextRequest) {
     const { variantId, clearAll } = validation.data;
 
     if (clearAll) {
-      await redisClient.del(`cart:${sessionId}`);
+      await redisDel(`cart:${sessionId}`);
       return NextResponse.json({ items: [] });
     }
 

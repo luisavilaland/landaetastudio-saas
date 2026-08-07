@@ -10,6 +10,7 @@ test.describe("Admin - Products CRUD", () => {
     await page.goto("/products/new");
     await page.fill("[data-testid=product-form-name]", "Test E2E Product");
     await page.fill("[data-testid=product-form-price]", "99.99");
+    await page.fill("#stock", "10");
     await page.click("[data-testid=product-form-submit]");
     await page.waitForURL("**/products");
   });
