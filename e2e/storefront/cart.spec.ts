@@ -12,10 +12,9 @@ test.describe("Cart", () => {
     await card.click();
     await page.waitForURL("**/products/**");
     const addBtn = page.locator("[data-testid=add-to-cart]");
-    if (await addBtn.isEnabled()) {
-      await addBtn.click();
-      await expect(page.locator("text=Agregado al carrito")).toBeVisible({ timeout: 5000 });
-    }
+    await expect(addBtn).toBeEnabled({ timeout: 10_000 });
+    await addBtn.click();
+    await expect(page.locator("text=Agregado al carrito")).toBeVisible();
   });
 
   test("ver carrito con ítem", async ({ page }) => {
@@ -24,13 +23,10 @@ test.describe("Cart", () => {
     await card.click();
     await page.waitForURL("**/products/**");
     const addBtn = page.locator("[data-testid=add-to-cart]");
-    if (await addBtn.isEnabled()) {
-      await addBtn.click();
-    }
+    await expect(addBtn).toBeEnabled({ timeout: 10_000 });
+    await addBtn.click();
+    await expect(page.locator("text=Agregado al carrito")).toBeVisible();
     await page.goto("/cart");
-    const cartItem = page.locator("[data-testid=cart-item]");
-    if (await cartItem.isVisible()) {
-      await expect(cartItem).toBeVisible();
-    }
+    await expect(page.locator("[data-testid=cart-item]")).toBeVisible();
   });
 });

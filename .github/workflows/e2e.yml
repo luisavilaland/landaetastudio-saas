@@ -27,9 +27,14 @@ concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
 
+# Guard anti-fork: este repo es público y usa un runner self-hosted.
+# Bloqueamos que código de PRs de entornos ajenos (forks) se ejecute en la
+# máquina del runner self-hosted (vector RCE). push/workflow_dispatch y PRs
+# del mismo repo corren normal; los PRs de forks se saltan.
 jobs:
   wait-for-deployments:
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: self-hosted
     timeout-minutes: 15
     steps:
       - name: Wait for storefront to be ready
@@ -73,7 +78,8 @@ jobs:
           E2E_SUPERADMIN_URL: ${{ env.E2E_SUPERADMIN_URL }}
 
   seed:
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: self-hosted
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +94,8 @@ jobs:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 
   e2e:
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: self-hosted
     needs: [wait-for-deployments, seed]
     timeout-minutes: 30
     steps:
@@ -99,7 +106,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install chromium
+      - name: Install Playwright Chromium (con deps del sistema para AlmaLinux)
+        run: pnpm exec playwright install --with-deps chromium
       - name: Run E2E tests
         run: pnpm test:e2e
         env:

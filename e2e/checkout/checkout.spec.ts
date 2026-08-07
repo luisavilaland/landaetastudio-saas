@@ -7,10 +7,9 @@ test.describe("Checkout", () => {
     await card.click();
     await page.waitForURL("**/products/**");
     const addBtn = page.locator("[data-testid=add-to-cart]");
-    if (await addBtn.isEnabled()) {
-      await addBtn.click();
-      await expect(page.locator("text=Agregado al carrito")).toBeVisible({ timeout: 5000 });
-    }
+    await expect(addBtn).toBeEnabled({ timeout: 10_000 });
+    await addBtn.click();
+    await expect(page.locator("text=Agregado al carrito")).toBeVisible();
     await page.goto("/checkout");
   });
 
@@ -20,11 +19,11 @@ test.describe("Checkout", () => {
     await card.click();
     await page.waitForURL("**/products/**");
     const addBtn = page.locator("[data-testid=add-to-cart]");
-    if (await addBtn.isEnabled()) {
-      await addBtn.click();
-    }
+    await expect(addBtn).toBeEnabled({ timeout: 10_000 });
+    await addBtn.click();
+    await expect(page.locator("text=Agregado al carrito")).toBeVisible();
     await page.goto("/checkout");
-    await page.waitForSelector("[data-testid=checkout-name]", { timeout: 5000 });
+    await expect(page.locator("[data-testid=checkout-name]")).toBeVisible();
     await page.fill("[data-testid=checkout-name]", "Juan Pérez");
     await page.fill("[data-testid=checkout-email]", "juan@test.com");
     await page.fill("[data-testid=checkout-address]", "Av. Italia 1234");
