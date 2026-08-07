@@ -716,3 +716,13 @@ El run E2E siguió en **28 passed / 1 failed (`cart`) / 1 flaky (`checkout`) / 1
 - **Mejora no-bloqueante del reviewer implementada:** `redisDown()` ahora además dispara `captureMessage("Redis unavailable during \"<op>\"")` a Sentry vía dynamic import de `@sentry/nextjs` (try/catch: no-op si no hay DSN o en tests). Se declaró `@sentry/nextjs@^10.69.0` (misma versión que las 3 apps) en `packages/commerce/package.json`; `pnpm-lock.yaml` actualizado.
 - **Verificación local:** `@repo/commerce` typecheck OK; suite completa **383 passed (48 files)**; ESLint OK en el archivo tocado. (Nota: `prettier --check` local falla por `prettier-plugin-tailwindcss` ausente — preexistente, el plugin nunca estuvo en el lockfile.)
 - **Branch:** `feat/e2e-playwright`
+
+## 2026-08-07 — Post-merge: dominios a producción + auditoría de env vars + pnpm install
+
+Tras mergear el PR #40 (feat/e2e-playwright) a develop, se cerraron los 3 pendientes operativos de la lista post-merge:
+
+- **1. Dominios reasignados a la rama `develop` en Vercel** (REST API con token de sesión, `PATCH /v9/projects/{p}/domains/{d}` con `gitBranch: "develop"`): `*.landaetastudio.com` (storefront), `admin.landaetastudio.com` (admin), `superadmin.landaetastudio.com` (superadmin). Apuntaban a `feat/e2e-playwright` (rama ya eliminada); sin el cambio quedaban sin servir. Los 3 verificados=True contra el preview de develop. Nota: el primer intento los puso en producción (`gitBranch: null` → rama de producción `main`, último build de mayo 2026); se corrigió de inmediato a `develop`.
+- **2. Auditoría de env vars (producción + preview) en los 3 proyectos Vercel**: completas — `DATABASE_URL`, `DATABASE_APP_URL`, `AUTH_SECRET`, `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET`, `R2_*`, `RESEND_API_KEY`, `STOREFRONT_URL` (storefront además `REDIS_URL` en mayúsculas + `UPSTASH_*`; admin/superadmin además `NEXTAUTH_URL` y `ADMIN_HOST`/`SUPERADMIN_HOST`). Sin gaps que corregir. `UPSTASH_REDIS_REST_URL` en storefront no rompe el boot porque las demás cloud vars de producción están presentes (el trap de `isProduction` exige todas, y están todas).
+- **3. `pnpm install --frozen-lockfile`** en el repo principal: sincroniza node_modules con la dep nueva `@sentry/nextjs` en `@repo/commerce` que trajo el merge.
+- **Nota para el release:** los dominios apuntan al preview de `develop` (build fresco con el E2E mergeado). La rama de producción de los 3 proyectos es `main`; hasta que se mergee `develop → main`, el dominio no sirve el build de producción de mayo 2026.
+- **Branch:** `develop`
