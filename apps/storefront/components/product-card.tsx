@@ -25,6 +25,7 @@ export function ProductCard({ product }: ProductCardProps) {
   return (
     <Link
       href={`/products/${product.slug}`}
+      data-testid="product-card"
       className="group block bg-white border border-zinc-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
     >
       <div className="aspect-square bg-zinc-100 relative">

@@ -53,6 +53,7 @@ export function AddToCartButton({ variantId, inStock }: Props) {
   return (
     <button
       onClick={handleAddToCart}
+      data-testid="add-to-cart"
       disabled={!inStock || loading}
       className={`w-full block text-center px-6 py-3 font-medium rounded-lg ${
         inStock

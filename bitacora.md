@@ -562,7 +562,33 @@
 
 ---
 
-## 2026-07-28 — Fix: R2 fuera de withTenantContext en products/[id] PUT
+## 2026-07-29 — Fase 1: Infraestructura E2E con Playwright
+
+- **Branch:** `feat/e2e-playwright` (Paseo worktree, branch off develop)
+- **Instalación:** `pnpm add -D -w @playwright/test` (v1.62.0)
+- **`e2e/playwright.config.ts`:** 6 projects (setup, storefront, checkout, admin, superadmin, security) con `baseURL` por proyecto, `storageState` para admin/superadmin/security, `fullyParallel: false`, `workers: 1`
+- **`e2e/global-setup.ts`:** login real admin en `http://localhost:3001/login` y superadmin en `http://localhost:3002/login`, guarda `storageState` en `e2e/.auth/admin.json` y `e2e/.auth/superadmin.json`
+- **Directorios creados:** `e2e/storefront/`, `e2e/checkout/`, `e2e/admin/`, `e2e/superadmin/`, `e2e/security/`, `e2e/setup/`
+- **Scripts en root package.json:** `test:e2e`, `test:e2e:ui`, `test:e2e:debug`, `test:e2e:report`
+- **.gitignore:** `e2e/.auth/`, `e2e/test-results/`, `e2e/playwright-report/`
+- **.env.local:** `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`
+- **Commit:** `4c5fde2` — "feat: E2E infraestructura Playwright — config, global-setup, scripts"
+
+---
+
+## Estado actual (29 de julio 2026)
+
+| Métrica | Valor |
+|---------|-------|
+| Tests | 379 pasando, 0 fallos |
+| E2E | Infraestructura lista (0 specs aún) |
+| Apps | storefront, admin, superadmin |
+| Servicios | Neon, Upstash, R2, Resend |
+| Deploy | Vercel (3 apps) |
+| Rama default | `develop` |
+| Build | Limpio (sin `ignoreBuildErrors`) |
+| CI | GitHub Actions (lint, typecheck, build, test) |
+| RLS | Activo con `app_user`, 27 handlers wireados con `withTenantContext` |
 
 - **Problema detectado en code review:** `uploadImage`/`deleteImage` quedaron dentro del `withTenantContext`, dejando una transacción PG abierta durante operaciones R2 (mismo anti-pattern que ya corregimos en `images/route.ts`).
 - **Solución:** Separar PUT en tres fases:
@@ -573,3 +599,120 @@
 - **Grep ampliado:** cubrió `packages/auth/`, `packages/storage/`, `packages/validation/`, `packages/logger/`, `packages/test-utils/`, `packages/commerce/`, `apps/superadmin/` — 0 matches.
 - **Verificación final:** lint 6/6 ✅ | typecheck 9/9 ✅ | tests 47/47, 379/379 ✅
 - **Deuda técnica (TOCTOU):** Entre Phase 1 (read) y Phase 3 (write) del PUT de `products/[id]` hay una ventana donde el producto pudo haber sido borrado — el UPDATE afecta 0 filas sin error, y el re-fetch devuelve array vacío, terminando en 200 con cuerpo vacío. Probabilidad baja (admin de 1 tenant, ventana de segundos), pero no hay catch de FK violation (`23503`) como sí tiene `images/route.ts`. Queda pendiente para una sesión futura de hardening.
+
+---
+
+## 2026-07-30 — E2E Vercel-ready + CI workflow
+
+- **Parametrización URLs:** `playwright.config.ts` y `global-setup.ts` leen `E2E_STOREFRONT_URL`, `E2E_ADMIN_URL`, `E2E_SUPERADMIN_URL` de env vars con fallback a localhost.
+- **CI workflow:** `.github/workflows/e2e.yml` — trigger en PR a develop, espera previews Vercel, seed en Neon, ejecuta E2E, comenta resultado en PR.
+- **Helper script:** `scripts/get-vercel-preview-url.js` — obtiene URL del preview deployment vía API de Vercel.
+- **Env vars documentadas:** en `.env.local.example` y `.env.local`.
+
+## 2026-08-06 — E2E con dominios custom asignados a la rama
+
+- **Estrategia cambiada:** se asignan `*.landaetastudio.com`, `admin.landaetastudio.com` y `superadmin.landaetastudio.com` al branch `feat/e2e-playwright` en Vercel. URLs fijas en CI; el proxy resuelve tenant por subdominio (`tienda1.landaetastudio.com`), sin `DEFAULT_TENANT_SLUG`.
+- **playwright.config.ts movido a la raíz** y `testMatch` corregidos (eran relativos a `testDir`). Se eliminó el proyecto `setup` vacío que causaba "No tests found".
+- **Fix cross-tenant:** `e2e/security/cross-tenant.spec.ts` reescrito para testear el diseño original (admin T1 → GET/PUT/DELETE de producto T2 vía API admin → 403/404). Agregada `E2E_STOREFRONT_T2_URL`.
+- **CI simplificado:** eliminado `scripts/get-vercel-preview-url.js` y el job de Vercel API. Reemplazado por job `wait-for-deployments` (poll de los 3 dominios custom).
+- **NEXTAUTH_URL confirmada como no requerida:** Auth.js v5 auto-activa `trustHost` en Vercel; solo Credentials + JWT.
+- **Secrets GitHub necesarios:** `NEON_DATABASE_URL`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`. Ya no hace falta `VERCEL_TOKEN`.
+- **Fix global-setup post-login:** el job `e2e` de CI fallaba en `e2e/global-setup.ts:19` con `TimeoutError` — el login funcionaba pero `waitForURL` exigía la URL exacta `/` y la app redirige a `/dashboard` (admin) y `/tenants` (superadmin). Corregido con globs `**/dashboard` y `**/tenants`. En el run del commit `8c08e31`, `seed`, `wait-for-deployments`, `build` y Vercel quedaron en success; el fix de global-setup se valida en el siguiente run.
+
+## 2026-08-06 — workflow_dispatch en e2e.yml + validez del fix bloqueada por incidente de GitHub Actions
+
+- **Incidente externo GitHub Actions** desde 2026-08-06 15:22 UTC (`major_outage`, crítico): webhooks throttled (~15%), runners asignándose jobs inválidos, runs quedando `queued` con 0 jobs. Primer `run de validación` del fix post-login (commit `b08c`-prev) nunca materializó jobs. No es fallo del repo.
+- **`workflow_dispatch:` agregado al trigger de `e2e.yml`**: permite lanzar el workflow manualmente ("Run workflow") inmune al throttle de webhooks y a runs colgados que no ofrecen botón de re-run (un run `queued` con 0 jobs no muestra opción de re-run porque el endpoint `POST /actions/runs/{id}/rerun` requiere al menos un job enlazado / context de UI). Con esto, una vez recuperado Actions, se cancela el run colgado y se dispara uno nuevo manual.
+- **Reentry de validación postergada:** la validación del fix de global-setup (`c03f43b`) sigue pendiente mientras dure el `major_outage`. Cuando Actions quede `operational`, validar run E2E → si verde, merge PR #40 → `develop` y reasignar dominios custom a prod.
+
+## 2026-08-06 — Fix bugs E2E: 11 fallos diagnosticados y corregidos (6 specs + config)
+
+- **Run real de validación ejecutado** (trás recuperarse Actions): 31 tests, 11 fallando. Diagnóstico clasificado en 6 bugs deterministas de spec (corregidos) + fallos de entorno (lentitud cold-start Vercel, `page.goto` timeout 30s).
+- **Fix 1 — `e2e/storefront/auth.spec.ts`:**
+  - Login "credenciales válidas" usaba `admin@tienda1.com` — es un **admin**, pero la auth de storefront valida contra `customers` (`apps/storefront/lib/auth.ts`). El login fallaba y nunca redirigía. Cambiado a **`cliente@ejemplo.com`** (customer real del seed).
+  - Test `/perfil sin auth redirige a login` era **incorrecto**: `/perfil` es la página pública de la tienda (`perfil/page.tsx`), no una ruta protegida. Reemplazado por validación real: `/perfil` muestra el nombre del tenant **"Tienda Demo"** (`getByRole("heading", { name: "Tienda Demo" })`).
+- **Fix 2 — `e2e/storefront/register.spec.ts`:** email "ya existente" usaba `admin@tienda1.com` (no es customer → no devolvía 409). Cambiado a **`cliente@ejemplo.com`** para que register devuelva 409 y muestre `register-error`.
+- **Fix 3 — 3 specs admin (categories, products-crud, settings):** `locator("h1")` daba **strict-mode violation** porque el layout `(dashboard)/layout.tsx` renderiza `h1` "Admin" + el título de página. Reemplazado por `getByRole("heading", { name })`.
+- **Fix 4 — superadmin login en proyecto sin storageState:** el spec `superadmin/login.spec.ts` corría bajo el proyecto `superadmin` con `storageState: superadmin.json` (ya autenticado por global-setup) → `goto("/login")` redirige a `/tenants` y el form nunca aparecía. Movido a `e2e/superadmin-login/login.spec.ts` y creado proyecto `superadmin-login` **sin storageState** en `playwright.config.ts`.
+- **Fix 5 — timeouts ampliados en `playwright.config.ts`:** `timeout: 60_000` (era default 30s) y `expect.timeout: 10_000` (era 5s) para tolerar lentitud cold-start Vercel.
+- **Verificación pendiente:** re-run vía `workflow_dispatch` para confirmar los 6 fixes y distinguir si los fallos de `cart`/`checkout`/`crear-producto` eran entorno (deberían pasar) o bugs reales con 500s persistentes.
+- **Branch:** `feat/e2e-playwright`
+
+---
+
+## 2026-08-07 — Round 2 E2E: fixes de aplicación/infra (auth RLS, cart, proxy, spec)
+
+Tras re-run del round 1 quedaron 6 fallos: `auth`, `register`, `cart`, `checkout`, `crear-producto`. Se re-clasifica el diagnóstico: 2 eran bugs reales de **código de aplicación** (auth contra RLS + proxy) y 4 de **infra/harness** (Redis). Correcciones aplicadas en `feat/e2e-playwright`:
+
+- **Fix 1 — `apps/storefront/proxy.ts`:** el matcher del middleware no incluía `/api/auth`, así que el login nunca pasaba por el middleware que inyecta `x-tenant-id` (necesario para resolver el tenant). Se agrega `/api/auth/:path*` al matcher.
+- **Fix 2 — `apps/storefront/lib/auth.ts` + nuevo `lib/customer-auth.ts`:** el `authorize` de Credentials consultaba `customers` **sin** contexto RLS: con el rol `app_user` (sin BYPASSRLS), `dbCustomers` tiene RLS activo y la query devolvía 0 filas → login siempre fallaba. Se traslada la lógica a `customer-auth.ts` con `authorizeCustomer(email, password, tenantId)` que envuelve la query en `withTenantContext(tenantId, cb)` (transacción + `SET LOCAL set_tenant_id`), lookup tenant-escoped. Se añade unit test `customer-auth.test.ts` (4 casos: válido, password incorrecto, customer inexistente, falta credenciales). El **test del endpoint `/api/cart`** se actualizó al cambiar `@/lib/redis` (el route ya no usa `redisClient`; ahora expone `safeGet`/`redisSetEx`/`redisDel`).
+- **Fix 3 — `packages/commerce/src/redis.ts` + handlers de carrito:** se agregan wrappers progresivos `safeGet`/`redisSetEx`/`redisDel` que degradan (null/no-op + `warn`) en vez de tirar 500 cuando Redis está caído; `redisClient` con `enableOfflineQueue: false` para fallar rápido. `packages/commerce/src/cart.ts` y `apps/storefront/app/api/cart/route.ts` usan ahora estos helpers → en E2E sin Redis, el carrito se trata como vacío (200) en lugar de un 500.
+- **Fix 4 — `e2e/admin/products-crud.spec.ts`:** el test "crear producto" no llenaba el campo obligatorio `stock`, por lo que el submit fallaba la validación y no navegaba a `/products`. Se agrega `page.fill("#stock", "10")`.
+- **Verificación:** `pnpm lint` y `pnpm typecheck` en verde para `storefront` y `@repo/commerce`. Los unit tests que importan `@repo/db` (cart y customer-auth) requieren `DATABASE_APP_URL` en el entorno para cargar el módulo; en el worktree local solo hay vars E2E, así que la corrida unitaria depende del harness (CI/`workflow_dispatch` definen `DATABASE_APP_URL`).
+- **Fix tests (CI `pnpm test` roto, 11 fallos en 2 archivos):**
+  - `packages/commerce/src/__tests__/cart.test.ts` (7 fallos): el factory de `vi.mock("../redis")` exponía solo `redisClient.get/setex/del`, pero `cart.ts` pasó a importar `safeGet`/`redisSetEx`/`redisDel`. Re-mapeado el factory a los 3 helpers (`safeGet: mockRedisGet`, etc.), eliminando la envoltura `redisClient`.
+  - `apps/storefront/lib/__tests__/customer-auth.test.ts` (4 fallos): `vi.mocked(bcrypt.compare).mockResolvedValue is not a function` — bcrypt no estaba mockeado. Fix: `vi.mock("bcryptjs", ...)` con patrón del test de register (factory `importOriginal` que expone **both** `default` y `compare` como `vi.fn()`, ya que `import bcrypt from "bcryptjs"` con esModuleInterop envuelve el objeto y `bcrypt.compare` quedaba `undefined` si el mock solo expone `compare`). Se elimina el cast previo `const compare` y se usa `vi.mocked(bcrypt.compare).mockResolvedValue(x as never)` (mismo idiom que `register`).
+  - Verificación local: `cart.test.ts` 10/10, `customer-auth.test.ts` 4/4, typecheck 2/2.
+- **Run E2E (después del fix de tests):** 29 passed, 1 failed, 1 skipped. El único fallo restante era **flaky determinista** en `e2e/checkout/checkout.spec.ts`: `if (await addBtn.isEnabled())` se evalúa un instante tras navegar al producto — si el botón aún no está enabled, **no agrega nada** y sigue; además no esperaba el toast "Agregado al carrito" antes de `goto("/checkout")` (el POST `/api/cart`/cookie puede quedar en vuelo) → `/checkout` queda vacío y no renderiza el formulario (`checkout-name`). Y `waitForSelector(..., 5000)` era corto para cold-start Vercel.
+- **Fix checkout/cart determinista:** en `e2e/checkout/checkout.spec.ts` y `e2e/storefront/cart.spec.ts` se reemplaza el guard racy por `expect(addBtn).toBeEnabled({ timeout: 10_000 })` → `click()` → `expect("Agregado al carrito").toBeVisible()`, y en checkout se usa `expect(checkout-name).toBeVisible()` (timeout default 10s) en vez de `waitForSelector(5000)`. **Migración a runner self-hosted (AlmaLinux):**
+  - `e2e.yml` (jobs `wait-for-deployments`, `seed`, `e2e`) y `ci.yml` (job `build`) → `runs-on: self-hosted` (label default). Se evita depender de los minutes gratis de Actions.
+  - Job `e2e`: `playwright install --with-deps chromium` (deps del sistema para AlmaLinux vía `dnf`).
+  - **Guard anti-fork** en cada job self-hosted: `if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository`. El repo es público y un runner self-hosted en repos públicos es vector RCE si corren PRs de forks; este guard los salta (push/workflow_dispatch/PR mismo repo corren normal).
+  - Prerequisitos del runner: Node 22, pnpm, git, red a Neon + los 3 dominios Vercel.
+- **Branch:** `feat/e2e-playwright`
+
+## 2026-08-07 — Cierre de infra del seed en el runner self-hosted (mj20)
+
+Los jobs `seed` y `e2e` del runner self-hosted (AlmaLinux, máquina `mj20`) quedaron bloqueados por 3 problemas de **infra del host** (no de código). Diagnóstico y resolución:
+
+- **1. Resolución DNS solo IPv6 + sin ruta IPv6.** `getent hosts` del endpoint Neon devolvía solo `AAAA` y el runner no enruta IPv6 → `postgres(process.env.DATABASE_URL!)` daba `ECONNREFUSED` (`[errors] ×3`). El host **sí** tiene IPv4; la causa era puramente de conectividad. Fix operativo: pin IPv4 en `/etc/hosts` del runner:
+  ```bash
+  echo '54.209.204.248 ep-dawn-hat-amtrizsw.c-5.us-east-1.aws.neon.tech' >> /etc/hosts
+  ```
+  Caveat: si el endpoint Neon cambia de IP hay que re-pinarlo y no se replica a otros runners.
+- **Egress IPv4 al puerto 5432 bloqueado.** Tras el pin, `seed` resolvía IPv4 pero seguía en `ECONNREFUSED`. Clasificación con `/dev/tcp`: `:443` OK, `:5432` FAIL contra la **misma IP** → firewall/NAT del host bloquea la **salida TCP 5432**. Se abre egress en el host (p. ej. firewalld):
+  ```bash
+  firewall-cmd --permanent --add-rich-rule='rule family="ipv4" port port="5432" protocol="tcp" accept'
+  firewall-cmd --reload
+  ```
+- **Playwright no soporta AlmaLinux de forma oficial.** `playwright install --with-deps chromium` cae al fallback Ubuntu y ejecuta `apt-get` (inexistente en RHEL-family) → `command not found`, exit 127. Fix: **quitar `--with-deps`** del job `e2e` del workflow; las libs del sistema se instalan una vez en el runner vía `dnf`, y Playwright 1.62.0 ya tiene el build `chromium-1234` (Chrome 151.0.7922.34) cacheado en `~/.cache/ms-playwright`, así que `playwright install chromium` valida sin descargar (la revisión 1234 es exactamente la que espera 1.62.0).
+- **Diagnóstico anexo revertido:** se eliminó el paso "Diagnose DB connectivity" del job `seed` (solo servía para clasificar el bloqueo; quedó ruido una vez resuelto).
+- **Prerequisitos documentados del runner self-hosted:** Node 22, pnpm, git, **egress TCP a Neon en 5432** (IPv4 o IPv6), pin IPv4 del endpoint Neon en `/etc/hosts` si no hay ruta IPv6, y las libs del sistema de chromium instaladas vía `dnf` (nss, atk, at-spi2-atk, cups-libs, libdrm, libxkbcommon, libXcomposite, libXdamage, libXfixes, libXrandr, mesa-libgbm, alsa-lib, pango, cairo, gtk3).
+- **Branch:** `feat/e2e-playwright`
+
+## 2026-08-07 — Carrito/checkout no persistían: faltaba Redis (Upstash) con el nombre correcto
+
+Tras arreglar la infra del runner, el job E2E quedó en 28 passed / 2 failed (`cart`, `checkout`), ambos con el **mismo síntoma determinista**: tras "Agregado al carrito" (POST 200 y toast OK), `/cart` y `/checkout` salían vacías → `[data-testid=cart-item]` y `[data-testid=checkout-name]` ausentes. Diagnóstico:
+
+- El carrito es 100% Redis-persistido: `packages/commerce/src/redis.ts` y `apps/superadmin/lib/redis.ts` leen `process.env.REDIS_URL` (ioredis). El proxy genera el cookie `cart_session_id` estable (`apps/storefront/proxy.ts:114`) e inyecta `x-cart-session-id`, así que POST y GET usan la misma sesión.
+- **Variable en mayúsculas:** el código lee `REDIS_URL`. En Vercel había quedado como `redis_url` (minúsculas) → `process.env.REDIS_URL` era `undefined` → fallback a `redis://localhost:6379` → cada `safeGet`/`redisSetEx` degrada a `null`/no-op → POST "ok" pero nada se persiste → GET devuelve `items: []`. Los nombres de variables de entorno son sensibles a mayúsculas/minúsculas.
+- **DB Upstash borrada:** al restaurar, "no databases available". No hay una política conocida de Upstash que borre el free tier por inactividad; probablemente se borró manualmente. Se recrea la instancia.
+- **Cuidado con `isProduction`** (`@repo/validation/env.ts`): `isProduction = NODE_ENV==="production" && (R2 || RESEND || UPSTASH_REDIS_REST_URL)`. Si el storefront arranca con solo las core, agregar `UPSTASH_REDIS_REST_URL` hace que `productionSchema` exija además `RESEND_API_KEY`, `R2_*`, `MERCADOPAGO_WEBHOOK_SECRET`, `STOREFRONT_URL` → sin ellas la app **revienta al boot**. Como el carrito solo usa `REDIS_URL` (que **no** está en `hasCloudVars`), alcanza con setear `REDIS_URL` (mayúsculas) en Vercel; `UPSTASH_*` es opcional y solo si se completan las demás vars de producción.
+- **Acción:** se configura `REDIS_URL` (nueva instancia Upstash `model-emu-200894`, URL `rediss://...:6379`) en el `.env.local` y se documenta. El carrito requiere **`REDIS_URL` (mayúsculas, ioredis)** — distinta de `UPSTASH_REDIS_REST_URL`.
+- **Branch:** `feat/e2e-playwright`
+
+## 2026-08-07 — E2E casi verde: fix de flakiness en `cart` (cold-start Vercel)
+
+Tras configurar `REDIS_URL` en Vercel, el run E2E quedó en **29 passed / 1 flaky / 1 skipped**: `checkout` ya pasa (el carrito persiste), pero `cart.spec.ts` "ver carrito con ítem" quedó **flaky** — `[data-testid=cart-item]` no aparecía en 10s en el primer intento y pasaba en el retry. Se trató de cold-start de Vercel en el primer hit a `/cart` (Server Component + GET `/api/cart`), no de un bug de app. Fix en `e2e/storefront/cart.spec.ts:30`: `toBeVisible({ timeout: 30_000 })` (mismo patrón que el fix de `checkout`). El `1 skipped` es intencional (spec con `test.skip`).
+- **Branch:** `feat/e2e-playwright`
+
+## 2026-08-07 — Auditoría RLS/tenant: grep con BRE roto dio falso "0 matches"; re-corrida con ripgrep limpia
+
+El reviewer pidió re-correr la búsqueda de accesos directos a `db` (sin `withTenantContext`) con sintaxis correcta: el grep de la auditoría anterior usaba BRE (sin `-E`/`-P`), donde `\(` y `|` son literales → reportaba "0 matches" por herramienta rota, no porque no hubiera código. Re-corrida con ripgrep sobre todo el worktree:
+
+- `db\.(select|insert|update|delete)\s*\(` → 20 matches, **todos** en `packages/db/seed.ts` (legítimo: el seed corre con rol owner/BYPASSRLS, no está sujeto a RLS).
+- Ampliado `db\.(select|insert|update|delete|execute|query|transaction)\s*\(` → 30 matches: `seed.ts` + `packages/db/src/index.ts:19` (`db.transaction` — es la implementación del propio helper `withTenantContext`).
+- `db\.query\.\w+` (consultas relacionales de Drizzle, otra vía de acceso directo) → **0 matches**.
+
+Conclusión: no queda ningún acceso directo a tablas de negocio fuera de `withTenantContext` en código de runtime. El único bug de ese tipo era `apps/storefront/lib/auth.ts` (login roto por RLS), ya corregido con el helper `customer-auth.ts`. Nada más que atender.
+- **Branch:** `feat/e2e-playwright`
+
+## 2026-08-07 — Carrito intermitente: race de conexión de ioredis en cold-start (el timeout de 30s no era la causa)
+
+El run E2E siguió en **28 passed / 1 failed (`cart`) / 1 flaky (`checkout`) / 1 skipped** incluso con `toBeVisible({ timeout: 30_000 })`. El `cart` fallaba de forma determinista con el carrito vacío tras un POST "ok": **el timeout no resolvía la causa real**. Diagnóstico en `packages/commerce/src/redis.ts`:
+
+- ioredis se crea con `lazyConnect: true` + `enableOfflineQueue: false`. En un cold-start de Vercel, el primer comando (`setex`/`get`) **dispara** la conexión y, como `enableOfflineQueue` está desactivado, ioredis **rechaza** el comando si el socket aún está en `connecting` (status no `ready`) → `redisSetEx` degrada a no-op → el POST responde 200 (el toast miente) pero nada se persiste → el GET devuelve `items: []`. Es una carrera que pierde el write en silencio; subir el timeout del assertion no cambia el estado.
+- **Fix:** nuevo `whenReady(timeoutMs=5000)` en `redis.ts` — espera (con tope) al evento `ready` antes de emitir el comando, disparando `connect()` si el status es `wait`/`end`. Si Redis nunca queda listo, se degrada tras 5s (mismo comportamiento "progresivo", pero sin la race). `safeRun` unifica los tres wrappers.
+- **Mejora no-bloqueante del reviewer implementada:** `redisDown()` ahora además dispara `captureMessage("Redis unavailable during \"<op>\"")` a Sentry vía dynamic import de `@sentry/nextjs` (try/catch: no-op si no hay DSN o en tests). Se declaró `@sentry/nextjs@^10.69.0` (misma versión que las 3 apps) en `packages/commerce/package.json`; `pnpm-lock.yaml` actualizado.
+- **Verificación local:** `@repo/commerce` typecheck OK; suite completa **383 passed (48 files)**; ESLint OK en el archivo tocado. (Nota: `prettier --check` local falla por `prettier-plugin-tailwindcss` ausente — preexistente, el plugin nunca estuvo en el lockfile.)
+- **Branch:** `feat/e2e-playwright`

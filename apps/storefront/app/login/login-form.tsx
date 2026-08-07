@@ -64,6 +64,7 @@ export default function LoginForm() {
           <input
             id="email"
             type="email"
+            data-testid="login-email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
@@ -78,6 +79,7 @@ export default function LoginForm() {
           <input
             id="password"
             type="password"
+            data-testid="login-password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required
@@ -86,11 +88,12 @@ export default function LoginForm() {
         </div>
 
         {error && (
-          <div style={{ color: "#dc2626", marginBottom: "1rem" }}>{error}</div>
+          <div data-testid="login-error" style={{ color: "#dc2626", marginBottom: "1rem" }}>{error}</div>
         )}
 
         <button
           type="submit"
+          data-testid="login-submit"
           disabled={loading}
           style={{
             width: "100%",

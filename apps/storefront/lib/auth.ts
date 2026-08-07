@@ -1,12 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import type { User } from "next-auth";
-import { db, dbCustomers, dbTenants } from "@repo/db";
-import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import { headers } from "next/headers";
-import { getTenantId } from "@/lib/tenant";
-import { NextResponse } from "next/server";
+import { authorizeCustomer, resolveTenantId } from "@/lib/customer-auth";
 
 interface StorefrontUser extends User {
   tenantId?: string | null;
@@ -19,7 +14,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Contraseña", type: "password" }
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
@@ -27,40 +22,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = credentials.email as string;
         const password = credentials.password as string;
 
-        // Find customer by email across all tenants
-        // Customers can have same email in different tenants
-        const [customer] = await db
-          .select({
-            id: dbCustomers.id,
-            tenantId: dbCustomers.tenantId,
-            email: dbCustomers.email,
-            password: dbCustomers.password,
-            name: dbCustomers.name,
-          })
-          .from(dbCustomers)
-          .where(eq(dbCustomers.email, email))
-          .limit(1);
-
-        if (!customer || !customer.password) {
+        const tenantId = await resolveTenantId(request);
+        if (!tenantId) {
           return null;
         }
 
-        // For login without tenant context (like after logout),
-        // we need to set the tenant in the session
-        // The middleware/proxy will need to handle this
-        
-        // Verify password
-        const isValid = await bcrypt.compare(password, customer.password);
-        if (!isValid) {
-          return null;
-        }
-
-        return {
-          id: customer.id,
-          email: customer.email,
-          name: customer.name || undefined,
-          tenantId: customer.tenantId,
-        };
+        return authorizeCustomer(email, password, tenantId);
       }
     })
   ],

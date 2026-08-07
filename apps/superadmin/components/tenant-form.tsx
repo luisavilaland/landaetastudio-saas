@@ -110,6 +110,7 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
           <input
             id="name"
             type="text"
+            data-testid="tenant-form-name"
             required
             value={form.name}
             onChange={(e) => {
@@ -185,6 +186,7 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
         <div className="flex gap-3 pt-4">
           <button
             type="submit"
+            data-testid="tenant-form-submit"
             disabled={loading}
             className="px-4 py-2 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 disabled:opacity-50"
           >

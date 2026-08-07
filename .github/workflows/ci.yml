@@ -8,7 +8,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    # Guard anti-fork: repo público + runner self-hosted. Bloquea PRs de forks
+    # (vector RCE); push a develop/main y PRs del mismo repo corren normal.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
       - uses: actions/checkout@v7

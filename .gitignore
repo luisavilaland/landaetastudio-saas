@@ -73,5 +73,10 @@ skills-lock.json
 # vs code
 .vscode/settings.json
 
+# E2E testing
+e2e/.auth/
+e2e/test-results/
+e2e/playwright-report/
+
 # Worktrees
 .worktrees/

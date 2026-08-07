@@ -59,6 +59,7 @@ export default function LoginForm() {
                 id="email"
                 name="email"
                 type="email"
+                data-testid="superadmin-email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -75,6 +76,7 @@ export default function LoginForm() {
                 id="password"
                 name="password"
                 type="password"
+                data-testid="superadmin-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -86,6 +88,7 @@ export default function LoginForm() {
 
           <button
             type="submit"
+            data-testid="superadmin-submit"
             disabled={loading}
             className="w-full py-2 px-4 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
           >

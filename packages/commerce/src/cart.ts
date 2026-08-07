@@ -1,6 +1,6 @@
 import { db, dbProducts, dbProductVariants, dbProductImages, withTenantContext } from "@repo/db";
 import { eq, inArray } from "drizzle-orm";
-import { redisClient } from "./redis";
+import { safeGet, redisSetEx, redisDel } from "./redis";
 
 export type CartItem = {
   variantId: string;
@@ -32,7 +32,7 @@ export async function getCart(sessionId: string, tenantId: string): Promise<Enri
   if (!sessionId) return [];
   if (!tenantId) return [];
 
-  const data = await redisClient.get(`cart:${sessionId}`);
+  const data = await safeGet(`cart:${sessionId}`);
   if (!data) return [];
 
   const cart = JSON.parse(data) as Cart;
@@ -114,7 +114,7 @@ export async function removeFromCart(
 ): Promise<EnrichedCartItem[]> {
   if (!sessionId) return [];
 
-  const data = await redisClient.get(`cart:${sessionId}`);
+  const data = await safeGet(`cart:${sessionId}`);
   if (!data) return [];
 
   const cart = JSON.parse(data) as Cart;
@@ -122,12 +122,12 @@ export async function removeFromCart(
   cart.items = cart.items.filter((item) => item.variantId !== variantId);
 
   if (cart.items.length === 0) {
-    await redisClient.del(`cart:${sessionId}`);
+    await redisDel(`cart:${sessionId}`);
     return [];
   }
 
   cart.updatedAt = new Date().toISOString();
-  await redisClient.setex(`cart:${sessionId}`, 60 * 60 * 24 * 7, JSON.stringify(cart));
+  await redisSetEx(`cart:${sessionId}`, 60 * 60 * 24 * 7, JSON.stringify(cart));
 
   return getCart(sessionId, tenantId);
 }

@@ -5,11 +5,9 @@ vi.mock("@/lib/tenant", () => ({
 }));
 
 vi.mock("@/lib/redis", () => ({
-  redisClient: {
-    get: vi.fn(),
-    setex: vi.fn(),
-    del: vi.fn(),
-  },
+  safeGet: vi.fn(),
+  redisSetEx: vi.fn(),
+  redisDel: vi.fn(),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -38,7 +36,7 @@ vi.mock("next/headers", () => ({
 import { NextRequest } from "next/server";
 import { headers } from "next/headers";
 import { db, withTenantContext } from "@repo/db";
-import { redisClient } from "@/lib/redis";
+import { safeGet, redisSetEx, redisDel } from "@/lib/redis";
 import { getTenantId } from "@/lib/tenant";
 import { makeTxMock, mockReq } from "@repo/test-utils";
 import { GET, POST, PUT, DELETE } from "../route";
@@ -108,8 +106,8 @@ describe("POST /api/cart", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getTenantId).mockResolvedValue(TENANT_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_EMPTY_CART));
-    vi.mocked(redisClient.setex).mockResolvedValue("OK");
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_EMPTY_CART));
+    vi.mocked(redisSetEx).mockResolvedValue(undefined);
   });
 
   it("debe devolver 400 cuando no hay session ID", async () => {
@@ -190,7 +188,7 @@ describe("POST /api/cart", () => {
     const mockTx = makeTxMock();
     mockTx.select.mockReturnValueOnce(createQuery([MOCK_VARIANT]));
     vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART));
 
     const res = await POST(mockReq("POST",{ variantId: VARIANT_ID, quantity: 3 }));
 
@@ -229,7 +227,7 @@ describe("GET /api/cart", () => {
 
   it("debe devolver items vacíos cuando el carrito está vacío", async () => {
     setupHeaders(SESSION_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_EMPTY_CART));
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_EMPTY_CART));
 
     const res = await GET();
 
@@ -240,7 +238,7 @@ describe("GET /api/cart", () => {
 
   it("debe devolver items enriquecidos en caso feliz", async () => {
     setupHeaders(SESSION_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART));
     const mockTx = makeTxMock();
     mockTx.select
       .mockReturnValueOnce(createQuery([MOCK_ENRICHED_VARIANT]))
@@ -261,8 +259,8 @@ describe("PUT /api/cart", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getTenantId).mockResolvedValue(TENANT_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
-    vi.mocked(redisClient.setex).mockResolvedValue("OK");
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART));
+    vi.mocked(redisSetEx).mockResolvedValue(undefined);
   });
 
   it("debe devolver 400 cuando no hay session ID", async () => {
@@ -333,9 +331,9 @@ describe("DELETE /api/cart", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getTenantId).mockResolvedValue(TENANT_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
-    vi.mocked(redisClient.setex).mockResolvedValue("OK");
-    vi.mocked(redisClient.del).mockResolvedValue(1);
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART));
+    vi.mocked(redisSetEx).mockResolvedValue(undefined);
+    vi.mocked(redisDel).mockResolvedValue(undefined);
   });
 
   it("debe devolver 400 cuando no hay session ID", async () => {

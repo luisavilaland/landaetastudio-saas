@@ -142,7 +142,7 @@ export function CartList({ initialItems }: Props) {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-semibold text-zinc-900">
+          <h1 data-testid="cart-empty" className="text-2xl font-semibold text-zinc-900">
             Tu carrito está vacío
           </h1>
           <p className="mt-2 text-zinc-500">
@@ -186,6 +186,7 @@ export function CartList({ initialItems }: Props) {
           return (
             <div
               key={item.variantId}
+              data-testid="cart-item"
               className="flex items-center gap-4 bg-white border border-zinc-200 rounded-lg p-4"
             >
               <div className="w-20 h-20 bg-zinc-100 rounded-md overflow-hidden relative flex-shrink-0">
@@ -228,6 +229,7 @@ export function CartList({ initialItems }: Props) {
                   onClick={() =>
                     updateQuantity(item.variantId, item.quantity - 1)
                   }
+                  data-testid="cart-quantity"
                   disabled={loading || item.quantity <= 1}
                   className="w-8 h-8 flex items-center justify-center border border-zinc-300 rounded hover:bg-zinc-100 disabled:opacity-50"
                 >
@@ -251,6 +253,7 @@ export function CartList({ initialItems }: Props) {
 
               <button
                 onClick={() => removeItem(item.variantId)}
+                data-testid="cart-remove"
                 disabled={loading}
                 className="text-red-600 hover:text-red-800 p-2"
               >

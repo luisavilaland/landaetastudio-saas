@@ -392,6 +392,7 @@ const productId = savedProduct.product?.id || savedProduct.id || initialProduct?
           <input
             id="name"
             type="text"
+            data-testid="product-form-name"
             required
             value={form.name}
             onChange={handleNameChange}
@@ -563,6 +564,7 @@ const productId = savedProduct.product?.id || savedProduct.id || initialProduct?
           <input
             id="price"
             type="number"
+            data-testid="product-form-price"
             step="0.01"
             min="0"
             required
@@ -745,6 +747,7 @@ const productId = savedProduct.product?.id || savedProduct.id || initialProduct?
         <div className="flex gap-3 pt-4">
           <button
             type="submit"
+            data-testid="product-form-submit"
             disabled={loading}
             className="px-4 py-2 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 disabled:opacity-50"
           >
