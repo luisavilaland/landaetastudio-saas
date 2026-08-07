@@ -10,6 +10,7 @@ on:
       - "packages/**"
       - "e2e/**"
       - ".github/workflows/e2e.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read

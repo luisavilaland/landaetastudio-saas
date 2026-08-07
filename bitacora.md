@@ -618,3 +618,9 @@
 - **NEXTAUTH_URL confirmada como no requerida:** Auth.js v5 auto-activa `trustHost` en Vercel; solo Credentials + JWT.
 - **Secrets GitHub necesarios:** `NEON_DATABASE_URL`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`. Ya no hace falta `VERCEL_TOKEN`.
 - **Fix global-setup post-login:** el job `e2e` de CI fallaba en `e2e/global-setup.ts:19` con `TimeoutError` — el login funcionaba pero `waitForURL` exigía la URL exacta `/` y la app redirige a `/dashboard` (admin) y `/tenants` (superadmin). Corregido con globs `**/dashboard` y `**/tenants`. En el run del commit `8c08e31`, `seed`, `wait-for-deployments`, `build` y Vercel quedaron en success; el fix de global-setup se valida en el siguiente run.
+
+## 2026-08-06 — workflow_dispatch en e2e.yml + validez del fix bloqueada por incidente de GitHub Actions
+
+- **Incidente externo GitHub Actions** desde 2026-08-06 15:22 UTC (`major_outage`, crítico): webhooks throttled (~15%), runners asignándose jobs inválidos, runs quedando `queued` con 0 jobs. Primer `run de validación` del fix post-login (commit `b08c`-prev) nunca materializó jobs. No es fallo del repo.
+- **`workflow_dispatch:` agregado al trigger de `e2e.yml`**: permite lanzar el workflow manualmente ("Run workflow") inmune al throttle de webhooks y a runs colgados que no ofrecen botón de re-run (un run `queued` con 0 jobs no muestra opción de re-run porque el endpoint `POST /actions/runs/{id}/rerun` requiere al menos un job enlazado / context de UI). Con esto, una vez recuperado Actions, se cancela el run colgado y se dispara uno nuevo manual.
+- **Reentry de validación postergada:** la validación del fix de global-setup (`c03f43b`) sigue pendiente mientras dure el `major_outage`. Cuando Actions quede `operational`, validar run E2E → si verde, merge PR #40 → `develop` y reasignar dominios custom a prod.
