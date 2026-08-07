@@ -695,3 +695,24 @@ Tras arreglar la infra del runner, el job E2E quedó en 28 passed / 2 failed (`c
 
 Tras configurar `REDIS_URL` en Vercel, el run E2E quedó en **29 passed / 1 flaky / 1 skipped**: `checkout` ya pasa (el carrito persiste), pero `cart.spec.ts` "ver carrito con ítem" quedó **flaky** — `[data-testid=cart-item]` no aparecía en 10s en el primer intento y pasaba en el retry. Se trató de cold-start de Vercel en el primer hit a `/cart` (Server Component + GET `/api/cart`), no de un bug de app. Fix en `e2e/storefront/cart.spec.ts:30`: `toBeVisible({ timeout: 30_000 })` (mismo patrón que el fix de `checkout`). El `1 skipped` es intencional (spec con `test.skip`).
 - **Branch:** `feat/e2e-playwright`
+
+## 2026-08-07 — Auditoría RLS/tenant: grep con BRE roto dio falso "0 matches"; re-corrida con ripgrep limpia
+
+El reviewer pidió re-correr la búsqueda de accesos directos a `db` (sin `withTenantContext`) con sintaxis correcta: el grep de la auditoría anterior usaba BRE (sin `-E`/`-P`), donde `\(` y `|` son literales → reportaba "0 matches" por herramienta rota, no porque no hubiera código. Re-corrida con ripgrep sobre todo el worktree:
+
+- `db\.(select|insert|update|delete)\s*\(` → 20 matches, **todos** en `packages/db/seed.ts` (legítimo: el seed corre con rol owner/BYPASSRLS, no está sujeto a RLS).
+- Ampliado `db\.(select|insert|update|delete|execute|query|transaction)\s*\(` → 30 matches: `seed.ts` + `packages/db/src/index.ts:19` (`db.transaction` — es la implementación del propio helper `withTenantContext`).
+- `db\.query\.\w+` (consultas relacionales de Drizzle, otra vía de acceso directo) → **0 matches**.
+
+Conclusión: no queda ningún acceso directo a tablas de negocio fuera de `withTenantContext` en código de runtime. El único bug de ese tipo era `apps/storefront/lib/auth.ts` (login roto por RLS), ya corregido con el helper `customer-auth.ts`. Nada más que atender.
+- **Branch:** `feat/e2e-playwright`
+
+## 2026-08-07 — Carrito intermitente: race de conexión de ioredis en cold-start (el timeout de 30s no era la causa)
+
+El run E2E siguió en **28 passed / 1 failed (`cart`) / 1 flaky (`checkout`) / 1 skipped** incluso con `toBeVisible({ timeout: 30_000 })`. El `cart` fallaba de forma determinista con el carrito vacío tras un POST "ok": **el timeout no resolvía la causa real**. Diagnóstico en `packages/commerce/src/redis.ts`:
+
+- ioredis se crea con `lazyConnect: true` + `enableOfflineQueue: false`. En un cold-start de Vercel, el primer comando (`setex`/`get`) **dispara** la conexión y, como `enableOfflineQueue` está desactivado, ioredis **rechaza** el comando si el socket aún está en `connecting` (status no `ready`) → `redisSetEx` degrada a no-op → el POST responde 200 (el toast miente) pero nada se persiste → el GET devuelve `items: []`. Es una carrera que pierde el write en silencio; subir el timeout del assertion no cambia el estado.
+- **Fix:** nuevo `whenReady(timeoutMs=5000)` en `redis.ts` — espera (con tope) al evento `ready` antes de emitir el comando, disparando `connect()` si el status es `wait`/`end`. Si Redis nunca queda listo, se degrada tras 5s (mismo comportamiento "progresivo", pero sin la race). `safeRun` unifica los tres wrappers.
+- **Mejora no-bloqueante del reviewer implementada:** `redisDown()` ahora además dispara `captureMessage("Redis unavailable during \"<op>\"")` a Sentry vía dynamic import de `@sentry/nextjs` (try/catch: no-op si no hay DSN o en tests). Se declaró `@sentry/nextjs@^10.69.0` (misma versión que las 3 apps) en `packages/commerce/package.json`; `pnpm-lock.yaml` actualizado.
+- **Verificación local:** `@repo/commerce` typecheck OK; suite completa **383 passed (48 files)**; ESLint OK en el archivo tocado. (Nota: `prettier --check` local falla por `prettier-plugin-tailwindcss` ausente — preexistente, el plugin nunca estuvo en el lockfile.)
+- **Branch:** `feat/e2e-playwright`
