@@ -726,3 +726,19 @@ Tras mergear el PR #40 (feat/e2e-playwright) a develop, se cerraron los 3 pendie
 - **3. `pnpm install --frozen-lockfile`** en el repo principal: sincroniza node_modules con la dep nueva `@sentry/nextjs` en `@repo/commerce` que trajo el merge.
 - **Nota para el release:** los dominios apuntan al preview de `develop` (build fresco con el E2E mergeado). La rama de producción de los 3 proyectos es `main`; hasta que se mergee `develop → main`, el dominio no sirve el build de producción de mayo 2026.
 - **Branch:** `develop`
+
+## 2026-08-07 — Lockfile roto tras merges de Dependabot: `ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY`
+
+Tras mergear los 10 PRs de Dependabot (#30-#39) a develop, los deploys de Vercel (3 proyectos) y el CI self-hosted fallaron con el mismo error en `pnpm install --frozen-lockfile`:
+
+```
+ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
+'vite@8.0.10(@types/node@26.1.2)(esbuild@0.25.12)(jiti@2.6.1)(terser@5.49.2)(tsx@4.23.5)'
+```
+
+- **Causa raíz:** lockfile roto por los merges de Dependabot (no código). El importer raíz y el snapshot de `@vitejs/plugin-react@6.0.5` referenciaban `vite@8.0.10(...)(jiti@2.6.1)...`, pero en la sección `snapshots` solo existía la variante con `jiti@2.7.0` (los merges mezclaron resoluciones generadas en ramas distintas: una resolvía jiti 2.6.1, otra 2.7.0).
+- **Fix:** `pnpm install --no-frozen-lockfile` (el comando que pnpm mismo sugiere para lockfiles rotos por merge) re-resolvió plugin-react contra la variante existente `jiti@2.7.0`. Diff final mínimo: 3 líneas en el lockfile (las 3 referencias de vite de `@vitejs/plugin-react`). Sin cambios en `package.json`.
+- **Verificación:** `pnpm install --frozen-lockfile` → exit 0 (reproduce el gate de Vercel/CI); `pnpm test` → 383/383 (48 files) con vitest 4.1.10.
+- **Resultado:** commit `678d5b6` → CI en develop **success**; deploys Vercel de los 3 proyectos en `678d5b6` **success**.
+- **Lección:** al mergear en lote PRs de Dependabot que tocan `pnpm-lock.yaml`, verificar localmente `pnpm install --frozen-lockfile` antes de pushear (o usar `@dependabot rebase` en secuencia para que cada PR se resuelva contra el develop actualizado).
+- **Branch:** `develop`
