@@ -690,3 +690,8 @@ Tras arreglar la infra del runner, el job E2E quedó en 28 passed / 2 failed (`c
 - **Cuidado con `isProduction`** (`@repo/validation/env.ts`): `isProduction = NODE_ENV==="production" && (R2 || RESEND || UPSTASH_REDIS_REST_URL)`. Si el storefront arranca con solo las core, agregar `UPSTASH_REDIS_REST_URL` hace que `productionSchema` exija además `RESEND_API_KEY`, `R2_*`, `MERCADOPAGO_WEBHOOK_SECRET`, `STOREFRONT_URL` → sin ellas la app **revienta al boot**. Como el carrito solo usa `REDIS_URL` (que **no** está en `hasCloudVars`), alcanza con setear `REDIS_URL` (mayúsculas) en Vercel; `UPSTASH_*` es opcional y solo si se completan las demás vars de producción.
 - **Acción:** se configura `REDIS_URL` (nueva instancia Upstash `model-emu-200894`, URL `rediss://...:6379`) en el `.env.local` y se documenta. El carrito requiere **`REDIS_URL` (mayúsculas, ioredis)** — distinta de `UPSTASH_REDIS_REST_URL`.
 - **Branch:** `feat/e2e-playwright`
+
+## 2026-08-07 — E2E casi verde: fix de flakiness en `cart` (cold-start Vercel)
+
+Tras configurar `REDIS_URL` en Vercel, el run E2E quedó en **29 passed / 1 flaky / 1 skipped**: `checkout` ya pasa (el carrito persiste), pero `cart.spec.ts` "ver carrito con ítem" quedó **flaky** — `[data-testid=cart-item]` no aparecía en 10s en el primer intento y pasaba en el retry. Se trató de cold-start de Vercel en el primer hit a `/cart` (Server Component + GET `/api/cart`), no de un bug de app. Fix en `e2e/storefront/cart.spec.ts:30`: `toBeVisible({ timeout: 30_000 })` (mismo patrón que el fix de `checkout`). El `1 skipped` es intencional (spec con `test.skip`).
+- **Branch:** `feat/e2e-playwright`

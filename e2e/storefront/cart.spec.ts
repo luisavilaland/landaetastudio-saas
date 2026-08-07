@@ -27,6 +27,8 @@ test.describe("Cart", () => {
     await addBtn.click();
     await expect(page.locator("text=Agregado al carrito")).toBeVisible();
     await page.goto("/cart");
-    await expect(page.locator("[data-testid=cart-item]")).toBeVisible();
+    // Timeout explícito: el primer hit a /cart (Server Component + GET /api/cart)
+    // sufre cold-start de Vercel y el default (10s) queda corto -> flaky.
+    await expect(page.locator("[data-testid=cart-item]")).toBeVisible({ timeout: 30_000 });
   });
 });
