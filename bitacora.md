@@ -679,3 +679,14 @@ Los jobs `seed` y `e2e` del runner self-hosted (AlmaLinux, máquina `mj20`) qued
 - **Diagnóstico anexo revertido:** se eliminó el paso "Diagnose DB connectivity" del job `seed` (solo servía para clasificar el bloqueo; quedó ruido una vez resuelto).
 - **Prerequisitos documentados del runner self-hosted:** Node 22, pnpm, git, **egress TCP a Neon en 5432** (IPv4 o IPv6), pin IPv4 del endpoint Neon en `/etc/hosts` si no hay ruta IPv6, y las libs del sistema de chromium instaladas vía `dnf` (nss, atk, at-spi2-atk, cups-libs, libdrm, libxkbcommon, libXcomposite, libXdamage, libXfixes, libXrandr, mesa-libgbm, alsa-lib, pango, cairo, gtk3).
 - **Branch:** `feat/e2e-playwright`
+
+## 2026-08-07 — Carrito/checkout no persistían: faltaba Redis (Upstash) con el nombre correcto
+
+Tras arreglar la infra del runner, el job E2E quedó en 28 passed / 2 failed (`cart`, `checkout`), ambos con el **mismo síntoma determinista**: tras "Agregado al carrito" (POST 200 y toast OK), `/cart` y `/checkout` salían vacías → `[data-testid=cart-item]` y `[data-testid=checkout-name]` ausentes. Diagnóstico:
+
+- El carrito es 100% Redis-persistido: `packages/commerce/src/redis.ts` y `apps/superadmin/lib/redis.ts` leen `process.env.REDIS_URL` (ioredis). El proxy genera el cookie `cart_session_id` estable (`apps/storefront/proxy.ts:114`) e inyecta `x-cart-session-id`, así que POST y GET usan la misma sesión.
+- **Variable en mayúsculas:** el código lee `REDIS_URL`. En Vercel había quedado como `redis_url` (minúsculas) → `process.env.REDIS_URL` era `undefined` → fallback a `redis://localhost:6379` → cada `safeGet`/`redisSetEx` degrada a `null`/no-op → POST "ok" pero nada se persiste → GET devuelve `items: []`. Los nombres de variables de entorno son sensibles a mayúsculas/minúsculas.
+- **DB Upstash borrada:** al restaurar, "no databases available". No hay una política conocida de Upstash que borre el free tier por inactividad; probablemente se borró manualmente. Se recrea la instancia.
+- **Cuidado con `isProduction`** (`@repo/validation/env.ts`): `isProduction = NODE_ENV==="production" && (R2 || RESEND || UPSTASH_REDIS_REST_URL)`. Si el storefront arranca con solo las core, agregar `UPSTASH_REDIS_REST_URL` hace que `productionSchema` exija además `RESEND_API_KEY`, `R2_*`, `MERCADOPAGO_WEBHOOK_SECRET`, `STOREFRONT_URL` → sin ellas la app **revienta al boot**. Como el carrito solo usa `REDIS_URL` (que **no** está en `hasCloudVars`), alcanza con setear `REDIS_URL` (mayúsculas) en Vercel; `UPSTASH_*` es opcional y solo si se completan las demás vars de producción.
+- **Acción:** se configura `REDIS_URL` (nueva instancia Upstash `model-emu-200894`, URL `rediss://...:6379`) en el `.env.local` y se documenta. El carrito requiere **`REDIS_URL` (mayúsculas, ioredis)** — distinta de `UPSTASH_REDIS_REST_URL`.
+- **Branch:** `feat/e2e-playwright`
