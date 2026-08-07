@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Admin - Products CRUD", () => {
   test("listar productos", async ({ page }) => {
     await page.goto("/products");
-    await expect(page.locator("h1")).toContainText("Productos");
+    await expect(page.getByRole("heading", { name: /Productos/ })).toBeVisible();
   });
 
   test("crear producto nuevo", async ({ page }) => {

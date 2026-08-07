@@ -624,3 +624,16 @@
 - **Incidente externo GitHub Actions** desde 2026-08-06 15:22 UTC (`major_outage`, crítico): webhooks throttled (~15%), runners asignándose jobs inválidos, runs quedando `queued` con 0 jobs. Primer `run de validación` del fix post-login (commit `b08c`-prev) nunca materializó jobs. No es fallo del repo.
 - **`workflow_dispatch:` agregado al trigger de `e2e.yml`**: permite lanzar el workflow manualmente ("Run workflow") inmune al throttle de webhooks y a runs colgados que no ofrecen botón de re-run (un run `queued` con 0 jobs no muestra opción de re-run porque el endpoint `POST /actions/runs/{id}/rerun` requiere al menos un job enlazado / context de UI). Con esto, una vez recuperado Actions, se cancela el run colgado y se dispara uno nuevo manual.
 - **Reentry de validación postergada:** la validación del fix de global-setup (`c03f43b`) sigue pendiente mientras dure el `major_outage`. Cuando Actions quede `operational`, validar run E2E → si verde, merge PR #40 → `develop` y reasignar dominios custom a prod.
+
+## 2026-08-06 — Fix bugs E2E: 11 fallos diagnosticados y corregidos (6 specs + config)
+
+- **Run real de validación ejecutado** (trás recuperarse Actions): 31 tests, 11 fallando. Diagnóstico clasificado en 6 bugs deterministas de spec (corregidos) + fallos de entorno (lentitud cold-start Vercel, `page.goto` timeout 30s).
+- **Fix 1 — `e2e/storefront/auth.spec.ts`:**
+  - Login "credenciales válidas" usaba `admin@tienda1.com` — es un **admin**, pero la auth de storefront valida contra `customers` (`apps/storefront/lib/auth.ts`). El login fallaba y nunca redirigía. Cambiado a **`cliente@ejemplo.com`** (customer real del seed).
+  - Test `/perfil sin auth redirige a login` era **incorrecto**: `/perfil` es la página pública de la tienda (`perfil/page.tsx`), no una ruta protegida. Reemplazado por validación real: `/perfil` muestra el nombre del tenant **"Tienda Demo"** (`getByRole("heading", { name: "Tienda Demo" })`).
+- **Fix 2 — `e2e/storefront/register.spec.ts`:** email "ya existente" usaba `admin@tienda1.com` (no es customer → no devolvía 409). Cambiado a **`cliente@ejemplo.com`** para que register devuelva 409 y muestre `register-error`.
+- **Fix 3 — 3 specs admin (categories, products-crud, settings):** `locator("h1")` daba **strict-mode violation** porque el layout `(dashboard)/layout.tsx` renderiza `h1` "Admin" + el título de página. Reemplazado por `getByRole("heading", { name })`.
+- **Fix 4 — superadmin login en proyecto sin storageState:** el spec `superadmin/login.spec.ts` corría bajo el proyecto `superadmin` con `storageState: superadmin.json` (ya autenticado por global-setup) → `goto("/login")` redirige a `/tenants` y el form nunca aparecía. Movido a `e2e/superadmin-login/login.spec.ts` y creado proyecto `superadmin-login` **sin storageState** en `playwright.config.ts`.
+- **Fix 5 — timeouts ampliados en `playwright.config.ts`:** `timeout: 60_000` (era default 30s) y `expect.timeout: 10_000` (era 5s) para tolerar lentitud cold-start Vercel.
+- **Verificación pendiente:** re-run vía `workflow_dispatch` para confirmar los 6 fixes y distinguir si los fallos de `cart`/`checkout`/`crear-producto` eran entorno (deberían pasar) o bugs reales con 500s persistentes.
+- **Branch:** `feat/e2e-playwright`

@@ -15,7 +15,7 @@ test.describe("Register", () => {
   test("registro con email existente muestra error", async ({ page }) => {
     await page.goto("/register");
     await page.fill("[data-testid=register-name]", "Test User");
-    await page.fill("[data-testid=register-email]", "admin@tienda1.com");
+    await page.fill("[data-testid=register-email]", "cliente@ejemplo.com");
     await page.fill("[data-testid=register-password]", "123456");
     await page.click("[data-testid=register-submit]");
     await expect(page.locator("[data-testid=register-error]")).toBeVisible();

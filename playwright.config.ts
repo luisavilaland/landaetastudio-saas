@@ -21,6 +21,10 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? "github" : "list",
   globalSetup: "e2e/global-setup.ts",
+  timeout: 60_000,
+  expect: {
+    timeout: 10_000,
+  },
   use: {
     baseURL: STOREFRONT_URL,
     trace: "on-first-retry",
@@ -55,6 +59,13 @@ export default defineConfig({
         storageState: "e2e/.auth/superadmin.json",
       },
       testMatch: "superadmin/*.spec.ts",
+    },
+    {
+      name: "superadmin-login",
+      use: {
+        baseURL: SUPERADMIN_URL,
+      },
+      testMatch: "superadmin-login/*.spec.ts",
     },
     {
       name: "security",
