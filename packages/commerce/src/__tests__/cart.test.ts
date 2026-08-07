@@ -18,11 +18,9 @@ const mockRedisSetex = vi.hoisted(() => vi.fn());
 const mockRedisDel = vi.hoisted(() => vi.fn());
 
 vi.mock("../redis", () => ({
-  redisClient: {
-    get: mockRedisGet,
-    setex: mockRedisSetex,
-    del: mockRedisDel,
-  },
+  safeGet: mockRedisGet,
+  redisSetEx: mockRedisSetex,
+  redisDel: mockRedisDel,
 }));
 
 const mockTxSelect = vi.hoisted(() => vi.fn());
