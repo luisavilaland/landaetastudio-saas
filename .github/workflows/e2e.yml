@@ -133,6 +133,10 @@ jobs:
           script: |
             const outcome = '${{ needs.e2e.result }}';
             const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+            if (!context.issue.number) {
+              console.log(`No PR context (${context.event}): outcome ${outcome} — skipping PR comment`);
+              return;
+            }
             const body = outcome === 'success'
               ? `✅ **E2E Tests passed** — [View run](${runUrl})`
               : `❌ **E2E Tests failed** — [View run](${runUrl})`;
