@@ -3,6 +3,7 @@ import { withTenantContext, dbOrders, dbOrderItems, dbProducts, dbProductVariant
 import { and, eq, inArray } from "drizzle-orm";
 import { checkoutPreferenceSchema } from "@repo/validation";
 import { getTenantId } from "@/lib/tenant";
+import { getStorefrontBaseUrl } from "@/lib/request";
 import { redisIncr, redisPexpire } from "@/lib/redis";
 import { createLogger } from "@/lib/logger";
 
@@ -213,11 +214,7 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const baseUrl = process.env.STOREFRONT_URL;
-
-    if (!baseUrl) {
-      throw new Error("STOREFRONT_URL no está configurada. Define la URL pública del tienda (ej: https://...loca.lt)");
-    }
+    const baseUrl = getStorefrontBaseUrl(request);
 
     logger.info({ orderId, tenantId }, "Creating checkout preference");
 

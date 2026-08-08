@@ -165,11 +165,9 @@ npx dotunnel
 🔗 Public URL:    https://saasecommerce-prxy.ayooub.me
 ```
 
-### Configurar STOREFRONT_URL en .env.local
+### STOREFRONT_URL (ya no se usa en storefront)
 
-```env
-STOREFRONT_URL=https://saasecommerce-prxy.ayooub.me
-```
+El storefront deriva la URL base de cada request (`x-forwarded-proto` + `host`) con `getStorefrontBaseUrl` para `back_urls` de MercadoPago y links de emails — sin variable de entorno ni fallbacks. `STOREFRONT_URL` se mantiene solo por la validación de entorno (`productionSchema` la exige): es **inerte** en storefront y no hace falta configurarla en `.env.local` para desarrollo.
 
 ### Testing del Webhook en Desarrollo
 
@@ -199,7 +197,7 @@ curl -X POST https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago \
 
 > **Nota:** La firma real en producción la genera MercadoPago (fail-closed), y `BYPASS_WEBHOOK_SIGNATURE=true` solo salta la verificación en desarrollo, nunca en producción. La ventana de validez del `ts` es de 300 segundos: si el webhook responde 401 por firma, verificá que el reloj esté sincronizado y que el `ts` sea actual.
 
-> **Nota:** La URL del túnel cambia cada vez que reinicias `npx dotunnel`, a menos que uses un plan pago con dominio fijo. Si el webhook deja de funcionar, verifica que el túnel esté activo y actualiza `STOREFRONT_URL` en tu `.env.local` con la nueva URL.
+> **Nota:** La URL del túnel cambia cada vez que reinicias `npx dotunnel`, a menos que uses un plan pago con dominio fijo. Si el webhook deja de funcionar, verifica que el túnel esté activo y actualiza la URL registrada en MP Developer Dashboard. El webhook es multi-tenant: una sola URL (`https://tienda1.landaetastudio.com/api/webhooks/mercadopago`) sirve para todos los tenants porque el tenant se resuelve por `external_reference` (`tenantId:orderId`), no por host.
 
 ## Troubleshooting
 
@@ -312,7 +310,7 @@ Todas las variables cloud deben estar configuradas en cada proyecto:
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `REDIS_URL` (ioredis — storefront)
 - `RESEND_API_KEY`
 - `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
-- `STOREFRONT_URL`
+- `STOREFRONT_URL` (solo validación — inerte en storefront: las URLs públicas se derivan del request)
 - `SUPERADMIN_HOST`, `ADMIN_HOST`, `DEFAULT_TENANT_SLUG`
 
 ### turbo.json

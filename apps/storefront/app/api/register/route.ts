@@ -3,6 +3,7 @@ import { withTenantContext, dbCustomers, dbTenants } from "@repo/db";
 import { eq, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getTenantId } from "@/lib/tenant";
+import { getStorefrontBaseUrl } from "@/lib/request";
 import { registerSchema } from "@repo/validation";
 import { sendWelcomeEmail } from "@repo/commerce";
 import { createLogger } from "@/lib/logger";
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      await sendWelcomeEmail(email, name, storeName, process.env.STOREFRONT_URL);
+      await sendWelcomeEmail(email, name, storeName, getStorefrontBaseUrl(request));
     } catch (error) {
       logger.error({ email, error }, "Failed to send welcome email");
     }

@@ -76,7 +76,6 @@ describe("POST /api/checkout/preference", () => {
     vi.clearAllMocks();
 
     process.env.MERCADOPAGO_ACCESS_TOKEN = "TEST-12345-test_access_token";
-    process.env.STOREFRONT_URL = "https://test-store.lvh.me";
 
     vi.mocked(getTenantId).mockResolvedValue(TENANT_ID);
     mockRedisIncr.mockReset();
@@ -85,7 +84,6 @@ describe("POST /api/checkout/preference", () => {
 
   afterEach(() => {
     delete process.env.MERCADOPAGO_ACCESS_TOKEN;
-    delete process.env.STOREFRONT_URL;
   });
 
   describe("Rate limiting", () => {
@@ -214,18 +212,33 @@ describe("POST /api/checkout/preference", () => {
       vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
 
       const originalFetch = globalThis.fetch;
-      globalThis.fetch = vi.fn().mockResolvedValue({
+      const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ id: "mp-pref-123", init_point: "https://mercadopago.com/pay/123", sandbox_init_point: "https://sandbox.mercadopago.com/pay/123" }),
       });
+      globalThis.fetch = mockFetch;
 
       try {
-        const res = await POST(mockReq("POST",{ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }));
+        const res = await POST(mockReq(
+          "POST",
+          { orderId: ORDER_ID, customerEmail: CALLER_EMAIL },
+          { host: "tienda1.landaetastudio.com", "x-forwarded-proto": "https" }
+        ));
 
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body).toHaveProperty("init_point");
         expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
+
+        const [url, init] = mockFetch.mock.calls[0];
+        expect(url).toBe("https://api.mercadopago.com/checkout/preferences");
+        const preference = JSON.parse((init as RequestInit).body as string);
+        expect(preference.back_urls).toEqual({
+          success: "https://tienda1.landaetastudio.com/checkout/success",
+          failure: "https://tienda1.landaetastudio.com/checkout/failure",
+          pending: "https://tienda1.landaetastudio.com/checkout/pending",
+        });
+        expect(preference.external_reference).toBe(`${TENANT_ID}:${ORDER_ID}`);
       } finally {
         globalThis.fetch = originalFetch;
       }

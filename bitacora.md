@@ -811,3 +811,20 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 
 **Verificación:** `pnpm test` 406/406 (1 nuevo, 52 files) | typecheck 9/9 | lint 6/6 | build 3 apps OK.
 - **Branch:** `develop`
+
+---
+
+## 2026-08-08 — Checkout: URL base derivada del request (fin de STOREFRONT_URL)
+
+**Bug:** los `back_urls` de MercadoPago se construían con `STOREFRONT_URL` (env fija), que en Vercel apuntaba a `saas-storefront.vercel.app` → el redirect post-pago daba 404 en `/checkout/success`. Con una env fija además rompe multi-tenant: un checkout de tienda2 redirigiría al dominio de tienda1 (el proxy resuelve el tenant por host).
+
+**Cambios:**
+- **Nuevo helper** `apps/storefront/lib/request.ts` (`getStorefrontBaseUrl(request)`): deriva la base de `x-forwarded-proto` + `host` del request entrante. Sin condicionales ni fallbacks (ya no se usa dotunnel local; solo Vercel).
+- **`checkout/preference/route.ts`:** `back_urls` usan `getStorefrontBaseUrl(request)`; se elimina el `throw` por `STOREFRONT_URL` faltante.
+- **`register/route.ts`:** el email de bienvenida usa la misma derivación (link de la tienda correcta por tenant).
+- **Vercel:** `STOREFRONT_URL` se mantiene en admin/superadmin por validación de env; en storefront queda inerte (el código ya no la lee). `.env.local` ya no la necesita para dev.
+- **Tests (TDD, RED primero):** el test de éxito de preference pasa `host`/`x-forwarded-proto` por headers y aserta `back_urls` y `external_reference` del body enviado a MP; el test de register aserta el email con la URL derivada.
+- **Docs:** README (sección webhook) y SETUP (sección STOREFRONT_URL → inerte) actualizados.
+
+**Verificación:** `pnpm test` 406/406 (52 files) | typecheck 9/9 | lint 6/6 | build 3 apps OK.
+- **Branch:** `develop`

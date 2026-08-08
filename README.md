@@ -335,8 +335,9 @@ saas-ecommerce/
 
 Para recibir notificaciones de pago en desarrollo:
 1. Usar dotunnel: `npx dotunnel` y exponer el puerto 3000
-2. Configurar `STOREFRONT_URL` en `.env.local` con la URL pública del túnel
-3. Registrar esa URL en MP Developer Dashboard: `https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago`
+2. Registrar esa URL en MP Developer Dashboard: `https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago`
+
+> **Nota:** el storefront ya **no** usa `STOREFRONT_URL` para construir URLs públicas: la base (`proto` + `host`) se deriva del request entrante en cada llamada (`getStorefrontBaseUrl`), así los `back_urls` de MercadoPago y los links de emails apuntan al dominio real de cada tenant. La variable se mantiene en Vercel solo por validación de entorno (inerte en storefront).
 
 MercadoPago firma cada notificación con el header `x-signature: ts=<ts>,v1=<v1>` y envía un header `x-request-id` aparte. La cadena canónica firmada es `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` (las partes vacías se omiten) y `v1` es `HMAC-SHA256(cadena, MERCADOPAGO_WEBHOOK_SECRET)`. El webhook rechaza firmas cuyo `ts` esté fuera de una ventana de **300 segundos** (anti-replay) y es **fail-closed en producción**. Idempotente por `payment_id`. Modo simulación en desarrollo con header `x-test-order-id` (magic IDs `123456789` approved / `000000` rejected). En desarrollo, `BYPASS_WEBHOOK_SIGNATURE=true` salta la verificación de firma — **nunca se salta en producción**.
 

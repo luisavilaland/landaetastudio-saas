@@ -111,7 +111,6 @@ describe("POST /api/register", () => {
   });
 
   it("debe crear el usuario exitosamente y enviar email de bienvenida", async () => {
-    vi.stubEnv("STOREFRONT_URL", "https://test-store.lvh.me");
     const readTx = makeTxMock({ select: [{ data: [], terminal: "limit" }, { data: [{ name: "Test Store" }], terminal: "limit" }] });
     const insertTx = makeTxMock();
     insertTx.insert.mockReturnValue(insertTx);
@@ -121,7 +120,11 @@ describe("POST /api/register", () => {
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(mockCalls[callIndex++]));
 
     const res = await POST(
-      mockReq("POST", { name: "Test User", email: "test@test.com", password: "password123" })
+      mockReq(
+        "POST",
+        { name: "Test User", email: "test@test.com", password: "password123" },
+        { host: "tienda1.landaetastudio.com", "x-forwarded-proto": "https" }
+      )
     );
 
     expect(res.status).toBe(201);
@@ -129,7 +132,7 @@ describe("POST /api/register", () => {
       "test@test.com",
       "Test User",
       "Test Store",
-      "https://test-store.lvh.me"
+      "https://tienda1.landaetastudio.com"
     );
     expect(withTenantContext).toHaveBeenCalledTimes(2);
   });
