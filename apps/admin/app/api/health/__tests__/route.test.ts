@@ -21,6 +21,12 @@ vi.mock("@repo/commerce/redis", () => ({
   redisPing: vi.fn(),
 }));
 
+const mockCaptureMessage = vi.hoisted(() => vi.fn());
+
+vi.mock("@sentry/nextjs", () => ({
+  captureMessage: mockCaptureMessage,
+}));
+
 import { GET } from "../route";
 import { redisPing } from "@repo/commerce/redis";
 
@@ -35,6 +41,8 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.REDIS_URL;
   delete process.env.MERCADOPAGO_ACCESS_TOKEN;
+  delete process.env.SENTRY_DSN;
+  delete process.env.NEXT_PUBLIC_SENTRY_DSN;
 });
 
 describe("GET /api/health (admin)", () => {
@@ -84,5 +92,26 @@ describe("GET /api/health (admin)", () => {
     expect(response.status).toBe(200);
     expect(body.status).toBe("ok");
     expect(body.checks.redis).toBe("skipped");
+  });
+
+  it("notifica a Sentry cuando el check degrada y hay DSN configurado", async () => {
+    process.env.SENTRY_DSN = "https://xxx@xxx.ingest.sentry.io/xxx";
+    mockDb.execute.mockRejectedValue(new Error("DB connection failed"));
+
+    const response = await GET();
+
+    expect(response.status).toBe(503);
+    expect(mockCaptureMessage).toHaveBeenCalledOnce();
+    expect(mockCaptureMessage.mock.calls[0][0]).toContain("Health check degraded");
+    expect(mockCaptureMessage.mock.calls[0][1].level).toBe("warning");
+  });
+
+  it("no notifica a Sentry cuando el health está ok", async () => {
+    process.env.SENTRY_DSN = "https://sentry@xxx.ingest.sentry.io/xxx";
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 });

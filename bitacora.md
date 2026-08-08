@@ -864,3 +864,10 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **Ítem 2 — Health check:** nuevo `redisPing()` en `@repo/commerce` (wrapper fail-open en `safeRun`) + `GET /api/health` público en las 3 apps (DB `SELECT 1`, Redis `ok/skipped`, token MP `ok/missing`; 200 ok / 503 degraded; `force-dynamic`; timeout 4s por check). Negación `api/health` en el matcher de `proxy.ts` del storefront (crítico: sin esto 404 por resolución de tenant). Ajuste `@repo/commerce/*` en tsconfig de admin/superadmin. 12 tests nuevos (4 por app). Docs: README (Monitoreo) y SETUP (Health Check / UptimeRobot).
 - **Ítem 3 — Deuda técnica:** nuevo `docs/deuda-tecnica.md` con 3 planes (TOCTOU en stock de checkout con update atómico `stock - qty WHERE stock >= qty`; migraciones inmutables con guard en CI; pin IPv4 del endpoint Neon para el runner self-hosted). **NO ejecutado, solo plan.**
 - **Branch:** `quality/calidad-y-monitoreo`
+
+## 2026-08-08 — Alertas proactivas: degradación de health → Sentry
+
+- Los 3 `GET /api/health` ahora disparan `captureMessage` (level `warning`) a Sentry cuando degradan (db error, redis error, token MP missing), solo si hay `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN`. Fail-open: si Sentry no está, solo queda el `logger.warn`.
+- Permite alerta temprana de "nuevo issue" ante degradación persistente (sin depender solo del 500 que ya capturaba).
+- 6 tests nuevos (2 por app): Sentry notificado en degradación + no notifica en ok. Suite: 55 archivos / 425 tests.
+- Monitoreo externo: UptimeRobot (3 monitores a los `/api/health`, 5 min, 200 OK), alertas de Vercel (5xx >5%, p95 >3s, disponibilidad <99%) y Sentry (≥10 errores/5 min) ya creadas manualmente en paneles.

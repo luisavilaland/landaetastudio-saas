@@ -66,6 +66,17 @@ export async function GET() {
 
   if (degraded) {
     logger.warn({ app: APP_NAME, checks }, "Health check degraded");
+    try {
+      const { captureMessage } = await import("@sentry/nextjs");
+      if (process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN) {
+        captureMessage(`Health check degraded (${APP_NAME})`, {
+          level: "warning",
+          extra: { checks, timestamp },
+        });
+      }
+    } catch {
+      // Sentry no disponible: la degradación ya quedó logueada.
+    }
   }
 
   return NextResponse.json(

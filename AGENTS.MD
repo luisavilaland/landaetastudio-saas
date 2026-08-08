@@ -41,7 +41,7 @@ Los servicios externos (R2, Resend, Sentry) deben tener fallback null si faltan 
 - Nombres de tabla y columna en camelCase (Drizzle). No snake_case.
 - Variables de entorno validadas con Zod en `packages/validation/src/env.ts`. No hardcodear valores como NEXTAUTH_URL.
 - Rutas API: todas bajo `app/api/`, no uses pages router.
-- **Health check**: `GET /api/health` público (sin `auth()`) en las 3 apps — DB `SELECT 1` (fuera de `withTenantContext`), Redis `redisPing()` si `REDIS_URL` (sino `"skipped"`), token MP por presencia. 200 ok / 503 degraded; `force-dynamic`; timeout 4s/check. En storefront `/api/health` va excluida del matcher de `proxy.ts` (si no, 404 por resolución de tenant).
+- **Health check**: `GET /api/health` público (sin `auth()`) en las 3 apps — DB `SELECT 1` (fuera de `withTenantContext`), Redis `redisPing()` si `REDIS_URL` (sino `"skipped"`), token MP por presencia. 200 ok / 503 degraded; `force-dynamic`; timeout 4s/check. En storefront `/api/health` va excluida del matcher de `proxy.ts` (si no, 404 por resolución de tenant). Si degrada y hay `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN`, envía `captureMessage` warning a Sentry (alerta temprana).
 - Responses HTTP: usar `NextResponse` (nunca `new Response()`). El helper `jsonResponse` es aceptable si envuelve `NextResponse.json`.
 - **Logs**: usar el logger de `@repo/logger`, no `console.log`. Crear instancias con `createLogger('nombre-modulo')`. En desarrollo `pino-pretty`; en producción JSON. Incluir contexto (tenantId, userId, requestId).
 - **Sentry**: integrado en las tres apps con `@sentry/nextjs`. Condicional vía `SENTRY_DSN`. Si no está, no se activa.
