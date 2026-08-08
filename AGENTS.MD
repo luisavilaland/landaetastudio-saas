@@ -118,11 +118,13 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - [ ] Devolver errores con `NextResponse.json({ error }, { status })`
 - [ ] Test de integración (éxito + 401/403 + validación de tenant)
 
-### Al crear un componente
+### Al crear un componente o página (Server Component) que consulta datos
 - [ ] Decidir si necesita `'use client'`
 - [ ] Tipar props con `interface`
 - [ ] Alias `@/` o `@repo/*` para imports
 - [ ] Textos en español
+- [ ] **Toda query a tabla con RLS va dentro de `withTenantContext(tenantId, cb)`** (incluso en páginas/render, no solo en API routes). Con `FORCE RLS` + `app_user` sin `rolbypassrls`, una query con `db.` directo devuelve 0 filas (no error): el síntoma es una página que parece vacía.
+- [ ] Si una query depende de un `IN (...)` sobre un array de IDs, guard explícito `array.length === 0` antes de construirla (PostgreSQL rechaza `IN ()` → 500).
 
 ### Al testear un handler que usa withTenantContext
 - [ ] NO mockear `db.transaction` — `withTenantContext` cierra sobre el `db` real, no la exportación mockeada

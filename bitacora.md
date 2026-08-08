@@ -742,3 +742,29 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **Resultado:** commit `678d5b6` → CI en develop **success**; deploys Vercel de los 3 proyectos en `678d5b6` **success**.
 - **Lección:** al mergear en lote PRs de Dependabot que tocan `pnpm-lock.yaml`, verificar localmente `pnpm install --frozen-lockfile` antes de pushear (o usar `@dependabot rebase` en secuencia para que cada PR se resuelva contra el develop actualizado).
 - **Branch:** `develop`
+
+## 2026-08-08 — INCIDENTE ACTIVO: 9 Server Components leían tablas con RLS directo (sin `withTenantContext`)
+
+**Descubrimiento:** la verificación final de la auditoría RLS (a pedido del reviewer) con salida cruda del grep reveló que la auditoría anterior era **falsa** por herramienta rota, esta vez doblemente:
+
+1. El grep de una línea `db\.(select|insert|update|delete)\s*\(` no matchea queries multilínea (`db` / `.select()` / `.from()`), que es el idiom estándar del codebase.
+2. La corrida cruda con el patrón multilínea `\.from(dbX)` encontró **72 matches**, y la clasificación tabla-por-tabla dejó **9 Server Components (páginas) leyendo tablas con RLS fuera de `withTenantContext`**: 7 del admin (`products`, `orders`, `categorias`, `shipping`, `products/new`, `products/[id]/edit`) y 2 del storefront (`buscar/search-results.tsx`, `checkout/success`, más `categoria/[slug]` — 9 en total).
+
+**Confirmación de impacto real en producción (no solo lectura de código):**
+- BD prod (Neon, rol owner): **7 productos, 7 categorías, 4 órdenes, 4 métodos de envío, 29 variantes, 10 imágenes** — los datos existen.
+- RLS en prod: `relrowsecurity=true` + `relforcerowsecurity=true` (migraciones 0009+0010, activas desde el 2026-07-29 con el commit `3b2d77c`) en las 8 tablas de negocio; `app_user` con `rolbypassrls=false`.
+- Navegador logueado en `admin.landaetastudio.com`: `/products`, `/orders`, `/categorias`, `/shipping` → **todas las tablas vacías** ("No hay productos. Crea el primero.", etc.).
+- Storefront público `tienda1.landaetastudio.com/buscar?q=remera` → **HTTP 500** (peor que vacío): con RLS devolviendo 0 productos, `productIds` quedaba vacío y `sql`... in ${productIds}`` generaba `IN ()` inválido en PostgreSQL.
+- **E2E no lo detectó:** los specs de admin solo asertan headings, nunca las filas de las tablas.
+
+**Fix (9 archivos, mismo patrón:** `db.` → `tx.` dentro de `return await withTenantContext(tenantId, cb)`):
+- Admin: `products/page.tsx` (3 queries), `orders/page.tsx`, `categorias/page.tsx`, `shipping/page.tsx`, `products/new/page.tsx`, `products/[id]/edit/page.tsx` (4 queries, todas en un solo contexto).
+- Storefront: `buscar/search-results.tsx` (4 queries en un contexto), `checkout/success/page.tsx` (agrega `getTenantId()`), `categoria/[slug]/page.tsx`.
+- **Guard adicional en `/buscar`:** si `productIds.length === 0` se devuelven `variants: []`/`images: []` sin construir el `IN ()` — caso legítimo (búsqueda sin resultados) que no debe dar 500 nunca.
+
+**Tests de regresión (3 archivos, 5 tests):** `orders/__tests__/page.test.ts`, `products/__tests__/page.test.ts` (assertan que la página llama `withTenantContext(tenantId, ...)` y renderiza los datos devueltos), `buscar/__tests__/search-results.test.ts` (con resultados + sin resultados / guard del `IN ()`). Patrón: mock de `withTenantContext` con chain Drizzle que resuelve en orden de await.
+
+**Verificación:** `pnpm test` 388/388 (5 nuevos, 51 files) | typecheck 9/9 | lint 6/6 | build 3 apps OK.
+
+**Impacto del incidente:** desde la activación de FORCE RLS (2026-07-29), el panel de admin mostraba listas vacías en el uso diario (productos, órdenes, categorías, envíos) y el buscador público del storefront daba 500. No fue reportado antes consistentemente con la ausencia de uso del admin en el período (sin tenants/clientes reales aún; el reviewer pidió confirmar si alguien del equipo entró — sin evidencia de uso, ADR-022 ya había documentado que no se detectó tráfico a rutas en la auditoría).
+- **Branch:** `develop`

@@ -1,4 +1,4 @@
-import { db, dbProducts, dbProductVariants, dbProductImages, dbTenants } from "@repo/db";
+import { withTenantContext, dbProducts, dbProductVariants, dbProductImages, dbTenants } from "@repo/db";
 import { getTenantId } from "@/lib/tenant";
 import { eq, and, or, ilike, sql, desc } from "drizzle-orm";
 import Link from "next/link";
@@ -54,70 +54,79 @@ export async function SearchResults({
     )
   );
 
-  const productsQuery = db
-    .select({
-      id: dbProducts.id,
-      name: dbProducts.name,
-      slug: dbProducts.slug,
-      description: dbProducts.description,
-      imageUrl: dbProducts.imageUrl,
-      status: dbProducts.status,
-      createdAt: dbProducts.createdAt,
-    })
-    .from(dbProducts)
-    .leftJoin(dbProductVariants, eq(dbProducts.id, dbProductVariants.productId))
-    .where(whereConditions)
-    .groupBy(dbProducts.id)
-    .orderBy(desc(dbProducts.createdAt))
-    .limit(limit)
-    .offset(currentOffset);
+  const { products, total, variants, images } = await withTenantContext(tenantId, async (tx) => {
+    const productsQuery = tx
+      .select({
+        id: dbProducts.id,
+        name: dbProducts.name,
+        slug: dbProducts.slug,
+        description: dbProducts.description,
+        imageUrl: dbProducts.imageUrl,
+        status: dbProducts.status,
+        createdAt: dbProducts.createdAt,
+      })
+      .from(dbProducts)
+      .leftJoin(dbProductVariants, eq(dbProducts.id, dbProductVariants.productId))
+      .where(whereConditions)
+      .groupBy(dbProducts.id)
+      .orderBy(desc(dbProducts.createdAt))
+      .limit(limit)
+      .offset(currentOffset);
 
-  const countQuery = db
-    .select({ count: sql<number>`count(distinct ${dbProducts.id})` })
-    .from(dbProducts)
-    .leftJoin(dbProductVariants, eq(dbProducts.id, dbProductVariants.productId))
-    .where(whereConditions);
+    const countQuery = tx
+      .select({ count: sql<number>`count(distinct ${dbProducts.id})` })
+      .from(dbProducts)
+      .leftJoin(dbProductVariants, eq(dbProducts.id, dbProductVariants.productId))
+      .where(whereConditions);
 
-  const [products, countResult] = await Promise.all([
-    productsQuery,
-    countQuery,
-  ]);
+    const [products, countResult] = await Promise.all([
+      productsQuery,
+      countQuery,
+    ]);
 
-  const total = countResult[0]?.count || 0;
-  const productIds = products.map((p) => p.id);
+    const total = countResult[0]?.count || 0;
+    const productIds = products.map((p) => p.id);
 
-  const variants = await db
-    .select({
-      id: dbProductVariants.id,
-      productId: dbProductVariants.productId,
-      price: dbProductVariants.price,
-      stock: dbProductVariants.stock,
-      sku: dbProductVariants.sku,
-    })
-    .from(dbProductVariants)
-    .where(
-      and(
-        eq(dbProductVariants.tenantId, tenantId),
-        sql`${dbProductVariants.productId} in ${productIds}`
+    // Sin productos no hay IN (...) que construir: PostgreSQL rechaza `IN ()` vacío
+    if (productIds.length === 0) {
+      return { products, total, variants: [], images: [] };
+    }
+
+    const variants = await tx
+      .select({
+        id: dbProductVariants.id,
+        productId: dbProductVariants.productId,
+        price: dbProductVariants.price,
+        stock: dbProductVariants.stock,
+        sku: dbProductVariants.sku,
+      })
+      .from(dbProductVariants)
+      .where(
+        and(
+          eq(dbProductVariants.tenantId, tenantId),
+          sql`${dbProductVariants.productId} in ${productIds}`
+        )
+      );
+
+    const images = await tx
+      .select({
+        id: dbProductImages.id,
+        productId: dbProductImages.productId,
+        url: dbProductImages.url,
+        alt: dbProductImages.alt,
+        position: dbProductImages.position,
+      })
+      .from(dbProductImages)
+      .where(
+        and(
+          eq(dbProductImages.tenantId, tenantId),
+          sql`${dbProductImages.productId} in ${productIds}`
+        )
       )
-    );
+      .orderBy(dbProductImages.position);
 
-  const images = await db
-    .select({
-      id: dbProductImages.id,
-      productId: dbProductImages.productId,
-      url: dbProductImages.url,
-      alt: dbProductImages.alt,
-      position: dbProductImages.position,
-    })
-    .from(dbProductImages)
-    .where(
-      and(
-        eq(dbProductImages.tenantId, tenantId),
-        sql`${dbProductImages.productId} in ${productIds}`
-      )
-    )
-    .orderBy(dbProductImages.position);
+    return { products, total, variants, images };
+  });
 
   const variantsByProduct = variants.reduce((acc, v) => {
     if (!acc[v.productId]) acc[v.productId] = [];

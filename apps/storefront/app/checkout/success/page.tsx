@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import { headers } from "next/headers";
-import { db, dbOrders } from "@repo/db";
+import { withTenantContext, dbOrders } from "@repo/db";
 import { eq } from "drizzle-orm";
+import { getTenantId } from "@/lib/tenant";
 
 type Props = {
   searchParams: { order_id?: string };
@@ -12,12 +13,17 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
 
   let order = null;
   if (orderId) {
-    const [o] = await db
-      .select()
-      .from(dbOrders)
-      .where(eq(dbOrders.id, orderId))
-      .limit(1);
-    order = o;
+    const tenantId = await getTenantId();
+    if (tenantId) {
+      const [o] = await withTenantContext(tenantId, async (tx) =>
+        tx
+          .select()
+          .from(dbOrders)
+          .where(eq(dbOrders.id, orderId))
+          .limit(1)
+      );
+      order = o;
+    }
   }
 
   return (

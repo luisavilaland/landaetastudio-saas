@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { db, dbShippingMethods } from "@repo/db";
+import { withTenantContext, dbShippingMethods } from "@repo/db";
 import { eq, asc } from "drizzle-orm";
 import { ShippingMethodsTable } from "./shipping-table";
 
@@ -19,11 +19,13 @@ export default async function ShippingPage() {
 
   const tenantId = session.user?.tenantId as string;
 
-  const methods = await db
-    .select()
-    .from(dbShippingMethods)
-    .where(eq(dbShippingMethods.tenantId, tenantId))
-    .orderBy(asc(dbShippingMethods.sortOrder));
+  const methods = await withTenantContext(tenantId, async (tx) =>
+    tx
+      .select()
+      .from(dbShippingMethods)
+      .where(eq(dbShippingMethods.tenantId, tenantId))
+      .orderBy(asc(dbShippingMethods.sortOrder))
+  );
 
   return (
     <div>

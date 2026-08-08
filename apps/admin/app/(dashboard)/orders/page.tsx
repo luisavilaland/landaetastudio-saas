@@ -1,4 +1,4 @@
-import { db, dbOrders } from "@repo/db";
+import { withTenantContext, dbOrders } from "@repo/db";
 import { OrdersTable } from "./orders-table";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
@@ -36,17 +36,19 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     whereConditions.push(eq(dbOrders.status, status));
   }
 
-  const orders = await db
-    .select({
-      id: dbOrders.id,
-      customerEmail: dbOrders.customerEmail,
-      total: dbOrders.total,
-      status: dbOrders.status,
-      createdAt: dbOrders.createdAt,
-    })
-    .from(dbOrders)
-    .where(and(...whereConditions))
-    .orderBy(dbOrders.createdAt);
+  const orders = await withTenantContext(tenantId, async (tx) =>
+    tx
+      .select({
+        id: dbOrders.id,
+        customerEmail: dbOrders.customerEmail,
+        total: dbOrders.total,
+        status: dbOrders.status,
+        createdAt: dbOrders.createdAt,
+      })
+      .from(dbOrders)
+      .where(and(...whereConditions))
+      .orderBy(dbOrders.createdAt)
+  );
 
   return (
     <div style={{ padding: "2rem" }}>

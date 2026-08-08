@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { db, dbCategories } from "@repo/db";
+import { withTenantContext, dbCategories } from "@repo/db";
 import { eq, desc } from "drizzle-orm";
 import { CategoriesTable } from "./categories-table";
 
@@ -15,11 +15,13 @@ export default async function CategoriesPage() {
 
   const tenantId = session.user?.tenantId as string;
 
-  const categories = await db
-    .select()
-    .from(dbCategories)
-    .where(eq(dbCategories.tenantId, tenantId))
-    .orderBy(desc(dbCategories.createdAt));
+  const categories = await withTenantContext(tenantId, async (tx) =>
+    tx
+      .select()
+      .from(dbCategories)
+      .where(eq(dbCategories.tenantId, tenantId))
+      .orderBy(desc(dbCategories.createdAt))
+  );
 
   return <CategoriesTable initialCategories={categories} />;
 }

@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { db, dbTenants, dbCategories } from "@repo/db";
+import { db, withTenantContext, dbTenants, dbCategories } from "@repo/db";
 import { eq } from "drizzle-orm";
 import { getProducts } from "@/lib/products";
 import { ProductCard } from "@/components/product-card";
@@ -46,11 +46,13 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     );
   }
 
-  const categoryResult = await db
-    .select()
-    .from(dbCategories)
-    .where(eq(dbCategories.slug, slug))
-    .limit(1);
+  const categoryResult = await withTenantContext(tenantId, async (tx) =>
+    tx
+      .select()
+      .from(dbCategories)
+      .where(eq(dbCategories.slug, slug))
+      .limit(1)
+  );
 
   if (categoryResult.length === 0) {
     return (
