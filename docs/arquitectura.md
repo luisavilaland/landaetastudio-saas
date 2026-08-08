@@ -26,6 +26,7 @@ Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada AD
 | [ADR-018](adr/ADR-018-consolidacion-nextauth.md) | Consolidación de NextAuth en @repo/auth | Aceptada |
 | [ADR-019](adr/ADR-019-logica-negocio-commerce.md) | Centralización de lógica de negocio en @repo/commerce | Aceptada |
 | [ADR-020](adr/ADR-020-normalizacion-slugs.md) | Normalización de slugs | Aceptada — ver discrepancia |
+| [ADR-022](adr/ADR-022-rls-status.md) | Estado de RLS (decorativo → activo con app_user) | Aceptada — actualizada |
 
 ## Convenciones clave
 
@@ -39,4 +40,4 @@ Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada AD
 - **Precios siempre en centavos**: integer en DB, dividir/100 solo en frontend.
 - **IDs**: UUIDs nativos de PostgreSQL (`gen_random_uuid()`).
 - **Sentry condicional**: activo solo si SENTRY_DSN está configurado (`@sentry/nextjs` en las 3 apps, condicional en next.config.mjs).
-- **Logs con @repo/logger (mayoritario, con deuda)**: ~49 instancias de `console.error`/`console.log` sin migrar en apps/. Convención vigente para código nuevo; barrido pendiente.
+- **Logs con @repo/logger (completo)**: 0 instancias de `console.*` en `apps/` (barrido completo). Excepción intencional: `packages/db/seed.ts` (script CLI) y `packages/validation/src/env.ts` (validación de boot). Convención vigente para código nuevo.

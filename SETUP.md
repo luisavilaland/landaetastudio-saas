@@ -206,6 +206,7 @@ pnpm db:migrate
 
 ```bash
 pnpm test          # Todos los tests (vitest run)
+pnpm test:e2e      # E2E Playwright (requiere apps corriendo + REDIS_URL)
 pnpm lint          # Linting + formatting
 pnpm typecheck     # TypeScript --noEmit
 pnpm build         # Build de todas las apps
@@ -213,12 +214,13 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**225 tests pasando, 0 fallos.** Todos los suites de test están operativos incluyendo los 25 tests de shipping escritos en patrón de lógica pura (evitan importar rutas de Next.js directamente, lo que elimina la incompatibilidad con next-auth@5.0.0-beta.31).
+**388 tests pasando, 0 fallos (51 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
-- **Lógica pura:** Los tests de endpoints no importan la ruta directamente. Mockean dependencias y exportan funciones puras que pueden ser testeada sin el runtime de Next.js.
+- **Handlers reales:** Los tests de endpoints importan los handlers reales (`import { GET, POST } from "../route"`) con mocks de dependencias (`withTenantContext`, Redis, storage). Patrón documentado en AGENTS.md → Helpers de test.
 - **Ubicación:** `__tests__/` junto al archivo bajo test.
+- **E2E:** Playwright en `e2e/` (ver sección E2E abajo).
 
 ### Herramientas adicionales
 
@@ -237,9 +239,35 @@ pnpm build         # Build de todas las apps
 tenant1.lvh.me:3000
 ```
 
+---
+
+## Redis (carrito)
+
+El carrito anónimo persiste en Redis vía ioredis. **Hay dos variables distintas, no confundir:**
+
+| Variable | Cliente | Uso |
+|----------|---------|-----|
+| `REDIS_URL` | ioredis (`rediss://...:6379`) | **El carrito** (`@repo/commerce/redis.ts`). Es la que importa. Sensible a mayúsculas. |
+| `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN` | REST HTTP | Legacy/validación de producción. **No** usada por el carrito. |
+
+⚠️ **Trap de `isProduction` en `packages/validation/src/env.ts`:** si `NODE_ENV=production` y está presente cualquiera de (`UPSTASH_REDIS_REST_URL`, `RESEND_API_KEY`, `R2_*`), el schema de producción **exige todas** las cloud vars — falta alguna → la app no arranca. El carrito solo necesita `REDIS_URL` (que no dispara `isProduction`), así que **no hace falta** agregar `UPSTASH_*` si no están las demás vars de producción.
+
+---
+
+## E2E (Playwright)
+
+- Config en la raíz: `playwright.config.ts` (6 projects, `storageState` para admin/superadmin vía `global-setup.ts`).
+- Specs en `e2e/` (storefront, checkout, admin, superadmin, security) — 14 specs.
+- Env vars (ver `.env.local.example`): `E2E_STOREFRONT_URL`, `E2E_STOREFRONT_T2_URL`, `E2E_ADMIN_URL`, `E2E_SUPERADMIN_URL`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`.
+- CI: `.github/workflows/e2e.yml` — corre en **runner self-hosted** (AlmaLinux). Requisitos del runner:
+  - Egress TCP a Neon (puerto 5432, IPv4 o IPv6) y red a los 3 dominios Vercel.
+  - Si el host no tiene ruta IPv6, pin del endpoint Neon en `/etc/hosts`.
+  - Libs de sistema de Chromium instaladas vía `dnf` (nss, atk, at-spi2-atk, cups-libs, libdrm, libxkbcommon, libXcomposite, libXdamage, libXfixes, libXrandr, mesa-libgbm, alsa-lib, pango, cairo, gtk3).
+  - Guard anti-fork: los jobs se saltan PRs de forks (repo público + runner self-hosted = riesgo RCE).
+
 ## Nota
 
-Última actualización: 10 de julio de 2026 – Migración a servicios cloud, deploy en Vercel (3 apps), CI con GitHub Actions. Rama `develop`. 225/225 tests. Build limpio.
+Última actualización: 08 de agosto de 2026 – Alineación documental post-incidente RLS (388 tests, E2E Playwright con CI self-hosted, sección Redis agregada). Rama `develop`. Build limpio.
 
 ## URLs de producción (Vercel)
 
@@ -267,9 +295,9 @@ Cada proyecto tiene su propio `vercel.json` en la carpeta de la app correspondie
 
 Todas las variables cloud deben estar configuradas en cada proyecto:
 
-- `DATABASE_URL`, `AUTH_SECRET` (core, obligatorias en todos)
+- `DATABASE_URL`, `DATABASE_APP_URL`, `AUTH_SECRET` (core, obligatorias en todos)
 - `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET`
-- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `REDIS_URL` (ioredis — storefront)
 - `RESEND_API_KEY`
 - `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
 - `STOREFRONT_URL`

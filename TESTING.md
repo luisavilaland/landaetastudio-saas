@@ -4,16 +4,17 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 
 ---
 
-## Pruebas Manuales – 30 de abril de 2026
+## Pruebas Manuales – 08 de agosto de 2026
 
 ### Setup Previo
 
 | # | Prueba | Estado |
 |---|--------|--------|
-| 1 | Docker servicios corriendo (PostgreSQL, Redis, MinIO) | ✅ |
+| 1 | Servicios cloud accesibles (Neon, Upstash, R2, Resend — `.env.local` completo) | ✅ |
 | 2 | Migraciones aplicadas (`pnpm db:migrate`) | ✅ |
-| 3 | Seed ejecutado (`pnpm db:seed`) | ✅ |
+| 3 | Seed ejecutado (`pnpm db:seed` — 2 tenants: tienda1, tienda2) | ✅ |
 | 4 | Apps en desarrollo (`pnpm dev`) sin errores | ✅ |
+| 5 | E2E: `playwright.config.ts` en raíz + vars `E2E_*` en `.env.local` (opcional) | ✅ |
 
 ---
 
@@ -272,10 +273,12 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 
 | # | Prueba | Estado |
 |---|--------|--------|
-| 1 | Flujo E2E completo (sandbox) | 🔄 Pendiente – cuenta de prueba no disponible |
-| 2 | Webhook de pago aprobado | 🔄 Pendiente |
-| 3 | Webhook de pago rechazado | 🔄 Pendiente |
-| 4 | Email de confirmación de orden | 🔄 Pendiente |
+| 1 | Flujo E2E completo en sandbox (tarjeta de prueba) | 🔄 Pendiente – cuenta de prueba de MP no disponible |
+| 2 | Webhook de pago aprobado (unit/integración, HMAC + magic ID `123456789`) | ✅ 11 tests en `webhooks/mercadopago/__tests__/route.test.ts` |
+| 3 | Webhook de pago rechazado (magic ID `000000`) | ✅ ídem |
+| 4 | Email de confirmación de orden (Resend) | ✅ Unit tests en `@repo/commerce` |
+
+> El webhook está **automatizado** (tests de integración con HMAC fail-closed, idempotencia por `payment_id`, modo simulación con `x-test-order-id`). El único pendiente operativo es el sandbox manual (cuenta de prueba de MP), que no bloquea la automatización.
 
 ---
 
@@ -287,12 +290,12 @@ pnpm test
 
 | Métrica | Valor |
 |---------|-------|
-| **Total** | 225 tests |
-| **Pasando** | 225 ✅ |
+| **Total** | 388 tests |
+| **Pasando** | 388 ✅ |
 | **Fallas** | 0 ✅ |
-| **Archivos** | 25 |
+| **Archivos** | 51 |
 
-> Los 25 tests de shipping usan patrón de "lógica pura" para evitar incompatibilidad con next-auth@5.0.0-beta.31. Los tests de categorías también fueron reescritos con este patrón.
+> Los tests de endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, Redis, storage). Helpers centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`). Además: 14 specs E2E en `e2e/` (Playwright, CI self-hosted).
 
 ---
 
@@ -310,10 +313,11 @@ pnpm test
 ---
 ## Notas
 
-- Última actualización: 6 de mayo de 2026 — Fase 5 completada ✅.
+- Última actualización: 08 de agosto de 2026 — Alineación documental post-incidente RLS (388 tests, E2E Playwright).
 - Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
-- 225 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
-- Flujo E2E de MercadoPago pendiente (bloqueado por cuenta de prueba).
+- Fase 6 en curso: withTenantContext real + FORCE RLS (app_user), E2E Playwright con CI self-hosted, incidente RLS de 9 Server Components corregido (08-08).
+- 388 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
+- Sandbox manual de MercadoPago pendiente (cuenta de prueba de MP).
 - Ver AGENTS.md para detalles de convenciones de código y comandos obligatorios.
 
 - Preparación para migración cloud: código adaptado para R2, Resend, Upstash con fallback local. Variables condicionales según entorno.

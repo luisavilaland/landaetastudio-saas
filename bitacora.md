@@ -768,3 +768,15 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 
 **Impacto del incidente:** desde la activación de FORCE RLS (2026-07-29), el panel de admin mostraba listas vacías en el uso diario (productos, órdenes, categorías, envíos) y el buscador público del storefront daba 500. No fue reportado antes consistentemente con la ausencia de uso del admin en el período (sin tenants/clientes reales aún; el reviewer pidió confirmar si alguien del equipo entró — sin evidencia de uso, ADR-022 ya había documentado que no se detectó tráfico a rutas en la auditoría).
 - **Branch:** `develop`
+
+---
+
+## 2026-08-08 — Alineación documental post-incidente RLS
+
+- **README.md:** tests 227→388 (51 archivos, fecha 08-08), nueva sección **Fase 6 – RLS real (withTenantContext) y E2E** (withTenantContext real, DATABASE_APP_URL, incidente 08-08, E2E, carrito resiliente, barrido console.*), endpoints faltantes agregados (`products/import`, `config/tenant`, `config/settings`, `config/tenant/domain`, `domain-check` en admin y superadmin, `search` y `categories` de storefront), bloque duplicado `apps/` de estructura eliminado, MercadoPago ngrok→dotunnel, "Estado actual" corregido (R2 en lugar de MinIO, Resend en lugar de nodemailer, customer-auth con withTenantContext).
+- **SETUP.md:** 225→388 tests, sección **Redis** nueva (REDIS_URL ioredis vs UPSTASH_* REST, trap de `isProduction` en env.ts), sección **E2E** nueva (playwright.config en raíz, requisitos runner self-hosted AlmaLinux: egress TCP 5432, pin IPv4 Neon en /etc/hosts, libs chromium dnf, guard anti-fork), vars Vercel completadas con `DATABASE_APP_URL` y `REDIS_URL`.
+- **docs/arquitectura.md:** ADR-022 (rls-status) agregado al índice; convención de logger actualizada a 0 instancias `console.*` en apps/ (barrido completo; excepción seed.ts y env.ts).
+- **TESTING.md:** setup Docker→cloud, MercadoPago diferenciado (sandbox manual pendiente vs webhook automatizado con 11 tests), 225→388 tests / 25→51 archivos, fecha 08-08, patrón de testing actualizado (handlers reales + @repo/test-utils).
+- **TESTING-MANUAL.md:** 225→388 + E2E (14 specs), Docker/ngrok → cloud/dotunnel, MailHog → Resend, **CSV import reconciliado** (pasó de "No implementado" a Implementado — sección y pendiente corregidos), **afirmación falsa de proxies removida** (secciones "Seguridad de subdominios" marcadas obsoletas: los proxy.ts de admin/superadmin fueron eliminados como no-ops el 10-07; el aislamiento se garantiza por datos, no por host).
+- **Verificación:** greps de coherencia (388 tests en vitest, 0 `console.*` en apps/, 14 specs, métodos HTTP confirmados en routes de config/tenant, config/settings, config/tenant/domain, domain-check, search, categories). Sin cambios de código — no se ejecutó build/test completo.
+- **Branch:** `develop`
