@@ -173,19 +173,31 @@ STOREFRONT_URL=https://saasecommerce-prxy.ayooub.me
 
 ### Testing del Webhook en Desarrollo
 
+Para simular un webhook firmado correctamente (formato real de MercadoPago: `x-signature: ts=<ts>,v1=<v1>` con cadena canónica `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`), genera `v1` con openssl y envialo contra el túnel:
+
 ```bash
 # Simular webhook aprobado (paymentId 123456789)
+TS=$(date +%s)
+CANONICAL="id:123456789;ts:${TS};"   # sin x-request-id → la parte se omite
+V1=$(printf '%s' "$CANONICAL" | openssl dgst -sha256 -hmac "$MERCADOPAGO_WEBHOOK_SECRET" -hex | sed 's/^.*= //')
 curl -X POST https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago \
   -H "Content-Type: application/json" \
+  -H "x-signature: ts=${TS},v1=${V1}" \
   -H "x-test-order-id: <order-id>" \
   -d '{"type":"payment","data":{"id":"123456789"}}'
 
 # Simular webhook rechazado (paymentId 000000)
+TS=$(date +%s)
+CANONICAL="id:000000;ts:${TS};"
+V1=$(printf '%s' "$CANONICAL" | openssl dgst -sha256 -hmac "$MERCADOPAGO_WEBHOOK_SECRET" -hex | sed 's/^.*= //')
 curl -X POST https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago \
   -H "Content-Type: application/json" \
+  -H "x-signature: ts=${TS},v1=${V1}" \
   -H "x-test-order-id: <order-id>" \
   -d '{"type":"payment","data":{"id":"000000"}}'
 ```
+
+> **Nota:** La firma real en producción la genera MercadoPago (fail-closed), y `BYPASS_WEBHOOK_SIGNATURE=true` solo salta la verificación en desarrollo, nunca en producción. La ventana de validez del `ts` es de 300 segundos: si el webhook responde 401 por firma, verificá que el reloj esté sincronizado y que el `ts` sea actual.
 
 > **Nota:** La URL del túnel cambia cada vez que reinicias `npx dotunnel`, a menos que uses un plan pago con dominio fijo. Si el webhook deja de funcionar, verifica que el túnel esté activo y actualiza `STOREFRONT_URL` en tu `.env.local` con la nueva URL.
 

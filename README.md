@@ -338,7 +338,22 @@ Para recibir notificaciones de pago en desarrollo:
 2. Configurar `STOREFRONT_URL` en `.env.local` con la URL pública del túnel
 3. Registrar esa URL en MP Developer Dashboard: `https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago`
 
-El webhook verifica firma HMAC con `MERCADOPAGO_WEBHOOK_SECRET` (fail-closed en producción) y es idempotente por `payment_id`. Modo simulación en desarrollo con header `x-test-order-id` (magic IDs `123456789` approved / `000000` rejected). Ver SETUP.md para detalles.
+MercadoPago firma cada notificación con el header `x-signature: ts=<ts>,v1=<v1>` y envía un header `x-request-id` aparte. La cadena canónica firmada es `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` (las partes vacías se omiten) y `v1` es `HMAC-SHA256(cadena, MERCADOPAGO_WEBHOOK_SECRET)`. El webhook rechaza firmas cuyo `ts` esté fuera de una ventana de **300 segundos** (anti-replay) y es **fail-closed en producción**. Idempotente por `payment_id`. Modo simulación en desarrollo con header `x-test-order-id` (magic IDs `123456789` approved / `000000` rejected). En desarrollo, `BYPASS_WEBHOOK_SIGNATURE=true` salta la verificación de firma — **nunca se salta en producción**.
+
+Ejemplo de smoke test local (generar `v1` con openssl, solo en dev vía dotunnel):
+
+```bash
+TS=$(date +%s)
+CANONICAL="id:123456789;ts:${TS};"                 # sin x-request-id → la parte se omite
+V1=$(printf '%s' "$CANONICAL" | openssl dgst -sha256 -hmac "$MERCADOPAGO_WEBHOOK_SECRET" -hex | sed 's/^.*= //')
+curl -s -X POST https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago \
+  -H "Content-Type: application/json" \
+  -H "x-signature: ts=${TS},v1=${V1}" \
+  -H "x-test-order-id: tenant-1:order-dev-123" \
+  -d '{"type":"payment","data":{"id":"123456789"}}'
+```
+
+En producción la firma la genera MercadoPago: prod es fail-closed, por lo que este ejemplo de firma local solo aplica al túnel de desarrollo. Ver SETUP.md para detalles.
 
 ### Estados de orden
 

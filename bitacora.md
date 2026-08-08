@@ -780,3 +780,18 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **TESTING-MANUAL.md:** 225→388 + E2E (14 specs), Docker/ngrok → cloud/dotunnel, MailHog → Resend, **CSV import reconciliado** (pasó de "No implementado" a Implementado — sección y pendiente corregidos), **afirmación falsa de proxies removida** (secciones "Seguridad de subdominios" marcadas obsoletas: los proxy.ts de admin/superadmin fueron eliminados como no-ops el 10-07; el aislamiento se garantiza por datos, no por host).
 - **Verificación:** greps de coherencia (388 tests en vitest, 0 `console.*` en apps/, 14 specs, métodos HTTP confirmados en routes de config/tenant, config/settings, config/tenant/domain, domain-check, search, categories). Sin cambios de código — no se ejecutó build/test completo.
 - **Branch:** `develop`
+
+---
+
+## 2026-08-08 — Webhook MP: verificación de firma alineada a spec oficial
+
+**Bug:** el webhook de MercadoPago calculaba `HMAC(rawBody + "." + x-request-id)` y comparaba el header completo; la spec real de MP firma la cadena canónica `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` y envía `x-signature: ts=<ts>,v1=<v1>`. Todo webhook legítimo devolvía 401 (fail-closed) → MP reintentaba 24 h → las órdenes nunca se confirmaban en prod. Además `BYPASS_WEBHOOK_SIGNATURE` figuraba en `.env.local.example` pero el código nunca lo leía (config muerta).
+
+**Cambios:**
+- **Nuevo helper** `packages/commerce/src/webhook-signature.ts` (`verifyMercadoPagoSignature`): parsea `ts`/`v1`, construye canonical omitiendo partes vacías, rechaza `ts` fuera de ventana de 300 s (anti-replay, recomendación de MP) y compara con `timingSafeEqual` con guard de longitud previo. Exportado desde `@repo/commerce` (index + subpath).
+- **route.ts:** bloque manual reemplazado por el helper; `BYPASS_WEBHOOK_SIGNATURE=true` solo salta verificación cuando `NODE_ENV !== "production"` (fail-closed intacto en prod). Flujo de negocio, magic IDs dev e idempotencia por `payment_id` sin cambios.
+- **Tests:** 14 unit del helper + 13 del route reescritos a formato MP real (firma válida/inválida/vencida, bypass dev sí / prod no, magic approved/rejected, 400 payload, 503 sin secret). TDD: test del helper rojo primero (módulo inexistente).
+- **Docs:** README (formato de firma MP + smoke test con openssl), SETUP.md (ejemplos curl con canonical correcto), esta entrada.
+
+**Verificación:** `pnpm test` 405/405 (17 nuevos, 52 files) | typecheck 9/9 | lint 6/6 | build 3 apps OK.
+- **Branch:** `fix/webhook-mp-firma` (pendiente merge a `develop`)
