@@ -20,7 +20,8 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "@repo/*": ["../../packages/*"]
+      "@repo/*": ["../../packages/*"],
+      "@repo/commerce/*": ["../../packages/commerce/src/*"]
     }
   },
   "include": [

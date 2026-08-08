@@ -106,3 +106,13 @@ export async function redisIncr(key: string): Promise<number | null> {
 export async function redisPexpire(key: string, milliseconds: number): Promise<void> {
   await safeRun("pexpire", () => redisClient.pexpire(key, milliseconds));
 }
+
+/**
+ * Ping de liveness para health checks. Reutiliza `safeRun` así el cold-start de
+ * `lazyConnect` no hace fallar el endpoint (degradado devuelve false en vez de
+ * disparar un 500).
+ */
+export async function redisPing(): Promise<boolean> {
+  const result = await safeRun("ping", () => redisClient.ping());
+  return result === "PONG";
+}
