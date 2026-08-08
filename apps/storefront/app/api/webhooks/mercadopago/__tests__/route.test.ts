@@ -31,19 +31,48 @@ const TENANT_ID = "tenant-123";
 
 import { POST } from "../route";
 
+function extractDataId(rawBody: string): string | undefined {
+  try {
+    const parsed = JSON.parse(rawBody) as { data?: { id?: string } };
+    return parsed.data?.id;
+  } catch {
+    return undefined;
+  }
+}
+
+function buildCanonical(dataId: string, xRequestId: string, ts: number): string {
+  const parts = [
+    dataId ? `id:${dataId}` : "",
+    xRequestId ? `request-id:${xRequestId}` : "",
+    ts ? `ts:${ts}` : "",
+  ].filter(Boolean);
+  return `${parts.join(";")};`;
+}
+
+function makeSignature(params: { dataId: string; ts: number; xRequestId?: string; secret?: string }): string {
+  const { dataId, ts, xRequestId = "", secret = WEBHOOK_SECRET } = params;
+  const canonical = buildCanonical(dataId, xRequestId, ts);
+  const v1 = crypto.createHmac("sha256", secret).update(canonical).digest("hex");
+  return `ts=${ts},v1=${v1}`;
+}
+
 function makeWebhookRequest(
   rawBody: string,
   overrides?: {
     signature?: string;
     requestId?: string;
     testOrderId?: string;
+    ts?: number;
+    secret?: string;
   }
 ): NextRequest {
   const headers = new Headers({ "content-type": "application/json" });
 
-  const requestId = overrides?.requestId || null;
-  const dataToSign = requestId ? `${rawBody}.${requestId}` : rawBody;
-  const signature = overrides?.signature ?? crypto.createHmac("sha256", WEBHOOK_SECRET).update(dataToSign).digest("hex");
+  const requestId = overrides?.requestId ?? "";
+  const dataId = extractDataId(rawBody) ?? "";
+  const signature =
+    overrides?.signature ??
+    makeSignature({ dataId, ts: overrides?.ts ?? Math.floor(Date.now() / 1000), xRequestId: requestId, secret: overrides?.secret });
 
   headers.set("x-signature", signature);
   if (requestId) {
@@ -62,7 +91,7 @@ function makeWebhookRequest(
   } as unknown as NextRequest;
 }
 
-describe("POST /api/webhooks/mercadopago — HMAC verification", () => {
+describe("POST /api/webhooks/mercadopago — signature verification", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.MERCADOPAGO_WEBHOOK_SECRET = WEBHOOK_SECRET;
@@ -73,6 +102,7 @@ describe("POST /api/webhooks/mercadopago — HMAC verification", () => {
   afterEach(() => {
     delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
     delete process.env.MERCADOPAGO_ACCESS_TOKEN;
+    delete process.env.BYPASS_WEBHOOK_SIGNATURE;
     vi.unstubAllEnvs();
   });
 
@@ -123,6 +153,47 @@ describe("POST /api/webhooks/mercadopago — HMAC verification", () => {
 
     expect(res.status).toBe(401);
   });
+
+  it("should reject when signature timestamp is expired", async () => {
+    const res = await POST(
+      makeWebhookRequest(RAW_BODY, { ts: Math.floor(Date.now() / 1000) - 3600 })
+    );
+
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /api/webhooks/mercadopago — signature bypass", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.MERCADOPAGO_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    process.env.MERCADOPAGO_ACCESS_TOKEN = ACCESS_TOKEN;
+    vi.stubEnv("NODE_ENV", "development");
+  });
+
+  afterEach(() => {
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    delete process.env.MERCADOPAGO_ACCESS_TOKEN;
+    delete process.env.BYPASS_WEBHOOK_SIGNATURE;
+    vi.unstubAllEnvs();
+  });
+
+  it("should bypass signature verification in development when enabled", async () => {
+    process.env.BYPASS_WEBHOOK_SIGNATURE = "true";
+
+    const res = await POST(makeWebhookRequest(RAW_BODY, { signature: "fake-signature" }));
+
+    expect(res.status).toBe(200);
+  });
+
+  it("should NOT bypass signature verification in production even when enabled", async () => {
+    process.env.BYPASS_WEBHOOK_SIGNATURE = "true";
+    vi.stubEnv("NODE_ENV", "production");
+
+    const res = await POST(makeWebhookRequest(RAW_BODY, { signature: "fake-signature" }));
+
+    expect(res.status).toBe(401);
+  });
 });
 
 describe("POST /api/webhooks/mercadopago — Dev mode payment processing", () => {
@@ -136,6 +207,7 @@ describe("POST /api/webhooks/mercadopago — Dev mode payment processing", () =>
   afterEach(() => {
     delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
     delete process.env.MERCADOPAGO_ACCESS_TOKEN;
+    delete process.env.BYPASS_WEBHOOK_SIGNATURE;
     vi.unstubAllEnvs();
   });
 
@@ -193,6 +265,7 @@ describe("POST /api/webhooks/mercadopago — Validation", () => {
   afterEach(() => {
     delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
     delete process.env.MERCADOPAGO_ACCESS_TOKEN;
+    delete process.env.BYPASS_WEBHOOK_SIGNATURE;
     vi.unstubAllEnvs();
   });
 

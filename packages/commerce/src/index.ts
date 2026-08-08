@@ -16,5 +16,8 @@ export { getCategoriesForTenant } from "./categories";
 // Tenant
 export { getTenantId } from "./tenant";
 
+// Webhook
+export { verifyMercadoPagoSignature } from "./webhook-signature";
+
 // Redis (export for testing or direct access if needed)
 export { redisClient } from "./redis";

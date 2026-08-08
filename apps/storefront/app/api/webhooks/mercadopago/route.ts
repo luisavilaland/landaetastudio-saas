@@ -2,11 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, dbOrders, dbOrderItems, dbProductVariants, withTenantContext } from "@repo/db";
 import { and, eq, sql } from "drizzle-orm";
 import { sendOrderConfirmationEmail } from "@/lib/email";
-import crypto from "crypto";
 import { webhookSchema } from "@repo/validation";
+import { verifyMercadoPagoSignature } from "@repo/commerce/webhook-signature";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("webhook-mercadopago");
+
+function extractDataId(rawBody: string): string | undefined {
+  try {
+    const parsed = JSON.parse(rawBody) as { data?: { id?: string } };
+    return parsed.data?.id;
+  } catch {
+    return undefined;
+  }
+}
 
 type MPWebhookPayload = {
   type: string;
@@ -69,17 +78,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing signature" }, { status: 401 });
     }
 
-    const requestId = request.headers.get("x-request-id");
-    const dataToSign = requestId
-      ? `${rawBody}.${requestId}`
-      : rawBody;
-    const expectedSignature = crypto.createHmac("sha256", webhookSecret).update(dataToSign).digest("hex");
+    const bypassVerified = process.env.BYPASS_WEBHOOK_SIGNATURE === "true" && process.env.NODE_ENV !== "production";
+    if (bypassVerified) {
+      logger.debug("Bypassing signature verification (dev only)");
+    } else {
+      const dataId = extractDataId(rawBody);
+      const result = verifyMercadoPagoSignature({
+        signatureHeader: signature,
+        xRequestId: request.headers.get("x-request-id") ?? "",
+        dataId: dataId ?? "",
+        secret: webhookSecret,
+      });
 
-    if (signature !== expectedSignature) {
-      logger.warn("Invalid signature");
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      if (!result.valid) {
+        logger.warn({ reason: result.reason }, "Invalid signature");
+        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      }
+      logger.debug("Signature verified");
     }
-    logger.debug("Signature verified");
 
     const parsedBody = JSON.parse(rawBody);
     const validation = webhookSchema.safeParse(parsedBody);
