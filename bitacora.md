@@ -857,3 +857,10 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 **Verificación:** CI `workflow_dispatch` verde — 34 passed, 1 skipped (cross-tenant pre-existente); los 4 tests de firma ejecutados contra `tienda1.landaetastudio.com` con firma real.
 - **Commits:** `a49747f`, `cf11cd6`, `71a9972`
 - **Branch:** `develop`
+
+## 2026-08-08 — Calidad: limpieza email, health check y deuda técnica
+
+- **Ítem 1 — Limpieza configs muertas:** `email.ts` Resend-only (`RESEND_FROM_EMAIL` como sender configurable, fallback `onboarding@resend.dev`); eliminados SMTP_HOST/PORT/FROM, `nodemailer` y `@types/nodemailer` (y del lockfile). `.env.local.example` refleja `RESEND_FROM_EMAIL`.
+- **Ítem 2 — Health check:** nuevo `redisPing()` en `@repo/commerce` (wrapper fail-open en `safeRun`) + `GET /api/health` público en las 3 apps (DB `SELECT 1`, Redis `ok/skipped`, token MP `ok/missing`; 200 ok / 503 degraded; `force-dynamic`; timeout 4s por check). Negación `api/health` en el matcher de `proxy.ts` del storefront (crítico: sin esto 404 por resolución de tenant). Ajuste `@repo/commerce/*` en tsconfig de admin/superadmin. 12 tests nuevos (4 por app). Docs: README (Monitoreo) y SETUP (Health Check / UptimeRobot).
+- **Ítem 3 — Deuda técnica:** nuevo `docs/deuda-tecnica.md` con 3 planes (TOCTOU en stock de checkout con update atómico `stock - qty WHERE stock >= qty`; migraciones inmutables con guard en CI; pin IPv4 del endpoint Neon para el runner self-hosted). **NO ejecutado, solo plan.**
+- **Branch:** `quality/calidad-y-monitoreo`

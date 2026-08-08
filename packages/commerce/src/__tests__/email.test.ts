@@ -1,12 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.hoisted(() => {
   process.env.RESEND_API_KEY = "test-key-for-ci";
-  process.env.RESEND_FROM = "test@example.com";
+  process.env.RESEND_FROM_EMAIL = "test@example.com";
 });
 
 const mockResendSend = vi.hoisted(() => vi.fn().mockResolvedValue({}));
-const mockNodemailerSend = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 
 vi.mock("resend", () => ({
   Resend: vi.fn().mockImplementation(function () {
@@ -14,18 +13,11 @@ vi.mock("resend", () => ({
   }),
 }));
 
-vi.mock("nodemailer", () => ({
-  default: {
-    createTransport: vi.fn().mockImplementation(() => ({
-      sendMail: mockNodemailerSend,
-    })),
-  },
-}));
-
 vi.mock("@repo/logger", () => ({
-  createLogger: vi.fn(() => ({
+createLogger: vi.fn(() => ({
     info: vi.fn(),
     error: vi.fn(),
+    warn: vi.fn(),
   })),
 }));
 
@@ -42,6 +34,7 @@ describe("sendOrderConfirmationEmail", () => {
     expect(mockResendSend).toHaveBeenCalledOnce();
     const callArg = mockResendSend.mock.calls[0][0];
     expect(callArg.to).toBe("test@example.com");
+    expect(callArg.from).toBe("test@example.com");
     expect(callArg.subject).toContain("order-123");
     expect(callArg.html).toContain("$150.00");
   });
@@ -66,6 +59,7 @@ describe("sendWelcomeEmail", () => {
     expect(mockResendSend).toHaveBeenCalledOnce();
     const callArg = mockResendSend.mock.calls[0][0];
     expect(callArg.to).toBe("user@example.com");
+    expect(callArg.from).toBe("test@example.com");
     expect(callArg.subject).toBe("¡Bienvenido a Mi Tienda!");
     expect(callArg.html).toContain("https://mitienda.com");
   });
@@ -85,5 +79,30 @@ describe("sendWelcomeEmail", () => {
     await expect(
       sendWelcomeEmail("user@example.com", "Luis", "Tienda"),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("sendOrderConfirmationEmail without RESEND_API_KEY", () => {
+  const originalApiKey = process.env.RESEND_API_KEY;
+
+  afterEach(() => {
+    if (originalApiKey) {
+      process.env.RESEND_API_KEY = originalApiKey;
+    } else {
+      delete process.env.RESEND_API_KEY;
+    }
+  });
+
+  it("should not send nor throw when no Resend key is configured", async () => {
+    vi.clearAllMocks();
+    delete process.env.RESEND_API_KEY;
+    vi.resetModules();
+
+    const { sendOrderConfirmationEmail: sendWithoutKey } = await import("../email");
+
+    await expect(
+      sendWithoutKey("test@example.com", "order-123", 1000, "Maria"),
+    ).resolves.toBeUndefined();
+    expect(mockResendSend).not.toHaveBeenCalled();
   });
 });

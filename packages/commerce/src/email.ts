@@ -1,22 +1,13 @@
-import nodemailer from "nodemailer";
 import { Resend } from "resend";
 import { createLogger } from "@repo/logger";
 
 const logger = createLogger("email-service");
 
-const isResend = !!process.env.RESEND_API_KEY;
+const resendApiKey = process.env.RESEND_API_KEY;
+const resend = resendApiKey ? new Resend(resendApiKey) : undefined;
 
-let resend: Resend | undefined;
-let smtpTransporter: nodemailer.Transporter | undefined;
-
-if (isResend) {
-  resend = new Resend(process.env.RESEND_API_KEY);
-} else {
-  smtpTransporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "localhost",
-    port: parseInt(process.env.SMTP_PORT || "1025"),
-    secure: false,
-  });
+if (!resend) {
+  logger.warn("RESEND_API_KEY not set; emails will not be sent");
 }
 
 export async function sendOrderConfirmationEmail(
@@ -25,9 +16,7 @@ export async function sendOrderConfirmationEmail(
   total: number,
   customerName: string
 ) {
-  const from = isResend
-    ? (process.env.RESEND_FROM || "onboarding@resend.dev")
-    : (process.env.SMTP_FROM || "noreply@saas.local");
+  const from = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
   const mailData = {
     from,
@@ -56,12 +45,12 @@ El equipo de la tienda
   };
 
   try {
-    if (isResend && resend) {
+    if (resend) {
       await resend.emails.send(mailData);
-    } else if (smtpTransporter) {
-      await smtpTransporter.sendMail(mailData);
+      logger.info({ email, orderId }, "Confirmation email sent");
+    } else {
+      logger.warn({ email, orderId }, "RESEND_API_KEY not configured; skipping send");
     }
-    logger.info({ email, orderId }, "Confirmation email sent");
   } catch (error) {
     logger.error({ email, orderId, error }, "Error sending confirmation email");
   }
@@ -73,9 +62,7 @@ export async function sendWelcomeEmail(
   storeName: string,
   storefrontUrl?: string
 ) {
-  const from = isResend
-    ? (process.env.RESEND_FROM || "onboarding@resend.dev")
-    : (process.env.SMTP_FROM || "noreply@saas.local");
+  const from = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
   const homeUrl = storefrontUrl || "";
 
@@ -105,12 +92,12 @@ ${homeUrl ? `<p><a href="${homeUrl}">Visitanos en la tienda</a></p>` : ""}
   };
 
   try {
-    if (isResend && resend) {
+    if (resend) {
       await resend.emails.send(mailData);
-    } else if (smtpTransporter) {
-      await smtpTransporter.sendMail(mailData);
+      logger.info({ email, storeName }, "Welcome email sent");
+    } else {
+      logger.warn({ email, storeName }, "RESEND_API_KEY not configured; skipping send");
     }
-    logger.info({ email, storeName }, "Welcome email sent");
   } catch (error) {
     logger.error({ email, storeName, error }, "Error sending welcome email");
   }

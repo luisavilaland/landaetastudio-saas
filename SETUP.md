@@ -287,6 +287,29 @@ El carrito anónimo persiste en Redis vía ioredis. **Hay dos variables distinta
 | Admin | https://saas-admin-sable.vercel.app |
 | Storefront | https://landaetastudio-saas-storefront.vercel.app |
 
+## Health Check / UptimeRobot
+
+Cada app expone un endpoint **público** `GET /api/health` (sin auth) pensado para monitoreo. Creá un monitor **HTTP(S)** en [UptimeRobot](https://uptimerobot.com) por app:
+
+| Monitor | URL |
+|---------|-----|
+| Storefront | `https://tienda1.landaetastudio.com/api/health` |
+| Admin | `https://admin.landaetastudio.com/api/health` |
+| Superadmin | `https://superadmin.landaetastudio.com/api/health` |
+
+Recomendaciones:
+
+- **Intervalo:** 60 segundos (o el que toleres, hay cuota por plan).
+- **Keyword check (opcional):** buscar `"status":"ok"` en la respuesta → alerta si la salud no es óptima. El endpoint responde `503 {"status":"degraded"}` cuando algún check falla.
+- **Timeout del monitor:** mayor al timeout interno de cada check (4s por dependencia), por ejemplo 10s.
+
+**Qué valida cada endpoint (sin requerir sesión):**
+- **DB:** `SELECT 1` (`db.execute` directo, sin `withTenantContext` — no toca tablas RLS). Timeout 4s → `"error"`.
+- **Redis:** `redisPing()` si `REDIS_URL` está configurada; `"skipped"` si no (admin/superadmin pueden no tenerla). Timeout 4s → `"error"`.
+- **MercadoPago:** `"ok"` si `MERCADOPAGO_ACCESS_TOKEN`; `"missing"` si no → 503.
+
+En storefront, `/api/health` está excluida del matcher del proxy multi-tenant para evitar el 404 por resolución de tenant (ver `apps/storefront/proxy.ts`).
+
 ## Deploy en Vercel
 
 Cada app es un proyecto independiente en Vercel conectado al mismo repositorio.

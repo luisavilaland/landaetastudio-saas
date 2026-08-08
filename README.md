@@ -356,6 +356,40 @@ curl -s -X POST https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago \
 
 En producción la firma la genera MercadoPago: prod es fail-closed, por lo que este ejemplo de firma local solo aplica al túnel de desarrollo. Ver SETUP.md para detalles.
 
+## Monitoreo / Health check
+
+Cada app expone un endpoint **público** `GET /api/health` (sin sesión ni auth) para monitoreo:
+
+| App | URL |
+|-----|-----|
+| Storefront | `https://tienda1.landaetastudio.com/api/health` |
+| Admin | `https://admin.landaetastudio.com/api/health` |
+| Superadmin | `https://superadmin.landaetastudio.com/api/health` |
+
+Cada endpoint evalúa, con timeout de 4s por dependencia (`Promise.race`), tres checks:
+
+- **DB**: `SELECT 1` con `db.execute` (fuera de `withTenantContext` — no toca tablas RLS).
+- **Redis**: `redisPing()` si `REDIS_URL` está configurada; `"skipped"` si no (admin/superadmin pueden no usar Redis).
+- **MercadoPago**: `"ok"` si `MERCADOPAGO_ACCESS_TOKEN` está presente; `"missing"` si no.
+
+Respuestas:
+
+- **200** `{ status: "ok", checks: { db, redis, mercadopago }, app, timestamp }`
+- **503** `{ status: "degraded", checks, app, timestamp }` si algún check es `"error"` (fallo o timeout) o el token de MP falta (`"missing"`).
+
+Ejemplo:
+
+```json
+{
+  "status": "ok",
+  "checks": { "db": "ok", "redis": "ok", "mercadopago": "ok" },
+  "app": "storefront",
+  "timestamp": "2026-08-08T17:00:00.000Z"
+}
+```
+
+En storefront `/api/health` está excluida del matcher del proxy multi-tenant (`proxy.ts`) para que no devuelva 404 por resolución de tenant. Ver SETUP.md → Health Check / UptimeRobot.
+
 ### Estados de orden
 
 | Estado | Descripción |
