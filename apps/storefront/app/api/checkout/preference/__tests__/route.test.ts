@@ -6,10 +6,8 @@ const { mockRedisIncr, mockRedisPexpire } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/redis", () => ({
-  redisClient: {
-    incr: mockRedisIncr,
-    pexpire: mockRedisPexpire,
-  },
+  redisIncr: mockRedisIncr,
+  redisPexpire: mockRedisPexpire,
 }));
 
 vi.mock("@/lib/tenant", () => ({
@@ -113,6 +111,17 @@ describe("POST /api/checkout/preference", () => {
 
       expect(res.status).not.toBe(429);
       expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
+    });
+
+    it("should fail open (skip rate limit) when Redis is unavailable", async () => {
+      delete process.env.MERCADOPAGO_ACCESS_TOKEN;
+      mockRedisIncr.mockResolvedValue(null);
+
+      const res = await POST(mockReq("POST",{ orderId: ORDER_ID, customerEmail: CALLER_EMAIL }, { "x-forwarded-for": "9.9.9.9" }));
+
+      expect(res.status).not.toBe(429);
+      const body = await res.json();
+      expect(body.error).toBe("MercadoPago no configurado");
     });
   });
 

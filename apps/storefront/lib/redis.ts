@@ -1,1 +1,1 @@
-export { redisClient, safeGet, redisSetEx, redisDel } from "@repo/commerce/redis";
+export { redisClient, safeGet, redisSetEx, redisDel, redisIncr, redisPexpire } from "@repo/commerce/redis";

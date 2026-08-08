@@ -3,7 +3,7 @@ import { withTenantContext, dbOrders, dbOrderItems, dbProducts, dbProductVariant
 import { and, eq, inArray } from "drizzle-orm";
 import { checkoutPreferenceSchema } from "@repo/validation";
 import { getTenantId } from "@/lib/tenant";
-import { redisClient } from "@/lib/redis";
+import { redisIncr, redisPexpire } from "@/lib/redis";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("checkout-preference");
@@ -13,9 +13,13 @@ const RATE_LIMIT_MAX = 10;
 
 async function rateLimitKey(ip: string): Promise<number> {
   const key = `rate_limit:checkout_preference:${ip}`;
-  const current = await redisClient.incr(key);
+  const current = await redisIncr(key);
+  if (current === null) {
+    logger.warn({ ip }, "Redis unavailable, rate limit disabled");
+    return 0;
+  }
   if (current === 1) {
-    await redisClient.pexpire(key, RATE_LIMIT_WINDOW_MS);
+    await redisPexpire(key, RATE_LIMIT_WINDOW_MS);
   }
   return current;
 }
@@ -275,11 +279,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       init_point: initPoint,
     });
-  } catch (error: any) {
-    logger.error({ error: error?.message, orderId }, "Checkout preference error");
-    const mpError = error?.message || error?.error?.message || "Error al crear preferencia de pago";
+  } catch (error: unknown) {
+    logger.error({ error: error instanceof Error ? error.message : error, orderId }, "Checkout preference error");
     return NextResponse.json(
-      { error: mpError, code: error?.error?.code || "UNKNOWN" },
+      { error: "Error al procesar el pago. Intenta nuevamente." },
       { status: 500 }
     );
   }

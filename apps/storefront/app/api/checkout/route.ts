@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies, headers } from "next/headers";
-import { redisClient } from "@/lib/redis";
+import { safeGet, redisDel } from "@/lib/redis";
 import { getTenantId } from "@/lib/tenant";
 import { auth } from "@/lib/auth";
 import { withTenantContext, dbOrders, dbOrderItems, dbProductVariants, dbShippingMethods } from "@repo/db";
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cartData = await redisClient.get(`cart:${sessionId}`);
+    const cartData = await safeGet(`cart:${sessionId}`);
     if (!cartData) {
       return NextResponse.json(
         { error: "Carrito vacío o no encontrado" },
@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await redisClient.del(`cart:${sessionId}`);
+    await redisDel(`cart:${sessionId}`);
 
     return NextResponse.json({
       orderId: result.order.id,

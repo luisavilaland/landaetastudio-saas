@@ -795,3 +795,19 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 
 **Verificación:** `pnpm test` 405/405 (17 nuevos, 52 files) | typecheck 9/9 | lint 6/6 | build 3 apps OK.
 - **Branch:** `fix/webhook-mp-firma` (pendiente merge a `develop`)
+
+---
+
+## 2026-08-08 — Checkout: cold-start de Redis no rompe el flujo (fail-open rate limit)
+
+**Bug:** al pagar en `/checkout` (tienda1 prod) el POST `/api/checkout/preference` devolvía `"Stream isn't writeable and enableOfflineQueue options is false"`. El rate limit usaba `redisClient.incr/pexpire` directos (sin `whenReady`), y con `lazyConnect` + `enableOfflineQueue:false` el primer comando de una instancia serverless fría se rechaza mientras el socket conecta — la misma carrera de cold-start ya documentada para el carrito (wrappers `safeGet`/`redisSetEx`/`redisDel`), pero sin cobertura en checkout.
+
+**Cambios:**
+- **`packages/commerce/src/redis.ts`:** nuevos wrappers progresivos `redisIncr` (retorna `number | null`) y `redisPexpire`, ambos vía `safeRun` (mismo patrón que `safeGet`).
+- **`checkout/preference/route.ts`:** `rateLimitKey` usa los wrappers; si Redis no responde (`null`) → `logger.warn("Redis unavailable, rate limit disabled")` y trata como 0 (**fail-open**: el checkout no se bloquea por un problema transitorio de Redis; el rate limit es protección, no crítica). Catch final ya no filtra `error.message` interno: mensaje genérico en español, detalle solo en logs.
+- **`checkout/route.ts`:** `redisClient.get/del` → `safeGet`/`redisDel` (degradación consistente con carrito: Redis caído = carrito vacío 400, no 500).
+- **Tests (TDD, RED primero):** mocks de `@/lib/redis` migrados a los wrappers; caso nuevo "fail open cuando Redis no está disponible" (sin 429 y flujo continúa); 21 tests en checkout (1 nuevo).
+- **Docs:** esta entrada.
+
+**Verificación:** `pnpm test` 406/406 (1 nuevo, 52 files) | typecheck 9/9 | lint 6/6 | build 3 apps OK.
+- **Branch:** `develop`

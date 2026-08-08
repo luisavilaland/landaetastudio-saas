@@ -98,3 +98,11 @@ export async function redisSetEx(
 export async function redisDel(key: string): Promise<void> {
   await safeRun("del", () => redisClient.del(key));
 }
+
+export async function redisIncr(key: string): Promise<number | null> {
+  return safeRun("incr", () => redisClient.incr(key));
+}
+
+export async function redisPexpire(key: string, milliseconds: number): Promise<void> {
+  await safeRun("pexpire", () => redisClient.pexpire(key, milliseconds));
+}

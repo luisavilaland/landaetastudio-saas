@@ -5,11 +5,8 @@ vi.mock("@/lib/tenant", () => ({
 }));
 
 vi.mock("@/lib/redis", () => ({
-  redisClient: {
-    get: vi.fn(),
-    setex: vi.fn(),
-    del: vi.fn(),
-  },
+  safeGet: vi.fn(),
+  redisDel: vi.fn(),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -38,7 +35,7 @@ vi.mock("@/lib/auth", () => ({
 import { withTenantContext } from "@repo/db";
 import { makeTxMock, mockReq } from "@repo/test-utils";
 import { cookies } from "next/headers";
-import { redisClient } from "@/lib/redis";
+import { safeGet, redisDel } from "@/lib/redis";
 import { getTenantId } from "@/lib/tenant";
 import { auth } from "@/lib/auth";
 import { POST } from "../route";
@@ -135,7 +132,7 @@ describe("POST /api/checkout", () => {
 
   it("debe devolver 400 cuando el carrito está vacío en Redis", async () => {
     setupCookie(SESSION_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(null);
+    vi.mocked(safeGet).mockResolvedValue(null);
 
     const res = await POST(
       mockReq("POST",{
@@ -153,7 +150,7 @@ describe("POST /api/checkout", () => {
 
   it("debe devolver 400 cuando el carrito tiene items vacíos", async () => {
     setupCookie(SESSION_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_EMPTY_CART));
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_EMPTY_CART));
 
     const res = await POST(
       mockReq("POST",{
@@ -171,7 +168,7 @@ describe("POST /api/checkout", () => {
 
   it("debe devolver 400 cuando la validación Zod falla", async () => {
     setupCookie(SESSION_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART));
 
     const res = await POST(mockReq("POST",{ email: "invalido" }));
 
@@ -182,7 +179,7 @@ describe("POST /api/checkout", () => {
 
   it("debe devolver 400 cuando no hay tenant", async () => {
     setupCookie(SESSION_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART));
     vi.mocked(getTenantId).mockResolvedValue(null);
 
     const res = await POST(
@@ -201,7 +198,7 @@ describe("POST /api/checkout", () => {
 
   it("debe devolver 422 cross-tenant cuando las variantes no pertenecen al tenant", async () => {
     setupCookie(SESSION_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART));
     vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID);
 
     const tx = makeTxMock();
@@ -228,7 +225,7 @@ describe("POST /api/checkout", () => {
 
   it("debe devolver 400 cuando el método de envío no coincide con el tenant", async () => {
     setupCookie(SESSION_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART));
 
     const tx = makeTxMock();
     tx.select.mockReturnValueOnce(tx);
@@ -257,7 +254,7 @@ describe("POST /api/checkout", () => {
 
   it("debe crear la orden exitosamente en caso feliz con envío", async () => {
     setupCookie(SESSION_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART));
 
     const tx = makeTxMock();
     const limitObj = { limit: vi.fn().mockResolvedValue([MOCK_SHIPPING_METHOD]) };
@@ -274,7 +271,7 @@ describe("POST /api/checkout", () => {
     tx.values.mockReturnValue(tx);
     tx.returning.mockResolvedValue([MOCK_ORDER]);
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
-    vi.mocked(redisClient.del).mockResolvedValue(1);
+    vi.mocked(redisDel).mockResolvedValue(undefined);
 
     const res = await POST(
       mockReq("POST",{
@@ -295,7 +292,7 @@ describe("POST /api/checkout", () => {
 
   it("debe crear la orden sin método de envío en caso feliz", async () => {
     setupCookie(SESSION_ID);
-    vi.mocked(redisClient.get).mockResolvedValue(JSON.stringify(MOCK_CART));
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART));
 
     const tx = makeTxMock();
     tx.select.mockReturnValue(tx);
@@ -308,7 +305,7 @@ describe("POST /api/checkout", () => {
     tx.values.mockReturnValue(tx);
     tx.returning.mockResolvedValue([MOCK_ORDER]);
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
-    vi.mocked(redisClient.del).mockResolvedValue(1);
+    vi.mocked(redisDel).mockResolvedValue(undefined);
 
     const res = await POST(
       mockReq("POST",{
