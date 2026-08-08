@@ -27,16 +27,16 @@ test.describe("Webhook MercadoPago - firma", () => {
     const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
 
     if (!databaseUrl || !secret) {
-      test.skip(true, "Faltan DATABASE_URL o MERCADOPAGO_WEBHOOK_SECRET");
-      return;
+      throw new Error(
+        `Missing env for webhook E2E: DATABASE_URL=${databaseUrl ? "set" : "MISSING"}, MERCADOPAGO_WEBHOOK_SECRET=${secret ? "set" : "MISSING"}`
+      );
     }
 
     sql = postgres(databaseUrl);
     const tenants = await sql<{ id: string }[]>`SELECT "id" FROM tenants WHERE slug = 'tienda1' LIMIT 1`;
     if (tenants.length === 0) {
       await sql.end();
-      test.skip(true, "Tenant tienda1 no encontrado (seed ausente)");
-      return;
+      throw new Error("Tenant tienda1 not found (seed ausente)");
     }
     tenantId = tenants[0].id;
 
