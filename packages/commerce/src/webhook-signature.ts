@@ -29,6 +29,25 @@ function parseSignatureHeader(header: string): { wellFormed: boolean; ts?: strin
   return { wellFormed: true, ...parsed };
 }
 
+export type MakeSignatureParams = {
+  dataId: string;
+  ts: number;
+  xRequestId?: string;
+  secret: string;
+};
+
+export function makeSignature(params: MakeSignatureParams): string {
+  const { dataId, ts, xRequestId = "", secret } = params;
+  const parts = [
+    dataId ? `id:${dataId}` : "",
+    xRequestId ? `request-id:${xRequestId}` : "",
+    ts ? `ts:${ts}` : "",
+  ].filter(Boolean);
+  const canonical = `${parts.join(";")};`;
+  const v1 = crypto.createHmac("sha256", secret).update(canonical).digest("hex");
+  return `ts=${ts},v1=${v1}`;
+}
+
 export function verifyMercadoPagoSignature(
   params: VerifyMercadoPagoSignatureParams
 ): MercadoPagoSignatureResult {

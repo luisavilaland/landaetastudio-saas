@@ -1,31 +1,15 @@
 import { describe, it, expect } from "vitest";
 import crypto from "crypto";
-import { verifyMercadoPagoSignature } from "../webhook-signature";
+import { makeSignature, verifyMercadoPagoSignature } from "../webhook-signature";
 
 const SECRET = "test-webhook-secret";
 const NOW = 1_700_000_000_000;
 const TS = Math.floor(NOW / 1000);
 
-function buildCanonical(dataId: string, xRequestId: string, ts: number): string {
-  const parts = [
-    dataId ? `id:${dataId}` : "",
-    xRequestId ? `request-id:${xRequestId}` : "",
-    ts ? `ts:${ts}` : "",
-  ].filter(Boolean);
-  return `${parts.join(";")};`;
-}
-
-function makeSignature(params: { dataId: string; ts: number; xRequestId?: string; secret?: string }): string {
-  const { dataId, ts, xRequestId = "", secret = SECRET } = params;
-  const canonical = buildCanonical(dataId, xRequestId, ts);
-  const v1 = crypto.createHmac("sha256", secret).update(canonical).digest("hex");
-  return `ts=${ts},v1=${v1}`;
-}
-
 describe("verifyMercadoPagoSignature", () => {
   it("should accept a valid signature with x-request-id", () => {
     const result = verifyMercadoPagoSignature({
-      signatureHeader: makeSignature({ dataId: "pay-123", xRequestId: "req-abc-123", ts: TS }),
+      signatureHeader: makeSignature({ dataId: "pay-123", xRequestId: "req-abc-123", ts: TS, secret: SECRET }),
       xRequestId: "req-abc-123",
       dataId: "pay-123",
       secret: SECRET,
@@ -37,7 +21,7 @@ describe("verifyMercadoPagoSignature", () => {
 
   it("should accept a valid signature without x-request-id", () => {
     const result = verifyMercadoPagoSignature({
-      signatureHeader: makeSignature({ dataId: "pay-123", ts: TS }),
+      signatureHeader: makeSignature({ dataId: "pay-123", ts: TS, secret: SECRET }),
       xRequestId: "",
       dataId: "pay-123",
       secret: SECRET,
@@ -118,7 +102,7 @@ describe("verifyMercadoPagoSignature", () => {
   it("should accept a timestamp within the tolerance window", () => {
     const nearEdge = Math.floor((NOW - 300_000) / 1000);
     const result = verifyMercadoPagoSignature({
-      signatureHeader: makeSignature({ dataId: "pay-123", ts: nearEdge }),
+      signatureHeader: makeSignature({ dataId: "pay-123", ts: nearEdge, secret: SECRET }),
       xRequestId: "",
       dataId: "pay-123",
       secret: SECRET,
@@ -131,7 +115,7 @@ describe("verifyMercadoPagoSignature", () => {
   it("should reject a timestamp older than the tolerance window", () => {
     const expired = Math.floor((NOW - 301_000) / 1000);
     const result = verifyMercadoPagoSignature({
-      signatureHeader: makeSignature({ dataId: "pay-123", ts: expired }),
+      signatureHeader: makeSignature({ dataId: "pay-123", ts: expired, secret: SECRET }),
       xRequestId: "",
       dataId: "pay-123",
       secret: SECRET,
@@ -144,7 +128,7 @@ describe("verifyMercadoPagoSignature", () => {
   it("should reject a timestamp in the future", () => {
     const future = Math.floor((NOW + 3_600_000) / 1000);
     const result = verifyMercadoPagoSignature({
-      signatureHeader: makeSignature({ dataId: "pay-123", ts: future }),
+      signatureHeader: makeSignature({ dataId: "pay-123", ts: future, secret: SECRET }),
       xRequestId: "",
       dataId: "pay-123",
       secret: SECRET,

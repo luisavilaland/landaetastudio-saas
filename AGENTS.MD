@@ -95,7 +95,8 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 ## Cómo probar flujos multi-tenant y webhook
 
 - Subdominios locales: `tenant1.lvh.me:3000`. Para probar resolución de tenant, lanza el servidor con `pnpm dev` y usa ese host.
-- Webhook simulado: `POST /api/webhooks/mercadopago` con header `x-test-order-id=<orderId>` y body `{"type":"payment","data":{"id":"123456789"}}` (approved) o `"000000"` (rejected).
+- Webhook simulado: `POST /api/webhooks/mercadopago` con header `x-test-order-id=<tenantId>:<orderId>` (formato `external_reference`) y body `{"type":"payment","data":{"id":"123456789"}}` (approved), `"000000"` (rejected) o `"999999"` (pending). Magic IDs activos con `NODE_ENV=development` o `E2E_WEBHOOK_TEST=1` (Vercel); la firma siempre se valida.
+- E2E webhook: `e2e/webhook/webhook-signature.spec.ts` firma con `makeSignature` (`@repo/commerce/webhook-signature`) usando `MERCADOPAGO_WEBHOOK_SECRET`, crea la orden directo en DB (`orders` camelCase, `total=0` para no disparar email) y verifica `confirmed`/`payment_failed`/`pending_payment`. Requiere `E2E_WEBHOOK_TEST=1` en Vercel (Preview) + `DATABASE_URL` y `MERCADOPAGO_WEBHOOK_SECRET` en el runner.
 - Seed de datos: `pnpm db:seed` resetea la BD con datos de prueba.
 
 ## Estructura mínima de referencia

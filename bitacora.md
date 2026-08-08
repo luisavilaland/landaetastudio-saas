@@ -828,3 +828,18 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 
 **VerificaciÃ³n:** `pnpm test` 406/406 (52 files) | typecheck 9/9 | lint 6/6 | build 3 apps OK.
 - **Branch:** `develop`
+
+## 2026-08-08 — E2E de firma real del webhook MP (spec `webhook-signature`)
+
+**Contexto:** el E2E existente (`checkout.spec.ts`) llega hasta el redirect de MP pero no completa el pago. Para validar la firma real del webhook (spec oficial `ts=...;v1=...`) y el cambio de estado de la orden sin llamar a la API de MP, se agrega un spec E2E que ejercita el endpoint desplegado. El modo `x-test-order-id` solo se activaba con `NODE_ENV=development`; en Vercel (production) no funcionaba.
+
+**Cambios:**
+- **`apps/storefront/app/api/webhooks/mercadopago/route.ts`:** refactor del bloque de simulación a `simMode` = `NODE_ENV=development` **o** `E2E_WEBHOOK_TEST=1` + mapa de magic IDs `123456789` (approved) / `000000` (rejected) / `999999` (pending). La firma nunca se salta (fail-closed).
+- **`packages/commerce`:** `makeSignature` movido del unit test a `webhook-signature.ts` y reexportado (subpath `@repo/commerce/webhook-signature`); unit test refactorizado para usarlo (DRY).
+- **`playwright.config.ts`:** nuevo proyecto `webhook` (testMatch `webhook/*.spec.ts`, baseURL storefront).
+- **Nuevo spec `e2e/webhook/webhook-signature.spec.ts`:** 4 tests — firma válida + approved ? orden `confirmed`; firma adulterada ? 401; sin `x-signature` ? 401; pending ? la orden queda `pending_payment`. La orden se crea por insert directo a DB (`orders` camelCase, `total=0` para no disparar email), tienda1 fijo, limpieza en `afterAll` (`DELETE ... WHERE id = ANY(...)`). Guard `test.skip` si CI sin `E2E_WEBHOOK_TEST`.
+- **`e2e.yml`:** workflow env `E2E_WEBHOOK_TEST=1` + job `e2e` recibe `DATABASE_URL` (Neon) y `MERCADOPAGO_WEBHOOK_SECRET`.
+- **Docs:** TESTING.md (fila E2E firma + magic ID `999999`) y AGENTS.md (formato `x-test-order-id=<tenantId>:<orderId>`, magic IDs, env `E2E_WEBHOOK_TEST`).
+
+**Pendiente operativo:** setear `E2E_WEBHOOK_TEST=1` como env var de Vercel (Preview) en el proyecto storefront y el secret `MERCADOPAGO_WEBHOOK_SECRET` en GitHub Actions (mismo valor que Vercel).
+- **Branch:** `develop`

@@ -8,6 +8,12 @@ import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("webhook-mercadopago");
 
+const SIM_PAYMENT_STATUS: Record<string, string> = {
+  "123456789": "approved",
+  "000000": "rejected",
+  "999999": "pending",
+};
+
 function extractDataId(rawBody: string): string | undefined {
   try {
     const parsed = JSON.parse(rawBody) as { data?: { id?: string } };
@@ -116,14 +122,13 @@ export async function POST(request: NextRequest) {
 
     let paymentStatusFromSim: string | null = null;
     let mockExternalRef: string | null = null;
-    if (process.env.NODE_ENV === "development" && paymentId === "123456789") {
-      paymentStatusFromSim = "approved";
+    const simMode =
+      process.env.NODE_ENV === "development" || process.env.E2E_WEBHOOK_TEST === "1";
+    const simStatus = simMode ? SIM_PAYMENT_STATUS[paymentId] ?? null : null;
+    if (simStatus) {
+      paymentStatusFromSim = simStatus;
       mockExternalRef = request.headers.get("x-test-order-id");
-      logger.info("Dev mode: simulating approved payment");
-    } else if (process.env.NODE_ENV === "development" && paymentId === "000000") {
-      paymentStatusFromSim = "rejected";
-      mockExternalRef = request.headers.get("x-test-order-id");
-      logger.info("Dev mode: simulating rejected payment");
+      logger.info({ paymentId, simStatus }, "Simulated payment via magic ID");
     }
 
     const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;

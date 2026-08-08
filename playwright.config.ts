@@ -45,6 +45,13 @@ export default defineConfig({
       testMatch: "checkout/*.spec.ts",
     },
     {
+      name: "webhook",
+      use: {
+        baseURL: STOREFRONT_URL,
+      },
+      testMatch: "webhook/*.spec.ts",
+    },
+    {
       name: "admin",
       use: {
         baseURL: ADMIN_URL,
