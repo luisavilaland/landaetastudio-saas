@@ -292,10 +292,10 @@ pnpm test
 
 | Métrica | Valor |
 |---------|-------|
-| **Total** | 388 tests |
-| **Pasando** | 388 ✅ |
+| **Total** | 426 tests |
+| **Pasando** | 426 ✅ |
 | **Fallas** | 0 ✅ |
-| **Archivos** | 51 |
+| **Archivos** | 55 |
 
 > Los tests de endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, Redis, storage). Helpers centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`). Además: 14 specs E2E en `e2e/` (Playwright, CI self-hosted).
 
@@ -315,10 +315,10 @@ pnpm test
 ---
 ## Notas
 
-- Última actualización: 08 de agosto de 2026 — Alineación documental post-incidente RLS (388 tests, E2E Playwright).
+- Última actualización: 10 de agosto de 2026 — Alineación documental post-PR44 (426 tests, E2E Playwright).
 - Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
 - Fase 6 en curso: withTenantContext real + FORCE RLS (app_user), E2E Playwright con CI self-hosted, incidente RLS de 9 Server Components corregido (08-08).
-- 388 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
+- 426 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Sandbox manual de MercadoPago pendiente (cuenta de prueba de MP).
 - Ver AGENTS.md para detalles de convenciones de código y comandos obligatorios.
 

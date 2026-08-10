@@ -34,7 +34,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ Página de perfil de tienda pública con SEO
 - ✅ Checkout con selector visual de envío y cálculo dinámico
 - ✅ Refactor de API: `NextResponse` unificado en todas las rutas
-- ✅ 388 tests (100% passing), build limpio en 3 apps (hoy)
+- ✅ 426 tests (100% passing), build limpio en 3 apps (hoy)
 
 ## Fase 5 – Producción ✅ (Completada)
 
@@ -339,7 +339,7 @@ Para recibir notificaciones de pago en desarrollo:
 
 > **Nota:** el storefront ya **no** usa `STOREFRONT_URL` para construir URLs públicas: la base (`proto` + `host`) se deriva del request entrante en cada llamada (`getStorefrontBaseUrl`), así los `back_urls` de MercadoPago y los links de emails apuntan al dominio real de cada tenant. La variable se mantiene en Vercel solo por validación de entorno (inerte en storefront).
 
-MercadoPago firma cada notificación con el header `x-signature: ts=<ts>,v1=<v1>` y envía un header `x-request-id` aparte. La cadena canónica firmada es `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` (las partes vacías se omiten) y `v1` es `HMAC-SHA256(cadena, MERCADOPAGO_WEBHOOK_SECRET)`. El webhook rechaza firmas cuyo `ts` esté fuera de una ventana de **300 segundos** (anti-replay) y es **fail-closed en producción**. Idempotente por `payment_id`. Modo simulación en desarrollo con header `x-test-order-id` (magic IDs `123456789` approved / `000000` rejected). En desarrollo, `BYPASS_WEBHOOK_SIGNATURE=true` salta la verificación de firma — **nunca se salta en producción**.
+MercadoPago firma cada notificación con el header `x-signature: ts=<ts>,v1=<v1>` y envía un header `x-request-id` aparte. La cadena canónica firmada es `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` (las partes vacías se omiten) y `v1` es `HMAC-SHA256(cadena, MERCADOPAGO_WEBHOOK_SECRET)`. El webhook rechaza firmas cuyo `ts` esté fuera de una ventana de **300 segundos** (anti-replay) y es **fail-closed en producción**. Idempotente por `payment_id`. Modo simulación en desarrollo con header `x-test-order-id` (magic IDs `123456789` approved / `000000` rejected / `999999` pending). En previews de Vercel los magic IDs se activan con `E2E_WEBHOOK_TEST=1` (decisión 2026-08-10, ver AGENTS.md) — la firma HMAC se valida siempre. En desarrollo, `BYPASS_WEBHOOK_SIGNATURE=true` salta la verificación de firma — **nunca se salta en producción**.
 
 Ejemplo de smoke test local (generar `v1` con openssl, solo en dev vía dotunnel):
 
@@ -365,6 +365,8 @@ Cada app expone un endpoint **público** `GET /api/health` (sin sesión ni auth)
 | Storefront | `https://tienda1.landaetastudio.com/api/health` |
 | Admin | `https://admin.landaetastudio.com/api/health` |
 | Superadmin | `https://superadmin.landaetastudio.com/api/health` |
+
+**Implementación:** los tres endpoints delegan en el factory compartido `createHealthCheckHandler({ appName, hasRedis })` de `@repo/commerce/health` (las routes solo delegan). Redis se chequea solo en storefront (`hasRedis: true` + `REDIS_URL`); admin/superadmin siempre `"skipped"`.
 
 Cada endpoint evalúa, con timeout de 4s por dependencia (`Promise.race`), tres checks:
 
@@ -456,11 +458,11 @@ pnpm test        # Unit + integración (vitest)
 pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 ```
 
-- **Total:** 388 tests pasando, 0 fallos (51 archivos).
+- **Total:** 426 tests pasando, 0 fallos (55 archivos).
 - Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 - Los endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, redis).
 - 14 specs E2E en `e2e/` (storefront, checkout, admin, superadmin, security) — CI con runner self-hosted.
 
 ---
 
-**Última actualización:** 08 de agosto de 2026 – Alineación documental post-incidente RLS (388 tests, Fase 6 en curso, E2E con CI self-hosted). Rama `develop`. Build limpio.
+**Última actualización:** 10 de agosto de 2026 – Alineación documental post-PR44 (426 tests, factory de health check, decisión E2E_WEBHOOK_TEST). Rama `develop`. Build limpio.
