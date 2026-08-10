@@ -26,6 +26,7 @@ Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada AD
 | [ADR-018](adr/ADR-018-consolidacion-nextauth.md) | Consolidación de NextAuth en @repo/auth | Aceptada |
 | [ADR-019](adr/ADR-019-logica-negocio-commerce.md) | Centralización de lógica de negocio en @repo/commerce | Aceptada |
 | [ADR-020](adr/ADR-020-normalizacion-slugs.md) | Normalización de slugs | Aceptada — ver discrepancia |
+| [ADR-021](adr/ADR-021-placeholder.md) | Gap de numeración (no emitido) | — |
 | [ADR-022](adr/ADR-022-rls-status.md) | Estado de RLS (decorativo → activo con app_user) | Aceptada — actualizada |
 
 ## Convenciones clave

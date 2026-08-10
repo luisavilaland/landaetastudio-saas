@@ -878,3 +878,16 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **Test faltante:** `"returns 503 if Redis is configured but fails (error, not skipped)"` en storefront (mock `redisPing` rechazado → 503, `checks.redis: "error"`). Suite: 55 archivos / 426 tests.
 - **Decisión documentada:** `E2E_WEBHOOK_TEST=1` en Preview de Vercel (proyecto storefront) — activa magic IDs (`123456789`/`000000`/`999999`) solo con firma HMAC válida (`MERCADOPAGO_WEBHOOK_SECRET` obligatorio siempre); aplica a todos los previews (no acotable por rama/dominio), aceptado porque la firma es el gate real. Documentado en AGENTS.md.
 - **Branch:** `chore/health-and-docs`
+
+---
+
+## 2026-08-10 — Alineación documental post-PR44
+
+- **README.md:** tests 388→426 (55 archivos), fecha a 10-08; mención del factory `createHealthCheckHandler` de `@repo/commerce/health` en Monitoreo y de la decisión `E2E_WEBHOOK_TEST=1` (previews, magic IDs `999999` incluido) en la sección MercadoPago.
+- **SETUP.md:** tests 388→426 (55 archivos), fecha a 10-08 y mención del factory de health check (los 3 `/api/health` solo delegan).
+- **PROMPTS.md:** `npx tsc --noEmit` → `pnpm typecheck` en el prompt de análisis completo (el comando raíz era inerte en el monorepo: no hay tsconfig raíz).
+- **docs/arquitectura.md + ADR-021-placeholder:** gap de numeración 020→022 documentado (no se reindexa ADR-022 para no romper links/historial).
+- **TESTING.md / TESTING-MANUAL.md:** tests 388→426 (55 archivos) — consistencia total (quedaban como discrepancia residual).
+- **bitacora.md:** solo se agrega esta entrada; la entrada previa del 10-08 ya reflejaba 426 tests.
+- **Verificación:** `pnpm lint` ✅ | grep: solo quedan menciones históricas de 388 en bitácora (inmutables).
+- **Branch:** `docs/align-post-pr44` (pendiente PR a develop)

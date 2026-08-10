@@ -35,7 +35,7 @@ Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md y docs/arquitectura.md. Confirmam
 Actuá como un desarrollador senior que se reincorpora al proyecto. Sin modificar archivos:
 
 1. Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, docs/arquitectura.md y bitacora.md.
-2. Ejecuta `pnpm lint`, `npx tsc --noEmit`, `pnpm build`, `pnpm test`.
+2. Ejecuta `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test`.
 3. Explorá la estructura de apps/ y packages/ para detectar cambios.
 
 Reportá:

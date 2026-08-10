@@ -224,7 +224,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**388 tests pasando, 0 fallos (51 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**426 tests pasando, 0 fallos (55 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
@@ -277,7 +277,7 @@ El carrito anónimo persiste en Redis vía ioredis. **Hay dos variables distinta
 
 ## Nota
 
-Última actualización: 08 de agosto de 2026 – Alineación documental post-incidente RLS (388 tests, E2E Playwright con CI self-hosted, sección Redis agregada). Rama `develop`. Build limpio.
+Última actualización: 10 de agosto de 2026 – Alineación documental post-PR44 (426 tests, factory de health check, E2E Playwright con CI self-hosted, sección Redis agregada). Rama `develop`. Build limpio.
 
 ## URLs de producción (Vercel)
 
@@ -302,6 +302,8 @@ Recomendaciones:
 - **Intervalo:** 60 segundos (o el que toleres, hay cuota por plan).
 - **Keyword check (opcional):** buscar `"status":"ok"` en la respuesta → alerta si la salud no es óptima. El endpoint responde `503 {"status":"degraded"}` cuando algún check falla.
 - **Timeout del monitor:** mayor al timeout interno de cada check (4s por dependencia), por ejemplo 10s.
+
+**Implementación:** los tres endpoints delegan en el factory compartido `createHealthCheckHandler({ appName, hasRedis })` de `@repo/commerce/health` — las routes solo delegan.
 
 **Qué valida cada endpoint (sin requerir sesión):**
 - **DB:** `SELECT 1` (`db.execute` directo, sin `withTenantContext` — no toca tablas RLS). Timeout 4s → `"error"`.
