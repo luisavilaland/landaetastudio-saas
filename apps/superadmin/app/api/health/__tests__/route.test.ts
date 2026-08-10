@@ -46,7 +46,7 @@ afterEach(() => {
 });
 
 describe("GET /api/health (superadmin)", () => {
-  it("devuelve 200 ok cuando db, redis y MercadoPago responden", async () => {
+  it("devuelve 200 ok cuando db y MercadoPago responden (redis skipped)", async () => {
     const response = await GET();
     const body = await response.json();
 
@@ -54,7 +54,7 @@ describe("GET /api/health (superadmin)", () => {
     expect(body.status).toBe("ok");
     expect(body.checks).toEqual({
       db: "ok",
-      redis: "ok",
+      redis: "skipped",
       mercadopago: "ok",
     });
     expect(body.app).toBe("superadmin");

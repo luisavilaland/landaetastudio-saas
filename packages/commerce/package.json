@@ -10,6 +10,7 @@
     "./products": "./src/products.ts",
     "./email": "./src/email.ts",
     "./categories": "./src/categories.ts",
+    "./health": "./src/health.ts",
     "./webhook-signature": "./src/webhook-signature.ts"
   },
   "scripts": {

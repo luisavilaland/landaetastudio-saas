@@ -94,6 +94,17 @@ describe("GET /api/health (storefront)", () => {
     expect(body.checks.redis).toBe("skipped");
   });
 
+  it("returns 503 if Redis is configured but fails (error, not skipped)", async () => {
+    vi.mocked(redisPing).mockRejectedValue(new Error("Connection timeout"));
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.checks.redis).toBe("error");
+  });
+
   it("notifica a Sentry cuando el check degrada y hay DSN configurado", async () => {
     process.env.SENTRY_DSN = "https://xxx@xxx.ingest.sentry.io/xxx";
     mockDb.execute.mockRejectedValue(new Error("DB connection failed"));

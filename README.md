@@ -369,7 +369,7 @@ Cada app expone un endpoint **público** `GET /api/health` (sin sesión ni auth)
 Cada endpoint evalúa, con timeout de 4s por dependencia (`Promise.race`), tres checks:
 
 - **DB**: `SELECT 1` con `db.execute` (fuera de `withTenantContext` — no toca tablas RLS).
-- **Redis**: `redisPing()` si `REDIS_URL` está configurada; `"skipped"` si no (admin/superadmin pueden no usar Redis).
+- **Redis**: `redisPing()` solo en storefront (única app con `hasRedis: true`) y si `REDIS_URL` está configurada; `"skipped"` en cualquier otro caso (admin/superadmin no tocan Redis).
 - **MercadoPago**: `"ok"` si `MERCADOPAGO_ACCESS_TOKEN` está presente; `"missing"` si no.
 
 Respuestas:
