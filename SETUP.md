@@ -305,7 +305,7 @@ Recomendaciones:
 
 **Qué valida cada endpoint (sin requerir sesión):**
 - **DB:** `SELECT 1` (`db.execute` directo, sin `withTenantContext` — no toca tablas RLS). Timeout 4s → `"error"`.
-- **Redis:** `redisPing()` si `REDIS_URL` está configurada; `"skipped"` si no (admin/superadmin pueden no tenerla). Timeout 4s → `"error"`.
+- **Redis:** `redisPing()` solo en storefront (`hasRedis: true` en `createHealthCheckHandler`) y si `REDIS_URL` está configurada; `"skipped"` en cualquier otro caso (admin/superadmin no tocan Redis). Timeout 4s → `"error"`.
 - **MercadoPago:** `"ok"` si `MERCADOPAGO_ACCESS_TOKEN`; `"missing"` si no → 503.
 
 En storefront, `/api/health` está excluida del matcher del proxy multi-tenant para evitar el 404 por resolución de tenant (ver `apps/storefront/proxy.ts`).

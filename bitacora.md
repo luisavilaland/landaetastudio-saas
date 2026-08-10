@@ -871,3 +871,10 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - Permite alerta temprana de "nuevo issue" ante degradación persistente (sin depender solo del 500 que ya capturaba).
 - 6 tests nuevos (2 por app): Sentry notificado en degradación + no notifica en ok. Suite: 55 archivos / 425 tests.
 - Monitoreo externo: UptimeRobot (3 monitores a los `/api/health`, 5 min, 200 OK), alertas de Vercel (5xx >5%, p95 >3s, disponibilidad <99%) y Sentry (≥10 errores/5 min) ya creadas manualmente en paneles.
+
+## 2026-08-10 — Chore: factory de health check, test de Redis fallando y decisión E2E_WEBHOOK_TEST
+
+- **Refactor (eliminar duplicación):** los 3 `route.ts` de `/api/health` (byte-idénticos salvo `APP_NAME`) ahora delegan en el factory `createHealthCheckHandler({ appName, hasRedis })` de `@repo/commerce/health` (export `"./health"` en `package.json`, patrón `./webhook-signature`). Semántica cambiada por diseño: Redis se chequea solo en storefront (`hasRedis: true` y `REDIS_URL` presente); admin/superadmin SIEMPRE `"skipped"` (antes dependían de `REDIS_URL`). Comportamiento observable en prod sin cambios (admin/superadmin no tienen `REDIS_URL`).
+- **Test faltante:** `"returns 503 if Redis is configured but fails (error, not skipped)"` en storefront (mock `redisPing` rechazado → 503, `checks.redis: "error"`). Suite: 55 archivos / 426 tests.
+- **Decisión documentada:** `E2E_WEBHOOK_TEST=1` en Preview de Vercel (proyecto storefront) — activa magic IDs (`123456789`/`000000`/`999999`) solo con firma HMAC válida (`MERCADOPAGO_WEBHOOK_SECRET` obligatorio siempre); aplica a todos los previews (no acotable por rama/dominio), aceptado porque la firma es el gate real. Documentado en AGENTS.md.
+- **Branch:** `chore/health-and-docs`
