@@ -78,8 +78,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Params }
 ) {
-  let id: string;
-  let tenantId: string;
+  let id = "";
+  let tenantId = "";
 
   try {
     const session = await auth();
