@@ -1,12 +1,12 @@
-import { db, dbCustomers, dbTenants, withTenantContext } from "@repo/db";
-import { eq, and } from "drizzle-orm";
-import bcrypt from "bcryptjs";
+import { db, dbCustomers, dbTenants, withTenantContext } from '@repo/db'
+import { eq, and } from 'drizzle-orm'
+import bcrypt from 'bcryptjs'
 
 export interface CustomerSessionUser {
-  id: string;
-  email: string;
-  tenantId: string;
-  name?: string;
+  id: string
+  email: string
+  tenantId: string
+  name?: string
 }
 
 /**
@@ -15,28 +15,28 @@ export interface CustomerSessionUser {
  * (tabla sin RLS). Sin tenant no hay contexto sobre el que autenticar.
  */
 export async function resolveTenantId(
-  request?: Request | null
+  request?: Request | null,
 ): Promise<string | null> {
-  const headerId = request?.headers.get("x-tenant-id");
-  if (headerId) return headerId;
+  const headerId = request?.headers.get('x-tenant-id')
+  if (headerId) return headerId
 
-  const host = request?.headers.get("host")?.replace(/:\d+$/, "");
-  if (!host || !host.includes(".") || host.startsWith("localhost")) return null;
+  const host = request?.headers.get('host')?.replace(/:\d+$/, '')
+  if (!host || !host.includes('.') || host.startsWith('localhost')) return null
 
   const byDomain = await db
     .select({ id: dbTenants.id })
     .from(dbTenants)
     .where(eq(dbTenants.customDomain, host))
-    .limit(1);
-  if (byDomain.length > 0) return byDomain[0].id;
+    .limit(1)
+  if (byDomain.length > 0) return byDomain[0].id
 
-  const sub = host.split(".")[0];
+  const sub = host.split('.')[0]
   const bySlug = await db
     .select({ id: dbTenants.id })
     .from(dbTenants)
     .where(eq(dbTenants.slug, sub))
-    .limit(1);
-  return bySlug.length > 0 ? bySlug[0].id : null;
+    .limit(1)
+  return bySlug.length > 0 ? bySlug[0].id : null
 }
 
 /**
@@ -48,9 +48,9 @@ export async function resolveTenantId(
 export async function authorizeCustomer(
   email: string,
   password: string,
-  tenantId: string
+  tenantId: string,
 ): Promise<CustomerSessionUser | null> {
-  if (!email || !password || !tenantId) return null;
+  if (!email || !password || !tenantId) return null
 
   return await withTenantContext(tenantId, async (tx) => {
     const [customer] = await tx
@@ -63,23 +63,20 @@ export async function authorizeCustomer(
       })
       .from(dbCustomers)
       .where(
-        and(
-          eq(dbCustomers.email, email),
-          eq(dbCustomers.tenantId, tenantId)
-        )
+        and(eq(dbCustomers.email, email), eq(dbCustomers.tenantId, tenantId)),
       )
-      .limit(1);
+      .limit(1)
 
-    if (!customer || !customer.password) return null;
+    if (!customer || !customer.password) return null
 
-    const isValid = await bcrypt.compare(password, customer.password);
-    if (!isValid) return null;
+    const isValid = await bcrypt.compare(password, customer.password)
+    if (!isValid) return null
 
     return {
       id: customer.id,
       email: customer.email,
       tenantId: customer.tenantId,
       name: customer.name || undefined,
-    };
-  });
+    }
+  })
 }

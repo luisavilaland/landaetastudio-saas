@@ -80,6 +80,7 @@ pnpm test        # vitest (todos los tests existentes)
 ⚠️ `ignoreBuildErrors` DEBE ser `false` en `next.config.mjs`. Nunca usar `ignoreBuildErrors: true`.
 
 **Ubicación de los tests:**
+
 - Lógica de negocio: `__tests__/` junto al módulo (ej. `packages/commerce/src/__tests__/cart.test.ts`).
 - Endpoints: `__tests__/` junto al archivo de ruta (ej. `apps/admin/app/api/products/__tests__/route.test.ts`).
 - Componentes: `__tests__/` junto al componente.
@@ -117,6 +118,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 ## Checklists
 
 ### Al crear un endpoint
+
 - [ ] Validar sesión (NextAuth) si modifica datos
 - [ ] Validar entrada con Zod antes de tocar DB
 - [ ] Filtrar por tenantId en toda query
@@ -124,6 +126,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - [ ] Test de integración (éxito + 401/403 + validación de tenant)
 
 ### Al crear un componente o página (Server Component) que consulta datos
+
 - [ ] Decidir si necesita `'use client'`
 - [ ] Tipar props con `interface`
 - [ ] Alias `@/` o `@repo/*` para imports
@@ -132,6 +135,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - [ ] Si una query depende de un `IN (...)` sobre un array de IDs, guard explícito `array.length === 0` antes de construirla (PostgreSQL rechaza `IN ()` → 500).
 
 ### Al testear un handler que usa withTenantContext
+
 - [ ] NO mockear `db.transaction` — `withTenantContext` cierra sobre el `db` real, no la exportación mockeada
 - [ ] Mockear `withTenantContext` directamente: `vi.mock("@repo/db", async () => ({ ...actual, withTenantContext: vi.fn() }))`
 - [ ] En beforeEach: `vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(makeTxMock()))`
@@ -140,6 +144,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 ### Helpers de test (`@repo/test-utils`)
 
 Los helpers de test están centralizados en `packages/test-utils` como `@repo/test-utils`:
+
 - **`makeTxMock(config?)`**: mock de transacción Drizzle. Sin config, auto-encadena (`select().from().where()` retorna `tx`). Con `config.select: [{ data, terminal }]` configura selects secuenciales con `mockResolvedValueOnce`. `terminal` puede ser `"where"` (default), `"limit"`, `"orderBy"`. Si se excede la cola de `select`/`from`, lanza error (usa `repeatLastSelect: true` para repetir la última entrada). `where`/`limit`/`orderBy` siempre retornan `tx` (son compartidos con `delete()`/`update()` chains).
 - **`session(tenantId, email?)`**: objeto de sesión NextAuth con `{ user: { tenantId, email }, expires }`. `email` default `"admin@test.com"`.
 - **`mockReq(method, body?, headerOverrides?)`**: mock de `NextRequest` tipado. `body` puede ser `Record<string, unknown>` o `FormData`. `headerOverrides` para headers custom (ej: `{ "x-forwarded-for": "1.2.3.4" }`). Retorna `NextRequest` (tipado real, no `as any`).
@@ -147,6 +152,7 @@ Los helpers de test están centralizados en `packages/test-utils` como `@repo/te
 Ver checklists específicas en cada sección de endpoint.
 
 ### Antes de commit
+
 - [ ] `pnpm lint && pnpm typecheck && pnpm build && pnpm test`
 - [ ] Sin `any` ni `console.log` fuera del logger
 - [ ] Tests para funcionalidad nueva

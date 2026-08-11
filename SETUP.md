@@ -27,11 +27,11 @@ pnpm db:seed
 
 ## Comandos de Base de Datos
 
-| Comando | Descripción |
-|--------|-------------|
-| `pnpm db:generate` | Genera migraciones desde el schema |
-| `pnpm db:migrate` | Aplica migraciones pendientes |
-| `pnpm db:seed` | Limpia la BD y crea datos de prueba |
+| Comando            | Descripción                         |
+| ------------------ | ----------------------------------- |
+| `pnpm db:generate` | Genera migraciones desde el schema  |
+| `pnpm db:migrate`  | Aplica migraciones pendientes       |
+| `pnpm db:seed`     | Limpia la BD y crea datos de prueba |
 
 ## Datos de Prueba
 
@@ -76,22 +76,22 @@ pnpm db:seed
 
 ## Variables de Entorno — 3 archivos
 
-| Archivo | Propósito | Git |
-|---------|-----------|-----|
-| `.env.example` | Template original del proyecto (legado) | ✅ tracked |
-| `.env.local.example` | Template con servicios cloud como default | ✅ tracked |
-| `.env.local` | Credenciales reales (copiar de `.env.local.example`) | ❌ ignorado |
+| Archivo              | Propósito                                            | Git         |
+| -------------------- | ---------------------------------------------------- | ----------- |
+| `.env.example`       | Template original del proyecto (legado)              | ✅ tracked  |
+| `.env.local.example` | Template con servicios cloud como default            | ✅ tracked  |
+| `.env.local`         | Credenciales reales (copiar de `.env.local.example`) | ❌ ignorado |
 
 **Solo `.env.local` contiene las credenciales reales** y no debe subirse a git. Los otros dos son templates de referencia.
 
 Los servicios locales (Docker) ya no se usan. En su lugar:
 
-| Servicio Local | Reemplazo Cloud |
-|---------------|-----------------|
-| PostgreSQL (Docker) | Neon |
-| Redis (Docker) | Upstash |
-| MinIO (Docker) | Cloudflare R2 |
-| MailHog (Docker) | Resend |
+| Servicio Local      | Reemplazo Cloud |
+| ------------------- | --------------- |
+| PostgreSQL (Docker) | Neon            |
+| Redis (Docker)      | Upstash         |
+| MinIO (Docker)      | Cloudflare R2   |
+| MailHog (Docker)    | Resend          |
 
 ## Validación de Variables de Entorno
 
@@ -99,10 +99,10 @@ La aplicación valida automáticamente las variables de entorno al arrancar (`pa
 
 ### Comportamiento por entorno
 
-| Entorno | Validación |
-|---------|-----------|
-| **Desarrollo** (`NODE_ENV=development`) | Valida solo las variables core (`DATABASE_URL`, `AUTH_SECRET`, `MERCADOPAGO_ACCESS_TOKEN`). `NEXTAUTH_URL` es opcional (NextAuth v5 la infiere del Host header). Las variables cloud son opcionales. |
-| **Producción** (`NODE_ENV=production`) | Valida core + todas las variables cloud (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `MERCADOPAGO_WEBHOOK_SECRET`, `STOREFRONT_URL`). |
+| Entorno                                 | Validación                                                                                                                                                                                                                                     |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Desarrollo** (`NODE_ENV=development`) | Valida solo las variables core (`DATABASE_URL`, `AUTH_SECRET`, `MERCADOPAGO_ACCESS_TOKEN`). `NEXTAUTH_URL` es opcional (NextAuth v5 la infiere del Host header). Las variables cloud son opcionales.                                           |
+| **Producción** (`NODE_ENV=production`)  | Valida core + todas las variables cloud (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `MERCADOPAGO_WEBHOOK_SECRET`, `STOREFRONT_URL`). |
 
 ### Si falta una variable
 
@@ -117,6 +117,7 @@ La app **no arrancará** y mostrará un error claro indicando qué variable falt
 ### Agregar nuevas variables
 
 Si agregás una variable de entorno nueva, actualizá:
+
 1. `packages/validation/src/env.ts` - agregala al schema correspondiente (dev o prod)
 2. `.env.example` y `.env.local.example` - agregá el placeholder
 3. `SETUP.md` - documentala si es relevante para el setup
@@ -147,6 +148,7 @@ npx dotunnel
 ```
 
 Te pedirá:
+
 1. Puerto local (ej: 3000)
 2. Nombre para el proxy (ej: saas-ecommerce)
 
@@ -240,7 +242,19 @@ pnpm build         # Build de todas las apps
 
 ### Tarjetas de prueba MercadoPago
 
-> Próximamente: tarjetas de prueba para simular pagos aprobados y rechazados en el entorno de desarrollo de MercadoPago.
+Tarjetas de prueba del sandbox de MercadoPago, ya funcionales en el entorno de desarrollo. **Titular y documento:** cualquier nombre y cualquier documento (el sandbox no los valida).
+
+| Tarjeta          | Número                | Código de resultado | CVV    | Vencimiento |
+| ---------------- | --------------------- | ------------------- | ------ | ----------- |
+| Visa             | `4509 9535 6623 3704` | `APRO`              | `123`  | `11/25`     |
+| Mastercard       | `5031 7557 3453 0604` | `OTHE`              | `123`  | `11/25`     |
+| American Express | `3711 8030 3257 522`  | `CONT`              | `1234` | `11/25`     |
+
+El código de resultado simula el desenlace del pago:
+
+- `APRO` — pago aprobado
+- `OTHE` — rechazado / otro medio de pago
+- `CONT` — pendiente de aprobación
 
 ### Multi-tenant local
 
@@ -255,10 +269,10 @@ tenant1.lvh.me:3000
 
 El carrito anónimo persiste en Redis vía ioredis. **Hay dos variables distintas, no confundir:**
 
-| Variable | Cliente | Uso |
-|----------|---------|-----|
-| `REDIS_URL` | ioredis (`rediss://...:6379`) | **El carrito** (`@repo/commerce/redis.ts`). Es la que importa. Sensible a mayúsculas. |
-| `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN` | REST HTTP | Legacy/validación de producción. **No** usada por el carrito. |
+| Variable                                            | Cliente                       | Uso                                                                                   |
+| --------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------- |
+| `REDIS_URL`                                         | ioredis (`rediss://...:6379`) | **El carrito** (`@repo/commerce/redis.ts`). Es la que importa. Sensible a mayúsculas. |
+| `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN` | REST HTTP                     | Legacy/validación de producción. **No** usada por el carrito.                         |
 
 ⚠️ **Trap de `isProduction` en `packages/validation/src/env.ts`:** si `NODE_ENV=production` y está presente cualquiera de (`UPSTASH_REDIS_REST_URL`, `RESEND_API_KEY`, `R2_*`), el schema de producción **exige todas** las cloud vars — falta alguna → la app no arranca. El carrito solo necesita `REDIS_URL` (que no dispara `isProduction`), así que **no hace falta** agregar `UPSTASH_*` si no están las demás vars de producción.
 
@@ -271,9 +285,40 @@ El carrito anónimo persiste en Redis vía ioredis. **Hay dos variables distinta
 - Env vars (ver `.env.local.example`): `E2E_STOREFRONT_URL`, `E2E_STOREFRONT_T2_URL`, `E2E_ADMIN_URL`, `E2E_SUPERADMIN_URL`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`.
 - CI: `.github/workflows/e2e.yml` — corre en **runner self-hosted** (AlmaLinux). Requisitos del runner:
   - Egress TCP a Neon (puerto 5432, IPv4 o IPv6) y red a los 3 dominios Vercel.
-  - Si el host no tiene ruta IPv6, pin del endpoint Neon en `/etc/hosts`.
+  - Si el host no tiene ruta IPv6, pin IPv4 del endpoint Neon en `/etc/hosts` (ver procedimiento completo abajo).
   - Libs de sistema de Chromium instaladas vía `dnf` (nss, atk, at-spi2-atk, cups-libs, libdrm, libxkbcommon, libXcomposite, libXdamage, libXfixes, libXrandr, mesa-libgbm, alsa-lib, pango, cairo, gtk3).
   - Guard anti-fork: los jobs se saltan PRs de forks (repo público + runner self-hosted = riesgo RCE).
+
+### Runner self-hosted: pin IPv4 de Neon
+
+El runner self-hosted no tiene ruta IPv6. El endpoint de Neon publica registros `AAAA` además de `A`, y el rollback del resolver puede devolver la IP IPv6 → el egress TCP a Neon en 5432 falla (`ECONNREFUSED`) aunque el host tenga IPv4. La mitigación es pin de la IPv4 del endpoint en `/etc/hosts` del runner.
+
+1. **Resolver la IP IPv4 actual del endpoint.** El host del endpoint se ve en el dashboard de Neon (al crear un restore/branch), con formato `ep-xxxxxxxx.c-X.<region>.aws.neon.tech` (ej: `xxxxxxxx.eu-central-1.aws.neon.tech`):
+
+   ```bash
+   dig +short A <host-neon>
+   # o bien
+   getent ahostsv4 <host-neon>
+   ```
+
+2. **Aplicar el pin** (root/sudo). Verificar primero el estado actual del archivo y luego agregar la línea con la IP IPv4 obtenida:
+
+   ```bash
+   cat /etc/hosts
+   echo "<IP-IPv4> <host-neon>" >> /etc/hosts
+   ```
+
+3. **Verificar conectividad:**
+
+   ```bash
+   psql "$DATABASE_URL" -c "SELECT 1"
+   # o corriendo el E2E del webhook:
+   pnpm test:e2e
+   ```
+
+4. **Alternativa robusta:** si el proyecto Neon lo soporta, usar un endpoint **IPv4-only** o una IP allowlist del pool del proyecto, que elimina la dependencia de `/etc/hosts`.
+
+5. **Mantenimiento:** las IPs del pool de Neon pueden rotar. Si el endpoint deja de responder y reaparece el problema de IPv6, hay que actualizar el pin (mantenimiento mensual o migrar a la alternativa IPv4-only). El pin es por máquina: replicar en cada runner.
 
 ## Nota
 
@@ -281,20 +326,20 @@ El carrito anónimo persiste en Redis vía ioredis. **Hay dos variables distinta
 
 ## URLs de producción (Vercel)
 
-| App | URL |
-|-----|-----|
+| App        | URL                                               |
+| ---------- | ------------------------------------------------- |
 | Superadmin | https://landaetastudio-saas-superadmin.vercel.app |
-| Admin | https://saas-admin-sable.vercel.app |
+| Admin      | https://saas-admin-sable.vercel.app               |
 | Storefront | https://landaetastudio-saas-storefront.vercel.app |
 
 ## Health Check / UptimeRobot
 
 Cada app expone un endpoint **público** `GET /api/health` (sin auth) pensado para monitoreo. Creá un monitor **HTTP(S)** en [UptimeRobot](https://uptimerobot.com) por app:
 
-| Monitor | URL |
-|---------|-----|
-| Storefront | `https://tienda1.landaetastudio.com/api/health` |
-| Admin | `https://admin.landaetastudio.com/api/health` |
+| Monitor    | URL                                                |
+| ---------- | -------------------------------------------------- |
+| Storefront | `https://tienda1.landaetastudio.com/api/health`    |
+| Admin      | `https://admin.landaetastudio.com/api/health`      |
 | Superadmin | `https://superadmin.landaetastudio.com/api/health` |
 
 Recomendaciones:
@@ -306,6 +351,7 @@ Recomendaciones:
 **Implementación:** los tres endpoints delegan en el factory compartido `createHealthCheckHandler({ appName, hasRedis })` de `@repo/commerce/health` — las routes solo delegan.
 
 **Qué valida cada endpoint (sin requerir sesión):**
+
 - **DB:** `SELECT 1` (`db.execute` directo, sin `withTenantContext` — no toca tablas RLS). Timeout 4s → `"error"`.
 - **Redis:** `redisPing()` solo en storefront (`hasRedis: true` en `createHealthCheckHandler`) y si `REDIS_URL` está configurada; `"skipped"` en cualquier otro caso (admin/superadmin no tocan Redis). Timeout 4s → `"error"`.
 - **MercadoPago:** `"ok"` si `MERCADOPAGO_ACCESS_TOKEN`; `"missing"` si no → 503.
@@ -318,10 +364,10 @@ Cada app es un proyecto independiente en Vercel conectado al mismo repositorio.
 
 ### Configuración por proyecto
 
-| App | Root Directory | Build Command |
-|-----|---------------|---------------|
+| App        | Root Directory    | Build Command                                    |
+| ---------- | ----------------- | ------------------------------------------------ |
 | Storefront | `apps/storefront` | `cd ../.. && pnpm run build --filter=storefront` |
-| Admin | `apps/admin` | `cd ../.. && pnpm run build --filter=admin` |
+| Admin      | `apps/admin`      | `cd ../.. && pnpm run build --filter=admin`      |
 | Superadmin | `apps/superadmin` | `cd ../.. && pnpm run build --filter=superadmin` |
 
 Cada proyecto tiene su propio `vercel.json` en la carpeta de la app correspondiente.
@@ -345,5 +391,5 @@ Las env vars deben estar declaradas en `turbo.json` > `tasks.build.env` para que
 ## Variables de entorno adicionales
 
 - `SUPERADMIN_HOST` — dominio del superadmin en Vercel
-- `ADMIN_HOST` — dominio del admin en Vercel  
+- `ADMIN_HOST` — dominio del admin en Vercel
 - `DEFAULT_TENANT_SLUG` — tenant por defecto para el storefront (tienda1)

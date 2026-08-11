@@ -1,70 +1,80 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db, dbProducts, dbProductVariants, dbProductImages, dbCategories, withTenantContext } from "@repo/db";
-import { auth } from "@/lib/auth";
-import { and, eq } from "drizzle-orm";
-import { uploadImage } from "@repo/storage";
-import { createProductSchema, normalizeSlug } from "@repo/validation";
-import { createLogger } from "@/lib/logger";
+import { NextRequest, NextResponse } from 'next/server'
+import {
+  db,
+  dbProducts,
+  dbProductVariants,
+  dbProductImages,
+  dbCategories,
+  withTenantContext,
+} from '@repo/db'
+import { auth } from '@/lib/auth'
+import { and, eq } from 'drizzle-orm'
+import { uploadImage } from '@repo/storage'
+import { createProductSchema, normalizeSlug } from '@repo/validation'
+import { createLogger } from '@/lib/logger'
 
-const logger = createLogger("admin-products-create-api");
+const logger = createLogger('admin-products-create-api')
 
 export async function GET() {
-  const session = await auth();
+  const session = await auth()
 
   if (!session) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  const tenantId = session.user?.tenantId as string;
+  const tenantId = session.user?.tenantId as string
 
   return await withTenantContext(tenantId, async (tx) => {
     const products = await tx
       .select()
       .from(dbProducts)
-      .where(eq(dbProducts.tenantId, tenantId));
+      .where(eq(dbProducts.tenantId, tenantId))
 
-    const productIds = products.map((p) => p.id);
+    const productIds = products.map((p) => p.id)
 
     const images = await tx
       .select()
       .from(dbProductImages)
       .where(eq(dbProductImages.tenantId, tenantId))
-      .orderBy(dbProductImages.position);
+      .orderBy(dbProductImages.position)
 
-    const imagesByProduct = images.reduce((acc, img) => {
-      if (!acc[img.productId]) acc[img.productId] = [];
-      acc[img.productId].push(img);
-      return acc;
-    }, {} as Record<string, typeof images>);
+    const imagesByProduct = images.reduce(
+      (acc, img) => {
+        if (!acc[img.productId]) acc[img.productId] = []
+        acc[img.productId].push(img)
+        return acc
+      },
+      {} as Record<string, typeof images>,
+    )
 
     const productsWithImages = products.map((product) => ({
       ...product,
       images: imagesByProduct[product.id] || [],
-    }));
+    }))
 
-    return NextResponse.json({ products: productsWithImages });
-  });
+    return NextResponse.json({ products: productsWithImages })
+  })
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = await auth()
 
     if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const tenantId = session.user?.tenantId as string;
+    const tenantId = session.user?.tenantId as string
 
-    const formData = await request.formData();
-    const name = formData.get("name") as string;
-    const slug = formData.get("slug") as string;
-    const description = (formData.get("description") as string) || null;
-    const status = (formData.get("status") as string) || "draft";
-    const categoryId = (formData.get("categoryId") as string) || null;
-    const price = parseInt(formData.get("price") as string, 10);
-    const stock = parseInt(formData.get("stock") as string, 10);
-    const image = formData.get("image") as File | null;
+    const formData = await request.formData()
+    const name = formData.get('name') as string
+    const slug = formData.get('slug') as string
+    const description = (formData.get('description') as string) || null
+    const status = (formData.get('status') as string) || 'draft'
+    const categoryId = (formData.get('categoryId') as string) || null
+    const price = parseInt(formData.get('price') as string, 10)
+    const stock = parseInt(formData.get('stock') as string, 10)
+    const image = formData.get('image') as File | null
 
     const validation = createProductSchema.safeParse({
       name,
@@ -74,25 +84,29 @@ export async function POST(request: NextRequest) {
       categoryId: categoryId || undefined,
       price,
       stock,
-    });
+    })
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validación fallida", issues: validation.error.issues },
-        { status: 400 }
-      );
+        { error: 'Validación fallida', issues: validation.error.issues },
+        { status: 400 },
+      )
     }
 
-    const { price: validPrice, stock: validStock } = validation.data;
-    const normalizedSlug = normalizeSlug(slug);
-    const now = new Date();
+    const { price: validPrice, stock: validStock } = validation.data
+    const normalizedSlug = normalizeSlug(slug)
+    const now = new Date()
 
-    let imageUrl: string | null = null;
+    let imageUrl: string | null = null
 
     if (image && image.size > 0) {
-      const buffer = Buffer.from(await image.arrayBuffer());
-      const ext = image.name.split(".").pop() || "png";
-      imageUrl = await uploadImage(buffer, `products/${Date.now()}-${normalizedSlug}.${ext}`, image.type);
+      const buffer = Buffer.from(await image.arrayBuffer())
+      const ext = image.name.split('.').pop() || 'png'
+      imageUrl = await uploadImage(
+        buffer,
+        `products/${Date.now()}-${normalizedSlug}.${ext}`,
+        image.type,
+      )
     }
 
     return await withTenantContext(tenantId, async (tx) => {
@@ -101,12 +115,12 @@ export async function POST(request: NextRequest) {
           .select()
           .from(dbCategories)
           .where(eq(dbCategories.id, categoryId))
-          .limit(1);
+          .limit(1)
         if (category.length === 0 || category[0].tenantId !== tenantId) {
           return NextResponse.json(
-            { error: "Categoría inválida" },
-            { status: 400 }
-          );
+            { error: 'Categoría inválida' },
+            { status: 400 },
+          )
         }
       }
 
@@ -116,16 +130,16 @@ export async function POST(request: NextRequest) {
         .where(
           and(
             eq(dbProducts.slug, normalizedSlug),
-            eq(dbProducts.tenantId, tenantId)
-          )
+            eq(dbProducts.tenantId, tenantId),
+          ),
         )
-        .limit(1);
+        .limit(1)
 
       if (existingSlug.length > 0) {
         return NextResponse.json(
-          { error: "Ya existe un producto con ese slug", field: "slug" },
-          { status: 409 }
-        );
+          { error: 'Ya existe un producto con ese slug', field: 'slug' },
+          { status: 409 },
+        )
       }
 
       const [product] = await tx
@@ -142,38 +156,36 @@ export async function POST(request: NextRequest) {
           createdAt: now,
           updatedAt: now,
         })
-        .returning();
+        .returning()
 
-      const sku = normalizedSlug.replace(/\s+/g, "-").toLowerCase();
+      const sku = normalizedSlug.replace(/\s+/g, '-').toLowerCase()
 
-      await tx
-        .insert(dbProductVariants)
-        .values({
-          tenantId,
-          productId: product.id,
-          sku,
-          price: validPrice,
-          stock: validStock,
-          options: {},
-          createdAt: now,
-          updatedAt: now,
-        });
+      await tx.insert(dbProductVariants).values({
+        tenantId,
+        productId: product.id,
+        sku,
+        price: validPrice,
+        stock: validStock,
+        options: {},
+        createdAt: now,
+        updatedAt: now,
+      })
 
       const variants = await tx
         .select()
         .from(dbProductVariants)
-        .where(eq(dbProductVariants.productId, product.id));
+        .where(eq(dbProductVariants.productId, product.id))
 
       return NextResponse.json(
         { product: { ...product, variants } },
-        { status: 201 }
-      );
-    });
+        { status: 201 },
+      )
+    })
   } catch (error) {
-    logger.error({ error }, "Error creating product");
+    logger.error({ error }, 'Error creating product')
     return NextResponse.json(
-      { error: "Error al crear producto" },
-      { status: 500 }
-    );
+      { error: 'Error al crear producto' },
+      { status: 500 },
+    )
   }
 }

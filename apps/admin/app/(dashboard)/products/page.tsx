@@ -1,74 +1,91 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { withTenantContext, dbProducts, dbProductVariants, dbProductImages, dbCategories } from "@repo/db";
-import { eq, desc } from "drizzle-orm";
-import { ProductsTable } from "./products-table";
+import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
+import {
+  withTenantContext,
+  dbProducts,
+  dbProductVariants,
+  dbProductImages,
+  dbCategories,
+} from '@repo/db'
+import { eq, desc } from 'drizzle-orm'
+import { ProductsTable } from './products-table'
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic'
 
 export default async function ProductsPage() {
-  const session = await auth();
+  const session = await auth()
 
   if (!session) {
-    redirect("/login");
+    redirect('/login')
   }
 
-  const tenantId = session.user?.tenantId as string;
+  const tenantId = session.user?.tenantId as string
 
   // Single query with JOINs instead of N+1 queries
-  const { productsRaw, categoriesMap, images } = await withTenantContext(tenantId, async (tx) => {
-    const productsRaw = await tx
-      .select({
-        id: dbProducts.id,
-        name: dbProducts.name,
-        slug: dbProducts.slug,
-        description: dbProducts.description,
-        imageUrl: dbProducts.imageUrl,
-        status: dbProducts.status,
-        createdAt: dbProducts.createdAt,
-        categoryId: dbProducts.categoryId,
-        variantId: dbProductVariants.id,
-        variantSku: dbProductVariants.sku,
-        variantPrice: dbProductVariants.price,
-        variantStock: dbProductVariants.stock,
-      })
-      .from(dbProducts)
-      .leftJoin(dbProductVariants, eq(dbProducts.id, dbProductVariants.productId))
-      .where(eq(dbProducts.tenantId, tenantId))
-      .orderBy(desc(dbProducts.createdAt));
+  const { productsRaw, categoriesMap, images } = await withTenantContext(
+    tenantId,
+    async (tx) => {
+      const productsRaw = await tx
+        .select({
+          id: dbProducts.id,
+          name: dbProducts.name,
+          slug: dbProducts.slug,
+          description: dbProducts.description,
+          imageUrl: dbProducts.imageUrl,
+          status: dbProducts.status,
+          createdAt: dbProducts.createdAt,
+          categoryId: dbProducts.categoryId,
+          variantId: dbProductVariants.id,
+          variantSku: dbProductVariants.sku,
+          variantPrice: dbProductVariants.price,
+          variantStock: dbProductVariants.stock,
+        })
+        .from(dbProducts)
+        .leftJoin(
+          dbProductVariants,
+          eq(dbProducts.id, dbProductVariants.productId),
+        )
+        .where(eq(dbProducts.tenantId, tenantId))
+        .orderBy(desc(dbProducts.createdAt))
 
-    // Get unique category IDs
-    const categoryIds = [...new Set(productsRaw.map(p => p.categoryId).filter(Boolean))];
-    const categoriesMap = new Map();
-    if (categoryIds.length > 0) {
-      const categories = await tx
-        .select({ id: dbCategories.id, name: dbCategories.name })
-        .from(dbCategories)
-        .where(eq(dbCategories.tenantId, tenantId));
-      for (const cat of categories) {
-        categoriesMap.set(cat.id, cat.name);
+      // Get unique category IDs
+      const categoryIds = [
+        ...new Set(productsRaw.map((p) => p.categoryId).filter(Boolean)),
+      ]
+      const categoriesMap = new Map()
+      if (categoryIds.length > 0) {
+        const categories = await tx
+          .select({ id: dbCategories.id, name: dbCategories.name })
+          .from(dbCategories)
+          .where(eq(dbCategories.tenantId, tenantId))
+        for (const cat of categories) {
+          categoriesMap.set(cat.id, cat.name)
+        }
       }
-    }
 
-    // Get product IDs for images
-    const productIds = [...new Set(productsRaw.map(p => p.id))];
-    const images = await tx
-      .select()
-      .from(dbProductImages)
-      .where(eq(dbProductImages.tenantId, tenantId))
-      .orderBy(dbProductImages.position);
+      // Get product IDs for images
+      const productIds = [...new Set(productsRaw.map((p) => p.id))]
+      const images = await tx
+        .select()
+        .from(dbProductImages)
+        .where(eq(dbProductImages.tenantId, tenantId))
+        .orderBy(dbProductImages.position)
 
-    return { productsRaw, categoriesMap, images };
-  });
+      return { productsRaw, categoriesMap, images }
+    },
+  )
 
-  const imagesByProduct = images.reduce((acc, img) => {
-    if (!acc[img.productId]) acc[img.productId] = [];
-    acc[img.productId].push(img);
-    return acc;
-  }, {} as Record<string, typeof images>);
+  const imagesByProduct = images.reduce(
+    (acc, img) => {
+      if (!acc[img.productId]) acc[img.productId] = []
+      acc[img.productId].push(img)
+      return acc
+    },
+    {} as Record<string, typeof images>,
+  )
 
   // Group by product ID and collect all variants
-  const productMap = new Map();
+  const productMap = new Map()
   for (const row of productsRaw) {
     if (!productMap.has(row.id)) {
       productMap.set(row.id, {
@@ -79,24 +96,26 @@ export default async function ProductsPage() {
         description: row.description,
         status: row.status,
         createdAt: row.createdAt,
-        categoryName: row.categoryId ? categoriesMap.get(row.categoryId) || null : null,
+        categoryName: row.categoryId
+          ? categoriesMap.get(row.categoryId) || null
+          : null,
         variants: [],
         images: imagesByProduct[row.id] || [],
-      });
+      })
     }
     if (row.variantId) {
-      const product = productMap.get(row.id);
+      const product = productMap.get(row.id)
       product.variants.push({
         id: row.variantId,
-        sku: row.variantSku || "",
+        sku: row.variantSku || '',
         price: row.variantPrice || 0,
         stock: row.variantStock || 0,
         options: {},
-      });
+      })
     }
   }
 
-  const productsWithVariants = Array.from(productMap.values());
+  const productsWithVariants = Array.from(productMap.values())
 
-  return <ProductsTable initialProducts={productsWithVariants} />;
+  return <ProductsTable initialProducts={productsWithVariants} />
 }

@@ -1,37 +1,37 @@
-"use client";
+'use client'
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { captureException } from "@sentry/nextjs";
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { captureException } from '@sentry/nextjs'
 
 interface Category {
-  id: string;
-  name: string;
-  slug: string;
+  id: string
+  name: string
+  slug: string
 }
 
 export function CategoryNav() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const res = await fetch("/api/categories");
-        const data = await res.json();
-        setCategories(data.categories || []);
+        const res = await fetch('/api/categories')
+        const data = await res.json()
+        setCategories(data.categories || [])
       } catch (error) {
-        captureException(error);
+        captureException(error)
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
     }
 
-    fetchCategories();
-  }, []);
+    fetchCategories()
+  }, [])
 
   if (isLoading || categories.length === 0) {
-    return null;
+    return null
   }
 
   return (
@@ -47,5 +47,5 @@ export function CategoryNav() {
         </Link>
       ))}
     </div>
-  );
+  )
 }

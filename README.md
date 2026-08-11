@@ -66,6 +66,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 ## Estado actual
 
 ✅ **Completado:**
+
 - Estructura monorepo con Turborepo (apps: `storefront`, `admin`, `superadmin`).
 - Servicios cloud: PostgreSQL (Neon), Redis (Upstash), R2 (Cloudflare), Resend.
 - Drizzle ORM configurado con todas las tablas (camelCase).
@@ -99,6 +100,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - **E2E Playwright:** 14 specs + CI self-hosted (e2e.yml). Ver SETUP.md sección E2E.
 
 ### Fase 5 - Tareas de Seguridad Completadas ✅
+
 - **Row Level Security (RLS)**: Implementado en todas las tablas de negocio con políticas `tenant_isolation`. Función `set_tenant_id` y helper `withTenantContext` en `@repo/db`.
 - **AUTH_SECRET obligatorio**: Eliminado fallback hardcoded. Validación al arrancar en `@repo/auth` lanza error si falta la variable.
 - **CSRF protection**: Manejado automáticamente por NextAuth v5 en producción (NODE_ENV=production). Documentado en `next.config.mjs`.
@@ -147,11 +149,13 @@ pnpm dev
 ```
 
 **URLs:**
+
 - Storefront: http://localhost:3000
 - Admin: http://localhost:3001
 - Superadmin: http://localhost:3002
 
 **Testing multi-tenant:**
+
 ```bash
 # Usar lvh.me para testing de subdominios
 tenant1.lvh.me:3000  # Tienda1 storefront
@@ -207,133 +211,134 @@ saas-ecommerce/
 
 ## Scripts
 
-| Script | Descripción |
-| :--- | :--- |
-| `pnpm dev` | Levanta todas las apps en modo desarrollo |
-| `pnpm start` | Inicia todas las apps en modo producción (requiere build previo) |
-| `pnpm db:generate` | Genera migraciones desde el schema |
-| `pnpm db:migrate` | Aplica migraciones pendientes |
-| `pnpm db:seed` | Limpia la BD y crea datos de prueba |
-| `pnpm test` | Ejecuta todos los tests (vitest) |
-| `pnpm lint` | Linting + formatting |
-| `pnpm typecheck` | Verificación de tipos TypeScript |
-| `pnpm build` | Build de producción de todas las apps |
+| Script             | Descripción                                                      |
+| :----------------- | :--------------------------------------------------------------- |
+| `pnpm dev`         | Levanta todas las apps en modo desarrollo                        |
+| `pnpm start`       | Inicia todas las apps en modo producción (requiere build previo) |
+| `pnpm db:generate` | Genera migraciones desde el schema                               |
+| `pnpm db:migrate`  | Aplica migraciones pendientes                                    |
+| `pnpm db:seed`     | Limpia la BD y crea datos de prueba                              |
+| `pnpm test`        | Ejecuta todos los tests (vitest)                                 |
+| `pnpm lint`        | Linting + formatting                                             |
+| `pnpm typecheck`   | Verificación de tipos TypeScript                                 |
+| `pnpm build`       | Build de producción de todas las apps                            |
 
 ## API Endpoints
 
 ### Admin Products
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| GET | /api/products | Listar productos |
-| POST | /api/products | Crear producto |
-| POST | /api/products/import | Importar productos por CSV (transacción por fila, éxito parcial) |
-| GET | /api/products/[id] | Obtener producto |
-| PUT | /api/products/[id] | Actualizar producto |
-| DELETE | /api/products/[id] | Eliminar producto |
-| POST | /api/products/[id]/images | Subir imágenes |
-| DELETE | /api/products/[id]/images/[imageId] | Eliminar imagen |
-| GET/PUT | /api/products/[id]/variants | Gestionar variantes |
+| Method  | Endpoint                            | Descripción                                                      |
+| :------ | :---------------------------------- | :--------------------------------------------------------------- |
+| GET     | /api/products                       | Listar productos                                                 |
+| POST    | /api/products                       | Crear producto                                                   |
+| POST    | /api/products/import                | Importar productos por CSV (transacción por fila, éxito parcial) |
+| GET     | /api/products/[id]                  | Obtener producto                                                 |
+| PUT     | /api/products/[id]                  | Actualizar producto                                              |
+| DELETE  | /api/products/[id]                  | Eliminar producto                                                |
+| POST    | /api/products/[id]/images           | Subir imágenes                                                   |
+| DELETE  | /api/products/[id]/images/[imageId] | Eliminar imagen                                                  |
+| GET/PUT | /api/products/[id]/variants         | Gestionar variantes                                              |
 
 ### Categories
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| GET | /api/categories | Listar categorías |
-| POST | /api/categories | Crear categoría |
-| GET | /api/categories/[id] | Obtener categoría |
-| PUT | /api/categories/[id] | Actualizar categoría |
-| DELETE | /api/categories/[id] | Eliminar categoría |
+| Method | Endpoint             | Descripción          |
+| :----- | :------------------- | :------------------- |
+| GET    | /api/categories      | Listar categorías    |
+| POST   | /api/categories      | Crear categoría      |
+| GET    | /api/categories/[id] | Obtener categoría    |
+| PUT    | /api/categories/[id] | Actualizar categoría |
+| DELETE | /api/categories/[id] | Eliminar categoría   |
 
 ### Storefront Cart
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| GET | /api/cart | Obtener carrito |
-| POST | /api/cart | Agregar item |
-| PUT | /api/cart | Actualizar cantidad |
+| Method | Endpoint  | Descripción            |
+| :----- | :-------- | :--------------------- |
+| GET    | /api/cart | Obtener carrito        |
+| POST   | /api/cart | Agregar item           |
+| PUT    | /api/cart | Actualizar cantidad    |
 | DELETE | /api/cart | Eliminar item o vaciar |
 
 ### Storefront Catálogo
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| GET | /api/categories | Categorías activas del tenant |
-| GET | /api/search | Búsqueda server-side con ILIKE (`?q=remera` o `?category=slug`) |
+| Method | Endpoint        | Descripción                                                     |
+| :----- | :-------------- | :-------------------------------------------------------------- |
+| GET    | /api/categories | Categorías activas del tenant                                   |
+| GET    | /api/search     | Búsqueda server-side con ILIKE (`?q=remera` o `?category=slug`) |
 
 ### Storefront Checkout
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| POST | /api/checkout | Crear orden desde carrito |
-| POST | /api/checkout/preference | Crear preferencia de pago MP |
-| POST | /api/webhooks/mercadopago | Notificación de pago |
-| GET | /checkout/success | Página de éxito |
-| GET | /checkout/failure | Página de fallo |
-| GET | /checkout/pending | Página de pendiente |
+| Method | Endpoint                  | Descripción                  |
+| :----- | :------------------------ | :--------------------------- |
+| POST   | /api/checkout             | Crear orden desde carrito    |
+| POST   | /api/checkout/preference  | Crear preferencia de pago MP |
+| POST   | /api/webhooks/mercadopago | Notificación de pago         |
+| GET    | /checkout/success         | Página de éxito              |
+| GET    | /checkout/failure         | Página de fallo              |
+| GET    | /checkout/pending         | Página de pendiente          |
 
 ### Admin Shipping
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| GET | /api/shipping | Listar métodos de envío del tenant |
-| POST | /api/shipping | Crear método de envío |
-| PUT | /api/shipping/[id] | Actualizar método de envío |
-| DELETE | /api/shipping/[id] | Eliminar método de envío |
+| Method | Endpoint           | Descripción                        |
+| :----- | :----------------- | :--------------------------------- |
+| GET    | /api/shipping      | Listar métodos de envío del tenant |
+| POST   | /api/shipping      | Crear método de envío              |
+| PUT    | /api/shipping/[id] | Actualizar método de envío         |
+| DELETE | /api/shipping/[id] | Eliminar método de envío           |
 
 ### Storefront Shipping
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| GET | /api/shipping | Métodos activos del tenant (lee `x-tenant-id` del proxy) |
+| Method | Endpoint      | Descripción                                              |
+| :----- | :------------ | :------------------------------------------------------- |
+| GET    | /api/shipping | Métodos activos del tenant (lee `x-tenant-id` del proxy) |
 
 ### Admin Dashboard
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| GET | /api/dashboard | Métricas (ventas, órdenes, stock bajo) |
+| Method | Endpoint       | Descripción                            |
+| :----- | :------------- | :------------------------------------- |
+| GET    | /api/dashboard | Métricas (ventas, órdenes, stock bajo) |
 
 ### Admin Orders
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| GET | /api/orders | Listar órdenes |
-| GET | /api/orders/[id] | Obtener orden |
-| PUT | /api/orders/[id] | Cambiar status |
+| Method | Endpoint         | Descripción    |
+| :----- | :--------------- | :------------- |
+| GET    | /api/orders      | Listar órdenes |
+| GET    | /api/orders/[id] | Obtener orden  |
+| PUT    | /api/orders/[id] | Cambiar status |
 
 ### Admin Configuración del tenant
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| GET | /api/config/tenant | Configuración del tenant (logo, colores, contacto) |
-| GET/PUT | /api/config/settings | Configuración visual (store_settings) |
-| PUT | /api/config/tenant/domain | Dominio personalizado + verificación |
-| GET | /api/domain-check | Verifica disponibilidad de un dominio (`?domain=`) |
+| Method  | Endpoint                  | Descripción                                        |
+| :------ | :------------------------ | :------------------------------------------------- |
+| GET     | /api/config/tenant        | Configuración del tenant (logo, colores, contacto) |
+| GET/PUT | /api/config/settings      | Configuración visual (store_settings)              |
+| PUT     | /api/config/tenant/domain | Dominio personalizado + verificación               |
+| GET     | /api/domain-check         | Verifica disponibilidad de un dominio (`?domain=`) |
 
 ### Superadmin Tenants
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| GET | /api/tenants | Listar tenants |
-| POST | /api/tenants | Crear tenant |
-| GET | /api/tenants/[id] | Obtener tenant |
-| PUT | /api/tenants/[id] | Actualizar tenant |
-| DELETE | /api/tenants/[id] | Eliminar tenant |
-| GET | /api/domain-check | Verifica disponibilidad de un dominio |
-| GET | /plans | Página de gestión de planes |
+| Method | Endpoint          | Descripción                           |
+| :----- | :---------------- | :------------------------------------ |
+| GET    | /api/tenants      | Listar tenants                        |
+| POST   | /api/tenants      | Crear tenant                          |
+| GET    | /api/tenants/[id] | Obtener tenant                        |
+| PUT    | /api/tenants/[id] | Actualizar tenant                     |
+| DELETE | /api/tenants/[id] | Eliminar tenant                       |
+| GET    | /api/domain-check | Verifica disponibilidad de un dominio |
+| GET    | /plans            | Página de gestión de planes           |
 
 ### Storefront Auth
 
-| Method | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| POST | /api/register | Registrar nuevo cliente |
-| POST | /api/auth/[...nextauth] | Login de cliente |
+| Method | Endpoint                | Descripción             |
+| :----- | :---------------------- | :---------------------- |
+| POST   | /api/register           | Registrar nuevo cliente |
+| POST   | /api/auth/[...nextauth] | Login de cliente        |
 
 ## MercadoPago
 
 ### Webhook
 
 Para recibir notificaciones de pago en desarrollo:
+
 1. Usar dotunnel: `npx dotunnel` y exponer el puerto 3000
 2. Registrar esa URL en MP Developer Dashboard: `https://saasecommerce-prxy.ayooub.me/api/webhooks/mercadopago`
 
@@ -360,10 +365,10 @@ En producción la firma la genera MercadoPago: prod es fail-closed, por lo que e
 
 Cada app expone un endpoint **público** `GET /api/health` (sin sesión ni auth) para monitoreo:
 
-| App | URL |
-|-----|-----|
-| Storefront | `https://tienda1.landaetastudio.com/api/health` |
-| Admin | `https://admin.landaetastudio.com/api/health` |
+| App        | URL                                                |
+| ---------- | -------------------------------------------------- |
+| Storefront | `https://tienda1.landaetastudio.com/api/health`    |
+| Admin      | `https://admin.landaetastudio.com/api/health`      |
 | Superadmin | `https://superadmin.landaetastudio.com/api/health` |
 
 **Implementación:** los tres endpoints delegan en el factory compartido `createHealthCheckHandler({ appName, hasRedis })` de `@repo/commerce/health` (las routes solo delegan). Redis se chequea solo en storefront (`hasRedis: true` + `REDIS_URL`); admin/superadmin siempre `"skipped"`.
@@ -394,44 +399,44 @@ En storefront `/api/health` está excluida del matcher del proxy multi-tenant (`
 
 ### Estados de orden
 
-| Estado | Descripción |
-|--------|-------------|
-| `pending_payment` | Orden creada, esperando pago |
-| `confirmed` | Pago aprobado |
-| `processing` | Pago confirmado, preparando envío |
-| `shipped` | Enviado al cliente |
-| `delivered` | Entregado al cliente |
-| `cancelled` | Cancelada (antes de envío) |
-| `refunded` | Devuelta/reembolsada |
+| Estado            | Descripción                       |
+| ----------------- | --------------------------------- |
+| `pending_payment` | Orden creada, esperando pago      |
+| `confirmed`       | Pago aprobado                     |
+| `processing`      | Pago confirmado, preparando envío |
+| `shipped`         | Enviado al cliente                |
+| `delivered`       | Entregado al cliente              |
+| `cancelled`       | Cancelada (antes de envío)        |
+| `refunded`        | Devuelta/reembolsada              |
 
 ## Prioridades para Producción
 
 ### 🔴 Alta prioridad (crítico antes de producción)
 
-| # | Tarea |
-| ---|-------|
-| 1 | ✅ **RLS** - Habilitar políticas de fila por tenant |
-| 2 | ✅ **AUTH_SECRET** - Validar que exista en prod, eliminar fallback |
-| 3 | ✅ **CSRF** - Habilitar en producción |
-| 4 | ✅ **NEXTAUTH_URL dinámica** - Opcional; NextAuth v5 la infiere del Host header |
+| #   | Tarea                                                                           |
+| --- | ------------------------------------------------------------------------------- |
+| 1   | ✅ **RLS** - Habilitar políticas de fila por tenant                             |
+| 2   | ✅ **AUTH_SECRET** - Validar que exista en prod, eliminar fallback              |
+| 3   | ✅ **CSRF** - Habilitar en producción                                           |
+| 4   | ✅ **NEXTAUTH_URL dinámica** - Opcional; NextAuth v5 la infiere del Host header |
 
 ### 🟡 Media prioridad
 
-| # | Tarea |
-| ---|-------|
-| 1 | ✅ **Normalizar slug en create/edit** |
-| 2 | ✅ **Consolidar auth duplicada en `@repo/auth`** |
-| 3 | ✅ **Refactorizar lógica de negocio duplicada a `@repo/commerce`** |
-| 4 | ✅ **Logs estructurados con Pino** |
-| 5 | ✅ **Sentry para errores en producción** |
-| 6 | ✅ **Mensajes de error 409 con campo específico** |
+| #   | Tarea                                                              |
+| --- | ------------------------------------------------------------------ |
+| 1   | ✅ **Normalizar slug en create/edit**                              |
+| 2   | ✅ **Consolidar auth duplicada en `@repo/auth`**                   |
+| 3   | ✅ **Refactorizar lógica de negocio duplicada a `@repo/commerce`** |
+| 4   | ✅ **Logs estructurados con Pino**                                 |
+| 5   | ✅ **Sentry para errores en producción**                           |
+| 6   | ✅ **Mensajes de error 409 con campo específico**                  |
 
 ### 🟢 Baja prioridad
 
-| # | Tarea |
-| ---|-------|
-| 1 | ✅ **Eliminar dotenv duplicado en `next.config.ts`** |
-| 2 | ✅ **Mejorar UI de errores 409** |
+| #   | Tarea                                                |
+| --- | ---------------------------------------------------- |
+| 1   | ✅ **Eliminar dotenv duplicado en `next.config.ts`** |
+| 2   | ✅ **Mejorar UI de errores 409**                     |
 
 ## Notas importantes
 

@@ -1,82 +1,84 @@
-import NextAuth from "next-auth";
-import Credentials from "next-auth/providers/credentials";
-import { db, dbAdminUsers } from "@repo/db";
-import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import "@repo/auth/types";
+import NextAuth from 'next-auth'
+import Credentials from 'next-auth/providers/credentials'
+import { db, dbAdminUsers } from '@repo/db'
+import { eq } from 'drizzle-orm'
+import bcrypt from 'bcryptjs'
+import '@repo/auth/types'
 
 if (!process.env.AUTH_SECRET) {
-  throw new Error('AUTH_SECRET no está configurada. Ver .env.example para instrucciones.');
+  throw new Error(
+    'AUTH_SECRET no está configurada. Ver .env.example para instrucciones.',
+  )
 }
 
-type ExpectedRole = "admin" | "superadmin";
+type ExpectedRole = 'admin' | 'superadmin'
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = process.env.NODE_ENV === 'production'
 
 export function createAdminAuth() {
   return NextAuth({
     providers: [
       Credentials({
         credentials: {
-          email: { label: "Email", type: "email" },
-          password: { label: "Contraseña", type: "password" }
+          email: { label: 'Email', type: 'email' },
+          password: { label: 'Contraseña', type: 'password' },
         },
         async authorize(credentials) {
           if (!credentials?.email || !credentials?.password) {
-            return null;
+            return null
           }
-          
-          const email = credentials.email as string;
-          const password = credentials.password as string;
-          
+
+          const email = credentials.email as string
+          const password = credentials.password as string
+
           const [user] = await db
             .select()
             .from(dbAdminUsers)
             .where(eq(dbAdminUsers.email, email))
-            .limit(1);
-          
+            .limit(1)
+
           if (!user) {
-            return null;
+            return null
           }
-          
-          const isValid = await bcrypt.compare(password, user.password);
+
+          const isValid = await bcrypt.compare(password, user.password)
           if (!isValid) {
-            return null;
+            return null
           }
-          
-          if (user.role !== "admin") {
-            return null;
+
+          if (user.role !== 'admin') {
+            return null
           }
-          
+
           return {
             id: user.id,
             email: user.email,
-            role: user.role ?? "admin",
-            tenantId: user.tenantId ?? null
-          };
-        }
-      })
+            role: user.role ?? 'admin',
+            tenantId: user.tenantId ?? null,
+          }
+        },
+      }),
     ],
     callbacks: {
       async jwt({ token, user }) {
         if (user) {
-          token.id = user.id;
-          token.tenantId = user.tenantId ?? null;
-          token.role = user.role ?? "admin";
+          token.id = user.id
+          token.tenantId = user.tenantId ?? null
+          token.role = user.role ?? 'admin'
         }
-        return token;
+        return token
       },
       async session({ session, token }) {
         if (session.user) {
-          session.user.id = token.id ?? "";
-          session.user.tenantId = token.tenantId ?? null;
-          session.user.role = token.role ?? "admin";
+          session.user.id = token.id ?? ''
+          session.user.tenantId = token.tenantId ?? null
+          session.user.role = token.role ?? 'admin'
         }
-        return session;
-      }
+        return session
+      },
     },
-    pages: { signIn: "/login" },
-    session: { strategy: "jwt" },
+    pages: { signIn: '/login' },
+    session: { strategy: 'jwt' },
     secret: process.env.AUTH_SECRET,
     cookies: {
       sessionToken: {
@@ -85,7 +87,7 @@ export function createAdminAuth() {
           : `authjs.session-token-admin`,
       },
     },
-  });
+  })
 }
 
 export function createSuperadminAuth() {
@@ -93,65 +95,65 @@ export function createSuperadminAuth() {
     providers: [
       Credentials({
         credentials: {
-          email: { label: "Email", type: "email" },
-          password: { label: "Contraseña", type: "password" }
+          email: { label: 'Email', type: 'email' },
+          password: { label: 'Contraseña', type: 'password' },
         },
         async authorize(credentials) {
           if (!credentials?.email || !credentials?.password) {
-            return null;
+            return null
           }
-          
-          const email = credentials.email as string;
-          const password = credentials.password as string;
-          
+
+          const email = credentials.email as string
+          const password = credentials.password as string
+
           const [user] = await db
             .select()
             .from(dbAdminUsers)
             .where(eq(dbAdminUsers.email, email))
-            .limit(1);
-          
+            .limit(1)
+
           if (!user) {
-            return null;
+            return null
           }
-          
-          const isValid = await bcrypt.compare(password, user.password);
+
+          const isValid = await bcrypt.compare(password, user.password)
           if (!isValid) {
-            return null;
+            return null
           }
-          
-          if (user.role !== "superadmin") {
-            return null;
+
+          if (user.role !== 'superadmin') {
+            return null
           }
-          
+
           return {
             id: user.id,
             email: user.email,
-            role: user.role ?? "superadmin",
-            tenantId: user.tenantId ?? null
-          };
-        }
-      })
+            role: user.role ?? 'superadmin',
+            tenantId: user.tenantId ?? null,
+          }
+        },
+      }),
     ],
     callbacks: {
       async jwt({ token, user }) {
         if (user) {
-          token.id = user.id;
-          token.tenantId = user.tenantId ?? null;
-          token.role = user.role ?? "superadmin";
+          token.id = user.id
+          token.tenantId = user.tenantId ?? null
+          token.role = user.role ?? 'superadmin'
         }
-        return token;
+        return token
       },
       async session({ session, token }) {
         if (session.user) {
-          session.user.id = token.id ?? "";
-          session.user.tenantId = token.tenantId ?? null;
-          session.user.role = token.role ?? "superadmin";
+          session.user.id = token.id ?? ''
+          session.user.tenantId = token.tenantId ?? null
+          session.user.role = token.role ?? 'superadmin'
         }
-        return session;
-      }
+        return session
+      },
     },
-    pages: { signIn: "/login" },
-    session: { strategy: "jwt" },
+    pages: { signIn: '/login' },
+    session: { strategy: 'jwt' },
     secret: process.env.AUTH_SECRET,
     cookies: {
       sessionToken: {
@@ -160,23 +162,23 @@ export function createSuperadminAuth() {
           : `authjs.session-token-superadmin`,
       },
     },
-  });
+  })
 }
 
 // Admin auth instance
-export const adminAuth = createAdminAuth();
-export const handlers = adminAuth.handlers;
-export const auth = adminAuth.auth;
-export const signIn = adminAuth.signIn;
-export const signOut = adminAuth.signOut;
+export const adminAuth = createAdminAuth()
+export const handlers = adminAuth.handlers
+export const auth = adminAuth.auth
+export const signIn = adminAuth.signIn
+export const signOut = adminAuth.signOut
 
 // Superadmin auth instance
-export const superadminAuth = createSuperadminAuth();
-export const superadminHandlers = superadminAuth.handlers;
-export const superadminAuthFn = superadminAuth.auth;
-export const superadminSignIn = superadminAuth.signIn;
-export const superadminSignOut = superadminAuth.signOut;
+export const superadminAuth = createSuperadminAuth()
+export const superadminHandlers = superadminAuth.handlers
+export const superadminAuthFn = superadminAuth.auth
+export const superadminSignIn = superadminAuth.signIn
+export const superadminSignOut = superadminAuth.signOut
 
 // Re-exports for superadmin app (expects `handlers` and `auth` naming)
-export const superadminAuthHandlers = superadminAuth.handlers;
-export const superadminAuthAuth = superadminAuth.auth;
+export const superadminAuthHandlers = superadminAuth.handlers
+export const superadminAuthAuth = superadminAuth.auth

@@ -1,89 +1,89 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const mockTransaction = vi.hoisted(() => vi.fn());
+const mockTransaction = vi.hoisted(() => vi.fn())
 
-vi.mock("postgres", () => ({
+vi.mock('postgres', () => ({
   default: vi.fn(() => ({})),
-}));
+}))
 
-vi.mock("drizzle-orm/postgres-js", () => ({
+vi.mock('drizzle-orm/postgres-js', () => ({
   drizzle: vi.fn(() => ({
     transaction: mockTransaction,
   })),
-}));
+}))
 
-import { withTenantContext } from "../index";
+import { withTenantContext } from '../index'
 
-describe("withTenantContext", () => {
+describe('withTenantContext', () => {
   beforeEach(() => {
-    mockTransaction.mockReset();
-  });
+    mockTransaction.mockReset()
+  })
 
-  it("should call db.transaction once", async () => {
-    const tx = { execute: vi.fn() };
+  it('should call db.transaction once', async () => {
+    const tx = { execute: vi.fn() }
     mockTransaction.mockImplementation(async (cb) => {
-      await cb(tx);
-      return "ok";
-    });
+      await cb(tx)
+      return 'ok'
+    })
 
-    await withTenantContext("tenant-id", async () => {});
+    await withTenantContext('tenant-id', async () => {})
 
-    expect(mockTransaction).toHaveBeenCalledOnce();
-  });
+    expect(mockTransaction).toHaveBeenCalledOnce()
+  })
 
-  it("should call tx.execute with set_tenant_id inside transaction", async () => {
-    const tx = { execute: vi.fn() };
+  it('should call tx.execute with set_tenant_id inside transaction', async () => {
+    const tx = { execute: vi.fn() }
     mockTransaction.mockImplementation(async (cb) => {
-      await cb(tx);
-    });
+      await cb(tx)
+    })
 
-    await withTenantContext("test-tenant-id", async () => {});
+    await withTenantContext('test-tenant-id', async () => {})
 
-    expect(tx.execute).toHaveBeenCalledOnce();
-  });
+    expect(tx.execute).toHaveBeenCalledOnce()
+  })
 
-  it("should pass tx to the user callback", async () => {
-    const tx = { execute: vi.fn() };
+  it('should pass tx to the user callback', async () => {
+    const tx = { execute: vi.fn() }
     mockTransaction.mockImplementation(async (cb) => {
-      await cb(tx);
-    });
+      await cb(tx)
+    })
 
-    let receivedTx: unknown;
-    await withTenantContext("tenant-id", async (tx) => {
-      receivedTx = tx;
-    });
+    let receivedTx: unknown
+    await withTenantContext('tenant-id', async (tx) => {
+      receivedTx = tx
+    })
 
-    expect(receivedTx).toBe(tx);
-  });
+    expect(receivedTx).toBe(tx)
+  })
 
-  it("should return the callback result", async () => {
-    const tx = { execute: vi.fn() };
+  it('should return the callback result', async () => {
+    const tx = { execute: vi.fn() }
     mockTransaction.mockImplementation(async (cb) => {
-      return await cb(tx);
-    });
+      return await cb(tx)
+    })
 
-    const result = await withTenantContext("tenant-id", async () => "done");
+    const result = await withTenantContext('tenant-id', async () => 'done')
 
-    expect(result).toBe("done");
-  });
+    expect(result).toBe('done')
+  })
 
-  it("should return the transaction result when callback returns undefined", async () => {
-    const tx = { execute: vi.fn() };
+  it('should return the transaction result when callback returns undefined', async () => {
+    const tx = { execute: vi.fn() }
     mockTransaction.mockImplementation(async (cb) => {
-      await cb(tx);
-      return "tx-result";
-    });
+      await cb(tx)
+      return 'tx-result'
+    })
 
-    const result = await withTenantContext("tenant-id", async () => {});
+    const result = await withTenantContext('tenant-id', async () => {})
 
-    expect(result).toBe("tx-result");
-  });
+    expect(result).toBe('tx-result')
+  })
 
-  it("should re-throw when db.transaction rejects", async () => {
-    mockTransaction.mockRejectedValue(new Error("db error"));
+  it('should re-throw when db.transaction rejects', async () => {
+    mockTransaction.mockRejectedValue(new Error('db error'))
 
     await expect(
-      withTenantContext("tenant-id", async () => {})
-    ).rejects.toThrow("db error");
-  });
-});
+      withTenantContext('tenant-id', async () => {}),
+    ).rejects.toThrow('db error')
+  })
+})

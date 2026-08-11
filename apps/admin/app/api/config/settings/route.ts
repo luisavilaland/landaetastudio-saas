@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db, dbTenants } from "@repo/db";
-import { auth } from "@/lib/auth";
-import { eq } from "drizzle-orm";
-import { z } from "zod";
-import { createLogger } from "@repo/logger";
+import { NextRequest, NextResponse } from 'next/server'
+import { db, dbTenants } from '@repo/db'
+import { auth } from '@/lib/auth'
+import { eq } from 'drizzle-orm'
+import { z } from 'zod'
+import { createLogger } from '@repo/logger'
 
-const logger = createLogger("config-settings");
+const logger = createLogger('config-settings')
 
-const hexColorRegex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const hexColorRegex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
 
 const storeSettingsSchema = z.object({
   logoUrl: z.string().url().optional(),
@@ -24,73 +24,79 @@ const storeSettingsSchema = z.object({
       facebook: z.string().url().optional(),
     })
     .optional(),
-});
+})
 
 export async function GET() {
   try {
-    const session = await auth();
+    const session = await auth()
 
     if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const tenantId = session.user?.tenantId as string;
+    const tenantId = session.user?.tenantId as string
 
     const [tenant] = await db
       .select({ settings: dbTenants.settings })
       .from(dbTenants)
       .where(eq(dbTenants.id, tenantId))
-      .limit(1);
+      .limit(1)
 
     if (!tenant) {
-      return NextResponse.json({ error: "Tenant no encontrado" }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Tenant no encontrado' },
+        { status: 404 },
+      )
     }
 
-    const settings = (tenant.settings as Record<string, unknown>) || {};
+    const settings = (tenant.settings as Record<string, unknown>) || {}
 
-    return NextResponse.json({ settings });
+    return NextResponse.json({ settings })
   } catch (error) {
-    logger.error({ error }, "Error getting store settings");
+    logger.error({ error }, 'Error getting store settings')
     return NextResponse.json(
-      { error: "Error al obtener configuración de tienda" },
-      { status: 500 }
-    );
+      { error: 'Error al obtener configuración de tienda' },
+      { status: 500 },
+    )
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = await auth()
 
     if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const tenantId = session.user?.tenantId as string;
+    const tenantId = session.user?.tenantId as string
 
     const [existing] = await db
       .select()
       .from(dbTenants)
       .where(eq(dbTenants.id, tenantId))
-      .limit(1);
+      .limit(1)
 
     if (!existing) {
-      return NextResponse.json({ error: "Tenant no encontrado" }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Tenant no encontrado' },
+        { status: 404 },
+      )
     }
 
-    const body = await request.json();
+    const body = await request.json()
 
-    const validation = storeSettingsSchema.safeParse(body);
+    const validation = storeSettingsSchema.safeParse(body)
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validación fallida", issues: validation.error.issues },
-        { status: 400 }
-      );
+        { error: 'Validación fallida', issues: validation.error.issues },
+        { status: 400 },
+      )
     }
 
-    const currentSettings = (existing.settings as Record<string, unknown>) || {};
-    const newSettings = { ...currentSettings, ...validation.data };
+    const currentSettings = (existing.settings as Record<string, unknown>) || {}
+    const newSettings = { ...currentSettings, ...validation.data }
 
     const [tenant] = await db
       .update(dbTenants)
@@ -99,14 +105,14 @@ export async function PUT(request: NextRequest) {
         updatedAt: new Date(),
       })
       .where(eq(dbTenants.id, tenantId))
-      .returning();
+      .returning()
 
-    return NextResponse.json({ settings: tenant.settings });
+    return NextResponse.json({ settings: tenant.settings })
   } catch (error) {
-    logger.error({ error }, "Error updating store settings");
+    logger.error({ error }, 'Error updating store settings')
     return NextResponse.json(
-      { error: "Error al actualizar configuración de tienda" },
-      { status: 500 }
-    );
+      { error: 'Error al actualizar configuración de tienda' },
+      { status: 500 },
+    )
   }
 }

@@ -1,65 +1,77 @@
-import { db, dbProducts, dbProductVariants, dbProductImages, dbCategories, withTenantContext } from "@repo/db";
-import { eq, desc, and, isNotNull, inArray } from "drizzle-orm";
+import {
+  db,
+  dbProducts,
+  dbProductVariants,
+  dbProductImages,
+  dbCategories,
+  withTenantContext,
+} from '@repo/db'
+import { eq, desc, and, isNotNull, inArray } from 'drizzle-orm'
 
 export type ProductImage = {
-  id: string;
-  url: string;
-  alt: string | null;
-  position: number | null;
-};
+  id: string
+  url: string
+  alt: string | null
+  position: number | null
+}
 
 export type ProductVariant = {
-  id: string;
-  price: number;
-  stock: number | null;
-  sku: string;
-  options: Record<string, string>;
-};
+  id: string
+  price: number
+  stock: number | null
+  sku: string
+  options: Record<string, string>
+}
 
 export type ProductWithVariants = {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  imageUrl: string | null;
-  status: string | null;
-  createdAt: Date;
-  categoryId: string | null;
-  categoryName: string | null;
-  categorySlug: string | null;
-  variants: ProductVariant[];
-  images: ProductImage[];
-};
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  imageUrl: string | null
+  status: string | null
+  createdAt: Date
+  categoryId: string | null
+  categoryName: string | null
+  categorySlug: string | null
+  variants: ProductVariant[]
+  images: ProductImage[]
+}
 
 export async function getProducts(
   tenantId: string,
   limit: number = 12,
-  categorySlug?: string
+  categorySlug?: string,
 ): Promise<ProductWithVariants[]> {
   return await withTenantContext(tenantId, async (tx) => {
-    let categoryFilter = undefined;
+    let categoryFilter = undefined
 
     if (categorySlug) {
       const categoryResult = await tx
         .select({ id: dbCategories.id })
         .from(dbCategories)
-        .where(and(eq(dbCategories.tenantId, tenantId), eq(dbCategories.slug, categorySlug)))
-        .limit(1);
+        .where(
+          and(
+            eq(dbCategories.tenantId, tenantId),
+            eq(dbCategories.slug, categorySlug),
+          ),
+        )
+        .limit(1)
 
       if (categoryResult.length > 0) {
-        categoryFilter = categoryResult[0].id;
+        categoryFilter = categoryResult[0].id
       } else {
-        return [];
+        return []
       }
     }
 
     const conditions = [
       eq(dbProducts.tenantId, tenantId),
-      eq(dbProducts.status, "active"),
-    ];
+      eq(dbProducts.status, 'active'),
+    ]
 
     if (categoryFilter) {
-      conditions.push(eq(dbProducts.categoryId, categoryFilter));
+      conditions.push(eq(dbProducts.categoryId, categoryFilter))
     }
 
     const results = await tx
@@ -79,47 +91,64 @@ export async function getProducts(
       .leftJoin(dbCategories, eq(dbProducts.categoryId, dbCategories.id))
       .where(and(...conditions))
       .orderBy(desc(dbProducts.createdAt))
-      .limit(limit);
+      .limit(limit)
 
-    const productIds = results.map((r) => r.id);
+    const productIds = results.map((r) => r.id)
 
     const variants = await tx
       .select()
       .from(dbProductVariants)
-      .where(and(eq(dbProductVariants.tenantId, tenantId), inArray(dbProductVariants.productId, productIds)));
+      .where(
+        and(
+          eq(dbProductVariants.tenantId, tenantId),
+          inArray(dbProductVariants.productId, productIds),
+        ),
+      )
 
-    const variantsByProduct = variants.reduce((acc, v) => {
-      if (!acc[v.productId]) acc[v.productId] = [];
-      acc[v.productId].push({
-        id: v.id,
-        price: v.price,
-        stock: v.stock,
-        sku: v.sku,
-        options: (v.options as Record<string, string>) || {},
-      });
-      return acc;
-    }, {} as Record<string, ProductVariant[]>);
+    const variantsByProduct = variants.reduce(
+      (acc, v) => {
+        if (!acc[v.productId]) acc[v.productId] = []
+        acc[v.productId].push({
+          id: v.id,
+          price: v.price,
+          stock: v.stock,
+          sku: v.sku,
+          options: (v.options as Record<string, string>) || {},
+        })
+        return acc
+      },
+      {} as Record<string, ProductVariant[]>,
+    )
 
     const images = await tx
       .select()
       .from(dbProductImages)
-      .where(and(eq(dbProductImages.tenantId, tenantId), inArray(dbProductImages.productId, productIds)))
-      .orderBy(dbProductImages.position);
+      .where(
+        and(
+          eq(dbProductImages.tenantId, tenantId),
+          inArray(dbProductImages.productId, productIds),
+        ),
+      )
+      .orderBy(dbProductImages.position)
 
-    const imagesByProduct = images.reduce((acc, img) => {
-      if (!acc[img.productId]) acc[img.productId] = [];
-      acc[img.productId].push({
-        id: img.id,
-        url: img.url,
-        alt: img.alt,
-        position: img.position ?? 0,
-      });
-      return acc;
-    }, {} as Record<string, ProductImage[]>);
+    const imagesByProduct = images.reduce(
+      (acc, img) => {
+        if (!acc[img.productId]) acc[img.productId] = []
+        acc[img.productId].push({
+          id: img.id,
+          url: img.url,
+          alt: img.alt,
+          position: img.position ?? 0,
+        })
+        return acc
+      },
+      {} as Record<string, ProductImage[]>,
+    )
 
     return results.map((row) => {
-      const productImages = imagesByProduct[row.id] || [];
-      const firstImageUrl = productImages.length > 0 ? productImages[0].url : row.imageUrl;
+      const productImages = imagesByProduct[row.id] || []
+      const firstImageUrl =
+        productImages.length > 0 ? productImages[0].url : row.imageUrl
       return {
         id: row.id,
         name: row.name,
@@ -133,14 +162,14 @@ export async function getProducts(
         categorySlug: row.categorySlug ?? null,
         variants: variantsByProduct[row.id] || [],
         images: productImages,
-      };
-    });
-  });
+      }
+    })
+  })
 }
 
 export async function getProductBySlug(
   tenantId: string,
-  slug: string
+  slug: string,
 ): Promise<ProductWithVariants | null> {
   return await withTenantContext(tenantId, async (tx) => {
     const results = await tx
@@ -162,28 +191,38 @@ export async function getProductBySlug(
         and(
           eq(dbProducts.tenantId, tenantId),
           eq(dbProducts.slug, slug),
-          eq(dbProducts.status, "active")
-        )
+          eq(dbProducts.status, 'active'),
+        ),
       )
-      .limit(1);
+      .limit(1)
 
     if (results.length === 0) {
-      return null;
+      return null
     }
 
-    const row = results[0];
+    const row = results[0]
 
     const variants = await tx
       .select()
       .from(dbProductVariants)
-      .where(and(eq(dbProductVariants.productId, row.id), eq(dbProductVariants.tenantId, tenantId)))
-      .orderBy(dbProductVariants.createdAt);
+      .where(
+        and(
+          eq(dbProductVariants.productId, row.id),
+          eq(dbProductVariants.tenantId, tenantId),
+        ),
+      )
+      .orderBy(dbProductVariants.createdAt)
 
     const images = await tx
       .select()
       .from(dbProductImages)
-      .where(and(eq(dbProductImages.productId, row.id), eq(dbProductImages.tenantId, tenantId)))
-      .orderBy(dbProductImages.position);
+      .where(
+        and(
+          eq(dbProductImages.productId, row.id),
+          eq(dbProductImages.tenantId, tenantId),
+        ),
+      )
+      .orderBy(dbProductImages.position)
 
     return {
       id: row.id,
@@ -209,6 +248,6 @@ export async function getProductBySlug(
         alt: img.alt,
         position: img.position ?? 0,
       })),
-    };
-  });
+    }
+  })
 }

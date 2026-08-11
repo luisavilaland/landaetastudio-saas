@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: saas123
       POSTGRES_DB: saas_ecommerce
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -18,7 +18,7 @@ services:
     image: redis:7-alpine
     container_name: saas-redis
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -31,8 +31,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
     ports:
-      - "9000:9000"   # API
-      - "9001:9001"   # Consola web
+      - '9000:9000' # API
+      - '9001:9001' # Consola web
     volumes:
       - minio_data:/data
     restart: unless-stopped
@@ -41,8 +41,8 @@ services:
     image: mailhog/mailhog:latest
     container_name: saas-mailhog
     ports:
-      - "1025:1025"   # SMTP
-      - "8025:8025"   # UI
+      - '1025:1025' # SMTP
+      - '8025:8025' # UI
     restart: unless-stopped
 
 volumes:

@@ -1,27 +1,27 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { withTenantContext, dbCategories } from "@repo/db";
-import { eq, desc } from "drizzle-orm";
-import { CategoriesTable } from "./categories-table";
+import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
+import { withTenantContext, dbCategories } from '@repo/db'
+import { eq, desc } from 'drizzle-orm'
+import { CategoriesTable } from './categories-table'
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic'
 
 export default async function CategoriesPage() {
-  const session = await auth();
+  const session = await auth()
 
   if (!session) {
-    redirect("/login");
+    redirect('/login')
   }
 
-  const tenantId = session.user?.tenantId as string;
+  const tenantId = session.user?.tenantId as string
 
   const categories = await withTenantContext(tenantId, async (tx) =>
     tx
       .select()
       .from(dbCategories)
       .where(eq(dbCategories.tenantId, tenantId))
-      .orderBy(desc(dbCategories.createdAt))
-  );
+      .orderBy(desc(dbCategories.createdAt)),
+  )
 
-  return <CategoriesTable initialCategories={categories} />;
+  return <CategoriesTable initialCategories={categories} />
 }
