@@ -50,6 +50,11 @@ const MOCK_CART = {
   updatedAt: new Date().toISOString(),
 };
 
+const MOCK_CART_QTY_1 = {
+  items: [{ variantId: VARIANT_ID, quantity: 1, addedAt: new Date().toISOString() }],
+  updatedAt: new Date().toISOString(),
+};
+
 const MOCK_EMPTY_CART = {
   items: [],
   updatedAt: new Date().toISOString(),
@@ -266,7 +271,7 @@ describe("POST /api/checkout", () => {
     tx.select.mockReturnValueOnce(fromObj);
     tx.update.mockReturnValue(tx);
     tx.set.mockReturnValue(tx);
-    tx.where.mockResolvedValue(undefined);
+    tx.where.mockReturnValue(tx);
     tx.insert.mockReturnValue(tx);
     tx.values.mockReturnValue(tx);
     tx.returning.mockResolvedValue([MOCK_ORDER]);
@@ -298,7 +303,7 @@ describe("POST /api/checkout", () => {
     tx.select.mockReturnValue(tx);
     tx.from.mockReturnValue(tx);
     tx.where.mockResolvedValueOnce([MOCK_VARIANT]);
-    tx.where.mockResolvedValue(undefined);
+    tx.where.mockReturnValue(tx);
     tx.update.mockReturnValue(tx);
     tx.set.mockReturnValue(tx);
     tx.insert.mockReturnValue(tx);
@@ -321,5 +326,88 @@ describe("POST /api/checkout", () => {
     expect(body).toHaveProperty("orderId");
     expect(body.total).toBe(4498);
     expect(withTenantContext).toHaveBeenCalledWith(TENANT_ID, expect.any(Function));
+  });
+
+  it("debe crear la orden cuando el stock es exacto al pedido (UPDATE atómico devuelve fila)", async () => {
+    setupCookie(SESSION_ID);
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART));
+
+    const tx = makeTxMock();
+    const updateReturning = vi.fn().mockResolvedValue([{ id: VARIANT_ID }]);
+    tx.update.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({ returning: updateReturning }),
+      }),
+    });
+    tx.select.mockReturnValue(tx);
+    tx.from.mockReturnValue(tx);
+    tx.where.mockResolvedValueOnce([{ ...MOCK_VARIANT, stock: 2 }]);
+    tx.insert.mockReturnValue(tx);
+    tx.values.mockReturnValue(tx);
+    tx.returning.mockResolvedValue([MOCK_ORDER]);
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
+    vi.mocked(redisDel).mockResolvedValue(undefined);
+
+    const res = await POST(
+      mockReq("POST", {
+        email: "test@test.com",
+        name: "Juan Perez",
+        phone: "099123456",
+        address: "Calle 123",
+      })
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.orderId).toBe(MOCK_ORDER.id);
+    expect(updateReturning).toHaveBeenCalledTimes(1);
+  });
+
+  it("debe prevenir el oversell en concurrencia: un checkout 200 y el otro 422", async () => {
+    setupCookie(SESSION_ID);
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART_QTY_1));
+
+    const tx = makeTxMock();
+    const updateReturning = vi
+      .fn()
+      .mockResolvedValueOnce([{ id: VARIANT_ID }])
+      .mockResolvedValueOnce([]);
+    tx.update.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({ returning: updateReturning }),
+      }),
+    });
+    tx.select.mockReturnValue(tx);
+    tx.from.mockReturnValue(tx);
+    tx.where.mockResolvedValueOnce([{ ...MOCK_VARIANT, stock: 1 }]);
+    tx.where.mockResolvedValueOnce([{ ...MOCK_VARIANT, stock: 1 }]);
+    tx.insert.mockReturnValue(tx);
+    tx.values.mockReturnValue(tx);
+    tx.returning.mockResolvedValue([MOCK_ORDER]);
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx));
+    vi.mocked(redisDel).mockResolvedValue(undefined);
+
+    const body = {
+      email: "test@test.com",
+      name: "Juan Perez",
+      phone: "099123456",
+      address: "Calle 123",
+    };
+
+    const [res1, res2] = await Promise.all([
+      POST(mockReq("POST", body)),
+      POST(mockReq("POST", body)),
+    ]);
+
+    const statuses = [res1.status, res2.status].sort((a, b) => a - b);
+    expect(statuses).toEqual([200, 422]);
+
+    const failed = res1.status === 422 ? res1 : res2;
+    const failedBody = await failed.json();
+    expect(failedBody.error).toBe("Stock insuficiente");
+    expect(failedBody.outOfStock).toContain(VARIANT_ID);
+
+    expect(updateReturning).toHaveBeenCalledTimes(2);
+    expect(tx.returning).toHaveBeenCalledTimes(1);
   });
 });
