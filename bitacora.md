@@ -891,3 +891,13 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **bitacora.md:** solo se agrega esta entrada; la entrada previa del 10-08 ya reflejaba 426 tests.
 - **Verificación:** `pnpm lint` ✅ | grep: solo quedan menciones históricas de 388 en bitácora (inmutables).
 - **Branch:** `docs/align-post-pr44` (pendiente PR a develop)
+
+---
+
+## 2026-08-10 — TOCTOU: oversell en checkout (fix atómico) + 409 en PUT products/[id]
+
+- **Checkout oversell (fix atómico):** el decremento de stock en `apps/storefront/app/api/checkout/route.ts` calculaba `stock - qty` sobre el valor leído en la fase 1 (no atómico): dos órdenes concurrentes con stock justo podían pasar la validación ambas y la segunda sobrescribía → oversell. Ahora UPDATE atómico con `sql`${stock} - ${qty}`` + `WHERE stock >= qty` + `.returning({ id })`: 0 filas → "Stock insuficiente" → 422 (mapeo existente, rollback automático de la transacción). 2 tests nuevos (stock exacto + concurrencia con `Promise.all`: una 200, una 422). Commit `9e7a518`.
+- **PUT products/[id] (TOCTOU entre fases):** ventana fase 1 read → R2 → fase 3 write donde el producto pudo ser borrado: el UPDATE afectaba 0 filas y el refetch vacío devolvía 200 con body vacío; FK `23503` al insertar variantes daba 500. Ahora: refetch post-update `updatedProduct.length === 0` → 409 "Producto eliminado durante la actualización", catch `23503` → 409 con el mismo mensaje y `logger.error` con `{ error, productId, tenantId }`. 2 tests nuevos (0 filas → 409, FK → 409). Commit `069f6aa`. Cierre de la deuda anotada el 2026-07-29.
+- **Ejecución:** 2 worktrees de Paseo en paralelo (`fix/toctou-checkout`, `fix/toctou-products`) con subagentes opencode (TDD estricto: RED → GREEN → verificación anti-revert con `git stash` de cada route.ts, tests nuevos fallan contra el código revertido). Integración: cherry-pick de ambos commits a la rama unificada `fix/toctou-checkout-products`.
+- **Tests:** 426 → **428** (55 archivos). Lint sin errores. `docs/deuda-tecnica.md` ítem 1 marcado implementado (incluye el caso products/[id], mismo patrón TOCTOU); README: pendientes sin "TOCTOU en PUT products/[id]".
+- **Branch:** `fix/toctou-checkout-products` (pendiente PR a develop)

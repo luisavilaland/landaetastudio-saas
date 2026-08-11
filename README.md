@@ -59,7 +59,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ **E2E Playwright** - 14 specs (storefront, checkout, admin, superadmin, security) con CI self-hosted
 - ✅ **Carrito resiliente** - degradación progresiva cuando Redis está caído (wrappers `safeGet`/`redisSetEx`/`redisDel` + `whenReady`)
 - ✅ **Barrido `console.*` completo** - 0 instancias en apps/ (excepción intencional: seed.ts y env.ts)
-- 🔄 Pendiente: migración `develop → main`, assertions de contenido en E2E, TOCTOU en PUT products/[id]
+- 🔄 Pendiente: migración `develop → main`, assertions de contenido en E2E
 
 ---
 

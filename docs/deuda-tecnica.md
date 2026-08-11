@@ -1,11 +1,11 @@
 # Deuda técnica — planes pendientes
 
 > Documentación de deuda técnica identificada al 2026-08-08 (plan aprobado, ítem 3).
-> **Estado: no ejecutado** — este documento es solo el plan; ninguno de los tres ítems fue implementado.
+> **Estado: ítem 1 implementado (2026-08-10, rama `fix/toctou-checkout-products`); ítems 2 y 3 pendientes.**
 
 ---
 
-## 1. TOCTOU en stock de checkout (time-of-check to time-of-use)
+## 1. TOCTOU en stock de checkout (time-of-check to time-of-use) — ✅ IMPLEMENTADO (2026-08-10)
 
 **Contexto real:** `apps/storefront/app/api/checkout/route.ts` dentro de `withTenantContext`:
 
@@ -41,6 +41,12 @@ El decremento calcula el valor nuevo a partir del leído (**no `stock - qty` at�
 - Unit test sobre el SQL atómico con `makeTxMock` configurado con `rowCount` (patrón AGENTS.md → Helpers de test).
 
 **Archivos a tocar:** `apps/storefront/app/api/checkout/route.ts` (+ su `__tests__/route.test.ts`).
+
+**Implementación (2026-08-10, rama `fix/toctou-checkout-products`):**
+
+- **Checkout** (commit `9e7a518`, `apps/storefront/app/api/checkout/route.ts`): decremento atómico con `sql`${dbProductVariants.stock} - ${item.quantity}`` + `gte(dbProductVariants.stock, item.quantity)` en el WHERE, y `.returning({ id })` para detectar 0 filas → se devuelve `{ error: "Stock insuficiente", outOfStock }` (mapeo 422 ya existente en el handler; el contrato HTTP no cambió). Rollback automático de la transacción al abortar.
+- **PUT `products/[id]` (misma ventana TOCTOU, fase 1 read → R2 → fase 3 write)** (commit `069f6aa`, `apps/admin/app/api/products/[id]/route.ts`): refetch post-update con `updatedProduct.length === 0` → 409 `{ error: "Producto eliminado durante la actualización" }`; catch de violación de FK `23503` → 409 con el mismo mensaje y `logger.error` con `{ error, productId, tenantId }` (el resto de errores sigue en 500).
+- **Tests:** 2 nuevos por fix (checkout: stock exacto + concurrencia con `Promise.all` donde una petición recibe 422; products: 0 filas → 409 + FK 23503 → 409). Suite: 426 → **428** (55 archivos). Verificación anti-revert hecha con `git stash` de cada route.ts: los tests nuevos fallan contra el código revertido.
 
 ---
 
