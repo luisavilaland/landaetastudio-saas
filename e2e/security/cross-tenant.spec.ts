@@ -1,3 +1,9 @@
+// Skip condicional: este spec necesita que el tenant T2 (tienda2) tenga al menos un
+// producto seed para extraer un ID real y probar el aislamiento cross-tenant. Mientras el
+// entorno de pruebas no cuente con un segundo tenant con productos (se requiere un tenant T2
+// con datos seed accesible vía E2E_STOREFRONT_T2_URL o el dominio de preview), el test se salta
+// en runtime con "No hay productos seed para tienda2". Se habilitará por completo cuando exista
+// un fixture/seed multi-tenant que garantice productos para tienda2.
 import { test, expect } from "@playwright/test";
 
 const STOREFRONT_T2_URL =
