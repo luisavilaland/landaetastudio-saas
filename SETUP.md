@@ -271,9 +271,40 @@ El carrito anónimo persiste en Redis vía ioredis. **Hay dos variables distinta
 - Env vars (ver `.env.local.example`): `E2E_STOREFRONT_URL`, `E2E_STOREFRONT_T2_URL`, `E2E_ADMIN_URL`, `E2E_SUPERADMIN_URL`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`.
 - CI: `.github/workflows/e2e.yml` — corre en **runner self-hosted** (AlmaLinux). Requisitos del runner:
   - Egress TCP a Neon (puerto 5432, IPv4 o IPv6) y red a los 3 dominios Vercel.
-  - Si el host no tiene ruta IPv6, pin del endpoint Neon en `/etc/hosts`.
+  - Si el host no tiene ruta IPv6, pin IPv4 del endpoint Neon en `/etc/hosts` (ver procedimiento completo abajo).
   - Libs de sistema de Chromium instaladas vía `dnf` (nss, atk, at-spi2-atk, cups-libs, libdrm, libxkbcommon, libXcomposite, libXdamage, libXfixes, libXrandr, mesa-libgbm, alsa-lib, pango, cairo, gtk3).
   - Guard anti-fork: los jobs se saltan PRs de forks (repo público + runner self-hosted = riesgo RCE).
+
+### Runner self-hosted: pin IPv4 de Neon
+
+El runner self-hosted no tiene ruta IPv6. El endpoint de Neon publica registros `AAAA` además de `A`, y el rollback del resolver puede devolver la IP IPv6 → el egress TCP a Neon en 5432 falla (`ECONNREFUSED`) aunque el host tenga IPv4. La mitigación es pin de la IPv4 del endpoint en `/etc/hosts` del runner.
+
+1. **Resolver la IP IPv4 actual del endpoint.** El host del endpoint se ve en el dashboard de Neon (al crear un restore/branch), con formato `ep-xxxxxxxx.c-X.<region>.aws.neon.tech` (ej: `xxxxxxxx.eu-central-1.aws.neon.tech`):
+
+   ```bash
+   dig +short A <host-neon>
+   # o bien
+   getent ahostsv4 <host-neon>
+   ```
+
+2. **Aplicar el pin** (root/sudo). Verificar primero el estado actual del archivo y luego agregar la línea con la IP IPv4 obtenida:
+
+   ```bash
+   cat /etc/hosts
+   echo "<IP-IPv4> <host-neon>" >> /etc/hosts
+   ```
+
+3. **Verificar conectividad:**
+
+   ```bash
+   psql "$DATABASE_URL" -c "SELECT 1"
+   # o corriendo el E2E del webhook:
+   pnpm test:e2e
+   ```
+
+4. **Alternativa robusta:** si el proyecto Neon lo soporta, usar un endpoint **IPv4-only** o una IP allowlist del pool del proyecto, que elimina la dependencia de `/etc/hosts`.
+
+5. **Mantenimiento:** las IPs del pool de Neon pueden rotar. Si el endpoint deja de responder y reaparece el problema de IPv6, hay que actualizar el pin (mantenimiento mensual o migrar a la alternativa IPv4-only). El pin es por máquina: replicar en cada runner.
 
 ## Nota
 
