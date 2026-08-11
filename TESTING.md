@@ -273,14 +273,14 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 
 | # | Prueba | Estado |
 |---|--------|--------|
-| 1 | Flujo E2E completo en sandbox (tarjeta de prueba) | 🔄 Pendiente – cuenta de prueba de MP no disponible |
+| 1 | Flujo E2E completo en sandbox (tarjeta de prueba) | ✅ Tarjetas de prueba disponibles en sandbox MP → ver SETUP.md → Tarjetas de prueba MercadoPago |
 | 2 | Webhook de pago aprobado (unit/integración, HMAC + magic ID `123456789`) | ✅ 11 tests en `webhooks/mercadopago/__tests__/route.test.ts` |
 | 3 | Webhook de pago rechazado (magic ID `000000`) | ✅ ídem |
 | 4 | Webhook pendiente (magic ID `999999`, sin cambio de estado) | ✅ ídem |
 | 5 | Firma real del webhook en E2E (approved/rejected/missing/tampered) | ✅ `e2e/webhook/webhook-signature.spec.ts` (requiere `E2E_WEBHOOK_TEST=1` en Vercel) |
 | 6 | Email de confirmación de orden (Resend) | ✅ Unit tests en `@repo/commerce` |
 
-> El webhook está **automatizado** (tests de integración con HMAC fail-closed, idempotencia por `payment_id`, modo simulación con `x-test-order-id`). El E2E `webhook-signature.spec.ts` valida la firma real contra el entorno desplegado: firma válida → orden `confirmed`, firma adulterada/sin firma → 401, pending → sin cambio. El único pendiente operativo es el sandbox manual (cuenta de prueba de MP), que no bloquea la automatización.
+> El webhook está **automatizado** (tests de integración con HMAC fail-closed, idempotencia por `payment_id`, modo simulación con `x-test-order-id`). El E2E `webhook-signature.spec.ts` valida la firma real contra el entorno desplegado: firma válida → orden `confirmed`, firma adulterada/sin firma → 401, pending → sin cambio. El flujo manual en sandbox se puede probar con las tarjetas de prueba (`APRO`/`OTHE`/`CONT`), documentadas en SETUP.md → Tarjetas de prueba MercadoPago.
 
 ---
 

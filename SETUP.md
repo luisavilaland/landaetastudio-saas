@@ -240,7 +240,19 @@ pnpm build         # Build de todas las apps
 
 ### Tarjetas de prueba MercadoPago
 
-> Próximamente: tarjetas de prueba para simular pagos aprobados y rechazados en el entorno de desarrollo de MercadoPago.
+Tarjetas de prueba del sandbox de MercadoPago, ya funcionales en el entorno de desarrollo. **Titular y documento:** cualquier nombre y cualquier documento (el sandbox no los valida).
+
+| Tarjeta | Número | Código de resultado | CVV | Vencimiento |
+|---------|--------|---------------------|-----|-------------|
+| Visa | `4509 9535 6623 3704` | `APRO` | `123` | `11/25` |
+| Mastercard | `5031 7557 3453 0604` | `OTHE` | `123` | `11/25` |
+| American Express | `3711 8030 3257 522` | `CONT` | `1234` | `11/25` |
+
+El código de resultado simula el desenlace del pago:
+
+- `APRO` — pago aprobado
+- `OTHE` — rechazado / otro medio de pago
+- `CONT` — pendiente de aprobación
 
 ### Multi-tenant local
 
