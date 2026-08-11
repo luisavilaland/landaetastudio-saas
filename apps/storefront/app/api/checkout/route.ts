@@ -4,7 +4,7 @@ import { safeGet, redisDel } from "@/lib/redis";
 import { getTenantId } from "@/lib/tenant";
 import { auth } from "@/lib/auth";
 import { withTenantContext, dbOrders, dbOrderItems, dbProductVariants, dbShippingMethods } from "@repo/db";
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, gte, sql } from "drizzle-orm";
 import { createCheckoutSchema } from "@repo/validation";
 import { createLogger } from "@/lib/logger";
 
@@ -170,15 +170,21 @@ export async function POST(request: NextRequest) {
         const variant = variantMap.get(item.variantId);
         if (!variant) continue;
 
-        await tx
+        const [updated] = await tx
           .update(dbProductVariants)
-          .set({ stock: (variant.stock ?? 0) - item.quantity })
+          .set({ stock: sql`${dbProductVariants.stock} - ${item.quantity}` })
           .where(
             and(
               eq(dbProductVariants.id, item.variantId),
-              eq(dbProductVariants.tenantId, tenantIdFromSlug)
+              eq(dbProductVariants.tenantId, tenantIdFromSlug),
+              gte(dbProductVariants.stock, item.quantity)
             )
-          );
+          )
+          .returning({ id: dbProductVariants.id });
+
+        if (!updated) {
+          return { error: "Stock insuficiente", outOfStock: [item.variantId] };
+        }
       }
 
       const [order] = await tx

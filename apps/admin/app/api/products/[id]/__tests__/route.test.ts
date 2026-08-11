@@ -212,6 +212,45 @@ describe("PUT /api/products/[id]", () => {
     expect(data.name).toBe("Updated Product");
     expect(data.variant).toBeDefined();
   });
+
+  it("409 si el producto fue eliminado entre la lectura y la escritura (0 filas en fase de escritura)", async () => {
+    vi.mocked(auth).mockResolvedValue(session(TENANT_A, "admin@a.com"));
+    const mockTx = makeTxMock();
+    mockTx.select
+      .mockReturnValueOnce(makeSelectChain([baseProduct]))   // fase 1: leer producto
+      .mockReturnValueOnce(makeSelectChain([baseVariant]))    // fase 1: variantes existentes
+      .mockReturnValueOnce(makeSelectChain([]))               // fase 3: refetch producto → 0 filas
+      .mockReturnValueOnce(makeSelectChain([]));              // fase 3: refetch variante
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(mockTx));
+    const res = await PUT(mockReq("PUT", { name: "Updated Product" }), {
+      params: Promise.resolve({ id: PRODUCT_ID }),
+    });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("Producto eliminado durante la actualización");
+  });
+
+  it("409 si la fase de escritura lanza violación de FK 23503 (producto borrado)", async () => {
+    vi.mocked(auth).mockResolvedValue(session(TENANT_A, "admin@a.com"));
+    const mockTx = makeTxMock();
+    mockTx.select
+      .mockReturnValueOnce(makeSelectChain([baseProduct]))   // fase 1: leer producto
+      .mockReturnValueOnce(makeSelectChain([baseVariant]));   // fase 1: variantes existentes
+    vi.mocked(withTenantContext)
+      .mockImplementationOnce(async (_tenantId, cb) => cb(mockTx)) // fase 1 ok
+      .mockImplementationOnce(async () => {
+        throw Object.assign(
+          new Error("insert or update on table product_variants violates foreign key constraint"),
+          { code: "23503" }
+        );
+      }); // fase 3 lanza violación de FK
+    const res = await PUT(mockReq("PUT", { name: "Updated Product" }), {
+      params: Promise.resolve({ id: PRODUCT_ID }),
+    });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("Producto eliminado durante la actualización");
+  });
 });
 
 // ──────── DELETE ────────

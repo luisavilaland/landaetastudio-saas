@@ -78,6 +78,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Params }
 ) {
+  let id = "";
+  let tenantId = "";
+
   try {
     const session = await auth();
 
@@ -85,8 +88,9 @@ export async function PUT(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { id } = await params;
-    const tenantId = session.user?.tenantId as string;
+    const resolvedParams = await params;
+    id = resolvedParams.id;
+    tenantId = session.user?.tenantId as string;
 
     const contentType = request.headers.get("content-type") || "";
 
@@ -404,6 +408,11 @@ export async function PUT(
         .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
         .limit(1);
 
+      if (updatedProduct.length === 0) {
+        logger.error({ productId: id, tenantId }, "[PUT Product] Product deleted during update");
+        return NextResponse.json({ error: "Producto eliminado durante la actualización" }, { status: 409 });
+      }
+
       const variant = await tx
         .select()
         .from(dbProductVariants)
@@ -416,10 +425,14 @@ export async function PUT(
       });
     });
   } catch (error) {
-    logger.error({ error }, "[PUT Product] Failed to update product");
+    logger.error({ error, productId: id, tenantId }, "[PUT Product] Failed to update product");
 
     if (error && typeof error === "object" && "code" in error && error.code === "23505") {
       return NextResponse.json({ error: "El SKU ya existe en otra variante", field: "sku" }, { status: 409 });
+    }
+
+    if (error && typeof error === "object" && "code" in error && error.code === "23503") {
+      return NextResponse.json({ error: "Producto eliminado durante la actualización" }, { status: 409 });
     }
 
     return NextResponse.json({ error: "Failed to update product", details: error instanceof Error ? error.message : String(error) }, { status: 500 });
