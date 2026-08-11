@@ -928,3 +928,19 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **Ejecución:** 2 worktrees de Paseo en paralelo (`fix/toctou-checkout`, `fix/toctou-products`) con subagentes opencode (TDD estricto: RED → GREEN → verificación anti-revert con `git stash` de cada route.ts, tests nuevos fallan contra el código revertido). Integración: cherry-pick de ambos commits a la rama unificada `fix/toctou-checkout-products`.
 - **Tests:** 426 → **428** (55 archivos). Lint sin errores. `docs/deuda-tecnica.md` ítem 1 marcado implementado (incluye el caso products/[id], mismo patrón TOCTOU); README: pendientes sin "TOCTOU en PUT products/[id]".
 - **Branch:** `fix/toctou-checkout-products` (pendiente PR a develop)
+
+---
+
+## 2026-08-11 - Calidad: guard de migraciones en CI, tarjetas de prueba MP, assertions E2E, prettier plugin y formateo global
+
+- **Guard de migraciones inmutables (CI):** nuevo scripts/check-migrations.sh - falla (fail-closed) si git diff origin/develop -- packages/db/migrations/ no est� vac�o: mensaje `? Migraci�n existente modificada - crea una nueva migraci�n, no edites las anteriores.`. .github/workflows/ci.yml: checkout@v7 con etch-depth: 0 + step Guard migraciones inmutables en el job uild. Cierra el �tem 2 de docs/deuda-tecnica.md.
+- **Pin IPv4 de Neon para el runner self-hosted (documentaci�n):** SETUP.md nueva sub-secci�n "Runner self-hosted: pin IPv4 de Neon" (diagn�stico, dig +short A/getent ahostsv4, pin en /etc/hosts, verificaci�n con psql/E2E, alternativa IPv4-only y rotaci�n de IPs). Cierra el �tem 3 de docs/deuda-tecnica.md.
+- **Tarjetas de prueba MercadoPago:** SETUP.md y TESTING.md - placeholder "Pr�ximamente" reemplazado por tabla real del sandbox: Visa 4509 9535 6623 3704 APRO, Mastercard 5031 7557 3453 0604 OTHE, Amex 3711 8030 3257 522 CONT; CVV 123 (Amex 1234), vencimiento 11/25, titular/documento libres.
+- **Assertions de contenido en E2E admin:** products-crud.spec.ts (verifica la fila creada con nombre �nico y que el estado vac�o no aparezca - detectar�a regresi�n RLS), orders.spec.ts ( body tr count > 0), categories.spec.ts (fila creada + sin estado vac�o). Nombres �nicos con Date.now().
+- **Skip del E2E cross-tenant documentado:** comentario al inicio de e2e/security/cross-tenant.spec.ts explicando el skip condicional (falta tenant T2 con productos seed; se habilitar� cuando exista fixture multi-tenant).
+- **prettier-plugin-tailwindcss en ra�z:** pnpm add -D -w prettier-plugin-tailwindcss@0.8.1 (peer prettier ^3.0, compatible con 3.9.6). .prettierrc ya lo referenciaba pero el plugin nunca estuvo instalado: prettier no pod�a correr con la config del repo.
+- **Primer formateo global con prettier:** al instalar el plugin, prettier --write . realine� 285 archivos (single quotes, sin semicolons, orden de clases tailwind, rewraps de markdown) contra el .prettierrc propio del repo (agregado en 44612f y nunca aplicado). Cero cambios funcionales. Archivos excluidos v�a nuevo .prettierignore: pnpm-lock.yaml y packages/db/migrations/ (inmutables). pnpm exec prettier --check . pasa limpio.
+- **Ejecuci�n:** 3 worktrees de Paseo en paralelo (quality-docs, quality-infra, quality-e2e) con subagentes opencode; los agentes quedaron colgados en shells de pnpm install dos veces (patr�n conocido) y se reavivaron re-enviando el prompt. El commit de prettier del agente mezclaba plugin + formateo: se escindi� en chore (2 archivos) + style (285 archivos) y el formateo final se aplic� sobre la rama integrada para evitar conflictos con los commits de docs/e2e.
+- **Integraci�n:** cherry-pick a rama unificada chore/quality-and-docs en orden: ci guard -> IPv4 -> MP cards -> assertions E2E -> skip doc -> chore plugin -> style format (7 commits).
+- **Verificaci�n:** pnpm lint 6/6, pnpm typecheck 9/9, pnpm test 430/430 (55 archivos), pnpm build 3/3, pnpm exec prettier --check . limpio.
+- **Branch:** chore/quality-and-docs (pendiente PR a develop)

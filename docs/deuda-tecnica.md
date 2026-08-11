@@ -1,7 +1,7 @@
 # Deuda técnica — planes pendientes
 
 > Documentación de deuda técnica identificada al 2026-08-08 (plan aprobado, ítem 3).
-> **Estado: ítem 1 implementado (2026-08-10, rama `fix/toctou-checkout-products`); ítems 2 y 3 pendientes.**
+> **Estado: ítems 1, 2 y 3 implementados (2026-08-10 y 2026-08-11).**
 
 ---
 
@@ -65,9 +65,15 @@ El decremento calcula el valor nuevo a partir del leído (**no `stock - qty` at�
 
 **Criterios de aceptación:** un `.sql` viejo modificado a mano → el check falla con mensaje claro; un `.sql` nuevo → pasa. Documentar el comando en SETUP.md → Comandos de Base de Datos.
 
+**Implementación (2026-08-11, rama `chore/quality-and-docs`):**
+
+- Script `scripts/check-migrations.sh` (commit `2ed0703`): `git diff --name-only origin/develop -- packages/db/migrations/`; si el diff no está vacío → `❌ Migración existente modificada — crea una nueva migración, no edites las anteriores.` + exit 1; fail-closed si `origin/develop` no existe localmente.
+- CI (`.github/workflows/ci.yml`, mismo commit): `checkout@v7` con `fetch-depth: 0` + step `Guard migraciones inmutables` (`bash scripts/check-migrations.sh`) en el job `build`.
+- Las migraciones quedan además excluidas de prettier vía `.prettierignore` (commit `55ad3fb`), para que un formateo masivo no las toque por accidente.
+
 ---
 
-## 3. Pin IPv4 del endpoint Neon para el runner self-hosted
+## 3. Pin IPv4 del endpoint Neon para el runner self-hosted — ✅ IMPLEMENTADO (2026-08-11)
 
 **Contexto real**: el runner self-hosted de GitHub Actions (AlmaLinux) que corre los E2E no tiene ruta IPv6; el endpoint de Neon publica también AAAA y el rollback DNS puede resolver a IPv6 → fallan las conexiones (ya observado en julio-2026; mitigado ad-hoc con pin en `/etc/hosts`, documentado parcialmente en SETUP.md → E2E).
 
@@ -82,6 +88,10 @@ El decremento calcula el valor nuevo a partir del leído (**no `stock - qty` at�
 **Riesgos y control:** las IPs de Neon pueden rotar (pool) — si una IP deja de responder y el problema de IPv6 reaparece, el pin debe actualizarse; documentar el rot de IPs como mantenimiento mensual o se ambia a la alternativa IPv4-only.
 
 **Dónde documentar:** SETUP.md → seccion E2E (expandir el bullet actual) y este doc.
+
+**Implementación (2026-08-11, rama `chore/quality-and-docs`):**
+
+- Procedimiento completo documentado en `SETUP.md` → "Runner self-hosted: pin IPv4 de Neon" (commit `30169bd`): diagnóstico, `dig +short A`/`getent ahostsv4`, pin en `/etc/hosts`, verificación con `psql`/E2E, alternativa IPv4-only/allowlist y mantenimiento de rotación de IPs.
 
 ---
 
