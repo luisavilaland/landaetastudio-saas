@@ -1,1 +1,7 @@
-export { type ProductImage, type ProductVariant, type ProductWithVariants, getProducts, getProductBySlug } from "@repo/commerce/products";
+export {
+  type ProductImage,
+  type ProductVariant,
+  type ProductWithVariants,
+  getProducts,
+  getProductBySlug,
+} from '@repo/commerce/products'

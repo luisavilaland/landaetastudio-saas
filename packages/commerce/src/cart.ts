@@ -1,46 +1,55 @@
-import { db, dbProducts, dbProductVariants, dbProductImages, withTenantContext } from "@repo/db";
-import { eq, inArray } from "drizzle-orm";
-import { safeGet, redisSetEx, redisDel } from "./redis";
+import {
+  db,
+  dbProducts,
+  dbProductVariants,
+  dbProductImages,
+  withTenantContext,
+} from '@repo/db'
+import { eq, inArray } from 'drizzle-orm'
+import { safeGet, redisSetEx, redisDel } from './redis'
 
 export type CartItem = {
-  variantId: string;
-  quantity: number;
-  addedAt: string;
-};
+  variantId: string
+  quantity: number
+  addedAt: string
+}
 
 export type Cart = {
-  items: CartItem[];
-  updatedAt: string;
-};
+  items: CartItem[]
+  updatedAt: string
+}
 
 export type EnrichedCartItem = CartItem & {
   product: {
-    id: string;
-    name: string;
-    slug: string;
-    imageUrl: string | null;
-    price: number;
-    stock: number | null;
-  } | null;
+    id: string
+    name: string
+    slug: string
+    imageUrl: string | null
+    price: number
+    stock: number | null
+  } | null
   variant?: {
-    sku: string;
-    options: Record<string, string>;
-  };
-};
+    sku: string
+    options: Record<string, string>
+  }
+}
 
-export async function getCart(sessionId: string, tenantId: string): Promise<EnrichedCartItem[]> {
-  if (!sessionId) return [];
-  if (!tenantId) return [];
+export async function getCart(
+  sessionId: string,
+  tenantId: string,
+): Promise<EnrichedCartItem[]> {
+  if (!sessionId) return []
+  if (!tenantId) return []
 
-  const data = await safeGet(`cart:${sessionId}`);
-  if (!data) return [];
+  const data = await safeGet(`cart:${sessionId}`)
+  if (!data) return []
 
-  const cart = JSON.parse(data) as Cart;
-  if (cart.items.length === 0) return [];
+  const cart = JSON.parse(data) as Cart
+  if (cart.items.length === 0) return []
 
-  const variantIds = cart.items.map((item) => item.variantId);
+  const variantIds = cart.items.map((item) => item.variantId)
 
-  if (variantIds.length === 0) return [];
+  if (variantIds.length === 0) return []
 
   return await withTenantContext(tenantId, async (tx) => {
     const variants = await tx
@@ -57,13 +66,14 @@ export async function getCart(sessionId: string, tenantId: string): Promise<Enri
       })
       .from(dbProductVariants)
       .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
-      .where(inArray(dbProductVariants.id, variantIds));
+      .where(inArray(dbProductVariants.id, variantIds))
 
-    const variantMap = new Map(variants.map((v) => [v.variantId, v]));
+    const variantMap = new Map(variants.map((v) => [v.variantId, v]))
 
-    const productIds = variants.map((v) => v.productId);
-    const images = productIds.length > 0
-      ? await tx
+    const productIds = variants.map((v) => v.productId)
+    const images =
+      productIds.length > 0
+        ? await tx
             .select({
               productId: dbProductImages.productId,
               url: dbProductImages.url,
@@ -71,20 +81,23 @@ export async function getCart(sessionId: string, tenantId: string): Promise<Enri
             .from(dbProductImages)
             .where(inArray(dbProductImages.productId, productIds))
             .orderBy(dbProductImages.position)
-      : [];
+        : []
 
-    const firstImageByProduct = images.reduce((acc, img) => {
-      if (!acc[img.productId]) acc[img.productId] = img.url;
-      return acc;
-    }, {} as Record<string, string>);
+    const firstImageByProduct = images.reduce(
+      (acc, img) => {
+        if (!acc[img.productId]) acc[img.productId] = img.url
+        return acc
+      },
+      {} as Record<string, string>,
+    )
 
-    const enrichedItems: EnrichedCartItem[] = [];
+    const enrichedItems: EnrichedCartItem[] = []
 
     for (const item of cart.items) {
-      const variant = variantMap.get(item.variantId);
-      if (!variant) continue;
+      const variant = variantMap.get(item.variantId)
+      if (!variant) continue
 
-      const firstImage = firstImageByProduct[variant.productId];
+      const firstImage = firstImageByProduct[variant.productId]
 
       enrichedItems.push({
         ...item,
@@ -100,34 +113,34 @@ export async function getCart(sessionId: string, tenantId: string): Promise<Enri
           sku: variant.variantSku,
           options: (variant.variantOptions as Record<string, string>) || {},
         },
-      });
+      })
     }
 
-    return enrichedItems;
-  });
+    return enrichedItems
+  })
 }
 
 export async function removeFromCart(
   sessionId: string,
   variantId: string,
-  tenantId: string
+  tenantId: string,
 ): Promise<EnrichedCartItem[]> {
-  if (!sessionId) return [];
+  if (!sessionId) return []
 
-  const data = await safeGet(`cart:${sessionId}`);
-  if (!data) return [];
+  const data = await safeGet(`cart:${sessionId}`)
+  if (!data) return []
 
-  const cart = JSON.parse(data) as Cart;
+  const cart = JSON.parse(data) as Cart
 
-  cart.items = cart.items.filter((item) => item.variantId !== variantId);
+  cart.items = cart.items.filter((item) => item.variantId !== variantId)
 
   if (cart.items.length === 0) {
-    await redisDel(`cart:${sessionId}`);
-    return [];
+    await redisDel(`cart:${sessionId}`)
+    return []
   }
 
-  cart.updatedAt = new Date().toISOString();
-  await redisSetEx(`cart:${sessionId}`, 60 * 60 * 24 * 7, JSON.stringify(cart));
+  cart.updatedAt = new Date().toISOString()
+  await redisSetEx(`cart:${sessionId}`, 60 * 60 * 24 * 7, JSON.stringify(cart))
 
-  return getCart(sessionId, tenantId);
+  return getCart(sessionId, tenantId)
 }

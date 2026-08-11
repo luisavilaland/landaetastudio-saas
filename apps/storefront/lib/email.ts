@@ -1,1 +1,1 @@
-export { sendOrderConfirmationEmail } from "@repo/commerce/email";
+export { sendOrderConfirmationEmail } from '@repo/commerce/email'

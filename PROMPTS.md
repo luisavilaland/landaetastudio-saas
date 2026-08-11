@@ -6,18 +6,18 @@
 
 ## Tabla de Contenidos
 
-| # | Sección | Uso principal |
-|---|---------|--------------|
-| 1 | [Calibración y análisis](#1-calibración-y-análisis) | Inicio de sesión, diagnóstico de estado |
-| 2 | [Desarrollo](#2-desarrollo) | Features, bugs, templates por tipo |
-| 3 | [Revisión y verificación](#3-revisión-y-verificación) | Post-tarea, auditoría |
-| 4 | [Mantenimiento](#4-mantenimiento) | Limpieza, .gitignore |
-| 5 | [Commits](#5-commits) | Commit y push |
-| 6 | [Documentación](#6-documentación) | Actualizar docs |
-| 7 | [Refactorización](#7-refactorización) | Refactors seguros |
-| 8 | [Varios](#8-varios) | Salud, dependencias, revert |
-| 9 | [Seed](#9-seed) | Actualizar datos de prueba |
-| 10 | [Infra y Deploy](#10-infra-y-deploy) | Vercel, env vars, CI |
+| #   | Sección                                               | Uso principal                           |
+| --- | ----------------------------------------------------- | --------------------------------------- |
+| 1   | [Calibración y análisis](#1-calibración-y-análisis)   | Inicio de sesión, diagnóstico de estado |
+| 2   | [Desarrollo](#2-desarrollo)                           | Features, bugs, templates por tipo      |
+| 3   | [Revisión y verificación](#3-revisión-y-verificación) | Post-tarea, auditoría                   |
+| 4   | [Mantenimiento](#4-mantenimiento)                     | Limpieza, .gitignore                    |
+| 5   | [Commits](#5-commits)                                 | Commit y push                           |
+| 6   | [Documentación](#6-documentación)                     | Actualizar docs                         |
+| 7   | [Refactorización](#7-refactorización)                 | Refactors seguros                       |
+| 8   | [Varios](#8-varios)                                   | Salud, dependencias, revert             |
+| 9   | [Seed](#9-seed)                                       | Actualizar datos de prueba              |
+| 10  | [Infra y Deploy](#10-infra-y-deploy)                  | Vercel, env vars, CI                    |
 
 ---
 

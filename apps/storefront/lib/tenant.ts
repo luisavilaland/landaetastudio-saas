@@ -1,1 +1,1 @@
-export { getTenantId } from "@repo/commerce/tenant";
+export { getTenantId } from '@repo/commerce/tenant'

@@ -4,12 +4,12 @@ on:
   pull_request:
     branches: [develop]
     paths:
-      - "apps/storefront/**"
-      - "apps/admin/**"
-      - "apps/superadmin/**"
-      - "packages/**"
-      - "e2e/**"
-      - ".github/workflows/e2e.yml"
+      - 'apps/storefront/**'
+      - 'apps/admin/**'
+      - 'apps/superadmin/**'
+      - 'packages/**'
+      - 'e2e/**'
+      - '.github/workflows/e2e.yml'
   workflow_dispatch:
 
 permissions:
@@ -22,7 +22,7 @@ env:
   E2E_STOREFRONT_T2_URL: https://tienda2.landaetastudio.com
   E2E_ADMIN_URL: https://admin.landaetastudio.com
   E2E_SUPERADMIN_URL: https://superadmin.landaetastudio.com
-  E2E_WEBHOOK_TEST: "1"
+  E2E_WEBHOOK_TEST: '1'
 
 concurrency:
   group: e2e-${{ github.ref }}

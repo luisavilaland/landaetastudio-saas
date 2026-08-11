@@ -37,11 +37,13 @@
 - [x] Eliminar tenant → desaparece del listado
 
 ### API domain-check
+
 - [x] `curl "localhost:3002/api/domain-check?domain=disponible123.com"` → `{"available":true}`
 - [x] `curl "localhost:3002/api/domain-check?domain=tienda1.com"` (si existe) → `{"available":false}`
 - [x] `curl "localhost:3002/api/domain-check"` (sin parámetro) → 400
 
 ### General
+
 - [x] Ruta /plans accesible
 
 ---
@@ -240,20 +242,21 @@ pnpm test:e2e
 
 ## Resumen de resultados
 
-| Área              | Total ítems | ✅ OK | ❌ Falla |
-| ----------------- | ----------- | ----- | -------- |
-| Superadmin        | 19          | 19    | 0        |
-| Admin             | 36          | 36    | 0        |
-| Admin (CSV)        | 10          | 10    | 0        |
-| Admin (Seguridad)  | 4           | 4     | 0        |
-| Storefront        | 36          | 32    | 4        |
-| Seguridad         | 5           | 5     | 0        |
-| Tests automáticos | 3           | 3     | 0        |
-| **Total**         | **113**     | **109**| **4**    |
+| Área              | Total ítems | ✅ OK   | ❌ Falla |
+| ----------------- | ----------- | ------- | -------- |
+| Superadmin        | 19          | 19      | 0        |
+| Admin             | 36          | 36      | 0        |
+| Admin (CSV)       | 10          | 10      | 0        |
+| Admin (Seguridad) | 4           | 4       | 0        |
+| Storefront        | 36          | 32      | 4        |
+| Seguridad         | 5           | 5       | 0        |
+| Tests automáticos | 3           | 3       | 0        |
+| **Total**         | **113**     | **109** | **4**    |
 
 > Los 4 ❌ de Storefront son el flujo de pago manual en sandbox (requiere cuenta de prueba de MP). El webhook automatizado está cubierto por 11 tests de integración.
 
 ---
+
 _Archivo actualizado en Agosto 2026 — concordante con TESTING.md_
 _Checklist generado en Abril 2026 — Pre Fase 5; migrado a servicios cloud en Julio 2026_
 
@@ -271,16 +274,19 @@ _Checklist generado en Abril 2026 — Pre Fase 5; migrado a servicios cloud en J
 - [x] Intentar crear un producto en el admin de tienda1. El producto solo debe ser visible en la tienda1 y no en otras.
 
 ### Validación de Errores 409 (Conflict)
+
 - [x] En el panel de administración, intentar crear un producto con un slug que ya exista. Verificar que aparece un mensaje de error junto al campo slug, no solo un mensaje genérico.
 - [x] En el panel de superadmin, intentar crear un tenant con un slug que ya exista. Verificar el mensaje de error en el campo slug.
 - [x] Repetir la prueba para categorías con slug duplicado.
 
 ### Logs Estructurados (Pino)
+
 - [x] Iniciar la aplicación en modo desarrollo (`pnpm dev`). Navegar por el storefront y el admin.
 - [x] Verificar que en la terminal los logs aparecen con el nuevo formato (colores, timestamp legible) y no como `console.log` planos.
 - [x] Buscar en los logs la presencia de la palabra "Proxy" para confirmar que los logs del middleware están usando el nuevo sistema.
 
 ### Integración de Sentry
+
 - [x] Iniciar la aplicación en modo desarrollo sin configurar `SENTRY_DSN`.
 - [x] Verificar que la aplicación compila y arranca sin errores relacionados con Sentry.
 - [x] En la terminal, buscar un mensaje de información que indique que Sentry no está configurado (o simplemente que no hay errores de compilación).
@@ -290,11 +296,13 @@ _Checklist generado en Abril 2026 — Pre Fase 5; migrado a servicios cloud en J
 ## Pendientes documentados
 
 ### Importación de productos por CSV
+
 - **Estado:** ✅ Implementado (ver sección 6 abajo)
 - **Endpoints:** `POST /api/products/import` en admin
 - **Detalle:** transacción POR FILA (éxito parcial), validación por fila con resumen (creados, omitidos, errores), template descargable
 
 ### Seguridad de subdominios en admin y superadmin
+
 - **Estado:** ⚠️ **Obsoleto — proxies eliminados**
 - **Descripción:** los `proxy.ts` de admin y superadmin (que rechazaban subdominios de tenant) fueron eliminados el 10-07 como no-ops. El aislamiento de tenant se garantiza por datos (RLS + `withTenantContext`), **no** por filtrado de host. `ADMIN_HOST` y `SUPERADMIN_HOST` quedan como documentación de entornos, sin enforce en runtime.
 
@@ -303,6 +311,7 @@ _Checklist generado en Abril 2026 — Pre Fase 5; migrado a servicios cloud en J
 ## 6. Importación de productos por CSV
 
 ### UI Admin (/products)
+
 - [x] Botón "Importar CSV" visible junto a "Nuevo Producto"
 - [x] Click en "Importar CSV" → abre modal
 - [x] Botón "Descargar template de ejemplo" → descarga CSV con columnas correctas
@@ -315,6 +324,7 @@ _Checklist generado en Abril 2026 — Pre Fase 5; migrado a servicios cloud en J
 - [x] Tras importación exitosa → productos aparecen en el listado
 
 ### API
+
 - [x] `POST /api/products/import` sin sesión → 401
 - [x] `POST /api/products/import` sin archivo → 400
 - [x] `POST /api/products/import` con CSV sin columnas requeridas → 400
@@ -327,9 +337,11 @@ _Checklist generado en Abril 2026 — Pre Fase 5; migrado a servicios cloud en J
 > ⚠️ **Obsoleta desde 10-07** — los proxies de admin/superadmin fueron eliminados (no-ops). Estas pruebas ya no aplican: el aislamiento multi-tenant se valida por datos (RLS + `withTenantContext` + tests de tenant isolation), no por host. Mantenidas como registro histórico.
 
 ### Admin (localhost:3001)
-- [x] Acceder a `tienda1.lvh.me:3001/login` → respuesta 403 *(histórico, pre-cleanup del 10-07)*
+
+- [x] Acceder a `tienda1.lvh.me:3001/login` → respuesta 403 _(histórico, pre-cleanup del 10-07)_
 - [x] Acceder a `localhost:3001/login` → carga normalmente
 
 ### Superadmin (localhost:3002)
-- [x] Acceder a `tienda1.lvh.me:3002/login` → respuesta 403 *(histórico, pre-cleanup del 10-07)*
+
+- [x] Acceder a `tienda1.lvh.me:3002/login` → respuesta 403 _(histórico, pre-cleanup del 10-07)_
 - [x] Acceder a `localhost:3002/login` → carga normalmente

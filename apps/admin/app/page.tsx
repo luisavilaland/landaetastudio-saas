@@ -1,10 +1,10 @@
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { auth } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 
 export default async function AdminHome() {
-  const session = await auth();
+  const session = await auth()
   if (!session) {
-    redirect("/login");
+    redirect('/login')
   }
-  redirect("/dashboard");
+  redirect('/dashboard')
 }

@@ -127,8 +127,9 @@
   - ✅ Superadmin en Vercel: env vars cloud agregadas.
 
 **Deuda técnica pendiente:**
-  - ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/` con verificación individual por ADR.
-  - ❌ `withTenantContext` nunca se llama en runtime. RLS es decorativo. Pendiente wiring completo post-hotfixes.
+
+- ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/` con verificación individual por ADR.
+- ❌ `withTenantContext` nunca se llama en runtime. RLS es decorativo. Pendiente wiring completo post-hotfixes.
 
 ## 2026-07-10 — Categories centralization
 
@@ -138,6 +139,7 @@
 - `apps/storefront/lib/categories.ts` ahora re-exporta desde `@repo/commerce/categories`
 - Comportamiento mejorado: sin try/catch silencioso (el original devolvía [] en error)
 - test: 227/227, typecheck: 8/8, lint: ✅
+
 ## 2026-07-10 — Vitest deprecation + PROMPTS.md verification
 
 - Reemplazado plugin `vite-tsconfig-paths` por opción nativa `resolve.tsconfigPaths: true` en vitest.config.ts
@@ -156,20 +158,21 @@
 
 ## Estado actual (10 de julio 2026)
 
-| Métrica | Valor |
-|---------|-------|
-| Tests | 238 pasando, 0 fallos |
-| Apps | storefront, admin, superadmin |
-| Servicios | Neon, Upstash, R2, Resend |
-| Deploy | Vercel (3 apps) |
-| Rama default | `develop` |
-| Build | Limpio (sin `ignoreBuildErrors`) |
-| CI | GitHub Actions (lint, typecheck, build) |
-| Storefront | ✅ Deploy OK |
-| Admin | ✅ Deploy OK |
-| Superadmin | ✅ Deploy OK |
+| Métrica      | Valor                                   |
+| ------------ | --------------------------------------- |
+| Tests        | 238 pasando, 0 fallos                   |
+| Apps         | storefront, admin, superadmin           |
+| Servicios    | Neon, Upstash, R2, Resend               |
+| Deploy       | Vercel (3 apps)                         |
+| Rama default | `develop`                               |
+| Build        | Limpio (sin `ignoreBuildErrors`)        |
+| CI           | GitHub Actions (lint, typecheck, build) |
+| Storefront   | ✅ Deploy OK                            |
+| Admin        | ✅ Deploy OK                            |
+| Superadmin   | ✅ Deploy OK                            |
 
 **Deuda técnica resuelta:**
+
 - ✅ Proxy placeholders (`apps/admin/proxy.ts`, `apps/superadmin/proxy.ts`) eliminados
 - ✅ Vitest deprecation warning (`vite-tsconfig-paths` → `resolve.tsconfigPaths`) corregido
 - ✅ PROMPTS.md verificado: encoding UTF-8 correcto
@@ -177,6 +180,7 @@
 - ✅ P0 Security Hotfix: tenant isolation gaps cerrados en 12 handlers
 
 **Infraestructura completada (10 de julio 2026):**
+
 - ✅ `MP_WEBHOOK_SECRET` → `MERCADOPAGO_WEBHOOK_SECRET` renombrado en Vercel admin
 - ✅ Env vars faltantes agregadas al proyecto superadmin en Vercel
 - ✅ `default_branch` cambiado a `develop` en GitHub
@@ -194,22 +198,24 @@
 
 ### Hotfixes aplicados
 
-| # | Ruta | Fix |
-|---|------|-----|
-| 1 | `webhooks/mercadopago` | Fail-closed HMAC, queries scoped por tenant, `x-test-order-id` solo dev |
-| 2 | `checkout/preference` | IDOR same-tenant cerrado (ownership check por email), rate limiting 10 req/min/IP, logging estructurado sin PII |
-| 3 | `cart/*` | `getTenantId` + filtro `tenantId` en variant/image queries |
-| 4 | `checkout` | Variant SELECT y stock UPDATE scoped por tenant |
-| 5 | `products/[id]/*` (8 handlers) | SQL-level `and(eq(id), eq(tenantId))` — TOCTOU eliminado |
-| 6 | `orders/[id]` | 6 queries scoped por tenant |
-| 7 | `shipping/[id]` | UPDATE/DELETE scoped por tenant |
-| 8 | `register` | Email lookup con `and(eq(email), eq(tenantId))` |
-| 9 | `tenants/*` (superadmin) | Role check `=== "superadmin"` en 5 handlers |
+| #   | Ruta                           | Fix                                                                                                             |
+| --- | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| 1   | `webhooks/mercadopago`         | Fail-closed HMAC, queries scoped por tenant, `x-test-order-id` solo dev                                         |
+| 2   | `checkout/preference`          | IDOR same-tenant cerrado (ownership check por email), rate limiting 10 req/min/IP, logging estructurado sin PII |
+| 3   | `cart/*`                       | `getTenantId` + filtro `tenantId` en variant/image queries                                                      |
+| 4   | `checkout`                     | Variant SELECT y stock UPDATE scoped por tenant                                                                 |
+| 5   | `products/[id]/*` (8 handlers) | SQL-level `and(eq(id), eq(tenantId))` — TOCTOU eliminado                                                        |
+| 6   | `orders/[id]`                  | 6 queries scoped por tenant                                                                                     |
+| 7   | `shipping/[id]`                | UPDATE/DELETE scoped por tenant                                                                                 |
+| 8   | `register`                     | Email lookup con `and(eq(email), eq(tenantId))`                                                                 |
+| 9   | `tenants/*` (superadmin)       | Role check `=== "superadmin"` en 5 handlers                                                                     |
 
 #### ADR-022 creado
+
 - `docs/adr/ADR-022-rls-status.md` documenta el hallazgo de RLS decorativo + verificación de logs.
 
 ### Deuda técnica documentada
+
 - ❌ `withTenantContext` nunca se llama en runtime. RLS es decorativo. Pendiente wiring completo.
 - ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/`.
 - ❌ Faltan 14 tests de integración de tenant isolation (27 planeados - 13 escritos en hotfixes 1, 2 y 9).
@@ -285,18 +291,19 @@
 
 ## Estado actual (14 de julio 2026)
 
-| Métrica | Valor |
-|---------|-------|
-| Tests | 289 pasando, 0 fallos |
-| Apps | storefront, admin, superadmin |
-| Servicios | Neon, Upstash, R2, Resend |
-| Deploy | Vercel (3 apps) |
-| Rama default | `develop` |
-| Build | Limpio (sin `ignoreBuildErrors`) |
-| CI | GitHub Actions (lint, typecheck, build, **test**) |
-| RLS | Decorativo — `withTenantContext` roto (SET LOCAL en auto-commit). Plan P1-1 listo para ejecutar |
+| Métrica      | Valor                                                                                           |
+| ------------ | ----------------------------------------------------------------------------------------------- |
+| Tests        | 289 pasando, 0 fallos                                                                           |
+| Apps         | storefront, admin, superadmin                                                                   |
+| Servicios    | Neon, Upstash, R2, Resend                                                                       |
+| Deploy       | Vercel (3 apps)                                                                                 |
+| Rama default | `develop`                                                                                       |
+| Build        | Limpio (sin `ignoreBuildErrors`)                                                                |
+| CI           | GitHub Actions (lint, typecheck, build, **test**)                                               |
+| RLS          | Decorativo — `withTenantContext` roto (SET LOCAL en auto-commit). Plan P1-1 listo para ejecutar |
 
 **Deuda técnica resuelta:**
+
 - ✅ P0 Security Hotfix: 12 handlers con filtrado manual `tenantId`
 - ✅ P1-3: 7 archivos de test de regresión para 6 hotfixes P0
 - ✅ Bug `getEnrichedItems` sin `await` en cart PUT/DELETE (raíz de bug productivo)
@@ -321,6 +328,7 @@
 - **22 tests resueltos** que antes fallaban por `ECONNREFUSED` o mock contamination.
 
 **Deuda técnica resuelta:**
+
 - ✅ `withTenantContext` wiring completo en 21 handlers Patrón A
 - ✅ Bug `return withTenantContext` sin `await` (bypass de try/catch en todos los handlers)
 - ✅ Storefront shipping test suite roto por mock de `drizzle-orm`
@@ -350,24 +358,25 @@
 - **292 tests finales** (290 originales + FK + UK)
 
 **Deuda técnica pendiente:**
+
 - ❌ FORCE ROW LEVEL SECURITY — PR4 (validación manual en Neon branch + concurrencia)
 - ❌ `docs/arquitectura.md` tiene 2 inexactitudes (AUTH_SECRET fallback, RLS). Pendiente migración a `docs/adr/`.
 
 ## Estado actual (15 de julio 2026)
 
-| Métrica | Valor |
-|---------|-------|
-| Tests | 292 pasando, 0 fallos |
-| Apps | storefront, admin, superadmin |
-| Servicios | Neon, Upstash, R2, Resend |
-| Deploy | Vercel (3 apps) |
-| Rama default | `develop` |
-| Build | Limpio (sin `ignoreBuildErrors`) |
-| CI | GitHub Actions (lint, typecheck, build, test) |
-  | Patrón A | 21 handlers wireados con `withTenantContext` |
-  | Patrón B | 5 handlers wireados con `withTenantContext` |
-  | RLS | FORCE RLS en 8 tablas + `app_user` (sin BYPASSRLS) |
-  | Conexión runtime | `DATABASE_APP_URL` (app_user), `DATABASE_URL` (neondb_owner solo build/migraciones) |
+| Métrica          | Valor                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------- |
+| Tests            | 292 pasando, 0 fallos                                                               |
+| Apps             | storefront, admin, superadmin                                                       |
+| Servicios        | Neon, Upstash, R2, Resend                                                           |
+| Deploy           | Vercel (3 apps)                                                                     |
+| Rama default     | `develop`                                                                           |
+| Build            | Limpio (sin `ignoreBuildErrors`)                                                    |
+| CI               | GitHub Actions (lint, typecheck, build, test)                                       |
+| Patrón A         | 21 handlers wireados con `withTenantContext`                                        |
+| Patrón B         | 5 handlers wireados con `withTenantContext`                                         |
+| RLS              | FORCE RLS en 8 tablas + `app_user` (sin BYPASSRLS)                                  |
+| Conexión runtime | `DATABASE_APP_URL` (app_user), `DATABASE_URL` (neondb_owner solo build/migraciones) |
 
 ---
 
@@ -452,8 +461,9 @@
 - **Branch:** `p1-2/adrs` (Paseo worktree)
 
 **Deuda técnica documentada (nueva):**
+
 - ❌ **Fechas sin UTC explícito:** el schema usa `timestamp` sin timezone. Sin mitigación — depende de que el entorno de despliegue esté en UTC. Pendiente: migrar a `timestamptz` o validación Zod de UTC en inserts.
-- ❌ **console.* sin migrar:** ~49 instancias de `console.error`/`console.log` en apps/ que aún no usan `@repo/logger`. Pendiente: barrido completo de apps/ (excluye seed.ts que es intencional).
+- ❌ _*console.* sin migrar:_* ~49 instancias de `console.error`/`console.log` en apps/ que aún no usan `@repo/logger`. Pendiente: barrido completo de apps/ (excluye seed.ts que es intencional).
 
 ---
 
@@ -471,9 +481,11 @@
 - **Branch:** `feat/utc-migration` (Paseo worktree)
 
 **Deuda técnica documentada (nueva):**
+
 - ❌ **drizzle-kit snapshots 0003-0004 perdidos por gitignore:** causa raíz confirmada — `.gitignore` tenía `packages/db/migrations/*` y `packages/db/migrations/meta/*.json`, lo que excluía silenciosamente cualquier archivo nuevo de migraciones o snapshots de `git add`. Desde que esa regla se agregó, toda migración generada después quedaba fuera de control de versiones sin que quien la generara lo notara. Corregido en este mismo commit (líneas eliminadas). Los snapshots 0005-0008 (que estaban en disco pero no en git) y 0011 ya están agregados.
 
 **Deuda técnica resuelta:**
+
 - ✅ **Fechas sin UTC explícito:** schema migrado a `timestamptz`. Migración 0011 aplicada contra producción (Fase 3) el 2026-07-20 — 18 columnas en 1.3s, datos preservados, sin NULLs.
 
 ---
@@ -578,17 +590,17 @@
 
 ## Estado actual (29 de julio 2026)
 
-| Métrica | Valor |
-|---------|-------|
-| Tests | 379 pasando, 0 fallos |
-| E2E | Infraestructura lista (0 specs aún) |
-| Apps | storefront, admin, superadmin |
-| Servicios | Neon, Upstash, R2, Resend |
-| Deploy | Vercel (3 apps) |
-| Rama default | `develop` |
-| Build | Limpio (sin `ignoreBuildErrors`) |
-| CI | GitHub Actions (lint, typecheck, build, test) |
-| RLS | Activo con `app_user`, 27 handlers wireados con `withTenantContext` |
+| Métrica      | Valor                                                               |
+| ------------ | ------------------------------------------------------------------- |
+| Tests        | 379 pasando, 0 fallos                                               |
+| E2E          | Infraestructura lista (0 specs aún)                                 |
+| Apps         | storefront, admin, superadmin                                       |
+| Servicios    | Neon, Upstash, R2, Resend                                           |
+| Deploy       | Vercel (3 apps)                                                     |
+| Rama default | `develop`                                                           |
+| Build        | Limpio (sin `ignoreBuildErrors`)                                    |
+| CI           | GitHub Actions (lint, typecheck, build, test)                       |
+| RLS          | Activo con `app_user`, 27 handlers wireados con `withTenantContext` |
 
 - **Problema detectado en code review:** `uploadImage`/`deleteImage` quedaron dentro del `withTenantContext`, dejando una transacción PG abierta durante operaciones R2 (mismo anti-pattern que ya corregimos en `images/route.ts`).
 - **Solución:** Separar PUT en tres fases:
@@ -694,6 +706,7 @@ Tras arreglar la infra del runner, el job E2E quedó en 28 passed / 2 failed (`c
 ## 2026-08-07 — E2E casi verde: fix de flakiness en `cart` (cold-start Vercel)
 
 Tras configurar `REDIS_URL` en Vercel, el run E2E quedó en **29 passed / 1 flaky / 1 skipped**: `checkout` ya pasa (el carrito persiste), pero `cart.spec.ts` "ver carrito con ítem" quedó **flaky** — `[data-testid=cart-item]` no aparecía en 10s en el primer intento y pasaba en el retry. Se trató de cold-start de Vercel en el primer hit a `/cart` (Server Component + GET `/api/cart`), no de un bug de app. Fix en `e2e/storefront/cart.spec.ts:30`: `toBeVisible({ timeout: 30_000 })` (mismo patrón que el fix de `checkout`). El `1 skipped` es intencional (spec con `test.skip`).
+
 - **Branch:** `feat/e2e-playwright`
 
 ## 2026-08-07 — Auditoría RLS/tenant: grep con BRE roto dio falso "0 matches"; re-corrida con ripgrep limpia
@@ -705,6 +718,7 @@ El reviewer pidió re-correr la búsqueda de accesos directos a `db` (sin `withT
 - `db\.query\.\w+` (consultas relacionales de Drizzle, otra vía de acceso directo) → **0 matches**.
 
 Conclusión: no queda ningún acceso directo a tablas de negocio fuera de `withTenantContext` en código de runtime. El único bug de ese tipo era `apps/storefront/lib/auth.ts` (login roto por RLS), ya corregido con el helper `customer-auth.ts`. Nada más que atender.
+
 - **Branch:** `feat/e2e-playwright`
 
 ## 2026-08-07 — Carrito intermitente: race de conexión de ioredis en cold-start (el timeout de 30s no era la causa)
@@ -751,6 +765,7 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 2. La corrida cruda con el patrón multilínea `\.from(dbX)` encontró **72 matches**, y la clasificación tabla-por-tabla dejó **9 Server Components (páginas) leyendo tablas con RLS fuera de `withTenantContext`**: 7 del admin (`products`, `orders`, `categorias`, `shipping`, `products/new`, `products/[id]/edit`) y 2 del storefront (`buscar/search-results.tsx`, `checkout/success`, más `categoria/[slug]` — 9 en total).
 
 **Confirmación de impacto real en producción (no solo lectura de código):**
+
 - BD prod (Neon, rol owner): **7 productos, 7 categorías, 4 órdenes, 4 métodos de envío, 29 variantes, 10 imágenes** — los datos existen.
 - RLS en prod: `relrowsecurity=true` + `relforcerowsecurity=true` (migraciones 0009+0010, activas desde el 2026-07-29 con el commit `3b2d77c`) en las 8 tablas de negocio; `app_user` con `rolbypassrls=false`.
 - Navegador logueado en `admin.landaetastudio.com`: `/products`, `/orders`, `/categorias`, `/shipping` → **todas las tablas vacías** ("No hay productos. Crea el primero.", etc.).
@@ -758,6 +773,7 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **E2E no lo detectó:** los specs de admin solo asertan headings, nunca las filas de las tablas.
 
 **Fix (9 archivos, mismo patrón:** `db.` → `tx.` dentro de `return await withTenantContext(tenantId, cb)`):
+
 - Admin: `products/page.tsx` (3 queries), `orders/page.tsx`, `categorias/page.tsx`, `shipping/page.tsx`, `products/new/page.tsx`, `products/[id]/edit/page.tsx` (4 queries, todas en un solo contexto).
 - Storefront: `buscar/search-results.tsx` (4 queries en un contexto), `checkout/success/page.tsx` (agrega `getTenantId()`), `categoria/[slug]/page.tsx`.
 - **Guard adicional en `/buscar`:** si `productIds.length === 0` se devuelven `variants: []`/`images: []` sin construir el `IN ()` — caso legítimo (búsqueda sin resultados) que no debe dar 500 nunca.
@@ -767,6 +783,7 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 **Verificación:** `pnpm test` 388/388 (5 nuevos, 51 files) | typecheck 9/9 | lint 6/6 | build 3 apps OK.
 
 **Impacto del incidente:** desde la activación de FORCE RLS (2026-07-29), el panel de admin mostraba listas vacías en el uso diario (productos, órdenes, categorías, envíos) y el buscador público del storefront daba 500. No fue reportado antes consistentemente con la ausencia de uso del admin en el período (sin tenants/clientes reales aún; el reviewer pidió confirmar si alguien del equipo entró — sin evidencia de uso, ADR-022 ya había documentado que no se detectó tráfico a rutas en la auditoría).
+
 - **Branch:** `develop`
 
 ---
@@ -788,12 +805,14 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 **Bug:** el webhook de MercadoPago calculaba `HMAC(rawBody + "." + x-request-id)` y comparaba el header completo; la spec real de MP firma la cadena canónica `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` y envía `x-signature: ts=<ts>,v1=<v1>`. Todo webhook legítimo devolvía 401 (fail-closed) → MP reintentaba 24 h → las órdenes nunca se confirmaban en prod. Además `BYPASS_WEBHOOK_SIGNATURE` figuraba en `.env.local.example` pero el código nunca lo leía (config muerta).
 
 **Cambios:**
+
 - **Nuevo helper** `packages/commerce/src/webhook-signature.ts` (`verifyMercadoPagoSignature`): parsea `ts`/`v1`, construye canonical omitiendo partes vacías, rechaza `ts` fuera de ventana de 300 s (anti-replay, recomendación de MP) y compara con `timingSafeEqual` con guard de longitud previo. Exportado desde `@repo/commerce` (index + subpath).
 - **route.ts:** bloque manual reemplazado por el helper; `BYPASS_WEBHOOK_SIGNATURE=true` solo salta verificación cuando `NODE_ENV !== "production"` (fail-closed intacto en prod). Flujo de negocio, magic IDs dev e idempotencia por `payment_id` sin cambios.
 - **Tests:** 14 unit del helper + 13 del route reescritos a formato MP real (firma válida/inválida/vencida, bypass dev sí / prod no, magic approved/rejected, 400 payload, 503 sin secret). TDD: test del helper rojo primero (módulo inexistente).
 - **Docs:** README (formato de firma MP + smoke test con openssl), SETUP.md (ejemplos curl con canonical correcto), esta entrada.
 
 **Verificación:** `pnpm test` 405/405 (17 nuevos, 52 files) | typecheck 9/9 | lint 6/6 | build 3 apps OK.
+
 - **Branch:** `fix/webhook-mp-firma` (pendiente merge a `develop`)
 
 ---
@@ -803,6 +822,7 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 **Bug:** al pagar en `/checkout` (tienda1 prod) el POST `/api/checkout/preference` devolvía `"Stream isn't writeable and enableOfflineQueue options is false"`. El rate limit usaba `redisClient.incr/pexpire` directos (sin `whenReady`), y con `lazyConnect` + `enableOfflineQueue:false` el primer comando de una instancia serverless fría se rechaza mientras el socket conecta — la misma carrera de cold-start ya documentada para el carrito (wrappers `safeGet`/`redisSetEx`/`redisDel`), pero sin cobertura en checkout.
 
 **Cambios:**
+
 - **`packages/commerce/src/redis.ts`:** nuevos wrappers progresivos `redisIncr` (retorna `number | null`) y `redisPexpire`, ambos vía `safeRun` (mismo patrón que `safeGet`).
 - **`checkout/preference/route.ts`:** `rateLimitKey` usa los wrappers; si Redis no responde (`null`) → `logger.warn("Redis unavailable, rate limit disabled")` y trata como 0 (**fail-open**: el checkout no se bloquea por un problema transitorio de Redis; el rate limit es protección, no crítica). Catch final ya no filtra `error.message` interno: mensaje genérico en español, detalle solo en logs.
 - **`checkout/route.ts`:** `redisClient.get/del` → `safeGet`/`redisDel` (degradación consistente con carrito: Redis caído = carrito vacío 400, no 500).
@@ -810,6 +830,7 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **Docs:** esta entrada.
 
 **Verificación:** `pnpm test` 406/406 (1 nuevo, 52 files) | typecheck 9/9 | lint 6/6 | build 3 apps OK.
+
 - **Branch:** `develop`
 
 ---
@@ -819,6 +840,7 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 **Bug:** los `back_urls` de MercadoPago se construían con `STOREFRONT_URL` (env fija), que en Vercel apuntaba a `saas-storefront.vercel.app` → el redirect post-pago daba 404 en `/checkout/success`. Con una env fija además rompe multi-tenant: un checkout de tienda2 redirigiría al dominio de tienda1 (el proxy resuelve el tenant por host).
 
 **Cambios:**
+
 - **Nuevo helper** `apps/storefront/lib/request.ts` (`getStorefrontBaseUrl(request)`): deriva la base de `x-forwarded-proto` + `host` del request entrante. Sin condicionales ni fallbacks (ya no se usa dotunnel local; solo Vercel).
 - **`checkout/preference/route.ts`:** `back_urls` usan `getStorefrontBaseUrl(request)`; se elimina el `throw` por `STOREFRONT_URL` faltante.
 - **`register/route.ts`:** el email de bienvenida usa la misma derivación (link de la tienda correcta por tenant).
@@ -827,6 +849,7 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **Docs:** README (sección webhook) y SETUP (sección STOREFRONT_URL → inerte) actualizados.
 
 **Verificación:** `pnpm test` 406/406 (52 files) | typecheck 9/9 | lint 6/6 | build 3 apps OK.
+
 - **Branch:** `develop`
 
 ## 2026-08-08 � E2E de firma real del webhook MP (spec `webhook-signature`)
@@ -834,6 +857,7 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 **Contexto:** el E2E existente (`checkout.spec.ts`) llega hasta el redirect de MP pero no completa el pago. Para validar la firma real del webhook (spec oficial `ts=...;v1=...`) y el cambio de estado de la orden sin llamar a la API de MP, se agrega un spec E2E que ejercita el endpoint desplegado. El modo `x-test-order-id` solo se activaba con `NODE_ENV=development`; en Vercel (production) no funcionaba.
 
 **Cambios:**
+
 - **`apps/storefront/app/api/webhooks/mercadopago/route.ts`:** refactor del bloque de simulaci�n a `simMode` = `NODE_ENV=development` **o** `E2E_WEBHOOK_TEST=1` + mapa de magic IDs `123456789` (approved) / `000000` (rejected) / `999999` (pending). La firma nunca se salta (fail-closed).
 - **`packages/commerce`:** `makeSignature` movido del unit test a `webhook-signature.ts` y reexportado (subpath `@repo/commerce/webhook-signature`); unit test refactorizado para usarlo (DRY).
 - **`playwright.config.ts`:** nuevo proyecto `webhook` (testMatch `webhook/*.spec.ts`, baseURL storefront).
@@ -842,6 +866,7 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **Docs:** TESTING.md (fila E2E firma + magic ID `999999`) y AGENTS.md (formato `x-test-order-id=<tenantId>:<orderId>`, magic IDs, env `E2E_WEBHOOK_TEST`).
 
 **Pendiente operativo:** setear `E2E_WEBHOOK_TEST=1` como env var de Vercel (Preview) en el proyecto storefront y el secret `MERCADOPAGO_WEBHOOK_SECRET` en GitHub Actions (mismo valor que Vercel).
+
 - **Branch:** `develop`
 
 ## 2026-08-08 — E2E webhook MP verde en CI (firma real)
@@ -849,12 +874,14 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 **Contexto:** el primer run de CI del spec `webhook-signature` reportó 5 skipped (4 webhook + 1 cross-tenant pre-existente): los skips eran silenciosos en `beforeAll` cuando faltaba env, haciendo parecer el run exitoso.
 
 **Cambios posteriores:**
+
 - **`e2e/webhook/webhook-signature.spec.ts`:** el `beforeAll` ahora lanza `throw` con mensaje explícito (lista `DATABASE_URL`/`MERCADOPAGO_WEBHOOK_SECRET` como `set`/`MISSING` y valida tenant `tienda1`) en lugar de `test.skip` silencioso — fail-fast cuando el workflow está opt-in (`E2E_WEBHOOK_TEST=1`).
 - **`e2e.yml`:** el paso de comentario de PR usa guard `if (!context.issue.number)` (workflow_dispatch no tiene issue → evitaba 404 `issues//comments`).
 
 **Configuración externa aplicada:** `E2E_WEBHOOK_TEST=1` en Vercel (Preview) y secret `MERCADOPAGO_WEBHOOK_SECRET` creado en GitHub Actions (valor real de Vercel, no el local).
 
 **Verificación:** CI `workflow_dispatch` verde — 34 passed, 1 skipped (cross-tenant pre-existente); los 4 tests de firma ejecutados contra `tienda1.landaetastudio.com` con firma real.
+
 - **Commits:** `a49747f`, `cf11cd6`, `71a9972`
 - **Branch:** `develop`
 

@@ -27,10 +27,11 @@ El decremento calcula el valor nuevo a partir del leído (**no `stock - qty` at�
       and(
         eq(dbProductVariants.id, item.variantId),
         eq(dbProductVariants.tenantId, tenantIdFromSlug),
-        gte(dbProductVariants.stock, item.quantity)
-      )
-    );
+        gte(dbProductVariants.stock, item.quantity),
+      ),
+    )
   ```
+
   — y validar `result.rowCount === 1` por ítem; si hay 0, abortar la transacción con "Stock insuficiente". Como todo corre dentro de `withTenantContext` (transacción real), el rollback es automático si un ítem falla.
 
 - Opción B: `SELECT ... FOR UPDATE` de las variantes al inicio del bloque, dentro de la misma transacción, y validar sobre esos valores lockeados (el `FOR UPDATE` se serializa correctamente entre transacciones concurrentes).
@@ -52,7 +53,7 @@ El decremento calcula el valor nuevo a partir del leído (**no `stock - qty` at�
 
 ## 2. Política de migraciones inmutables — formalizar en CI
 
-**Contexto real:** AGENTS.md ya establece la regla *“Migraciones de DB inmutables: ante un cambio de schema, genera una nueva migración con `pnpm db:generate`. Jamás modifiques migraciones existentes”*. Hasta ahora es solo una regla de proceso (humana) — no hay guard automatizado.
+**Contexto real:** AGENTS.md ya establece la regla _“Migraciones de DB inmutables: ante un cambio de schema, genera una nueva migración con `pnpm db:generate`. Jamás modifiques migraciones existentes”_. Hasta ahora es solo una regla de proceso (humana) — no hay guard automatizado.
 
 **Plan propuesto (no implementar ahora):**
 

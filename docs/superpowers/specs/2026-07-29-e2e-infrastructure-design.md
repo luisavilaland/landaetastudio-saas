@@ -9,15 +9,15 @@ El proyecto tiene 379 tests unitarios/de integración (vitest) pero cero tests e
 
 ## Decisiones arquitectónicas
 
-| Decisión | Opción elegida | Alternativa descartada |
-|---|---|---|
-| Framework | Playwright | Cypress (más lento, menos integración TypeScript) |
-| Auth | Híbrido: `auth.spec.ts` login real + `storageState` reutilizado (solo admin y superadmin) | Login en cada spec (más lento, duplica asserts) |
-| Cliente storefront | Sin autenticación — carrito anónimo vía cookie, checkout sin cuenta | Login de cliente (no hay consumidor real, oculta flujo guest) |
-| data-testid | Incremental por spec | Barrido global previo (nunca pasa) |
-| CI | Fase 2 con fecha explícita | Sin CI (nunca se agrega) o CI inmediato (entrena a ignorar rojo) |
-| Checkout MP | Hasta redirect a MP | Sin checkout (se posterga indefinidamente) |
-| Hosts | Subdominios locales con lvh.me | localhost con rewrites (no refleja prod) |
+| Decisión           | Opción elegida                                                                            | Alternativa descartada                                           |
+| ------------------ | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Framework          | Playwright                                                                                | Cypress (más lento, menos integración TypeScript)                |
+| Auth               | Híbrido: `auth.spec.ts` login real + `storageState` reutilizado (solo admin y superadmin) | Login en cada spec (más lento, duplica asserts)                  |
+| Cliente storefront | Sin autenticación — carrito anónimo vía cookie, checkout sin cuenta                       | Login de cliente (no hay consumidor real, oculta flujo guest)    |
+| data-testid        | Incremental por spec                                                                      | Barrido global previo (nunca pasa)                               |
+| CI                 | Fase 2 con fecha explícita                                                                | Sin CI (nunca se agrega) o CI inmediato (entrena a ignorar rojo) |
+| Checkout MP        | Hasta redirect a MP                                                                       | Sin checkout (se posterga indefinidamente)                       |
+| Hosts              | Subdominios locales con lvh.me                                                            | localhost con rewrites (no refleja prod)                         |
 
 ## Estructura de directorios
 
@@ -132,27 +132,32 @@ Cada spec documenta en comentarios qué `data-testid` agrega.
 ### Storefront (6)
 
 #### `auth.spec.ts`
+
 - Login con credenciales válidas → redirect a home
 - Login con email inválido → mensaje de error
 - Login con contraseña incorrecta → mensaje de error
 - Acceso a `/perfil` sin auth → redirect a login
 
 #### `home.spec.ts`
+
 - Homepage carga sin errores
 - Navegación a categorías desde navbar
 - Navegación a carrito desde header
 
 #### `products.spec.ts`
+
 - Listado de productos se renderiza
 - Búsqueda por texto encuentra producto
 - Detalle de producto muestra nombre, precio, descripción
 - Variante seleccionable cambia precio
 
 #### `categories.spec.ts`
+
 - Navegación por categoría desde home
 - Filtro de productos por categoría
 
 #### `cart.spec.ts`
+
 - Agregar producto al carrito (anónimo, cookie)
 - Ver carrito con ítem
 - Actualizar cantidad
@@ -160,6 +165,7 @@ Cada spec documenta en comentarios qué `data-testid` agrega.
 - Carrito vacío muestra mensaje
 
 #### `register.spec.ts`
+
 - Registro con datos válidos → redirect
 - Registro con email existente → error 409
 - Registro con datos inválidos → errores de validación
@@ -167,6 +173,7 @@ Cada spec documenta en comentarios qué `data-testid` agrega.
 ### Checkout (1)
 
 #### `checkout.spec.ts`
+
 - Agregar producto al carrito
 - Navegar a checkout
 - Completar formulario de envío
@@ -177,6 +184,7 @@ Cada spec documenta en comentarios qué `data-testid` agrega.
 ### Admin (4)
 
 #### `products-crud.spec.ts`
+
 - Login admin (storageState)
 - Listar productos
 - Crear producto nuevo con imagen
@@ -184,16 +192,19 @@ Cada spec documenta en comentarios qué `data-testid` agrega.
 - Eliminar producto
 
 #### `categories.spec.ts`
+
 - Listar categorías
 - Crear categoría
 - Editar categoría
 - Eliminar categoría
 
 #### `orders.spec.ts`
+
 - Listar órdenes
 - Ver detalle de orden
 
 #### `settings.spec.ts`
+
 - Ver configuración de tienda
 - Editar nombre de tienda
 - Cambiar dominio
@@ -201,18 +212,21 @@ Cada spec documenta en comentarios qué `data-testid` agrega.
 ### Superadmin (2)
 
 #### `tenants.spec.ts`
+
 - Listar tenants
 - Crear tenant nuevo
 - Ver detalle de tenant
 - Editar tenant
 
 #### `login.spec.ts`
+
 - Login superadmin
 - Acceso a panel superadmin
 
 ### Seguridad (1)
 
 #### `cross-tenant.spec.ts`
+
 - Login como admin de T1
 - Intentar GET `products/[id]` de T2 (producto seed de otro tenant) → esperar 404 o 403
 - Intentar PUT `products/[id]` de T2 → esperar 404 o 403
@@ -224,52 +238,52 @@ Cada spec documenta en comentarios qué `data-testid` agrega.
 ### playwright.config.ts config base
 
 ```ts
-import { defineConfig } from "@playwright/test";
+import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
-  testDir: "e2e",
+  testDir: 'e2e',
   fullyParallel: false, // evitar colisión de storageState
   retries: process.env.CI ? 2 : 0,
   workers: 1, // 1 worker por proyecto
-  reporter: process.env.CI ? "github" : "list",
-  globalSetup: "e2e/global-setup.ts",
+  reporter: process.env.CI ? 'github' : 'list',
+  globalSetup: 'e2e/global-setup.ts',
   use: {
-    baseURL: "http://localhost:3000",
-    trace: "on-first-retry",
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
   },
   projects: [
     // ... 5 projects
   ],
-});
+})
 ```
 
 ### global-setup.ts
 
 ```ts
-import { chromium, type FullConfig } from "@playwright/test";
+import { chromium, type FullConfig } from '@playwright/test'
 
 async function globalSetup(config: FullConfig) {
   // Login admin (T1)
-  const adminBrowser = await chromium.launch();
-  const adminPage = await adminBrowser.newPage();
-  await adminPage.goto("http://localhost:3001/login");
-  await adminPage.fill("[name=email]", process.env.E2E_ADMIN_EMAIL!);
-  await adminPage.fill("[name=password]", process.env.E2E_ADMIN_PASSWORD!);
-  await adminPage.click("button[type=submit]");
-  await adminPage.waitForURL("http://localhost:3001/");
-  await adminPage.context().storageState({ path: "e2e/.auth/admin.json" });
-  await adminBrowser.close();
+  const adminBrowser = await chromium.launch()
+  const adminPage = await adminBrowser.newPage()
+  await adminPage.goto('http://localhost:3001/login')
+  await adminPage.fill('[name=email]', process.env.E2E_ADMIN_EMAIL!)
+  await adminPage.fill('[name=password]', process.env.E2E_ADMIN_PASSWORD!)
+  await adminPage.click('button[type=submit]')
+  await adminPage.waitForURL('http://localhost:3001/')
+  await adminPage.context().storageState({ path: 'e2e/.auth/admin.json' })
+  await adminBrowser.close()
 
   // Login superadmin
-  const saBrowser = await chromium.launch();
-  const saPage = await saBrowser.newPage();
-  await saPage.goto("http://localhost:3002/login");
-  await saPage.fill("[name=email]", process.env.E2E_SUPERADMIN_EMAIL!);
-  await saPage.fill("[name=password]", process.env.E2E_SUPERADMIN_PASSWORD!);
-  await saPage.click("button[type=submit]");
-  await saPage.waitForURL("http://localhost:3002/");
-  await saPage.context().storageState({ path: "e2e/.auth/superadmin.json" });
-  await saBrowser.close();
+  const saBrowser = await chromium.launch()
+  const saPage = await saBrowser.newPage()
+  await saPage.goto('http://localhost:3002/login')
+  await saPage.fill('[name=email]', process.env.E2E_SUPERADMIN_EMAIL!)
+  await saPage.fill('[name=password]', process.env.E2E_SUPERADMIN_PASSWORD!)
+  await saPage.click('button[type=submit]')
+  await saPage.waitForURL('http://localhost:3002/')
+  await saPage.context().storageState({ path: 'e2e/.auth/superadmin.json' })
+  await saBrowser.close()
 
   // Sin login de cliente storefront — ningún spec lo necesita
   // (carrito anónimo vía cookie, checkout sin cuenta)
@@ -321,24 +335,25 @@ e2e/playwright-report/
 
 ## data-testid a agregar
 
-| Spec | data-testid |
-|---|---|
-| auth.spec.ts | `login-email`, `login-password`, `login-submit`, `login-error` |
-| home.spec.ts | `nav-categories`, `nav-cart`, `hero-title` |
-| products.spec.ts | `product-card`, `search-input`, `search-submit`, `product-name`, `product-price`, `variant-selector` |
-| categories.spec.ts | `category-link`, `category-name` |
-| cart.spec.ts | `add-to-cart`, `cart-count`, `cart-item`, `cart-quantity`, `cart-remove`, `cart-empty` |
-| register.spec.ts | `register-name`, `register-email`, `register-password`, `register-submit`, `register-error` |
-| checkout.spec.ts | `checkout-email`, `checkout-name`, `checkout-address`, `checkout-submit`, `shipping-method` |
-| products-crud.spec.ts | `product-form-name`, `product-form-price`, `product-form-submit`, `delete-product` |
-| admin-categories.spec.ts | `category-form-name`, `category-form-submit`, `delete-category` |
-| settings.spec.ts | `store-name-input`, `store-name-submit`, `domain-input`, `domain-submit` |
-| tenants.spec.ts | `tenant-form-name`, `tenant-form-submit`, `tenant-table` |
-| superadmin-login.spec.ts | `superadmin-email`, `superadmin-password`, `superadmin-submit` |
+| Spec                     | data-testid                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| auth.spec.ts             | `login-email`, `login-password`, `login-submit`, `login-error`                                       |
+| home.spec.ts             | `nav-categories`, `nav-cart`, `hero-title`                                                           |
+| products.spec.ts         | `product-card`, `search-input`, `search-submit`, `product-name`, `product-price`, `variant-selector` |
+| categories.spec.ts       | `category-link`, `category-name`                                                                     |
+| cart.spec.ts             | `add-to-cart`, `cart-count`, `cart-item`, `cart-quantity`, `cart-remove`, `cart-empty`               |
+| register.spec.ts         | `register-name`, `register-email`, `register-password`, `register-submit`, `register-error`          |
+| checkout.spec.ts         | `checkout-email`, `checkout-name`, `checkout-address`, `checkout-submit`, `shipping-method`          |
+| products-crud.spec.ts    | `product-form-name`, `product-form-price`, `product-form-submit`, `delete-product`                   |
+| admin-categories.spec.ts | `category-form-name`, `category-form-submit`, `delete-category`                                      |
+| settings.spec.ts         | `store-name-input`, `store-name-submit`, `domain-input`, `domain-submit`                             |
+| tenants.spec.ts          | `tenant-form-name`, `tenant-form-submit`, `tenant-table`                                             |
+| superadmin-login.spec.ts | `superadmin-email`, `superadmin-password`, `superadmin-submit`                                       |
 
 ## Plan de implementación
 
 ### Fase 1: Infraestructura
+
 1. `pnpm add -D @playwright/test`
 2. Crear `e2e/playwright.config.ts`
 3. Crear `e2e/global-setup.ts`
@@ -347,6 +362,7 @@ e2e/playwright-report/
 6. Agregar variables E2E a `.env.local`
 
 ### Fase 2: Storefront (6 specs) + Checkout (1)
+
 1. `auth.spec.ts` — login real + storageState
 2. `home.spec.ts`
 3. `products.spec.ts`
@@ -356,17 +372,20 @@ e2e/playwright-report/
 7. `checkout.spec.ts`
 
 ### Fase 3: Admin (4 specs)
+
 1. `products-crud.spec.ts`
 2. `categories.spec.ts`
 3. `orders.spec.ts`
 4. `settings.spec.ts`
 
 ### Fase 4: Superadmin (2) + Seguridad (1)
+
 1. `tenants.spec.ts`
 2. `login.spec.ts`
 3. `cross-tenant.spec.ts`
 
 ### Fase 5: CI
+
 1. Docker services en workflow
 2. Playwright install + run
 3. Compromiso con fecha

@@ -13,12 +13,12 @@ Migrar las 18 columnas a `timestamp with time zone` (`timestamptz`) con `{ withT
 
 ## Riesgos y mitigaciones
 
-| Riesgo | Mitigación |
-|--------|------------|
-| `ACCESS EXCLUSIVE` lock durante ALTER TYPE | Las migraciones generadas por drizzle-kit usan `--> statement-breakpoint` entre cada sentencia. Con `breakpoints: true` (journal v7), cada bloque corre en su propia transacción. El lock no acumula entre tablas. Exposición real: ~1.6s para una columna, ~3s para tablas con 2 columnas (ALTER seq.) Si el volumen crece 100x, revisar. |
-| Datos existentes interpretados con timezone incorrecto | `SET TIME ZONE 'UTC'` como primera sentencia de la migración. PostgreSQL asume que los valores naive están en la zona de la sesión al convertirlos a `timestamptz`. |
-| Rollback por bloque | Cada bloque (`--> statement-breakpoint`) corre en una transacción individual. Si un ALTER falla, solo ese bloque se revierte; los anteriores ya están commiteados. |
-| Seed con datos de prueba | `pnpm db:seed` solo se ejecuta en la branch de validación o en develop local. En producción no se corre seed — el checklist de verificación debe aclararlo explícitamente. |
+| Riesgo                                                 | Mitigación                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ACCESS EXCLUSIVE` lock durante ALTER TYPE             | Las migraciones generadas por drizzle-kit usan `--> statement-breakpoint` entre cada sentencia. Con `breakpoints: true` (journal v7), cada bloque corre en su propia transacción. El lock no acumula entre tablas. Exposición real: ~1.6s para una columna, ~3s para tablas con 2 columnas (ALTER seq.) Si el volumen crece 100x, revisar. |
+| Datos existentes interpretados con timezone incorrecto | `SET TIME ZONE 'UTC'` como primera sentencia de la migración. PostgreSQL asume que los valores naive están en la zona de la sesión al convertirlos a `timestamptz`.                                                                                                                                                                        |
+| Rollback por bloque                                    | Cada bloque (`--> statement-breakpoint`) corre en una transacción individual. Si un ALTER falla, solo ese bloque se revierte; los anteriores ya están commiteados.                                                                                                                                                                         |
+| Seed con datos de prueba                               | `pnpm db:seed` solo se ejecuta en la branch de validación o en develop local. En producción no se corre seed — el checklist de verificación debe aclararlo explícitamente.                                                                                                                                                                 |
 
 ## Plan de implementación
 
@@ -67,14 +67,14 @@ Tablas afectadas: `tenants`, `products`, `product_images`, `product_variants`, `
 
 Ejecutada el 2026-07-20 contra BD con 2 tenants, 6 productos, 28 variantes, 4 órdenes:
 
-| Métrica | Valor |
-|---------|-------|
-| Columnas medidas | 18 |
-| Tiempo total (18 ALTER TYPE) | ~17.2s |
-| Peor columna individual | 1,625ms (`products.updatedAt`) |
-| Peor tabla (2 columnas) | ~2.8s (`products`, `tenants`) |
-| Promedio por columna | ~954ms |
-| Timeout por comando | 10s |
+| Métrica                      | Valor                          |
+| ---------------------------- | ------------------------------ |
+| Columnas medidas             | 18                             |
+| Tiempo total (18 ALTER TYPE) | ~17.2s                         |
+| Peor columna individual      | 1,625ms (`products.updatedAt`) |
+| Peor tabla (2 columnas)      | ~2.8s (`products`, `tenants`)  |
+| Promedio por columna         | ~954ms                         |
+| Timeout por comando          | 10s                            |
 
 La variación incluye latencia de red a Neon (~100-300ms por viaje redondo). En Vercel (misma región que Neon) sería menor.
 
@@ -94,6 +94,7 @@ La variación incluye latencia de red a Neon (~100-300ms por viaje redondo). En 
 ## Reintento después de falla parcial — verificado
 
 Probado en BD real (2026-07-20):
+
 - `ALTER COLUMN ... TYPE timestamptz` sobre columna ya `timestamptz` es **no-op exitoso** (incluso con cláusula `USING` explícita)
 - Si una transacción (bloque) falla por timeout, todo el bloque se rollbackea — la columna vuelve a su estado anterior
 - Reintentar `pnpm db:migrate` después de una falla parcial es seguro: las columnas ya convertidas aceptan el ALTER como no-op, las pendientes se reintentan limpiamente

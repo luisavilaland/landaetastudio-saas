@@ -1,13 +1,15 @@
-import { db, dbCategories, withTenantContext } from "@repo/db";
-import { eq } from "drizzle-orm";
+import { db, dbCategories, withTenantContext } from '@repo/db'
+import { eq } from 'drizzle-orm'
 
 export type CategoryData = {
-  id: string;
-  name: string;
-  slug: string;
-};
+  id: string
+  name: string
+  slug: string
+}
 
-export async function getCategoriesForTenant(tenantId: string): Promise<CategoryData[]> {
+export async function getCategoriesForTenant(
+  tenantId: string,
+): Promise<CategoryData[]> {
   return await withTenantContext(tenantId, async (tx) => {
     return await tx
       .select({
@@ -17,6 +19,6 @@ export async function getCategoriesForTenant(tenantId: string): Promise<Category
       })
       .from(dbCategories)
       .where(eq(dbCategories.tenantId, tenantId))
-      .orderBy(dbCategories.name);
-  });
+      .orderBy(dbCategories.name)
+  })
 }

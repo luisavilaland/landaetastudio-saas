@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db, dbCategories, withTenantContext } from "@repo/db";
-import { getTenantId } from "@/lib/tenant";
-import { eq, and } from "drizzle-orm";
+import { NextRequest, NextResponse } from 'next/server'
+import { db, dbCategories, withTenantContext } from '@repo/db'
+import { getTenantId } from '@/lib/tenant'
+import { eq, and } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
-  const tenantId = await getTenantId();
+  const tenantId = await getTenantId()
   if (!tenantId) {
-    return NextResponse.json({ categories: [] });
+    return NextResponse.json({ categories: [] })
   }
 
   return await withTenantContext(tenantId, async (tx) => {
@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
       })
       .from(dbCategories)
       .where(eq(dbCategories.tenantId, tenantId))
-      .orderBy(dbCategories.name);
+      .orderBy(dbCategories.name)
 
-    return NextResponse.json({ categories });
-  });
+    return NextResponse.json({ categories })
+  })
 }

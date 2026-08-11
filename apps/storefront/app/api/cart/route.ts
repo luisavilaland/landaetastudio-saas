@@ -1,75 +1,93 @@
-import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { safeGet, redisSetEx, redisDel } from "@/lib/redis";
-import { dbProducts, dbProductVariants, dbProductImages, withTenantContext } from "@repo/db";
-import { inArray, eq, and } from "drizzle-orm";
-import { addCartItemSchema, updateCartItemSchema, deleteCartItemSchema } from "@repo/validation";
-import { createLogger } from "@/lib/logger";
-import { getTenantId } from "@/lib/tenant";
+import { NextRequest, NextResponse } from 'next/server'
+import { headers } from 'next/headers'
+import { safeGet, redisSetEx, redisDel } from '@/lib/redis'
+import {
+  dbProducts,
+  dbProductVariants,
+  dbProductImages,
+  withTenantContext,
+} from '@repo/db'
+import { inArray, eq, and } from 'drizzle-orm'
+import {
+  addCartItemSchema,
+  updateCartItemSchema,
+  deleteCartItemSchema,
+} from '@repo/validation'
+import { createLogger } from '@/lib/logger'
+import { getTenantId } from '@/lib/tenant'
 
-const logger = createLogger("cart-api");
+const logger = createLogger('cart-api')
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic'
 
 type CartItem = {
-  variantId: string;
-  quantity: number;
-  addedAt: string;
-};
+  variantId: string
+  quantity: number
+  addedAt: string
+}
 
 type Cart = {
-  items: CartItem[];
-  updatedAt: string;
-};
+  items: CartItem[]
+  updatedAt: string
+}
 
-const CART_TTL = 60 * 60 * 24 * 7; // 7 days in seconds
+const CART_TTL = 60 * 60 * 24 * 7 // 7 days in seconds
 
 async function getCart(sessionId: string): Promise<Cart> {
-  const data = await safeGet(`cart:${sessionId}`);
+  const data = await safeGet(`cart:${sessionId}`)
   if (!data) {
-    return { items: [], updatedAt: new Date().toISOString() };
+    return { items: [], updatedAt: new Date().toISOString() }
   }
-  return JSON.parse(data) as Cart;
+  return JSON.parse(data) as Cart
 }
 
 async function saveCart(sessionId: string, cart: Cart): Promise<void> {
-  cart.updatedAt = new Date().toISOString();
-  await redisSetEx(`cart:${sessionId}`, CART_TTL, JSON.stringify(cart));
+  cart.updatedAt = new Date().toISOString()
+  await redisSetEx(`cart:${sessionId}`, CART_TTL, JSON.stringify(cart))
 }
 
-async function getEnrichedItems(cart: Cart, variants: any[], tenantId: string, tx: any) {
-  if (cart.items.length === 0) return [];
+async function getEnrichedItems(
+  cart: Cart,
+  variants: any[],
+  tenantId: string,
+  tx: any,
+) {
+  if (cart.items.length === 0) return []
 
-  const variantMap = new Map(variants.map((v) => [v.variantId, v]));
+  const variantMap = new Map(variants.map((v) => [v.variantId, v]))
 
-  const productIds = variants.map((v) => v.productId);
-  const images = productIds.length > 0
-    ? await tx
-        .select({
-          productId: dbProductImages.productId,
-          url: dbProductImages.url,
-        })
-        .from(dbProductImages)
-        .where(
-          and(
-            inArray(dbProductImages.productId, productIds),
-            eq(dbProductImages.tenantId, tenantId)
+  const productIds = variants.map((v) => v.productId)
+  const images =
+    productIds.length > 0
+      ? await tx
+          .select({
+            productId: dbProductImages.productId,
+            url: dbProductImages.url,
+          })
+          .from(dbProductImages)
+          .where(
+            and(
+              inArray(dbProductImages.productId, productIds),
+              eq(dbProductImages.tenantId, tenantId),
+            ),
           )
-        )
-        .orderBy(dbProductImages.position)
-    : [];
+          .orderBy(dbProductImages.position)
+      : []
 
-  const firstImageByProduct = images.reduce((acc: Record<string, string>, img: { productId: string; url: string }) => {
-    if (!acc[img.productId]) acc[img.productId] = img.url;
-    return acc;
-  }, {} as Record<string, string>);
+  const firstImageByProduct = images.reduce(
+    (acc: Record<string, string>, img: { productId: string; url: string }) => {
+      if (!acc[img.productId]) acc[img.productId] = img.url
+      return acc
+    },
+    {} as Record<string, string>,
+  )
 
   const itemsWithProduct = cart.items
     .map((item) => {
-      const variant = variantMap.get(item.variantId);
-      if (!variant) return null;
+      const variant = variantMap.get(item.variantId)
+      if (!variant) return null
 
-      const firstImage = firstImageByProduct[variant.productId];
+      const firstImage = firstImageByProduct[variant.productId]
 
       return {
         ...item,
@@ -85,44 +103,44 @@ async function getEnrichedItems(cart: Cart, variants: any[], tenantId: string, t
           sku: variant.variantSku,
           options: variant.variantOptions || {},
         },
-      };
+      }
     })
-    .filter(Boolean);
+    .filter(Boolean)
 
-  return itemsWithProduct;
+  return itemsWithProduct
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const headersList = await headers();
-    const sessionId = headersList.get("x-cart-session-id");
+    const headersList = await headers()
+    const sessionId = headersList.get('x-cart-session-id')
 
     if (!sessionId) {
       return NextResponse.json(
-        { error: "Sesión de carrito no encontrada" },
-        { status: 400 }
-      );
+        { error: 'Sesión de carrito no encontrada' },
+        { status: 400 },
+      )
     }
 
-    const tenantId = await getTenantId();
+    const tenantId = await getTenantId()
     if (!tenantId) {
       return NextResponse.json(
-        { error: "Tienda no encontrada" },
-        { status: 400 }
-      );
+        { error: 'Tienda no encontrada' },
+        { status: 400 },
+      )
     }
 
-    const body = await request.json();
-    const validation = addCartItemSchema.safeParse(body);
+    const body = await request.json()
+    const validation = addCartItemSchema.safeParse(body)
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validación fallida", issues: validation.error.issues },
-        { status: 400 }
-      );
+        { error: 'Validación fallida', issues: validation.error.issues },
+        { status: 400 },
+      )
     }
 
-    const { variantId, quantity } = validation.data;
+    const { variantId, quantity } = validation.data
 
     return await withTenantContext(tenantId, async (tx) => {
       const variant = await tx
@@ -131,263 +149,274 @@ export async function POST(request: NextRequest) {
         .where(
           and(
             eq(dbProductVariants.id, variantId),
-            eq(dbProductVariants.tenantId, tenantId)
-          )
+            eq(dbProductVariants.tenantId, tenantId),
+          ),
         )
-        .limit(1);
+        .limit(1)
 
       if (variant.length === 0) {
         return NextResponse.json(
-          { error: "Variante no encontrada" },
-          { status: 404 }
-        );
+          { error: 'Variante no encontrada' },
+          { status: 404 },
+        )
       }
 
-      const variantStock = variant[0].stock ?? 0;
+      const variantStock = variant[0].stock ?? 0
       if (variantStock < quantity) {
         return NextResponse.json(
-          { error: "Stock insuficiente" },
-          { status: 400 }
-        );
+          { error: 'Stock insuficiente' },
+          { status: 400 },
+        )
       }
 
-      const cart = await getCart(sessionId);
+      const cart = await getCart(sessionId)
 
       const existingIndex = cart.items.findIndex(
-        (item) => item.variantId === variantId
-      );
+        (item) => item.variantId === variantId,
+      )
 
       if (existingIndex >= 0) {
-        cart.items[existingIndex].quantity += quantity;
+        cart.items[existingIndex].quantity += quantity
       } else {
         cart.items.push({
           variantId,
           quantity,
           addedAt: new Date().toISOString(),
-        });
+        })
       }
 
-      await saveCart(sessionId, cart);
+      await saveCart(sessionId, cart)
 
-      return NextResponse.json({ cart, success: true });
-    });
+      return NextResponse.json({ cart, success: true })
+    })
   } catch (error) {
-    logger.error({ error }, "Cart API error");
+    logger.error({ error }, 'Cart API error')
     return NextResponse.json(
-      { error: "Error al agregar al carrito" },
-      { status: 500 }
-    );
+      { error: 'Error al agregar al carrito' },
+      { status: 500 },
+    )
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    const headersList = await headers();
-    const sessionId = headersList.get("x-cart-session-id");
+    const headersList = await headers()
+    const sessionId = headersList.get('x-cart-session-id')
 
     if (!sessionId) {
       return NextResponse.json(
-        { error: "Sesión de carrito no encontrada" },
-        { status: 400 }
-      );
+        { error: 'Sesión de carrito no encontrada' },
+        { status: 400 },
+      )
     }
 
-    const tenantId = await getTenantId();
+    const tenantId = await getTenantId()
     if (!tenantId) {
       return NextResponse.json(
-        { error: "Tienda no encontrada" },
-        { status: 400 }
-      );
+        { error: 'Tienda no encontrada' },
+        { status: 400 },
+      )
     }
 
-    const cart = await getCart(sessionId);
+    const cart = await getCart(sessionId)
 
-    const body = await request.json();
-    const validation = updateCartItemSchema.safeParse(body);
+    const body = await request.json()
+    const validation = updateCartItemSchema.safeParse(body)
 
     if (!validation.success) {
-       return NextResponse.json(
-        { error: "Validación fallida", issues: validation.error.issues },
-        { status: 400 }
-      );
+      return NextResponse.json(
+        { error: 'Validación fallida', issues: validation.error.issues },
+        { status: 400 },
+      )
     }
 
-    const { variantId, quantity } = validation.data;
+    const { variantId, quantity } = validation.data
 
     if (quantity === 0) {
-      cart.items = cart.items.filter((item) => item.variantId !== variantId);
+      cart.items = cart.items.filter((item) => item.variantId !== variantId)
     } else {
       const existingIndex = cart.items.findIndex(
-        (item) => item.variantId === variantId
-      );
+        (item) => item.variantId === variantId,
+      )
 
       if (existingIndex >= 0) {
-        cart.items[existingIndex].quantity = quantity;
+        cart.items[existingIndex].quantity = quantity
       } else {
         cart.items.push({
           variantId,
           quantity,
           addedAt: new Date().toISOString(),
-        });
+        })
       }
     }
 
-    await saveCart(sessionId, cart);
+    await saveCart(sessionId, cart)
 
-    const variantIds = cart.items.map((item) => item.variantId);
+    const variantIds = cart.items.map((item) => item.variantId)
 
-    const enrichedItems = variantIds.length > 0
-      ? await withTenantContext(tenantId, async (tx) => {
-          const variants = await tx
-            .select({
-              variantId: dbProductVariants.id,
-              variantPrice: dbProductVariants.price,
-              variantStock: dbProductVariants.stock,
-              variantSku: dbProductVariants.sku,
-              variantOptions: dbProductVariants.options,
-              productId: dbProducts.id,
-              productName: dbProducts.name,
-              productSlug: dbProducts.slug,
-              productImage: dbProducts.imageUrl,
-            })
-            .from(dbProductVariants)
-            .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
-            .where(
-              and(
-                inArray(dbProductVariants.id, variantIds),
-                eq(dbProductVariants.tenantId, tenantId)
+    const enrichedItems =
+      variantIds.length > 0
+        ? await withTenantContext(tenantId, async (tx) => {
+            const variants = await tx
+              .select({
+                variantId: dbProductVariants.id,
+                variantPrice: dbProductVariants.price,
+                variantStock: dbProductVariants.stock,
+                variantSku: dbProductVariants.sku,
+                variantOptions: dbProductVariants.options,
+                productId: dbProducts.id,
+                productName: dbProducts.name,
+                productSlug: dbProducts.slug,
+                productImage: dbProducts.imageUrl,
+              })
+              .from(dbProductVariants)
+              .innerJoin(
+                dbProducts,
+                eq(dbProductVariants.productId, dbProducts.id),
               )
-            );
+              .where(
+                and(
+                  inArray(dbProductVariants.id, variantIds),
+                  eq(dbProductVariants.tenantId, tenantId),
+                ),
+              )
 
-          return await getEnrichedItems(cart, variants, tenantId, tx);
-        })
-      : [];
+            return await getEnrichedItems(cart, variants, tenantId, tx)
+          })
+        : []
 
-    return NextResponse.json({ items: enrichedItems });
+    return NextResponse.json({ items: enrichedItems })
   } catch (error) {
-    logger.error({ error }, "Cart API PUT error");
+    logger.error({ error }, 'Cart API PUT error')
     return NextResponse.json(
-      { error: "Error al actualizar el carrito" },
-      { status: 500 }
-    );
+      { error: 'Error al actualizar el carrito' },
+      { status: 500 },
+    )
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
-    const headersList = await headers();
-    const sessionId = headersList.get("x-cart-session-id");
+    const headersList = await headers()
+    const sessionId = headersList.get('x-cart-session-id')
 
     if (!sessionId) {
       return NextResponse.json(
-        { error: "Sesión de carrito no encontrada" },
-        { status: 400 }
-      );
+        { error: 'Sesión de carrito no encontrada' },
+        { status: 400 },
+      )
     }
 
-    const tenantId = await getTenantId();
+    const tenantId = await getTenantId()
     if (!tenantId) {
       return NextResponse.json(
-        { error: "Tienda no encontrada" },
-        { status: 400 }
-      );
+        { error: 'Tienda no encontrada' },
+        { status: 400 },
+      )
     }
 
-    const cart = await getCart(sessionId);
+    const cart = await getCart(sessionId)
 
-    let body: any = {};
+    let body: any = {}
     try {
-      body = await request.json();
+      body = await request.json()
     } catch (e) {
-      logger.warn({ error: e }, "DELETE - Error parsing JSON body");
+      logger.warn({ error: e }, 'DELETE - Error parsing JSON body')
     }
 
-    logger.debug({ body }, "DELETE - Request body");
+    logger.debug({ body }, 'DELETE - Request body')
 
-    const validation = deleteCartItemSchema.safeParse(body);
+    const validation = deleteCartItemSchema.safeParse(body)
 
     if (!validation.success) {
-       logger.warn({ issues: validation.error.issues }, "DELETE - Validación fallida");
+      logger.warn(
+        { issues: validation.error.issues },
+        'DELETE - Validación fallida',
+      )
       return NextResponse.json(
-        { error: "Validación fallida", issues: validation.error.issues },
-        { status: 400 }
-      );
+        { error: 'Validación fallida', issues: validation.error.issues },
+        { status: 400 },
+      )
     }
 
-    const { variantId, clearAll } = validation.data;
+    const { variantId, clearAll } = validation.data
 
     if (clearAll) {
-      await redisDel(`cart:${sessionId}`);
-      return NextResponse.json({ items: [] });
+      await redisDel(`cart:${sessionId}`)
+      return NextResponse.json({ items: [] })
     }
 
-    cart.items = cart.items.filter((item) => item.variantId !== variantId);
+    cart.items = cart.items.filter((item) => item.variantId !== variantId)
 
-    await saveCart(sessionId, cart);
+    await saveCart(sessionId, cart)
 
-    const variantIds = cart.items.map((item) => item.variantId);
+    const variantIds = cart.items.map((item) => item.variantId)
 
-    const enrichedItems = variantIds.length > 0
-      ? await withTenantContext(tenantId, async (tx) => {
-          const variants = await tx
-            .select({
-              variantId: dbProductVariants.id,
-              variantPrice: dbProductVariants.price,
-              variantStock: dbProductVariants.stock,
-              variantSku: dbProductVariants.sku,
-              variantOptions: dbProductVariants.options,
-              productId: dbProducts.id,
-              productName: dbProducts.name,
-              productSlug: dbProducts.slug,
-              productImage: dbProducts.imageUrl,
-            })
-            .from(dbProductVariants)
-            .innerJoin(dbProducts, eq(dbProductVariants.productId, dbProducts.id))
-            .where(
-              and(
-                inArray(dbProductVariants.id, variantIds),
-                eq(dbProductVariants.tenantId, tenantId)
+    const enrichedItems =
+      variantIds.length > 0
+        ? await withTenantContext(tenantId, async (tx) => {
+            const variants = await tx
+              .select({
+                variantId: dbProductVariants.id,
+                variantPrice: dbProductVariants.price,
+                variantStock: dbProductVariants.stock,
+                variantSku: dbProductVariants.sku,
+                variantOptions: dbProductVariants.options,
+                productId: dbProducts.id,
+                productName: dbProducts.name,
+                productSlug: dbProducts.slug,
+                productImage: dbProducts.imageUrl,
+              })
+              .from(dbProductVariants)
+              .innerJoin(
+                dbProducts,
+                eq(dbProductVariants.productId, dbProducts.id),
               )
-            );
+              .where(
+                and(
+                  inArray(dbProductVariants.id, variantIds),
+                  eq(dbProductVariants.tenantId, tenantId),
+                ),
+              )
 
-          return await getEnrichedItems(cart, variants, tenantId, tx);
-        })
-      : [];
+            return await getEnrichedItems(cart, variants, tenantId, tx)
+          })
+        : []
 
-    return NextResponse.json({ items: enrichedItems });
+    return NextResponse.json({ items: enrichedItems })
   } catch (error) {
-    logger.error({ error }, "Cart API DELETE error");
+    logger.error({ error }, 'Cart API DELETE error')
     return NextResponse.json(
-      { error: "Error al eliminar del carrito" },
-      { status: 500 }
-    );
+      { error: 'Error al eliminar del carrito' },
+      { status: 500 },
+    )
   }
 }
 
 export async function GET() {
   try {
-    const headersList = await headers();
-    const sessionId = headersList.get("x-cart-session-id");
+    const headersList = await headers()
+    const sessionId = headersList.get('x-cart-session-id')
 
     if (!sessionId) {
-      return NextResponse.json({ items: [] });
+      return NextResponse.json({ items: [] })
     }
 
-    const tenantId = await getTenantId();
+    const tenantId = await getTenantId()
     if (!tenantId) {
       return NextResponse.json(
-        { error: "Tienda no encontrada" },
-        { status: 400 }
-      );
+        { error: 'Tienda no encontrada' },
+        { status: 400 },
+      )
     }
 
-    const cart = await getCart(sessionId);
+    const cart = await getCart(sessionId)
 
     if (cart.items.length === 0) {
-      return NextResponse.json({ items: [] });
+      return NextResponse.json({ items: [] })
     }
 
-    const variantIds = cart.items.map((item) => item.variantId);
+    const variantIds = cart.items.map((item) => item.variantId)
 
     const itemsWithProduct = await withTenantContext(tenantId, async (tx) => {
       const variants = await tx
@@ -408,41 +437,48 @@ export async function GET() {
           variantIds.length > 0
             ? and(
                 inArray(dbProductVariants.id, variantIds),
-                eq(dbProductVariants.tenantId, tenantId)
+                eq(dbProductVariants.tenantId, tenantId),
               )
-            : undefined
-        );
+            : undefined,
+        )
 
-      const productIds = variants.map((v) => v.productId);
-      const images = productIds.length > 0
-        ? await tx
-            .select({
-              productId: dbProductImages.productId,
-              url: dbProductImages.url,
-            })
-            .from(dbProductImages)
-            .where(
-              and(
-                inArray(dbProductImages.productId, productIds),
-                eq(dbProductImages.tenantId, tenantId)
+      const productIds = variants.map((v) => v.productId)
+      const images =
+        productIds.length > 0
+          ? await tx
+              .select({
+                productId: dbProductImages.productId,
+                url: dbProductImages.url,
+              })
+              .from(dbProductImages)
+              .where(
+                and(
+                  inArray(dbProductImages.productId, productIds),
+                  eq(dbProductImages.tenantId, tenantId),
+                ),
               )
-            )
-            .orderBy(dbProductImages.position)
-        : [];
+              .orderBy(dbProductImages.position)
+          : []
 
-      const firstImageByProduct = images.reduce((acc: Record<string, string>, img: { productId: string; url: string }) => {
-        if (!acc[img.productId]) acc[img.productId] = img.url;
-        return acc;
-      }, {} as Record<string, string>);
+      const firstImageByProduct = images.reduce(
+        (
+          acc: Record<string, string>,
+          img: { productId: string; url: string },
+        ) => {
+          if (!acc[img.productId]) acc[img.productId] = img.url
+          return acc
+        },
+        {} as Record<string, string>,
+      )
 
-      const variantMap = new Map(variants.map((v) => [v.variantId, v]));
+      const variantMap = new Map(variants.map((v) => [v.variantId, v]))
 
       return cart.items
         .map((item) => {
-          const variant = variantMap.get(item.variantId);
-          if (!variant) return null;
+          const variant = variantMap.get(item.variantId)
+          if (!variant) return null
 
-          const firstImage = firstImageByProduct[variant.productId];
+          const firstImage = firstImageByProduct[variant.productId]
 
           return {
             ...item,
@@ -458,17 +494,17 @@ export async function GET() {
               sku: variant.variantSku,
               options: variant.variantOptions || {},
             },
-          };
+          }
         })
-        .filter(Boolean);
-    });
+        .filter(Boolean)
+    })
 
-    return NextResponse.json({ items: itemsWithProduct });
+    return NextResponse.json({ items: itemsWithProduct })
   } catch (error) {
-    logger.error({ error }, "Cart API GET error");
+    logger.error({ error }, 'Cart API GET error')
     return NextResponse.json(
-      { error: "Error al obtener el carrito" },
-      { status: 500 }
-    );
+      { error: 'Error al obtener el carrito' },
+      { status: 500 },
+    )
   }
 }
