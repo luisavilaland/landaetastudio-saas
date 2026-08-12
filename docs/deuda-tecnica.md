@@ -95,6 +95,24 @@ El decremento calcula el valor nuevo a partir del leído (**no `stock - qty` at�
 
 ---
 
+## 4. Dependencias no declaradas que sobreviven por hoisting del root — PENDIENTE (2026-08-12)
+
+**Contexto real:** durante la limpieza de dependencias muertas (rama `chore/remove-dead-deps`) se detectaron imports que funcionan solo por el hoisting del `node_modules` raíz, sin declaración en el `package.json` del workspace:
+
+- `packages/storage` → importa `minio` (packages/storage/src/index.ts) pero su `package.json` no tiene `dependencies` ni `devDependencies`.
+- `apps/storefront` → importa `bcryptjs` (lib/customer-auth.ts, app/api/register/route.ts) sin declararlo (lo declara el root; sobrevive por hoisting).
+
+Riesgo: un futuro cambio de `pnpm.hoistPattern` / instalación sin hoisting / extracción del paquete rompe el import sin aviso. Funciona hoy, pero es frágil.
+
+**Plan propuesto (no implementar ahora):**
+
+1. Declarar `minio` como dependencia explícita en `packages/storage/package.json`.
+2. Declarar `bcryptjs` como dependencia explícita en `apps/storefront/package.json` (o mover el hashing a `@repo/auth`, que ya lo usa — mejor diseño).
+
+**Criterios de aceptación:** `pnpm install` y `pnpm typecheck` sin cambios de comportamiento; los imports resuelven desde el workspace que los declara.
+
+---
+
 ## Referencia
 
 Plan aprobado el 2026-08-08 (ítem 3 de la tarea de calidad: limpieza email + health check + deuda técnica). Rama `quality/calidad-y-monitoreo`. Ver bitacora.md → entrada 2026-08-08 — Calidad.
