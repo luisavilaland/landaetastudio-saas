@@ -953,3 +953,18 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **Deuda documentada:** packages/storage importa minio sin declararlo (hoisting del root) - agregar como dependencia explícita en PR futuro. Deuda similar en storefront (bcryptjs no declarado, usado vía root hoisting).
 - **Verificación:** pnpm lint 6/6, pnpm typecheck 9/9, pnpm test 430/430 (55 archivos), pnpm build 3/3.
 - **Branch:** chore/remove-dead-deps (pendiente PR a develop)
+
+## 2026-08-12 - Release: merge develop -> main
+
+- **Merge de develop a main** (primera vez desde mayo 2026; main estaba 235 commits atras). Los dominios de produccion (tienda1.landaetastudio.com, admin., superadmin.) pasan a servir el build real con todo el trabajo de junio-agosto.
+- **Cambios incluidos en el release (resumen):**
+  - **Seguridad:** RLS real con FORCE ROW LEVEL SECURITY + rol app_user sin BYPASSRLS (DATABASE_APP_URL obligatorio); withTenantContext wireado en 27 handlers + 9 Server Components; hotfix P0 de aislamiento multi-tenant (12 handlers con filtrado tenantId); AUTH_SECRET obligatorio; firma HMAC del webhook alineada a spec oficial de MercadoPago (anti-replay 300s, fail-closed).
+  - **RLS:** migraciones 0009/0010/0011 (FORCE RLS, timestamptz); incidente de Server Components leyendo tablas RLS directo corregido (08-08); auditorias de aislamiento cross-tenant con ripgrep.
+  - **Webhook:** verficacion de firma canonical id:;request-id:;ts:; con timingSafeEqual; magic IDs solo con firma valida; E2E de firma real contra preview.
+  - **Redis:** wrappers progresivos safeGet/redisSetEx/redisDel/redisIncr/redisPexpire + whenReady (cold-start Vercel); carrito y rate limit fail-open (degradan, nunca 500).
+  - **Monitoreo:** health checks en las 3 apps (factory createHealthCheckHandler, DB/Redis/MP); alertas proactivas a Sentry en degradacion; UptimeRobot en los 3 endpoints; 0 console.* en apps/ (Pino + @repo/logger).
+  - **TOCTOU:** checkout con decremento atomico de stock (WHERE stock >= qty, .returning) anti-oversell; PUT products/[id] con 409 ante producto eliminado durante la actualizacion; FK 23503 -> 409.
+  - **Calidad:** 15 PRs dependabot mergeados (10 npm + 5 actions) con validacion completa; lockfile corrupto reparado 2 veces; limpieza de 13 dependencias muertas; guard de migraciones inmutables en CI; prettier global aplicado (285 archivos, 0 cambios funcionales); 430 tests / 55 archivos; E2E Playwright 15 specs con runner self-hosted; assertions de contenido en E2E admin.
+- **Verificacion pre-merge:** pnpm lint 6/6, pnpm typecheck 9/9, pnpm test 430/430 (55 archivos), pnpm build 3/3.
+- **Post-merge pendiente:** verificar deploys de produccion en Vercel (las 3 apps), confirmar health checks en dominios reales y revisar checklist de go-live (MP en modo produccion con token APP_USR-).
+- **Branch:** main (merge commit: PENDIENTE)

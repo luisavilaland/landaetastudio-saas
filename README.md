@@ -34,7 +34,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ Página de perfil de tienda pública con SEO
 - ✅ Checkout con selector visual de envío y cálculo dinámico
 - ✅ Refactor de API: `NextResponse` unificado en todas las rutas
-- ✅ 426 tests (100% passing), build limpio en 3 apps (hoy)
+- ✅ 430 tests (100% passing), build limpio en 3 apps (hoy)
 
 ## Fase 5 – Producción ✅ (Completada)
 
@@ -51,15 +51,16 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ **Mensajes de error 409 con campo específico** - UI inline con validación visual en formularios
 - ✅ **Configuración de build corregida** - next.config.mjs para compatibilidad ESM
 
-## Fase 6 – RLS real (withTenantContext) y E2E 🔄 (en curso)
+## Fase 6 – RLS real (withTenantContext) y E2E ✅ (Completada)
 
 - ✅ **withTenantContext real** - Transacción + `SET LOCAL set_tenant_id`, 27 handlers wireados, FORCE RLS + role `app_user` sin BYPASSRLS
 - ✅ **DATABASE_APP_URL** obligatorio en runtime (rol app_user), `DATABASE_URL` solo build/migraciones
 - ✅ **Incidente RLS Server Components (08-08) corregido** - 9 Server Components leían tablas con RLS directo (`db.`); envueltos en withTenantContext, admin vacío y 500 en /buscar solucionados
-- ✅ **E2E Playwright** - 14 specs (storefront, checkout, admin, superadmin, security) con CI self-hosted
+- ✅ **E2E Playwright** - 15 specs (storefront, checkout, admin, superadmin, security, webhook) con CI self-hosted
 - ✅ **Carrito resiliente** - degradación progresiva cuando Redis está caído (wrappers `safeGet`/`redisSetEx`/`redisDel` + `whenReady`)
 - ✅ **Barrido `console.*` completo** - 0 instancias en apps/ (excepción intencional: seed.ts y env.ts)
-- 🔄 Pendiente: migración `develop → main`, assertions de contenido en E2E
+- ✅ **Assertions de contenido en E2E admin** - productos, órdenes y categorías verifican filas reales (no solo headings)
+- ✅ **Migración `develop → main`** - release 2026-08-12
 
 ---
 
@@ -97,7 +98,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - **Métodos de envío:** API `GET /api/shipping` en storefront que lee `x-tenant-id` del proxy. Checkout con selector visual, cálculo dinámico de envío gratis, desglose subtotal + envío + total.
 - **Seed:** 2 tenants (tienda1, tienda2), 2 métodos de envío para tienda1.
 - **Fixes:** Bugs carrito, variantes, imágenes, validación tenant, queries N+1, logout redirects. Refactor completo de `new Response()` → `NextResponse` en todas las rutas.
-- **E2E Playwright:** 14 specs + CI self-hosted (e2e.yml). Ver SETUP.md sección E2E.
+- **E2E Playwright:** 15 specs + CI self-hosted (e2e.yml). Ver SETUP.md sección E2E.
 
 ### Fase 5 - Tareas de Seguridad Completadas ✅
 
@@ -196,7 +197,7 @@ saas-ecommerce/
 │   ├── storage/      # Cliente R2/cloud storage (upload de imágenes)
 │   ├── test-utils/   # Helpers de test (makeTxMock, session, mockReq)
 │   └── validation/   # Schemas Zod compartidos
-├── e2e/              # Tests end-to-end Playwright (14 specs)
+├── e2e/              # Tests end-to-end Playwright (15 specs)
 ├── docs/
 │   ├── adr/          # Decisiones de arquitectura (ADR-001 a ADR-022)
 │   └── superpowers/  # Specs y planes de diseño
@@ -463,11 +464,11 @@ pnpm test        # Unit + integración (vitest)
 pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 ```
 
-- **Total:** 426 tests pasando, 0 fallos (55 archivos).
+- **Total:** 430 tests pasando, 0 fallos (55 archivos).
 - Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 - Los endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, redis).
-- 14 specs E2E en `e2e/` (storefront, checkout, admin, superadmin, security) — CI con runner self-hosted.
+- 15 specs E2E en `e2e/` (storefront, checkout, admin, superadmin, security, webhook) — CI con runner self-hosted.
 
 ---
 
-**Última actualización:** 10 de agosto de 2026 – Alineación documental post-PR44 (426 tests, factory de health check, decisión E2E_WEBHOOK_TEST). Rama `develop`. Build limpio.
+**Última actualización:** 12 de agosto de 2026 – Release develop → main (430 tests, 15 specs E2E, factory de health check, decisión E2E_WEBHOOK_TEST). Rama `main`. Build limpio.
