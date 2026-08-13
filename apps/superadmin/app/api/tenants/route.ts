@@ -1,61 +1,69 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db, dbTenants } from "@repo/db";
-import { auth } from "@/lib/auth";
-import { redisClient } from "@/lib/redis";
-import { desc, eq } from "drizzle-orm";
-import { createTenantSchema } from "@repo/validation";
-import { createLogger } from "@/lib/logger";
+import { NextRequest, NextResponse } from 'next/server'
+import { db, dbTenants } from '@repo/db'
+import { auth } from '@/lib/auth'
+import { redisClient } from '@/lib/redis'
+import { desc, eq } from 'drizzle-orm'
+import { createTenantSchema } from '@repo/validation'
+import { createLogger } from '@/lib/logger'
 
-const logger = createLogger("superadmin-tenants-api");
+const logger = createLogger('superadmin-tenants-api')
 
-const TENANT_CACHE_PREFIX = "tenant:slug:";
+const TENANT_CACHE_PREFIX = 'tenant:slug:'
 
 export async function GET() {
-  const session = await auth();
+  const session = await auth()
 
   if (!session) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
+  if (session.user?.role !== 'superadmin') {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   }
 
   const tenants = await db
     .select()
     .from(dbTenants)
-    .orderBy(desc(dbTenants.createdAt));
+    .orderBy(desc(dbTenants.createdAt))
 
-  return NextResponse.json({ tenants });
+  return NextResponse.json({ tenants })
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = await auth()
 
     if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const body = await request.json();
-    const validation = createTenantSchema.safeParse(body);
+    if (session.user?.role !== 'superadmin') {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const validation = createTenantSchema.safeParse(body)
 
     if (!validation.success) {
       return NextResponse.json(
-         { error: "Validación fallida", issues: validation.error.issues },
-        { status: 400 }
-      );
+        { error: 'Validación fallida', issues: validation.error.issues },
+        { status: 400 },
+      )
     }
 
-    const { slug, name, plan, status, customDomain } = validation.data;
+    const { slug, name, plan, status, customDomain } = validation.data
 
     const existing = await db
       .select()
       .from(dbTenants)
       .where(eq(dbTenants.slug, slug))
-      .limit(1);
+      .limit(1)
 
     if (existing.length > 0) {
       return NextResponse.json(
-        { error: "Slug ya existe", field: "slug" },
-        { status: 409 }
-      );
+        { error: 'Slug ya existe', field: 'slug' },
+        { status: 409 },
+      )
     }
 
     if (customDomain) {
@@ -63,13 +71,16 @@ export async function POST(request: NextRequest) {
         .select()
         .from(dbTenants)
         .where(eq(dbTenants.customDomain, customDomain))
-        .limit(1);
+        .limit(1)
 
       if (existingDomain.length > 0) {
         return NextResponse.json(
-          { error: "El dominio personalizado ya está en uso", field: "customDomain" },
-          { status: 409 }
-        );
+          {
+            error: 'El dominio personalizado ya está en uso',
+            field: 'customDomain',
+          },
+          { status: 409 },
+        )
       }
     }
 
@@ -78,24 +89,24 @@ export async function POST(request: NextRequest) {
       .values({
         slug,
         name,
-        plan: plan || "starter",
-        status: status || "active",
+        plan: plan || 'starter',
+        status: status || 'active',
         customDomain: customDomain || null,
       })
-      .returning();
+      .returning()
 
     try {
-      await redisClient.del(`${TENANT_CACHE_PREFIX}${slug}`);
+      await redisClient.del(`${TENANT_CACHE_PREFIX}${slug}`)
     } catch (e) {
-      logger.error({ error: e }, "[Cache] Failed to invalidate");
+      logger.error({ error: e }, '[Cache] Failed to invalidate')
     }
 
-    return NextResponse.json(newTenant[0], { status: 201 });
+    return NextResponse.json(newTenant[0], { status: 201 })
   } catch (error) {
-    logger.error({ error }, "Error creating tenant");
+    logger.error({ error }, 'Error creating tenant')
     return NextResponse.json(
-      { error: "Error al crear tenant" },
-      { status: 500 }
-    );
+      { error: 'Error al crear tenant' },
+      { status: 500 },
+    )
   }
 }

@@ -1,18 +1,18 @@
 # Checklist de Pruebas Manuales — SaaS eCommerce
 
-**Fecha:** Abril 2026 | **Versión:** 2.0 | **Estado:** Fase 5 completada ✅
+**Fecha:** Agosto 2026 | **Versión:** 3.0 | **Estado:** Fase 6 en curso (RLS real + E2E) ✅
 
 > Ejecutar en orden. Marcar cada ítem con ✅ al verificar o ❌ si falla.
-> Credenciales: admin@tienda1.com / 123456 | super@admin.com / 123456
+> Credenciales: admin@tienda1.com / 123456 | super@admin.com / 123456 | cliente@ejemplo.com / 123456
 
 ---
 
 ## 0. Setup previo
 
-- [x] Docker corriendo (`docker compose ps` — 4 servicios UP)
+- [x] Servicios cloud accesibles — Neon (PostgreSQL), Upstash (Redis `REDIS_URL`), R2 (imágenes), Resend (emails)
 - [x] `pnpm dev` corriendo (storefront :3000, admin :3001, superadmin :3002)
-- [x] `pnpm db:seed` ejecutado (datos frescos)
-- [x] ngrok corriendo (`ngrok http 3000`) y URL en `.env.local`
+- [x] `pnpm db:seed` ejecutado (datos frescos — 2 tenants: tienda1, tienda2)
+- [x] Para webhooks en dev: `npx dotunnel` y `STOREFRONT_URL` apuntando al túnel
 
 ---
 
@@ -37,11 +37,13 @@
 - [x] Eliminar tenant → desaparece del listado
 
 ### API domain-check
+
 - [x] `curl "localhost:3002/api/domain-check?domain=disponible123.com"` → `{"available":true}`
 - [x] `curl "localhost:3002/api/domain-check?domain=tienda1.com"` (si existe) → `{"available":false}`
 - [x] `curl "localhost:3002/api/domain-check"` (sin parámetro) → 400
 
 ### General
+
 - [x] Ruta /plans accesible
 
 ---
@@ -175,9 +177,9 @@
 - [ ] Página /checkout/success muestra confirmación
 - [ ] Orden creada en panel admin con estado "confirmed"
 - [ ] Stock descontado correctamente tras la compra
-- [ ] Email de confirmación recibido en MailHog (localhost:8025)
 - [ ] Pago fallido → redirige a /checkout/failure
 - [ ] Pago pendiente → redirige a /checkout/pending
+- [ ] Email de confirmación de orden recibido en Resend (bandeja de pruebas)
 
 ### Perfil de tienda (/perfil)
 
@@ -220,7 +222,7 @@
 pnpm test
 ```
 
-- [x] 225 tests pasando
+- [x] 426 tests pasando (55 archivos)
 - [x] 0 tests fallando
 
 ```bash
@@ -230,48 +232,61 @@ pnpm build
 - [x] 3 builds exitosos (storefront, admin, superadmin)
 - [x] 0 errores de TypeScript
 
+```bash
+pnpm test:e2e
+```
+
+- [x] 14 specs E2E pasando (Playwright, CI self-hosted)
+
 ---
 
 ## Resumen de resultados
 
-| Área              | Total ítems | ✅ OK | ❌ Falla |
-| ----------------- | ----------- | ----- | -------- |
-| Superadmin        | 19          | 19    | 0        |
-| Admin             | 35          | 34    | 1        |
-| Admin (CSV)        | 10          | 10    | 0        |
-| Admin (Seguridad)  | 4           | 4     | 0        |
-| Storefront        | 35          | 31    | 4        |
-| Seguridad         | 5           | 5     | 0        |
-| Tests automáticos | 2           | 2     | 0        |
-| **Total**         | **110**     | **105**| **5**    |
+| Área              | Total ítems | ✅ OK   | ❌ Falla |
+| ----------------- | ----------- | ------- | -------- |
+| Superadmin        | 19          | 19      | 0        |
+| Admin             | 36          | 36      | 0        |
+| Admin (CSV)       | 10          | 10      | 0        |
+| Admin (Seguridad) | 4           | 4       | 0        |
+| Storefront        | 36          | 32      | 4        |
+| Seguridad         | 5           | 5       | 0        |
+| Tests automáticos | 3           | 3       | 0        |
+| **Total**         | **113**     | **109** | **4**    |
+
+> Los 4 ❌ de Storefront son el flujo de pago manual en sandbox (requiere cuenta de prueba de MP). El webhook automatizado está cubierto por 11 tests de integración.
 
 ---
-_Archivo actualizado en Mayo 2026 — concordante con TESTING.md_
-_Checklist generado en Abril 2026 — Pre Fase 5_
+
+_Archivo actualizado en Agosto 2026 — concordante con TESTING.md_
+_Checklist generado en Abril 2026 — Pre Fase 5; migrado a servicios cloud en Julio 2026_
 
 ---
 
 ## 8. Verificación de la Fase 5 (Seguridad y Rendimiento)
 
 ### Seguridad (RLS, Auth y CSRF)
-- [x] Acceder a `tienda1.lvh.me:3001/login` → debe devolver un error 403. No debe cargar el login del admin.
-- [x] Acceder a `localhost:3001/login` → debe cargar el panel de administración normalmente.
-- [x] Acceder a `tienda1.lvh.me:3002/login` → debe devolver un error 403. No debe cargar el login del superadmin.
-- [x] Acceder a `localhost:3002/login` → debe cargar el panel del superadministrador normalmente.
-- [x] Registro de cliente con email nuevo → 201. El email de confirmación debe aparecer en MailHog.
+
+> ⚠️ **Actualizado 08-08:** los `proxy.ts` de admin y superadmin fueron **eliminados** (10-07, eran no-ops). Ya no existe rechazo de subdominios a nivel de middleware en esas apps. El aislamiento de tenant se garantiza por datos (RLS + `withTenantContext`), no por host. Las pruebas de 403 por subdominio quedan obsoletas.
+
+- [x] Login de admin en `admin.landaetastudio.com` (o localhost:3001) → panel de administración normal.
+- [x] Login de superadmin en `superadmin.landaetastudio.com` (o localhost:3002) → panel del superadministrador normal.
+- [x] Registro de cliente con email nuevo → 201. Email de confirmación enviado vía Resend.
 - [x] Intentar crear un producto en el admin de tienda1. El producto solo debe ser visible en la tienda1 y no en otras.
 
 ### Validación de Errores 409 (Conflict)
+
 - [x] En el panel de administración, intentar crear un producto con un slug que ya exista. Verificar que aparece un mensaje de error junto al campo slug, no solo un mensaje genérico.
 - [x] En el panel de superadmin, intentar crear un tenant con un slug que ya exista. Verificar el mensaje de error en el campo slug.
 - [x] Repetir la prueba para categorías con slug duplicado.
 
 ### Logs Estructurados (Pino)
+
 - [x] Iniciar la aplicación en modo desarrollo (`pnpm dev`). Navegar por el storefront y el admin.
 - [x] Verificar que en la terminal los logs aparecen con el nuevo formato (colores, timestamp legible) y no como `console.log` planos.
 - [x] Buscar en los logs la presencia de la palabra "Proxy" para confirmar que los logs del middleware están usando el nuevo sistema.
 
 ### Integración de Sentry
+
 - [x] Iniciar la aplicación en modo desarrollo sin configurar `SENTRY_DSN`.
 - [x] Verificar que la aplicación compila y arranca sin errores relacionados con Sentry.
 - [x] En la terminal, buscar un mensaje de información que indique que Sentry no está configurado (o simplemente que no hay errores de compilación).
@@ -281,23 +296,22 @@ _Checklist generado en Abril 2026 — Pre Fase 5_
 ## Pendientes documentados
 
 ### Importación de productos por CSV
-- **Estado:** No implementado
-- **Descripción:** Permitir que el admin cargue productos masivamente desde un archivo CSV
-- **Campos mínimos del CSV:** nombre, slug, descripción, precio, stock, categoría, SKU
-- **Ubicación sugerida:** `/admin/products` → botón "Importar CSV"
-- **Endpoints a crear:** `POST /api/products/import` en admin
-- **Consideraciones:** validar formato, manejar errores por fila, reportar resumen de importación
+
+- **Estado:** ✅ Implementado (ver sección 6 abajo)
+- **Endpoints:** `POST /api/products/import` en admin
+- **Detalle:** transacción POR FILA (éxito parcial), validación por fila con resumen (creados, omitidos, errores), template descargable
 
 ### Seguridad de subdominios en admin y superadmin
-- **Estado:** ✅ Implementado — commit 13b5f28
-- **Descripción:** proxy.ts en admin y superadmin rechaza requests desde subdominios de tenant
-- **Pendiente para producción:** configurar variables `ADMIN_HOST` y `SUPERADMIN_HOST` en Vercel
+
+- **Estado:** ⚠️ **Obsoleto — proxies eliminados**
+- **Descripción:** los `proxy.ts` de admin y superadmin (que rechazaban subdominios de tenant) fueron eliminados el 10-07 como no-ops. El aislamiento de tenant se garantiza por datos (RLS + `withTenantContext`), **no** por filtrado de host. `ADMIN_HOST` y `SUPERADMIN_HOST` quedan como documentación de entornos, sin enforce en runtime.
 
 ---
 
 ## 6. Importación de productos por CSV
 
 ### UI Admin (/products)
+
 - [x] Botón "Importar CSV" visible junto a "Nuevo Producto"
 - [x] Click en "Importar CSV" → abre modal
 - [x] Botón "Descargar template de ejemplo" → descarga CSV con columnas correctas
@@ -310,6 +324,7 @@ _Checklist generado en Abril 2026 — Pre Fase 5_
 - [x] Tras importación exitosa → productos aparecen en el listado
 
 ### API
+
 - [x] `POST /api/products/import` sin sesión → 401
 - [x] `POST /api/products/import` sin archivo → 400
 - [x] `POST /api/products/import` con CSV sin columnas requeridas → 400
@@ -319,10 +334,14 @@ _Checklist generado en Abril 2026 — Pre Fase 5_
 
 ## 7. Seguridad de subdominios
 
+> ⚠️ **Obsoleta desde 10-07** — los proxies de admin/superadmin fueron eliminados (no-ops). Estas pruebas ya no aplican: el aislamiento multi-tenant se valida por datos (RLS + `withTenantContext` + tests de tenant isolation), no por host. Mantenidas como registro histórico.
+
 ### Admin (localhost:3001)
-- [x] Acceder a `tienda1.lvh.me:3001/login` → respuesta 403
+
+- [x] Acceder a `tienda1.lvh.me:3001/login` → respuesta 403 _(histórico, pre-cleanup del 10-07)_
 - [x] Acceder a `localhost:3001/login` → carga normalmente
 
 ### Superadmin (localhost:3002)
-- [x] Acceder a `tienda1.lvh.me:3002/login` → respuesta 403
+
+- [x] Acceder a `tienda1.lvh.me:3002/login` → respuesta 403 _(histórico, pre-cleanup del 10-07)_
 - [x] Acceder a `localhost:3002/login` → carga normalmente

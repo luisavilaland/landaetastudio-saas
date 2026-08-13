@@ -1,33 +1,34 @@
-import Link from "next/link";
-import Image from "next/image";
-import type { ProductWithVariants } from "@/lib/products";
+import Link from 'next/link'
+import Image from 'next/image'
+import type { ProductWithVariants } from '@/lib/products'
 
 type ProductCardProps = {
-  product: ProductWithVariants;
-};
+  product: ProductWithVariants
+}
 
 function formatPrice(cents: number): string {
-  return new Intl.NumberFormat("es-UY", {
-    style: "currency",
-    currency: "UYU",
-  }).format(cents / 100);
+  return new Intl.NumberFormat('es-UY', {
+    style: 'currency',
+    currency: 'UYU',
+  }).format(cents / 100)
 }
 
 function getFirstAvailableVariant(product: ProductWithVariants) {
-  return product.variants.find(v => (v.stock ?? 0) > 0) || product.variants[0];
+  return product.variants.find((v) => (v.stock ?? 0) > 0) || product.variants[0]
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const displayVariant = getFirstAvailableVariant(product);
-  const price = displayVariant?.price ?? 0;
-  const stock = displayVariant?.stock ?? 0;
+  const displayVariant = getFirstAvailableVariant(product)
+  const price = displayVariant?.price ?? 0
+  const stock = displayVariant?.stock ?? 0
 
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="group block bg-white border border-zinc-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+      data-testid="product-card"
+      className="group block overflow-hidden rounded-lg border border-zinc-200 bg-white transition-shadow hover:shadow-md"
     >
-      <div className="aspect-square bg-zinc-100 relative">
+      <div className="relative aspect-square bg-zinc-100">
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
@@ -37,12 +38,12 @@ export function ProductCard({ product }: ProductCardProps) {
             className="object-cover"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-zinc-400 text-sm">
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
             Sin imagen
           </div>
         )}
         {stock <= 0 && (
-          <span className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded">
+          <span className="absolute top-2 right-2 rounded bg-red-600 px-2 py-1 text-xs text-white">
             Agotado
           </span>
         )}
@@ -55,9 +56,9 @@ export function ProductCard({ product }: ProductCardProps) {
           {formatPrice(price)}
         </p>
         <p className="mt-1 text-xs text-zinc-500">
-          {stock <= 0 ? "Agotado" : `${stock} disponibles`}
+          {stock <= 0 ? 'Agotado' : `${stock} disponibles`}
         </p>
       </div>
     </Link>
-  );
+  )
 }

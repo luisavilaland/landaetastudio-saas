@@ -1,30 +1,30 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import Image from "next/image";
+import { useState } from 'react'
+import Image from 'next/image'
 
 export function ImageGallery({
   images,
   productName,
 }: {
-  images: { id: string; url: string; alt: string | null; position: number }[];
-  productName: string;
+  images: { id: string; url: string; alt: string | null; position: number }[]
+  productName: string
 }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0)
 
   if (images.length === 0) {
     return (
-      <div className="bg-zinc-100 rounded-lg aspect-square flex items-center justify-center text-zinc-400">
+      <div className="flex aspect-square items-center justify-center rounded-lg bg-zinc-100 text-zinc-400">
         Sin imagen
       </div>
-    );
+    )
   }
 
-  const currentImage = images[currentIndex];
+  const currentImage = images[currentIndex]
 
   return (
     <div>
-      <div className="bg-zinc-100 rounded-lg overflow-hidden aspect-square relative">
+      <div className="relative aspect-square overflow-hidden rounded-lg bg-zinc-100">
         <Image
           src={currentImage.url}
           alt={currentImage.alt || productName}
@@ -37,18 +37,22 @@ export function ImageGallery({
           <>
             <button
               onClick={() =>
-                setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
+                setCurrentIndex((prev) =>
+                  prev === 0 ? images.length - 1 : prev - 1,
+                )
               }
-              className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full w-8 h-8 flex items-center justify-center shadow-md transition-colors"
+              className="absolute top-1/2 left-2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 shadow-md transition-colors hover:bg-white"
               aria-label="Imagen anterior"
             >
               ‹
             </button>
             <button
               onClick={() =>
-                setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))
+                setCurrentIndex((prev) =>
+                  prev === images.length - 1 ? 0 : prev + 1,
+                )
               }
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full w-8 h-8 flex items-center justify-center shadow-md transition-colors"
+              className="absolute top-1/2 right-2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 shadow-md transition-colors hover:bg-white"
               aria-label="Imagen siguiente"
             >
               ›
@@ -58,13 +62,13 @@ export function ImageGallery({
       </div>
 
       {images.length > 1 && (
-        <div className="grid grid-cols-4 gap-2 mt-2">
+        <div className="mt-2 grid grid-cols-4 gap-2">
           {images.map((img, idx) => (
             <button
               key={img.id}
               onClick={() => setCurrentIndex(idx)}
-              className={`relative aspect-square rounded-md overflow-hidden border-2 transition-colors ${
-                idx === currentIndex ? "border-zinc-900" : "border-transparent"
+              className={`relative aspect-square overflow-hidden rounded-md border-2 transition-colors ${
+                idx === currentIndex ? 'border-zinc-900' : 'border-transparent'
               }`}
             >
               <Image
@@ -80,10 +84,10 @@ export function ImageGallery({
       )}
 
       {images.length > 1 && (
-        <p className="text-center text-xs text-zinc-500 mt-2">
+        <p className="mt-2 text-center text-xs text-zinc-500">
           {currentIndex + 1} de {images.length}
         </p>
       )}
     </div>
-  );
+  )
 }

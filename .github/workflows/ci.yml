@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  build:
+    runs-on: self-hosted
+    # Guard anti-fork: repo público + runner self-hosted. Bloquea PRs de forks
+    # (vector RCE); push a develop/main y PRs del mismo repo corren normal.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      # fetch-depth: 0 so origin/develop exists locally, allowing the
+      # migration guard to diff against the base branch.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Guard migraciones inmutables: migrations are append-only. Fails the
+      # build if an already-shipped migration file was edited instead of
+      # adding a new one. Runs on the self-hosted runner (has git/bash).
+      - name: Guard migraciones inmutables
+        run: bash scripts/check-migrations.sh
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+
+      - run: pnpm lint
+
+      - name: Create .env.local for build
+        run: |
+          echo "AUTH_SECRET=dummy-for-build-min-32-chars-long-enough" >> .env.local
+          echo "DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy" >> .env.local
+          echo "DATABASE_APP_URL=postgresql://dummy:dummy@localhost:5432/dummy" >> .env.local
+          echo "MERCADOPAGO_ACCESS_TOKEN=dummy" >> .env.local
+
+      - run: pnpm build
+
+      - run: pnpm test

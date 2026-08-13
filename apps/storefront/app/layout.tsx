@@ -1,34 +1,34 @@
-import type { Metadata } from "next";
-import { headers } from "next/headers";
-import Navbar from "@/components/navbar";
-import { Breadcrumbs, BreadcrumbsProvider } from "@/components/breadcrumbs";
-import { SessionProvider } from "@/components/session-provider";
-import { getCategoriesForTenant } from "@/lib/categories";
-import { validateEnv } from "@repo/validation";
-import "./globals.css";
+import type { Metadata } from 'next'
+import { headers } from 'next/headers'
+import Navbar from '@/components/navbar'
+import { Breadcrumbs, BreadcrumbsProvider } from '@/components/breadcrumbs'
+import { SessionProvider } from '@/components/session-provider'
+import { getCategoriesForTenant } from '@/lib/categories'
+import { validateEnv } from '@repo/validation'
+import './globals.css'
 
-validateEnv();
+validateEnv()
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic'
 
 export async function generateMetadata() {
-  const headersList = await headers();
-  const tenantSlug = headersList.get("x-tenant-slug") || "default";
+  const headersList = await headers()
+  const tenantSlug = headersList.get('x-tenant-slug') || 'default'
 
-  let tenantName = "Mi Tienda";
+  let tenantName = 'Mi Tienda'
 
   try {
-    const { db, dbTenants } = await import("@repo/db");
-    const { eq } = await import("drizzle-orm");
+    const { db, dbTenants } = await import('@repo/db')
+    const { eq } = await import('drizzle-orm')
 
     const result = await db
       .select({ name: dbTenants.name })
       .from(dbTenants)
       .where(eq(dbTenants.slug, tenantSlug))
-      .limit(1);
+      .limit(1)
 
     if (result.length > 0) {
-      tenantName = result[0].name;
+      tenantName = result[0].name
     }
   } catch {
     // ignore
@@ -37,28 +37,28 @@ export async function generateMetadata() {
   return {
     title: tenantName,
     description: `Tienda online de ${tenantName}`,
-  };
+  }
 }
 
 export default async function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
-  const headersList = await headers();
-  const tenantSlug = headersList.get("x-tenant-slug") || "default";
+  const headersList = await headers()
+  const tenantSlug = headersList.get('x-tenant-slug') || 'default'
 
-  let tenantName = "Mi Tienda";
-  let tenantId: string | null = null;
-  let logoUrl: string | null = null;
-  let primaryColor = "#18181b";
-  let secondaryColor = "#f4f4f5";
-  let accentColor = "#ec4899";
-  let fontFamily = "system-ui, sans-serif";
+  let tenantName = 'Mi Tienda'
+  let tenantId: string | null = null
+  let logoUrl: string | null = null
+  let primaryColor = '#18181b'
+  let secondaryColor = '#f4f4f5'
+  let accentColor = '#ec4899'
+  let fontFamily = 'system-ui, sans-serif'
 
   try {
-    const { db, dbTenants } = await import("@repo/db");
-    const { eq } = await import("drizzle-orm");
+    const { db, dbTenants } = await import('@repo/db')
+    const { eq } = await import('drizzle-orm')
 
     const result = await db
       .select({
@@ -68,36 +68,36 @@ export default async function RootLayout({
       })
       .from(dbTenants)
       .where(eq(dbTenants.slug, tenantSlug))
-      .limit(1);
+      .limit(1)
 
     if (result.length > 0) {
-      tenantName = result[0].name;
-      tenantId = result[0].id;
+      tenantName = result[0].name
+      tenantId = result[0].id
       const settings = (result[0].settings ?? {}) as {
-        logoUrl?: string;
-        primaryColor?: string;
-        secondaryColor?: string;
-        accentColor?: string;
-        fontFamily?: string;
-      };
-      logoUrl = settings.logoUrl ?? null;
-      if (settings.primaryColor) primaryColor = settings.primaryColor;
-      if (settings.secondaryColor) secondaryColor = settings.secondaryColor;
-      if (settings.accentColor) accentColor = settings.accentColor;
-      if (settings.fontFamily) fontFamily = settings.fontFamily;
+        logoUrl?: string
+        primaryColor?: string
+        secondaryColor?: string
+        accentColor?: string
+        fontFamily?: string
+      }
+      logoUrl = settings.logoUrl ?? null
+      if (settings.primaryColor) primaryColor = settings.primaryColor
+      if (settings.secondaryColor) secondaryColor = settings.secondaryColor
+      if (settings.accentColor) accentColor = settings.accentColor
+      if (settings.fontFamily) fontFamily = settings.fontFamily
     }
   } catch {
     // ignore
   }
 
-  const categories = tenantId ? await getCategoriesForTenant(tenantId) : [];
+  const categories = tenantId ? await getCategoriesForTenant(tenantId) : []
 
   const themeStyle = {
-    "--tenant-primary-color": primaryColor,
-    "--tenant-secondary-color": secondaryColor,
-    "--tenant-accent-color": accentColor,
-    "--tenant-font-family": fontFamily,
-  } as React.CSSProperties;
+    '--tenant-primary-color': primaryColor,
+    '--tenant-secondary-color': secondaryColor,
+    '--tenant-accent-color': accentColor,
+    '--tenant-font-family': fontFamily,
+  } as React.CSSProperties
 
   const dynamicStyles = `
     /* Override Tailwind palette with tenant colors */
@@ -173,37 +173,41 @@ export default async function RootLayout({
 
     /* Font family */
     body { font-family: var(--tenant-font-family, system-ui, sans-serif) !important; }
-  `;
+  `
 
-    return (
-       <html lang="es" style={themeStyle}>
-         <head>
-           <style dangerouslySetInnerHTML={{ __html: dynamicStyles }} />
-         </head>
-         <body className="min-h-screen flex flex-col bg-zinc-50">
-            <SessionProvider>
-              <BreadcrumbsProvider>
-                <Navbar tenantName={tenantName} logoUrl={logoUrl} categories={categories} />
-                <Breadcrumbs />
-                <main className="flex-1">{children}</main>
-                 <footer className="bg-zinc-100 border-t border-zinc-200 px-6 py-4 mt-auto">
-                   <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                     <p className="text-sm text-zinc-500">
-                       &copy; {new Date().getFullYear()} {tenantName}
-                     </p>
-                     <div className="flex items-center gap-4">
-                       <a
-                         href="/perfil"
-                         className="text-sm text-zinc-600 hover:text-zinc-900"
-                       >
-                         Sobre la tienda
-                       </a>
-                     </div>
-                   </div>
-                 </footer>
-              </BreadcrumbsProvider>
-            </SessionProvider>
-          </body>
-        </html>
-      );
-  }
+  return (
+    <html lang="es" style={themeStyle}>
+      <head>
+        <style dangerouslySetInnerHTML={{ __html: dynamicStyles }} />
+      </head>
+      <body className="flex min-h-screen flex-col bg-zinc-50">
+        <SessionProvider>
+          <BreadcrumbsProvider>
+            <Navbar
+              tenantName={tenantName}
+              logoUrl={logoUrl}
+              categories={categories}
+            />
+            <Breadcrumbs />
+            <main className="flex-1">{children}</main>
+            <footer className="mt-auto border-t border-zinc-200 bg-zinc-100 px-6 py-4">
+              <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+                <p className="text-sm text-zinc-500">
+                  &copy; {new Date().getFullYear()} {tenantName}
+                </p>
+                <div className="flex items-center gap-4">
+                  <a
+                    href="/perfil"
+                    className="text-sm text-zinc-600 hover:text-zinc-900"
+                  >
+                    Sobre la tienda
+                  </a>
+                </div>
+              </div>
+            </footer>
+          </BreadcrumbsProvider>
+        </SessionProvider>
+      </body>
+    </html>
+  )
+}

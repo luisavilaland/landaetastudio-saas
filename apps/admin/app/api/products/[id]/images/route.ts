@@ -1,123 +1,162 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db, dbProducts, dbProductImages } from "@repo/db";
-import { auth } from "@/lib/auth";
-import { eq } from "drizzle-orm";
-import { uploadImage } from "@repo/storage";
-import { productImageSchema } from "@repo/validation";
-import { createLogger } from "@/lib/logger";
+import { NextRequest, NextResponse } from 'next/server'
+import { withTenantContext, dbProducts, dbProductImages } from '@repo/db'
+import { auth } from '@/lib/auth'
+import { and, eq } from 'drizzle-orm'
+import { uploadImage } from '@repo/storage'
+import { createLogger } from '@/lib/logger'
 
-const logger = createLogger("admin-product-images-api");
+const logger = createLogger('admin-product-images-api')
 
-type Params = Promise<{ id: string }>;
+type Params = Promise<{ id: string }>
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: { params: Params },
 ) {
   try {
-    const session = await auth();
+    const session = await auth()
 
     if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { id } = await params;
-    const tenantId = session.user?.tenantId as string;
+    const { id } = await params
+    const tenantId = session.user?.tenantId as string
 
-    const product = await db
-      .select()
-      .from(dbProducts)
-      .where(eq(dbProducts.id, id))
-      .limit(1);
+    return await withTenantContext(tenantId, async (tx) => {
+      const product = await tx
+        .select()
+        .from(dbProducts)
+        .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
+        .limit(1)
 
-    if (product.length === 0) {
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
-    }
+      if (product.length === 0) {
+        return NextResponse.json(
+          { error: 'Producto no encontrado' },
+          { status: 404 },
+        )
+      }
 
-    if (product[0].tenantId !== tenantId) {
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
-    }
+      const images = await tx
+        .select()
+        .from(dbProductImages)
+        .where(
+          and(
+            eq(dbProductImages.productId, id),
+            eq(dbProductImages.tenantId, tenantId),
+          ),
+        )
+        .orderBy(dbProductImages.position)
 
-    const images = await db
-      .select()
-      .from(dbProductImages)
-      .where(eq(dbProductImages.productId, id))
-      .orderBy(dbProductImages.position);
-
-    return NextResponse.json({ images });
+      return NextResponse.json({ images })
+    })
   } catch (error) {
-    logger.error({ error }, "Error getting product images");
-    return NextResponse.json({ error: "Error al obtener imágenes" }, { status: 500 });
+    logger.error({ error }, 'Error getting product images')
+    return NextResponse.json(
+      { error: 'Error al obtener imágenes' },
+      { status: 500 },
+    )
   }
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: { params: Params },
 ) {
   try {
-    const session = await auth();
+    const session = await auth()
 
     if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { id } = await params;
-    const tenantId = session.user?.tenantId as string;
+    const { id } = await params
+    const tenantId = session.user?.tenantId as string
 
-    const product = await db
-      .select()
-      .from(dbProducts)
-      .where(eq(dbProducts.id, id))
-      .limit(1);
+    const product = await withTenantContext(tenantId, async (tx) => {
+      const [product] = await tx
+        .select()
+        .from(dbProducts)
+        .where(and(eq(dbProducts.id, id), eq(dbProducts.tenantId, tenantId)))
+        .limit(1)
+      return product ?? null
+    })
 
-    if (product.length === 0) {
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+    if (!product) {
+      return NextResponse.json(
+        { error: 'Producto no encontrado' },
+        { status: 404 },
+      )
     }
 
-    if (product[0].tenantId !== tenantId) {
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
-    }
-
-    const formData = await request.formData();
-    const image = formData.get("image") as File | null;
+    const formData = await request.formData()
+    const image = formData.get('image') as File | null
 
     if (!image || image.size === 0) {
-      return NextResponse.json({ error: "No se proporcionó imagen" }, { status: 400 });
+      return NextResponse.json(
+        { error: 'No se proporcionó imagen' },
+        { status: 400 },
+      )
     }
 
-    const buffer = Buffer.from(await image.arrayBuffer());
-    const ext = image.name.split(".").pop() || "png";
-    const slug = product[0].slug;
-    const imageUrl = await uploadImage(buffer, `products/${Date.now()}-${slug}.${ext}`, image.type);
+    const buffer = Buffer.from(await image.arrayBuffer())
+    const ext = image.name.split('.').pop() || 'png'
+    const slug = product.slug
+    const imageUrl = await uploadImage(
+      buffer,
+      `products/${Date.now()}-${slug}.${ext}`,
+      image.type,
+    )
 
-    const now = new Date();
+    const now = new Date()
 
-    const existingImages = await db
-      .select()
-      .from(dbProductImages)
-      .where(eq(dbProductImages.productId, id))
-      .orderBy(dbProductImages.position);
+    const [newImage] = await withTenantContext(tenantId, async (tx) => {
+      const existingImages = await tx
+        .select()
+        .from(dbProductImages)
+        .where(
+          and(
+            eq(dbProductImages.productId, id),
+            eq(dbProductImages.tenantId, tenantId),
+          ),
+        )
+        .orderBy(dbProductImages.position)
 
-    const maxPosition = existingImages.length > 0
-      ? Math.max(...existingImages.map(img => img.position ?? 0)) + 1
-      : 0;
+      const maxPosition =
+        existingImages.length > 0
+          ? Math.max(...existingImages.map((img) => img.position ?? 0)) + 1
+          : 0
 
-    const [newImage] = await db
-      .insert(dbProductImages)
-      .values({
-        tenantId,
-        productId: id,
-        url: imageUrl,
-        alt: product[0].name,
-        position: maxPosition,
-        createdAt: now,
-      })
-      .returning();
+      return await tx
+        .insert(dbProductImages)
+        .values({
+          tenantId,
+          productId: id,
+          url: imageUrl,
+          alt: product.name,
+          position: maxPosition,
+          createdAt: now,
+        })
+        .returning()
+    })
 
-    return NextResponse.json({ image: newImage }, { status: 201 });
+    return NextResponse.json({ image: newImage }, { status: 201 })
   } catch (error) {
-    logger.error({ error }, "Error uploading product image");
-    return NextResponse.json({ error: "Error al subir imagen" }, { status: 500 });
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === '23503'
+    ) {
+      return NextResponse.json(
+        { error: 'Producto no encontrado' },
+        { status: 409 },
+      )
+    }
+    logger.error({ error }, 'Error uploading product image')
+    return NextResponse.json(
+      { error: 'Error al subir imagen' },
+      { status: 500 },
+    )
   }
 }

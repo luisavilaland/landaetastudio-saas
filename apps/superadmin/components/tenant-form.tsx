@@ -1,87 +1,91 @@
-"use client";
+'use client'
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 
 type Tenant = {
-  id?: string;
-  slug?: string;
-  name?: string;
-  plan?: string | null;
-  status?: string | null;
-  customDomain?: string | null;
-  settings?: unknown;
-};
+  id?: string
+  slug?: string
+  name?: string
+  plan?: string | null
+  status?: string | null
+  customDomain?: string | null
+  settings?: unknown
+}
 
 type Props = {
-  tenant?: Tenant;
-  isEdit?: boolean;
-};
+  tenant?: Tenant
+  isEdit?: boolean
+}
 
 export function TenantForm({ tenant, isEdit = false }: Props) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState({
-    slug: tenant?.slug || "",
-    name: tenant?.name || "",
-    plan: tenant?.plan || "starter",
-    status: tenant?.status || "active",
-    customDomain: tenant?.customDomain || "",
-  });
+    slug: tenant?.slug || '',
+    name: tenant?.name || '',
+    plan: tenant?.plan || 'starter',
+    status: tenant?.status || 'active',
+    customDomain: tenant?.customDomain || '',
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+    e.preventDefault()
+    setLoading(true)
+    setError('')
 
     try {
-      const url = isEdit && tenant?.id ? `/api/tenants/${tenant.id}` : "/api/tenants";
-      const method = isEdit ? "PUT" : "POST";
+      const url =
+        isEdit && tenant?.id ? `/api/tenants/${tenant.id}` : '/api/tenants'
+      const method = isEdit ? 'PUT' : 'POST'
 
-      setFieldErrors({});
+      setFieldErrors({})
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
-      });
+      })
 
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json()
         if (res.status === 409 && data.field) {
-          setFieldErrors({ [data.field]: data.error });
-          setLoading(false);
-          return;
+          setFieldErrors({ [data.field]: data.error })
+          setLoading(false)
+          return
         }
-        throw new Error(data.error || "Error saving tenant");
+        throw new Error(data.error || 'Error saving tenant')
       }
 
-      router.push("/tenants");
-      router.refresh();
+      router.push('/tenants')
+      router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error saving tenant");
+      setError(err instanceof Error ? err.message : 'Error saving tenant')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="max-w-md">
-      <h1 className="text-2xl font-semibold mb-6">
-        {isEdit ? "Editar Tenant" : "Nuevo Tenant"}
+      <h1 className="mb-6 text-2xl font-semibold">
+        {isEdit ? 'Editar Tenant' : 'Nuevo Tenant'}
       </h1>
 
       {error && (
-        <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 rounded-md">
+        <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-600">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="slug" className="block text-sm font-medium text-zinc-700">
+          <label
+            htmlFor="slug"
+            className="block text-sm font-medium text-zinc-700"
+          >
             Slug
           </label>
           <input
@@ -90,11 +94,12 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
             required
             value={form.slug}
             onChange={(e) => {
-              setForm({ ...form, slug: e.target.value });
-              if (fieldErrors.slug) setFieldErrors(prev => ({ ...prev, slug: "" }));
+              setForm({ ...form, slug: e.target.value })
+              if (fieldErrors.slug)
+                setFieldErrors((prev) => ({ ...prev, slug: '' }))
             }}
-            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500 ${
-              fieldErrors.slug ? "border-red-500" : "border-zinc-300"
+            className={`mt-1 block w-full rounded-md border px-3 py-2 shadow-sm focus:ring-2 focus:ring-zinc-500 focus:outline-none ${
+              fieldErrors.slug ? 'border-red-500' : 'border-zinc-300'
             }`}
             placeholder="mi-tienda"
           />
@@ -104,20 +109,25 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
         </div>
 
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-zinc-700">
+          <label
+            htmlFor="name"
+            className="block text-sm font-medium text-zinc-700"
+          >
             Nombre
           </label>
           <input
             id="name"
             type="text"
+            data-testid="tenant-form-name"
             required
             value={form.name}
             onChange={(e) => {
-              setForm({ ...form, name: e.target.value });
-              if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: "" }));
+              setForm({ ...form, name: e.target.value })
+              if (fieldErrors.name)
+                setFieldErrors((prev) => ({ ...prev, name: '' }))
             }}
-            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500 ${
-              fieldErrors.name ? "border-red-500" : "border-zinc-300"
+            className={`mt-1 block w-full rounded-md border px-3 py-2 shadow-sm focus:ring-2 focus:ring-zinc-500 focus:outline-none ${
+              fieldErrors.name ? 'border-red-500' : 'border-zinc-300'
             }`}
             placeholder="Mi Tienda"
           />
@@ -127,14 +137,17 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
         </div>
 
         <div>
-          <label htmlFor="plan" className="block text-sm font-medium text-zinc-700">
+          <label
+            htmlFor="plan"
+            className="block text-sm font-medium text-zinc-700"
+          >
             Plan
           </label>
           <select
             id="plan"
             value={form.plan}
             onChange={(e) => setForm({ ...form, plan: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
+            className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-sm focus:ring-2 focus:ring-zinc-500 focus:outline-none"
           >
             <option value="starter">Starter</option>
             <option value="pro">Pro</option>
@@ -143,14 +156,17 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
         </div>
 
         <div>
-          <label htmlFor="status" className="block text-sm font-medium text-zinc-700">
+          <label
+            htmlFor="status"
+            className="block text-sm font-medium text-zinc-700"
+          >
             Estado
           </label>
           <select
             id="status"
             value={form.status}
             onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
+            className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-sm focus:ring-2 focus:ring-zinc-500 focus:outline-none"
           >
             <option value="active">Activo</option>
             <option value="inactive">Inactivo</option>
@@ -158,7 +174,10 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
         </div>
 
         <div>
-          <label htmlFor="customDomain" className="block text-sm font-medium text-zinc-700">
+          <label
+            htmlFor="customDomain"
+            className="block text-sm font-medium text-zinc-700"
+          >
             Dominio personalizado
           </label>
           <input
@@ -166,16 +185,19 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
             type="text"
             value={form.customDomain}
             onChange={(e) => {
-              setForm({ ...form, customDomain: e.target.value });
-              if (fieldErrors.customDomain) setFieldErrors(prev => ({ ...prev, customDomain: "" }));
+              setForm({ ...form, customDomain: e.target.value })
+              if (fieldErrors.customDomain)
+                setFieldErrors((prev) => ({ ...prev, customDomain: '' }))
             }}
-            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500 ${
-              fieldErrors.customDomain ? "border-red-500" : "border-zinc-300"
+            className={`mt-1 block w-full rounded-md border px-3 py-2 shadow-sm focus:ring-2 focus:ring-zinc-500 focus:outline-none ${
+              fieldErrors.customDomain ? 'border-red-500' : 'border-zinc-300'
             }`}
             placeholder="mitienda.com"
           />
           {fieldErrors.customDomain && (
-            <p className="mt-1 text-sm text-red-600">{fieldErrors.customDomain}</p>
+            <p className="mt-1 text-sm text-red-600">
+              {fieldErrors.customDomain}
+            </p>
           )}
           <p className="mt-1 text-xs text-zinc-500">
             Ejemplo: mitienda.com (sin http://)
@@ -185,20 +207,21 @@ export function TenantForm({ tenant, isEdit = false }: Props) {
         <div className="flex gap-3 pt-4">
           <button
             type="submit"
+            data-testid="tenant-form-submit"
             disabled={loading}
-            className="px-4 py-2 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 disabled:opacity-50"
+            className="rounded-md bg-zinc-900 px-4 py-2 text-white hover:bg-zinc-800 disabled:opacity-50"
           >
-            {loading ? "Guardando..." : "Guardar"}
+            {loading ? 'Guardando...' : 'Guardar'}
           </button>
           <button
             type="button"
-            onClick={() => router.push("/tenants")}
-            className="px-4 py-2 border border-zinc-300 rounded-md hover:bg-zinc-50"
+            onClick={() => router.push('/tenants')}
+            className="rounded-md border border-zinc-300 px-4 py-2 hover:bg-zinc-50"
           >
             Cancelar
           </button>
         </div>
       </form>
     </div>
-  );
+  )
 }

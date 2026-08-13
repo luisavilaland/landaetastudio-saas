@@ -4,7 +4,7 @@ Brief Técnico — Fase 5: Producción
 
 Para: Equipo de Ingeniería
 
-*Versión 1.0 — Abril 2026 — Confidencial*
+_Versión 1.0 — Abril 2026 — Confidencial_
 
 Resumen Ejecutivo
 
@@ -20,45 +20,46 @@ Nada de lo que se construya en esta fase agrega features nuevas. Todo es para qu
 
 Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 
-| **Componente** | **Estado** | **Notas** |
-| --- | --- | --- |
-| **Autenticación admin/superadmin** | ✅ OK | NextAuth v5 con JWT. Funcional en ambas apps. |
-| **Multi-tenant (tenantId)** | ✅ OK | Columna tenantId en todas las tablas. Middleware resuelve slug. |
-| **Catálogo + variantes + imágenes** | ✅ OK | CRUD completo, múltiples imágenes, variantes JSONB. |
-| **Carrito con Redis** | ✅ OK | Sesiones anónimas, TTL 7 días, variantes en carrito. |
-| **Checkout MercadoPago** | ✅ OK | Flujo completo, webhook, confirmación por email. |
-| **Panel admin órdenes + dashboard** | ✅ OK | Métricas reales, cambio de estado, stock bajo. |
-| **Configuración visual del tenant** | ✅ OK | Logo, colores, descripción, redes sociales. |
-| **Métodos de envío configurables** | ✅ OK | CRUD en admin + API storefront con `x-tenant-id`. Checkout con selector visual y cálculo dinámico. |
-| **Proxy multi-tenant (storefront)** | ✅ OK | Restaurado en Fase 4 con NextResponse.next(). |
-| **Dominio personalizado** | ✅ OK | Verificación + resolución por dominio en proxy. |
-| **Página de perfil de tienda** | ✅ OK | Server Component con SEO (JSON-LD). |
-| **Responses HTTP** | ✅ OK | `NextResponse` unificado en todas las rutas. Sin `new Response()` nativa. |
-| **Tests** | ✅ OK | 225/225 pasando, 0 fallos. Build limpio en 3 apps. |
-| **Auth consolidada en @repo/auth** | ✅ OK | Código duplicado movido a paquete compartido. |
-| **Lógica de negocio en @repo/commerce** | ✅ OK | Carrito, órdenes, emails, tenant centralizados. |
-| **Normalización de slugs** | ✅ OK | `normalizeSlug()` en @repo/validation/src/utils.ts. |
-| **Row Level Security (RLS)** | ✅ OK | Implementado en tablas de negocio con políticas `tenant_isolation`. Función `set_tenant_id` y helper `withTenantContext` en `@repo/db`. |
-| **AUTH_SECRET con fallback hardcoded** | ✅ OK | Eliminado fallback hardcoded. Validación al arrancar en `@repo/auth` lanza error si falta la variable. |
-| **CSRF protection** | ✅ OK | Manejado automáticamente por NextAuth v5 en producción (NODE_ENV=production). Documentado en `next.config.ts`. |
-| **Infraestructura cloud** | ✅ OK | Código preparado con variables condicionales (R2, Resend, Upstash). Credenciales configurables por entorno. |
-| **Validación de env vars al arrancar** | ✅ OK | Zod valida variables críticas en `packages/validation/src/env.ts`. Falla inmediato si falta alguna en producción. |
-| **Logs estructurados** | ✅ OK | `@repo/logger` con `createLogger()`. Pino + pino-pretty en dev, JSON en prod. Contexto con tenantId, userId, requestId. |
-| **Deploy en Vercel** | 🔄 Pendiente | Ningún ambiente productivo configurado todavía. |
-| **Sentry** | ✅ OK | Integrado en las tres apps con `@sentry/nextjs`. Configuración condicional vía SENTRY_DSN. |
-| **Mensajes de error 409** | ✅ OK | Todos los endpoints retornan `field` para identificar el campo conflictivo. UI inline con validación visual en formularios. |
-| **Configuración de build** | ✅ OK | `next.config.mjs` para compatibilidad ESM en Next.js 16. Dotenv integrado en cada app. |
+| **Componente**                          | **Estado**   | **Notas**                                                                                                                               |
+| --------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Autenticación admin/superadmin**      | ✅ OK        | NextAuth v5 con JWT. Funcional en ambas apps.                                                                                           |
+| **Multi-tenant (tenantId)**             | ✅ OK        | Columna tenantId en todas las tablas. Middleware resuelve slug.                                                                         |
+| **Catálogo + variantes + imágenes**     | ✅ OK        | CRUD completo, múltiples imágenes, variantes JSONB.                                                                                     |
+| **Carrito con Redis**                   | ✅ OK        | Sesiones anónimas, TTL 7 días, variantes en carrito.                                                                                    |
+| **Checkout MercadoPago**                | ✅ OK        | Flujo completo, webhook, confirmación por email.                                                                                        |
+| **Panel admin órdenes + dashboard**     | ✅ OK        | Métricas reales, cambio de estado, stock bajo.                                                                                          |
+| **Configuración visual del tenant**     | ✅ OK        | Logo, colores, descripción, redes sociales.                                                                                             |
+| **Métodos de envío configurables**      | ✅ OK        | CRUD en admin + API storefront con `x-tenant-id`. Checkout con selector visual y cálculo dinámico.                                      |
+| **Proxy multi-tenant (storefront)**     | ✅ OK        | Restaurado en Fase 4 con NextResponse.next().                                                                                           |
+| **Dominio personalizado**               | ✅ OK        | Verificación + resolución por dominio en proxy.                                                                                         |
+| **Página de perfil de tienda**          | ✅ OK        | Server Component con SEO (JSON-LD).                                                                                                     |
+| **Responses HTTP**                      | ✅ OK        | `NextResponse` unificado en todas las rutas. Sin `new Response()` nativa.                                                               |
+| **Tests**                               | ✅ OK        | 225/225 pasando, 0 fallos. Build limpio en 3 apps.                                                                                      |
+| **Auth consolidada en @repo/auth**      | ✅ OK        | Código duplicado movido a paquete compartido.                                                                                           |
+| **Lógica de negocio en @repo/commerce** | ✅ OK        | Carrito, órdenes, emails, tenant centralizados.                                                                                         |
+| **Normalización de slugs**              | ✅ OK        | `normalizeSlug()` en @repo/validation/src/utils.ts.                                                                                     |
+| **Row Level Security (RLS)**            | ✅ OK        | Implementado en tablas de negocio con políticas `tenant_isolation`. Función `set_tenant_id` y helper `withTenantContext` en `@repo/db`. |
+| **AUTH_SECRET con fallback hardcoded**  | ✅ OK        | Eliminado fallback hardcoded. Validación al arrancar en `@repo/auth` lanza error si falta la variable.                                  |
+| **CSRF protection**                     | ✅ OK        | Manejado automáticamente por NextAuth v5 en producción (NODE_ENV=production). Documentado en `next.config.ts`.                          |
+| **Infraestructura cloud**               | ✅ OK        | Código preparado con variables condicionales (R2, Resend, Upstash). Credenciales configurables por entorno.                             |
+| **Validación de env vars al arrancar**  | ✅ OK        | Zod valida variables críticas en `packages/validation/src/env.ts`. Falla inmediato si falta alguna en producción.                       |
+| **Logs estructurados**                  | ✅ OK        | `@repo/logger` con `createLogger()`. Pino + pino-pretty en dev, JSON en prod. Contexto con tenantId, userId, requestId.                 |
+| **Deploy en Vercel**                    | 🔄 Pendiente | Ningún ambiente productivo configurado todavía.                                                                                         |
+| **Sentry**                              | ✅ OK        | Integrado en las tres apps con `@sentry/nextjs`. Configuración condicional vía SENTRY_DSN.                                              |
+| **Mensajes de error 409**               | ✅ OK        | Todos los endpoints retornan `field` para identificar el campo conflictivo. UI inline con validación visual en formularios.             |
+| **Configuración de build**              | ✅ OK        | `next.config.mjs` para compatibilidad ESM en Next.js 16. Dotenv integrado en cada app.                                                  |
 
 **2. Pasos previos antes de Fase 5**
 
 ✅ **Completado en orden:**
 
 1. **Pruebas manuales:** Ejecutar el checklist `TESTING-MANUAL.md` completo (92 ítems en 5 áreas). Anotar fallos y corregirlos antes de avanzar.
-2. **Deuda técnica menor:** ~~Consolidar auth duplicada en `@repo/auth` (admin y superadmin tienen su propio `lib/auth.ts`)~~ ✅ Completado, ~~normalización de slugs (acentos y mayúsculas)~~ ✅ Completado, y ~~refactorización de lógica duplicada hacia `@repo/commerce`~~ ✅ Completado.  
+2. **Deuda técnica menor:** ~~Consolidar auth duplicada en `@repo/auth` (admin y superadmin tienen su propio `lib/auth.ts`)~~ ✅ Completado, ~~normalización de slugs (acentos y mayúsculas)~~ ✅ Completado, y ~~refactorización de lógica duplicada hacia `@repo/commerce`~~ ✅ Completado.
 
 ✅ Completado: auth duplicada consolidada en @repo/auth, lógica de negocio migrada a @repo/commerce, slugs normalizados con normalizeSlug().
 
 **Tareas bloqueantes de Fase 5 completadas:**
+
 - ✅ **Row Level Security (RLS)** implementado en PostgreSQL
 - ✅ **AUTH_SECRET** sin fallback hardcoded, validación al arrancar
 - ✅ **CSRF protection** manejado automáticamente por NextAuth v5 en producción
@@ -69,25 +70,25 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 
 ---
 
-| **#** | **Prioridad** | **Tarea** | **Semana** |
-| --- | --- | --- | --- |
-| **1** | **BLOQUEANTE** | **Row Level Security en PostgreSQL** | **1** |
-| **2** | **BLOQUEANTE** | **Eliminar fallback AUTH_SECRET + validación obligatoria** | **1** |
-| **3** | **BLOQUEANTE** | **CSRF activado en producción** | **1** |
-| **4** | **Alta** | **Migración PostgreSQL local → Neon** | **2** |
-| **5** | **Alta** | **Migración Redis local → Upstash** | **2** |
-| **6** | **Alta** | **Migración MinIO → Cloudflare R2** | **2** |
-| **7** | **Alta** | **Deploy Vercel (storefront + admin + superadmin)** | **2-3** |
-| **8** | **Alta** | ~~Validación de variables de entorno al arrancar (Zod)~~ | **✅ Completada** |
-| **9** | **Alta** | ~~NEXTAUTH_URL dinámica por entorno~~ | **✅ Completada** |
-| **10** | **Media** | ~~Logs estructurados con pino~~ | **✅ Completada** |
-| **11** | **Media** | ~~Sentry para errores en producción~~ | **✅ Completada** |
-| **12** | **Media** | ~~Refactorización auth duplicada → @repo/auth~~ | **✅ Completada** |
-| **13** | **Media** | ~~Normalizar slug en create/edit de productos~~ | **✅ Completada** |
-| **14** | **Baja** | ~~Refactorización hacia @repo/commerce~~ | **✅ Completada** |
-| **15** | **Baja** | ~~Eliminar dotenv duplicado en next.config.ts~~ | **✅ Completada** |
-| **16** | **Baja** | ~~Mensajes de error 409 con campo específico~~ | **✅ Completada** |
-| **17** | **Baja** | ~~Configuración de build ESM (next.config.mjs)~~ | **✅ Completada** |
+| **#**  | **Prioridad**  | **Tarea**                                                  | **Semana**        |
+| ------ | -------------- | ---------------------------------------------------------- | ----------------- |
+| **1**  | **BLOQUEANTE** | **Row Level Security en PostgreSQL**                       | **1**             |
+| **2**  | **BLOQUEANTE** | **Eliminar fallback AUTH_SECRET + validación obligatoria** | **1**             |
+| **3**  | **BLOQUEANTE** | **CSRF activado en producción**                            | **1**             |
+| **4**  | **Alta**       | **Migración PostgreSQL local → Neon**                      | **2**             |
+| **5**  | **Alta**       | **Migración Redis local → Upstash**                        | **2**             |
+| **6**  | **Alta**       | **Migración MinIO → Cloudflare R2**                        | **2**             |
+| **7**  | **Alta**       | **Deploy Vercel (storefront + admin + superadmin)**        | **2-3**           |
+| **8**  | **Alta**       | ~~Validación de variables de entorno al arrancar (Zod)~~   | **✅ Completada** |
+| **9**  | **Alta**       | ~~NEXTAUTH_URL dinámica por entorno~~                      | **✅ Completada** |
+| **10** | **Media**      | ~~Logs estructurados con pino~~                            | **✅ Completada** |
+| **11** | **Media**      | ~~Sentry para errores en producción~~                      | **✅ Completada** |
+| **12** | **Media**      | ~~Refactorización auth duplicada → @repo/auth~~            | **✅ Completada** |
+| **13** | **Media**      | ~~Normalizar slug en create/edit de productos~~            | **✅ Completada** |
+| **14** | **Baja**       | ~~Refactorización hacia @repo/commerce~~                   | **✅ Completada** |
+| **15** | **Baja**       | ~~Eliminar dotenv duplicado en next.config.ts~~            | **✅ Completada** |
+| **16** | **Baja**       | ~~Mensajes de error 409 con campo específico~~             | **✅ Completada** |
+| **17** | **Baja**       | ~~Configuración de build ESM (next.config.mjs)~~           | **✅ Completada** |
 
 **3. Implementación detallada — Bloqueantes**
 
@@ -347,7 +348,7 @@ Esta es la lista completa de variables que deben estar configuradas en cada app 
 | **AUTH_SECRET** | Admin, Superadmin | Secret para JWT. Generar con: openssl rand -base64 32 |
 | **NEXTAUTH_URL** | Admin, Superadmin | Opcional: NextAuth v5 la infiere del Host header. Solo necesaria si usás proxy inverso. |
 | **MP_ACCESS_TOKEN** | Storefront | Access token de MercadoPago (producción: APP_USR-...) |
-| **MP_WEBHOOK_SECRET** | Storefront | Secret para validar webhooks de MercadoPago |
+| **MERCADOPAGO_WEBHOOK_SECRET** | Storefront, Admin, Superadmin | Secret para validar webhooks de MercadoPago |
 | **RESEND_API_KEY** | Storefront | API key de Resend para emails transaccionales |
 | **NEXT_PUBLIC_APP_URL** | Storefront | URL pública del storefront (para links en emails) |
 | **R2_ACCOUNT_ID** | Admin | ID de cuenta Cloudflare para R2 |
@@ -409,3 +410,4 @@ La Fase 5 fue completada exitosamente el 6 de mayo de 2026. Todos los objetivos 
 - **Calidad del código**: 225 tests pasando, build limpio en las 3 apps, lint y typecheck sin errores.
 
 El sistema está listo para el deploy a producción en Vercel con infraestructura cloud (Neon PostgreSQL, Upstash Redis, Cloudflare R2, Resend).
+$$

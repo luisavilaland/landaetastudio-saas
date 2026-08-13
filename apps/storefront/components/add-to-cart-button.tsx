@@ -1,65 +1,67 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { captureException } from '@sentry/nextjs'
 
 type Props = {
-  variantId: string;
-  inStock: boolean;
-};
+  variantId: string
+  inStock: boolean
+}
 
 export function AddToCartButton({ variantId, inStock }: Props) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [added, setAdded] = useState(false);
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [added, setAdded] = useState(false)
 
   const handleAddToCart = async () => {
-    if (!inStock) return;
+    if (!inStock) return
 
-    setLoading(true);
+    setLoading(true)
     try {
-      const res = await fetch("/api/cart", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ variantId, quantity: 1 }),
-      });
+      })
 
       if (res.ok) {
-        setAdded(true);
+        setAdded(true)
         setTimeout(() => {
-          router.refresh();
-        }, 1500);
+          router.refresh()
+        }, 1500)
       }
     } catch (error) {
-      console.error("Error adding to cart:", error);
+      captureException(error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   if (added) {
     return (
       <Link
         href="/cart"
-        className="w-full block text-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700"
+        className="block w-full rounded-lg bg-green-600 px-6 py-3 text-center font-medium text-white hover:bg-green-700"
       >
         ✓ Agregado al carrito
       </Link>
-    );
+    )
   }
 
   return (
     <button
       onClick={handleAddToCart}
+      data-testid="add-to-cart"
       disabled={!inStock || loading}
-      className={`w-full block text-center px-6 py-3 font-medium rounded-lg ${
+      className={`block w-full rounded-lg px-6 py-3 text-center font-medium ${
         inStock
-          ? "bg-zinc-900 text-white hover:bg-zinc-800"
-          : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
+          ? 'bg-zinc-900 text-white hover:bg-zinc-800'
+          : 'cursor-not-allowed bg-zinc-200 text-zinc-400'
       }`}
     >
-      {loading ? "Agregando..." : inStock ? "Agregar al carrito" : "Agotado"}
+      {loading ? 'Agregando...' : inStock ? 'Agregar al carrito' : 'Agotado'}
     </button>
-  );
+  )
 }

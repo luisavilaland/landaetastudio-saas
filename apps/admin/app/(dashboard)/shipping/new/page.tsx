@@ -1,13 +1,13 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { ShippingForm } from "@/components/shipping-form";
+import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
+import { ShippingForm } from '@/components/shipping-form'
 
 export default async function NewShippingMethodPage() {
-  const session = await auth();
+  const session = await auth()
 
   if (!session) {
-    redirect("/login");
+    redirect('/login')
   }
 
-  return <ShippingForm mode="create" />;
+  return <ShippingForm mode="create" />
 }

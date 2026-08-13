@@ -1,190 +1,428 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest, NextResponse } from "next/server";
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-describe("POST /api/checkout", () => {
+vi.mock('@/lib/tenant', () => ({
+  getTenantId: vi.fn(),
+}))
+
+vi.mock('@/lib/redis', () => ({
+  safeGet: vi.fn(),
+  redisDel: vi.fn(),
+}))
+
+vi.mock('@/lib/logger', () => ({
+  createLogger: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}))
+
+vi.mock('@repo/db', async () => {
+  const actual = await vi.importActual<typeof import('@repo/db')>('@repo/db')
+  return { ...actual, withTenantContext: vi.fn() }
+})
+
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(),
+  headers: vi.fn(),
+}))
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(),
+}))
+
+import { withTenantContext } from '@repo/db'
+import { makeTxMock, mockReq } from '@repo/test-utils'
+import { cookies } from 'next/headers'
+import { safeGet, redisDel } from '@/lib/redis'
+import { getTenantId } from '@/lib/tenant'
+import { auth } from '@/lib/auth'
+import { POST } from '../route'
+
+const TENANT_ID = 'tenant-123'
+const CROSS_TENANT_ID = 'tenant-b'
+const SESSION_ID = 'session-abc-123'
+const VARIANT_ID = 'variant-1'
+
+const MOCK_CART = {
+  items: [
+    { variantId: VARIANT_ID, quantity: 2, addedAt: new Date().toISOString() },
+  ],
+  updatedAt: new Date().toISOString(),
+}
+
+const MOCK_CART_QTY_1 = {
+  items: [
+    { variantId: VARIANT_ID, quantity: 1, addedAt: new Date().toISOString() },
+  ],
+  updatedAt: new Date().toISOString(),
+}
+
+const MOCK_EMPTY_CART = {
+  items: [],
+  updatedAt: new Date().toISOString(),
+}
+
+const MOCK_VARIANT = {
+  id: VARIANT_ID,
+  tenantId: TENANT_ID,
+  productId: 'product-1',
+  sku: 'SKU-001',
+  price: 1999,
+  stock: 10,
+}
+
+const MOCK_SHIPPING_METHOD = {
+  id: 'method-1',
+  tenantId: TENANT_ID,
+  name: 'Envío estándar',
+  description: '3 a 5 días',
+  price: 500,
+  freeShippingThreshold: null,
+  isActive: 'true',
+  estimatedDaysMin: 3,
+  estimatedDaysMax: 5,
+  sortOrder: 0,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}
+
+const MOCK_ORDER = {
+  id: 'order-123',
+  tenantId: TENANT_ID,
+  total: 4498,
+  status: 'pending_payment',
+  currency: 'UYU',
+  customerEmail: 'test@test.com',
+  shippingDetails: {
+    name: 'Juan Perez',
+    email: 'test@test.com',
+    phone: '099123456',
+    address: 'Calle 123',
+  },
+  customerId: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}
+
+function setupCookie(sessionId: string | undefined) {
+  const mockCookieStore = { get: vi.fn() }
+  vi.mocked(cookies).mockResolvedValue(mockCookieStore as any)
+  mockCookieStore.get.mockImplementation((key: string) => {
+    if (key === 'cart_session_id' && sessionId) return { value: sessionId }
+    return undefined
+  })
+}
+
+describe('POST /api/checkout', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
+    vi.clearAllMocks()
+    vi.mocked(getTenantId).mockResolvedValue(TENANT_ID)
+    vi.mocked(auth).mockRejectedValue(new Error('No session'))
+  })
 
-  describe("Authentication & Session", () => {
-    it("should return 401 when no cart session exists", async () => {
-      const mockCookies = {
-        get: vi.fn().mockReturnValue(undefined),
-      };
-      
-      const handler = async (cookies: typeof mockCookies) => {
-        const sessionId = cookies.get("cart_session_id")?.value;
-        if (!sessionId) {
-          return NextResponse.json(
-            { error: "Sesión de carrito no encontrada" },
-            { status: 401 }
-          );
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+  it('debe devolver 401 cuando no hay cookie de carrito', async () => {
+    setupCookie(undefined)
 
-      const response = await handler(mockCookies);
-      expect(response.status).toBe(401);
-    });
+    const res = await POST(
+      mockReq('POST', {
+        email: 'test@test.com',
+        name: 'Juan Perez',
+        phone: '099123456',
+        address: 'Calle 123',
+      }),
+    )
 
-    it("should return 400 when cart is empty", async () => {
-      const mockCart = { items: [] };
-      
-      const handler = async (cart: typeof mockCart) => {
-        if (!cart.items || cart.items.length === 0) {
-          return NextResponse.json(
-            { error: "Carrito vacío" },
-            { status: 400 }
-          );
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+    expect(res.status).toBe(401)
+    const body = await res.json()
+    expect(body.error).toBe('Sesión de carrito no encontrada')
+  })
 
-      const response = await handler(mockCart);
-      expect(response.status).toBe(400);
-    });
-  });
+  it('debe devolver 400 cuando el carrito está vacío en Redis', async () => {
+    setupCookie(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(null)
 
-  describe("Validation", () => {
-    it("should return 400 when shipping details are missing", async () => {
-      const body = { email: "", name: "", phone: "", address: "" };
-      
-      const handler = async (b: typeof body) => {
-        const { email, name, phone, address } = b;
-        if (!email || !name || !phone || !address) {
-          return NextResponse.json(
-            { error: "Faltan datos de envío: email, name, phone, address son requeridos" },
-            { status: 400 }
-          );
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+    const res = await POST(
+      mockReq('POST', {
+        email: 'test@test.com',
+        name: 'Juan Perez',
+        phone: '099123456',
+        address: 'Calle 123',
+      }),
+    )
 
-      const response = await handler(body);
-      expect(response.status).toBe(400);
-    });
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Carrito vacío o no encontrado')
+  })
 
-    it("should return 400 when email is invalid", async () => {
-      const body = { email: "invalid-email", name: "Test", phone: "099123456", address: "Calle 123" };
-      
-      const handler = async (b: typeof body) => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(b.email)) {
-          return NextResponse.json(
-            { error: "Email inválido" },
-            { status: 400 }
-          );
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+  it('debe devolver 400 cuando el carrito tiene items vacíos', async () => {
+    setupCookie(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_EMPTY_CART))
 
-      const response = await handler(body);
-      expect(response.status).toBe(400);
-    });
-  });
+    const res = await POST(
+      mockReq('POST', {
+        email: 'test@test.com',
+        name: 'Juan Perez',
+        phone: '099123456',
+        address: 'Calle 123',
+      }),
+    )
 
-  describe("Stock Validation", () => {
-    it("should return 422 when stock is insufficient", async () => {
-      const items = [{ variantId: "v1", quantity: 10 }];
-      const variants = [{ id: "v1", stock: 5 }];
-      
-      const handler = async () => {
-        const outOfStock: string[] = [];
-        for (const item of items) {
-          const variant = variants.find((v) => v.id === item.variantId);
-          if (!variant || variant.stock < item.quantity) {
-            outOfStock.push(item.variantId);
-          }
-        }
-        
-        if (outOfStock.length > 0) {
-          return NextResponse.json(
-            { error: "Stock insuficiente", outOfStock },
-            { status: 422 }
-          );
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Carrito vacío')
+  })
 
-      const response = await handler();
-      expect(response.status).toBe(422);
-    });
-  });
+  it('debe devolver 400 cuando la validación Zod falla', async () => {
+    setupCookie(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
 
-  describe("Tenant & Multi-tenant", () => {
-    it("should return 400 when x-tenant-slug header is missing", async () => {
-      const handler = async (tenantSlug: string | null) => {
-        if (!tenantSlug) {
-          return NextResponse.json(
-            { error: "Tenant no encontrado" },
-            { status: 400 }
-          );
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+    const res = await POST(mockReq('POST', { email: 'invalido' }))
 
-      const response = await handler(null);
-      expect(response.status).toBe(400);
-    });
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Validación fallida')
+  })
 
-    it("should return 400 when items from different tenants", async () => {
-      const variants = [
-        { id: "v1", tenantId: "tenant-1" },
-        { id: "v2", tenantId: "tenant-2" },
-      ];
-      
-      const handler = async () => {
-        const tenantIds = new Set(variants.map((v) => v.tenantId));
-        if (tenantIds.size > 1) {
-          return NextResponse.json(
-            { error: "Items de diferentes tenants no permitidos" },
-            { status: 400 }
-          );
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+  it('debe devolver 400 cuando no hay tenant', async () => {
+    setupCookie(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
+    vi.mocked(getTenantId).mockResolvedValue(null)
 
-      const response = await handler();
-      expect(response.status).toBe(400);
-    });
-  });
+    const res = await POST(
+      mockReq('POST', {
+        email: 'test@test.com',
+        name: 'Juan Perez',
+        phone: '099123456',
+        address: 'Calle 123',
+      }),
+    )
 
-  describe("Order Creation", () => {
-    it("should return order with pending_payment status", async () => {
-      const mockOrder = {
-        id: "order-123",
-        total: 15000,
-        status: "pending_payment",
-      };
-      
-      const handler = async () => {
-        return NextResponse.json({
-          orderId: mockOrder.id,
-          total: mockOrder.total,
-          status: mockOrder.status,
-        });
-      };
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Tenant no válido')
+  })
 
-      const response = await handler();
-      const body = await response.json();
-      
-      expect(response.status).toBe(200);
-      expect(body).toHaveProperty("orderId");
-      expect(body.status).toBe("pending_payment");
-    });
+  it('debe devolver 422 cross-tenant cuando las variantes no pertenecen al tenant', async () => {
+    setupCookie(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
+    vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID)
 
-    it("should use cents (integer) for total", async () => {
-      const mockOrder = { total: 15000 };
-      
-      const handler = async () => {
-        return NextResponse.json({ total: mockOrder.total });
-      };
+    const tx = makeTxMock()
+    tx.select.mockReturnValue(tx)
+    tx.from.mockReturnValue(tx)
+    tx.where.mockResolvedValue([])
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx))
 
-      const response = await handler();
-      const body = await response.json();
-      
-      expect(Number.isInteger(body.total)).toBe(true);
-      expect(body.total).toBeGreaterThan(0);
-    });
-  });
-});
+    const res = await POST(
+      mockReq('POST', {
+        email: 'test@test.com',
+        name: 'Juan Perez',
+        phone: '099123456',
+        address: 'Calle 123',
+      }),
+    )
+
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('Stock insuficiente')
+    expect(body.outOfStock).toContain(VARIANT_ID)
+    expect(withTenantContext).toHaveBeenCalledWith(
+      CROSS_TENANT_ID,
+      expect.any(Function),
+    )
+  })
+
+  it('debe devolver 400 cuando el método de envío no coincide con el tenant', async () => {
+    setupCookie(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
+
+    const tx = makeTxMock()
+    tx.select.mockReturnValueOnce(tx)
+    tx.from.mockReturnValueOnce(tx)
+    tx.where.mockResolvedValueOnce([MOCK_VARIANT])
+    tx.select.mockReturnValueOnce(tx)
+    tx.from.mockReturnValueOnce(tx)
+    tx.where.mockReturnValueOnce(tx)
+    tx.limit.mockResolvedValueOnce([])
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx))
+
+    const res = await POST(
+      mockReq('POST', {
+        email: 'test@test.com',
+        name: 'Juan Perez',
+        phone: '099123456',
+        address: 'Calle 123',
+        shippingMethodId: 'method-nonexistent',
+      }),
+    )
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Método de envío inválido o inactivo')
+  })
+
+  it('debe crear la orden exitosamente en caso feliz con envío', async () => {
+    setupCookie(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
+
+    const tx = makeTxMock()
+    const limitObj = {
+      limit: vi.fn().mockResolvedValue([MOCK_SHIPPING_METHOD]),
+    }
+    const whereObj = { where: vi.fn().mockReturnValue(limitObj) }
+    const fromObj = { from: vi.fn().mockReturnValue(whereObj) }
+    tx.select.mockReturnValueOnce(tx)
+    tx.from.mockReturnValueOnce(tx)
+    tx.where.mockResolvedValueOnce([MOCK_VARIANT])
+    tx.select.mockReturnValueOnce(fromObj)
+    tx.update.mockReturnValue(tx)
+    tx.set.mockReturnValue(tx)
+    tx.where.mockReturnValue(tx)
+    tx.insert.mockReturnValue(tx)
+    tx.values.mockReturnValue(tx)
+    tx.returning.mockResolvedValue([MOCK_ORDER])
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx))
+    vi.mocked(redisDel).mockResolvedValue(undefined)
+
+    const res = await POST(
+      mockReq('POST', {
+        email: 'test@test.com',
+        name: 'Juan Perez',
+        phone: '099123456',
+        address: 'Calle 123',
+        shippingMethodId: 'method-1',
+      }),
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toHaveProperty('orderId')
+    expect(body.status).toBe('pending_payment')
+    expect(withTenantContext).toHaveBeenCalledWith(
+      TENANT_ID,
+      expect.any(Function),
+    )
+  })
+
+  it('debe crear la orden sin método de envío en caso feliz', async () => {
+    setupCookie(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
+
+    const tx = makeTxMock()
+    tx.select.mockReturnValue(tx)
+    tx.from.mockReturnValue(tx)
+    tx.where.mockResolvedValueOnce([MOCK_VARIANT])
+    tx.where.mockReturnValue(tx)
+    tx.update.mockReturnValue(tx)
+    tx.set.mockReturnValue(tx)
+    tx.insert.mockReturnValue(tx)
+    tx.values.mockReturnValue(tx)
+    tx.returning.mockResolvedValue([MOCK_ORDER])
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx))
+    vi.mocked(redisDel).mockResolvedValue(undefined)
+
+    const res = await POST(
+      mockReq('POST', {
+        email: 'test@test.com',
+        name: 'Juan Perez',
+        phone: '099123456',
+        address: 'Calle 123',
+      }),
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toHaveProperty('orderId')
+    expect(body.total).toBe(4498)
+    expect(withTenantContext).toHaveBeenCalledWith(
+      TENANT_ID,
+      expect.any(Function),
+    )
+  })
+
+  it('debe crear la orden cuando el stock es exacto al pedido (UPDATE atómico devuelve fila)', async () => {
+    setupCookie(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
+
+    const tx = makeTxMock()
+    const updateReturning = vi.fn().mockResolvedValue([{ id: VARIANT_ID }])
+    tx.update.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({ returning: updateReturning }),
+      }),
+    })
+    tx.select.mockReturnValue(tx)
+    tx.from.mockReturnValue(tx)
+    tx.where.mockResolvedValueOnce([{ ...MOCK_VARIANT, stock: 2 }])
+    tx.insert.mockReturnValue(tx)
+    tx.values.mockReturnValue(tx)
+    tx.returning.mockResolvedValue([MOCK_ORDER])
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx))
+    vi.mocked(redisDel).mockResolvedValue(undefined)
+
+    const res = await POST(
+      mockReq('POST', {
+        email: 'test@test.com',
+        name: 'Juan Perez',
+        phone: '099123456',
+        address: 'Calle 123',
+      }),
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.orderId).toBe(MOCK_ORDER.id)
+    expect(updateReturning).toHaveBeenCalledTimes(1)
+  })
+
+  it('debe prevenir el oversell en concurrencia: un checkout 200 y el otro 422', async () => {
+    setupCookie(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART_QTY_1))
+
+    const tx = makeTxMock()
+    const updateReturning = vi
+      .fn()
+      .mockResolvedValueOnce([{ id: VARIANT_ID }])
+      .mockResolvedValueOnce([])
+    tx.update.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({ returning: updateReturning }),
+      }),
+    })
+    tx.select.mockReturnValue(tx)
+    tx.from.mockReturnValue(tx)
+    tx.where.mockResolvedValueOnce([{ ...MOCK_VARIANT, stock: 1 }])
+    tx.where.mockResolvedValueOnce([{ ...MOCK_VARIANT, stock: 1 }])
+    tx.insert.mockReturnValue(tx)
+    tx.values.mockReturnValue(tx)
+    tx.returning.mockResolvedValue([MOCK_ORDER])
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) => cb(tx))
+    vi.mocked(redisDel).mockResolvedValue(undefined)
+
+    const body = {
+      email: 'test@test.com',
+      name: 'Juan Perez',
+      phone: '099123456',
+      address: 'Calle 123',
+    }
+
+    const [res1, res2] = await Promise.all([
+      POST(mockReq('POST', body)),
+      POST(mockReq('POST', body)),
+    ])
+
+    const statuses = [res1.status, res2.status].sort((a, b) => a - b)
+    expect(statuses).toEqual([200, 422])
+
+    const failed = res1.status === 422 ? res1 : res2
+    const failedBody = await failed.json()
+    expect(failedBody.error).toBe('Stock insuficiente')
+    expect(failedBody.outOfStock).toContain(VARIANT_ID)
+
+    expect(updateReturning).toHaveBeenCalledTimes(2)
+    expect(tx.returning).toHaveBeenCalledTimes(1)
+  })
+})

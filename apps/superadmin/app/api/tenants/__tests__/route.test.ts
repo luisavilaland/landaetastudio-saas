@@ -1,107 +1,206 @@
-import { describe, it, expect } from "vitest";
-import { NextResponse } from "next/server";
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-describe("GET /api/tenants", () => {
-  describe("Superadmin Access Control", () => {
-    it("should return 401 when no session", async () => {
-      const session = null;
-      const handler = async (s: typeof session) => {
-        if (!s) {
-          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(),
+}))
 
-      const response = await handler(session);
-      expect(response.status).toBe(401);
-    });
+vi.mock('@/lib/redis', () => ({
+  redisClient: {
+    del: vi.fn().mockResolvedValue(0),
+  },
+}))
 
-    it("should return 403 when user is not superadmin", async () => {
-      const session = { user: { role: "admin" } };
-      const handler = async (s: typeof session) => {
-        if (s?.user?.role !== "superadmin") {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+vi.mock('@/lib/logger', () => ({
+  createLogger: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}))
 
-      const response = await handler(session);
-      expect(response.status).toBe(403);
-    });
+vi.mock('@repo/db', async () => {
+  const actual = await vi.importActual<typeof import('@repo/db')>('@repo/db')
+  return {
+    ...actual,
+    db: { select: vi.fn(), insert: vi.fn() },
+  }
+})
 
-    it("should allow access for superadmin role", async () => {
-      const session = { user: { role: "superadmin" } };
-      const handler = async (s: typeof session) => {
-        if (s?.user?.role === "superadmin") {
-          return NextResponse.json({ tenants: [] });
-        }
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      };
+import { db } from '@repo/db'
+import { auth } from '@/lib/auth'
+import { mockReq } from '@repo/test-utils'
+import { GET, POST } from '../route'
 
-      const response = await handler(session);
-      expect(response.status).toBe(200);
-    });
-  });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockQuery<T>(resolveValue: T[]): any {
+  const q = {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue(resolveValue),
+    orderBy: vi.fn().mockResolvedValue(resolveValue),
+    then: (onFulfilled: (v: T[]) => unknown) =>
+      Promise.resolve(resolveValue).then(onFulfilled),
+  }
+  return q
+}
 
-  describe("Tenant List Response", () => {
-    it("should return list of tenants", () => {
-      const mockTenants = [
-        { id: "tenant-1", name: "Tenant 1", slug: "tenant-1", status: "active" },
-      ];
+const MOCK_TENANT = {
+  id: 'tenant-1',
+  slug: 'test-store',
+  name: 'Test Store',
+  plan: 'starter',
+  status: 'active',
+  customDomain: null,
+  settings: {},
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}
 
-      expect(Array.isArray(mockTenants)).toBe(true);
-      expect(mockTenants[0]).toHaveProperty("id");
-      expect(mockTenants[0]).toHaveProperty("slug");
-    });
+const superadminSession: Record<string, unknown> = {
+  user: { email: 'super@admin.com', role: 'superadmin' },
+  expires: '2099-01-01T00:00:00.000Z',
+}
 
-    it("should include tenant metadata", () => {
-      const tenant = { id: "t1", name: "Test Store", slug: "test-store", status: "active" };
-      expect(tenant).toHaveProperty("name");
-      expect(tenant).toHaveProperty("slug");
-    });
-  });
-});
+const adminSession: Record<string, unknown> = {
+  user: { email: 'admin@store.com', role: 'admin' },
+  expires: '2099-01-01T00:00:00.000Z',
+}
 
-describe("POST /api/tenants - Tenant Creation", () => {
-  describe("Validation", () => {
-    it("should require name", async () => {
-      const body = { name: undefined, slug: "test" };
-      const handler = async (b: typeof body) => {
-        if (!b.name) {
-          return NextResponse.json({ error: "Name is required" }, { status: 400 });
-        }
-        return NextResponse.json({ success: true });
-      };
+describe('GET /api/tenants', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
-      const response = await handler(body);
-      expect(response.status).toBe(400);
-    });
+  it('should return 401 when no session', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(auth as any).mockResolvedValue(null)
 
-    it("should require unique slug", async () => {
-      const existingSlugs = ["tenant-1", "tenant-2"];
-      const handler = async (slug: string) => {
-        if (existingSlugs.includes(slug)) {
-          return NextResponse.json({ error: "Slug already exists" }, { status: 409 });
-        }
-        return NextResponse.json({ success: true });
-      };
+    const res = await GET()
 
-      const response = await handler("tenant-1");
-      expect(response.status).toBe(409);
-    });
-  });
+    expect(res.status).toBe(401)
+  })
 
-  describe("Slug Generation", () => {
-    it("should normalize slug to lowercase", () => {
-      const name = "New Store";
-      const slug = name.toLowerCase().replace(/\s+/g, "-");
-      expect(slug).toBe("new-store");
-    });
+  it('should return 403 when user is not superadmin', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(auth as any).mockResolvedValue(adminSession)
 
-    it("should handle special characters", () => {
-      const name = "Tienda de Prueba 123!";
-      const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-      expect(slug).toBe("tienda-de-prueba-123");
-    });
-  });
-});
+    const res = await GET()
+
+    expect(res.status).toBe(403)
+  })
+
+  it('should return 200 with tenant list for superadmin', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(auth as any).mockResolvedValue(superadminSession)
+
+    vi.mocked(db.select).mockReturnValueOnce(mockQuery([MOCK_TENANT]))
+
+    const res = await GET()
+
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data).toHaveProperty('tenants')
+    expect(data.tenants).toHaveLength(1)
+  })
+})
+
+describe('POST /api/tenants', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should return 403 when user is not superadmin', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(auth as any).mockResolvedValue(adminSession)
+
+    const res = await POST(
+      mockReq('POST', {
+        slug: 'new-store',
+        name: 'New Store',
+        plan: 'starter',
+        status: 'active',
+      }),
+    )
+
+    expect(res.status).toBe(403)
+  })
+
+  it('should return 201 when superadmin creates tenant', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(auth as any).mockResolvedValue(superadminSession)
+
+    vi.mocked(db.select).mockReturnValueOnce(mockQuery([]))
+    vi.mocked(db.insert).mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([MOCK_TENANT]),
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+
+    const res = await POST(
+      mockReq('POST', {
+        slug: 'test-store',
+        name: 'Test Store',
+        plan: 'starter',
+        status: 'active',
+      }),
+    )
+
+    expect(res.status).toBe(201)
+    const data = await res.json()
+    expect(data.slug).toBe('test-store')
+  })
+
+  it('should return 409 when slug already exists', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(auth as any).mockResolvedValue(superadminSession)
+
+    vi.mocked(db.select).mockReturnValueOnce(mockQuery([MOCK_TENANT]))
+
+    const res = await POST(
+      mockReq('POST', {
+        slug: 'test-store',
+        name: 'Test Store',
+        plan: 'starter',
+        status: 'active',
+      }),
+    )
+
+    expect(res.status).toBe(409)
+  })
+
+  it('should return 400 when name is missing', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(auth as any).mockResolvedValue(superadminSession)
+
+    const res = await POST(mockReq('POST', { slug: 'test-store' }))
+
+    expect(res.status).toBe(400)
+  })
+
+  it('should return 400 when slug is missing', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(auth as any).mockResolvedValue(superadminSession)
+
+    const res = await POST(mockReq('POST', { name: 'Test Store' }))
+
+    expect(res.status).toBe(400)
+  })
+
+  it('should return 401 when no session', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(auth as any).mockResolvedValue(null)
+
+    const res = await POST(
+      mockReq('POST', {
+        slug: 'test-store',
+        name: 'Test Store',
+        plan: 'starter',
+        status: 'active',
+      }),
+    )
+
+    expect(res.status).toBe(401)
+  })
+})

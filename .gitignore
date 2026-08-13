@@ -32,13 +32,6 @@ Thumbs.db
 # Turborepo
 .turbo/
 
-# Drizzle migrations (generated locally)
-packages/db/migrations/*
-
-# Drizzle snapshots (generated locally)
-packages/db/migrations/meta/*.json
-!packages/db/migrations/meta/_journal.json
-
 # Temporary files
 *.tmp
 *.temp
@@ -53,6 +46,9 @@ test-output.txt
 # ngrok (if installed)
 ngrok.yml
 
+# sentry
+.sentryclirc
+
 # Vercel
 .vercel/
 
@@ -62,3 +58,26 @@ next-env.d.ts
 
 # Certificates
 *.pem
+.vercel
+
+# coverage
+coverage/
+
+# memory local overrides
+.superpowers/memory/*.local.json
+
+# agent skills (local tooling config)
+.agents/
+skills-lock.json
+
+# vs code
+.vscode/settings.json
+
+# E2E testing
+e2e/.auth/
+e2e/test-results/
+e2e/playwright-report/
+.playwright-mcp/
+
+# Worktrees
+.worktrees/

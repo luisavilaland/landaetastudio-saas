@@ -1,55 +1,76 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db, dbProductImages } from "@repo/db";
-import { auth } from "@/lib/auth";
-import { eq } from "drizzle-orm";
-import { deleteImage } from "@repo/storage";
+import { NextRequest, NextResponse } from 'next/server'
+import { withTenantContext, dbProductImages } from '@repo/db'
+import { auth } from '@/lib/auth'
+import { and, eq } from 'drizzle-orm'
+import { deleteImage } from '@repo/storage'
+import { createLogger } from '@/lib/logger'
 
-type Params = Promise<{ id: string; imageId: string }>;
+const logger = createLogger('admin-product-image-delete')
+
+type Params = Promise<{ id: string; imageId: string }>
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Params }
+  { params }: { params: Params },
 ) {
   try {
-    const session = await auth();
+    const session = await auth()
 
     if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { id, imageId } = await params;
-    const tenantId = session.user?.tenantId as string;
+    const { id, imageId } = await params
+    const tenantId = session.user?.tenantId as string
 
-    const images = await db
-      .select()
-      .from(dbProductImages)
-      .where(eq(dbProductImages.id, imageId))
-      .limit(1);
+    const image = await withTenantContext(tenantId, async (tx) => {
+      const [image] = await tx
+        .select()
+        .from(dbProductImages)
+        .where(
+          and(
+            eq(dbProductImages.id, imageId),
+            eq(dbProductImages.tenantId, tenantId),
+          ),
+        )
+        .limit(1)
+      return image ?? null
+    })
 
-    if (images.length === 0) {
-      return NextResponse.json({ error: "Imagen no encontrada" }, { status: 404 });
+    if (!image) {
+      return NextResponse.json(
+        { error: 'Imagen no encontrada' },
+        { status: 404 },
+      )
     }
-
-    const image = images[0];
 
     if (image.productId !== id) {
-      return NextResponse.json({ error: "Imagen no encontrada" }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Imagen no encontrada' },
+        { status: 404 },
+      )
     }
 
-    if (image.tenantId !== tenantId) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
+    const fileName = image.url.replace(/^.*\//, '')
+    await deleteImage(`products/${id}/${fileName}`)
 
-    const fileName = image.url.replace(/^.*\//, "");
-    await deleteImage(`products/${id}/${fileName}`);
+    await withTenantContext(tenantId, async (tx) => {
+      await tx
+        .delete(dbProductImages)
+        .where(
+          and(
+            eq(dbProductImages.id, imageId),
+            eq(dbProductImages.tenantId, tenantId),
+          ),
+        )
+    })
 
-    await db
-      .delete(dbProductImages)
-      .where(eq(dbProductImages.id, imageId));
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error deleting product image:", error);
-      return NextResponse.json({ error: "Error al eliminar imagen" }, { status: 500 });
+    logger.error({ error }, 'Error deleting product image')
+    return NextResponse.json(
+      { error: 'Error al eliminar imagen' },
+      { status: 500 },
+    )
   }
 }

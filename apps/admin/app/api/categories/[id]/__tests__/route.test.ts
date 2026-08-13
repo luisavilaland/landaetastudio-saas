@@ -1,175 +1,248 @@
-import { describe, it, expect } from "vitest";
-import { NextResponse } from "next/server";
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { withTenantContext } from '@repo/db'
+import { makeTxMock, session, mockReq } from '@repo/test-utils'
 
-type Category = {
-  id: string;
-  tenantId: string;
-  name: string;
-  slug: string;
-  updatedAt?: Date;
-};
+vi.mock('@/lib/auth', () => ({ auth: vi.fn() }))
 
-function generateSlug(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
+vi.mock('@repo/logger', () => ({
+  createLogger: vi.fn().mockReturnValue({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}))
+
+vi.mock('@repo/db', async () => {
+  const actual = await vi.importActual<typeof import('@repo/db')>('@repo/db')
+  return { ...actual, withTenantContext: vi.fn(), db: undefined }
+})
+
+import { auth } from '@/lib/auth'
+import { GET, PUT, DELETE } from '../route'
+
+const mockCategory = {
+  id: 'cat-1',
+  tenantId: 'tenant-1',
+  name: 'Electrónica',
+  slug: 'electronica',
+  createdAt: new Date('2026-01-01'),
+  updatedAt: new Date('2026-01-01'),
 }
 
-async function handlePut(
-  session: { user: { tenantId: string } } | null,
-  existing: Category | null,
-  body: { name?: string; slug?: string },
-  duplicateSlug: Category | null = null
-) {
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!existing) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  // Determinar el slug final
-  let finalSlug = body.slug;
-  if (!finalSlug && body.name && body.name !== existing.name) {
-    finalSlug = generateSlug(body.name);
-  }
-  if (!finalSlug) {
-    finalSlug = existing.slug;
-  }
-
-  // Verificar duplicado de slug
-  if (finalSlug !== existing.slug && duplicateSlug) {
-    return NextResponse.json(
-      { error: "Slug already exists for this tenant" },
-      { status: 409 }
-    );
-  }
-
-  const updated: Category = {
-    ...existing,
-    name: body.name ?? existing.name,
-    slug: finalSlug,
-    updatedAt: new Date(),
-  };
-
-  return NextResponse.json({ category: updated });
+const mockCategory2 = {
+  id: 'cat-2',
+  tenantId: 'tenant-1',
+  name: 'Ropa',
+  slug: 'ropa',
+  createdAt: new Date('2026-01-01'),
+  updatedAt: new Date('2026-01-01'),
 }
 
-describe("PUT /api/categories/[id]", () => {
-  describe("Slug regeneration", () => {
-    it("should regenerate slug when name changes", async () => {
-      const existing: Category = {
-        id: "cat-1",
-        tenantId: "tenant-1",
-        name: "Shorts",
-        slug: "shorts",
-      };
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
-      const res = await handlePut(
-        { user: { tenantId: "tenant-1" } },
-        existing,
-        { name: "Short", slug: undefined },
-        null
-      );
+describe('GET /api/categories/[id]', () => {
+  it('should return 401 when no session', async () => {
+    vi.mocked(auth).mockResolvedValue(null)
 
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.category).toBeDefined();
-      expect(body.category.slug).toBe("short");
-    });
+    const response = await GET(mockReq('GET'), {
+      params: Promise.resolve({ id: 'cat-1' }),
+    })
+    const body = await response.json()
 
-    it("should return 409 when regenerated slug already exists for tenant", async () => {
-      const existing: Category = {
-        id: "cat-1",
-        tenantId: "tenant-1",
-        name: "Shorts",
-        slug: "shorts",
-      };
+    expect(response.status).toBe(401)
+    expect(body.error).toBe('No autorizado')
+  })
 
-      const duplicate: Category = {
-        id: "cat-2",
-        tenantId: "tenant-1",
-        name: "Short",
-        slug: "short",
-      };
+  it('should return 404 when category not found', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(makeTxMock({ select: [{ data: [], terminal: 'limit' }] })),
+    )
 
-      const res = await handlePut(
-        { user: { tenantId: "tenant-1" } },
-        existing,
-        { name: "Short", slug: undefined },
-        duplicate
-      );
+    const response = await GET(mockReq('GET'), {
+      params: Promise.resolve({ id: 'nonexistent' }),
+    })
+    const body = await response.json()
 
-      expect(res.status).toBe(409);
-      const body = await res.json();
-      expect(body.error).toContain("Slug already exists");
-    });
+    expect(response.status).toBe(404)
+    expect(body.error).toBe('Categoría no encontrada')
+  })
 
-    it("should keep provided slug if name doesn't change", async () => {
-      const existing: Category = {
-        id: "cat-1",
-        tenantId: "tenant-1",
-        name: "Shorts",
-        slug: "shorts",
-      };
+  it('should return category when found', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(makeTxMock({ select: [{ data: [mockCategory], terminal: 'limit' }] })),
+    )
 
-      const res = await handlePut(
-        { user: { tenantId: "tenant-1" } },
-        existing,
-        { slug: "custom-slug" },
-        null
-      );
+    const response = await GET(mockReq('GET'), {
+      params: Promise.resolve({ id: 'cat-1' }),
+    })
+    const body = await response.json()
 
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.category.slug).toBe("custom-slug");
-      expect(body.category.name).toBe("Shorts");
-    });
+    expect(response.status).toBe(200)
+    expect(body.category.id).toBe('cat-1')
+    expect(body.category.name).toBe('Electrónica')
+  })
+})
 
-    it("should return 401 when no session", async () => {
-      const existing: Category = {
-        id: "cat-1",
-        tenantId: "tenant-1",
-        name: "Shorts",
-        slug: "shorts",
-      };
+describe('PUT /api/categories/[id]', () => {
+  it('should return 401 when no session', async () => {
+    vi.mocked(auth).mockResolvedValue(null)
 
-      const res = await handlePut(null, existing, { name: "Short" });
-      expect(res.status).toBe(401);
-    });
+    const response = await PUT(mockReq('PUT', { name: 'Updated' }), {
+      params: Promise.resolve({ id: 'cat-1' }),
+    })
+    const body = await response.json()
 
-    it("should return 404 when category not found", async () => {
-      const res = await handlePut(
-        { user: { tenantId: "tenant-1" } },
-        null,
-        { name: "Short" }
-      );
-      expect(res.status).toBe(404);
-    });
+    expect(response.status).toBe(401)
+    expect(body.error).toBe('No autorizado')
+  })
 
-    it("should normalize slug with accents and uppercase", async () => {
-      const existing: Category = {
-        id: "cat-1",
-        tenantId: "tenant-1",
-        name: "Remeras",
-        slug: "remeras",
-      };
+  it('should return 404 when category not found', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(makeTxMock({ select: [{ data: [], terminal: 'limit' }] })),
+    )
 
-      const res = await handlePut(
-        { user: { tenantId: "tenant-1" } },
-        existing,
-        { name: "Ñoños Ácidos" },
-        null
-      );
+    const response = await PUT(mockReq('PUT', { name: 'Updated' }), {
+      params: Promise.resolve({ id: 'nonexistent' }),
+    })
+    const body = await response.json()
 
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.category.slug).toBe("nonos-acidos");
-    });
-  });
-});
+    expect(response.status).toBe(404)
+    expect(body.error).toBe('Categoría no encontrada')
+  })
+
+  it('should return 400 when neither name nor slug provided', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(makeTxMock({ select: [{ data: [mockCategory], terminal: 'limit' }] })),
+    )
+
+    const response = await PUT(mockReq('PUT', {}), {
+      params: Promise.resolve({ id: 'cat-1' }),
+    })
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.error).toBe('Debe proporcionar al menos un campo')
+  })
+
+  it('should return 409 when regenerated slug already exists for another category', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      const tx = makeTxMock({
+        select: [
+          { data: [mockCategory], terminal: 'limit' },
+          { data: [mockCategory2], terminal: 'limit' },
+        ],
+      })
+      return cb(tx)
+    })
+
+    const response = await PUT(mockReq('PUT', { name: 'Ropa' }), {
+      params: Promise.resolve({ id: 'cat-1' }),
+    })
+    const body = await response.json()
+
+    expect(response.status).toBe(409)
+    expect(body.error).toBe('Ya existe una categoría con ese slug')
+    expect(body.field).toBe('slug')
+  })
+
+  it('should update category successfully', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      const tx = makeTxMock({
+        select: [
+          { data: [mockCategory], terminal: 'limit' },
+          { data: [], terminal: 'limit' },
+        ],
+      })
+      return cb(tx)
+    })
+
+    const response = await PUT(
+      mockReq('PUT', { name: 'Electrónica Pro', slug: 'electronica-pro' }),
+      { params: Promise.resolve({ id: 'cat-1' }) },
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.category).toBeDefined()
+  })
+})
+
+describe('DELETE /api/categories/[id]', () => {
+  it('should return 401 when no session', async () => {
+    vi.mocked(auth).mockResolvedValue(null)
+
+    const response = await DELETE(mockReq('DELETE'), {
+      params: Promise.resolve({ id: 'cat-1' }),
+    })
+    const body = await response.json()
+
+    expect(response.status).toBe(401)
+    expect(body.error).toBe('No autorizado')
+  })
+
+  it('should return 404 when category not found', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(makeTxMock({ select: [{ data: [], terminal: 'limit' }] })),
+    )
+
+    const response = await DELETE(mockReq('DELETE'), {
+      params: Promise.resolve({ id: 'nonexistent' }),
+    })
+    const body = await response.json()
+
+    expect(response.status).toBe(404)
+    expect(body.error).toBe('Categoría no encontrada')
+  })
+
+  it('should return 409 when category has associated products', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      const tx = makeTxMock({
+        select: [
+          { data: [mockCategory], terminal: 'limit' },
+          { data: [{ id: 'prod-1' }], terminal: 'limit' },
+        ],
+      })
+      return cb(tx)
+    })
+
+    const response = await DELETE(mockReq('DELETE'), {
+      params: Promise.resolve({ id: 'cat-1' }),
+    })
+    const body = await response.json()
+
+    expect(response.status).toBe(409)
+    expect(body.error).toBe('La categoría tiene productos asociados')
+  })
+
+  it('should delete category successfully', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      const tx = makeTxMock({
+        select: [
+          { data: [mockCategory], terminal: 'limit' },
+          { data: [], terminal: 'limit' },
+        ],
+      })
+      return cb(tx)
+    })
+
+    const response = await DELETE(mockReq('DELETE'), {
+      params: Promise.resolve({ id: 'cat-1' }),
+    })
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.success).toBe(true)
+  })
+})

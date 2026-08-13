@@ -1,16 +1,15 @@
-import Redis from "ioredis";
+import { createLogger } from '@repo/logger'
+import Redis from 'ioredis'
 
-const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+const logger = createLogger('redis')
+
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379'
 
 export const redisClient = new Redis(redisUrl, {
   maxRetriesPerRequest: 3,
   lazyConnect: true,
-});
+})
 
-redisClient.on("error", (err) => {
-  console.error("[Redis] Error:", err.message);
-});
-
-redisClient.on("connect", () => {
-  console.log("[Redis] Connected");
-});
+redisClient.on('error', (err) => {
+  logger.error({ error: err }, '[Redis] Error')
+})

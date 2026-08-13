@@ -1,75 +1,91 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db, dbShippingMethods } from "@repo/db";
-import { auth } from "@/lib/auth";
-import { eq, asc } from "drizzle-orm";
-import { createShippingMethodSchema } from "@repo/validation";
+import { NextRequest, NextResponse } from 'next/server'
+import { db, dbShippingMethods, withTenantContext } from '@repo/db'
+import { auth } from '@/lib/auth'
+import { eq, asc } from 'drizzle-orm'
+import { createShippingMethodSchema } from '@repo/validation'
+import { createLogger } from '@repo/logger'
+
+const logger = createLogger('shipping')
 
 export async function GET() {
-  const session = await auth();
+  const session = await auth()
 
   if (!session) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  const tenantId = session.user?.tenantId as string;
+  const tenantId = session.user?.tenantId as string
 
-  const methods = await db
-    .select()
-    .from(dbShippingMethods)
-    .where(eq(dbShippingMethods.tenantId, tenantId))
-    .orderBy(asc(dbShippingMethods.sortOrder));
+  return await withTenantContext(tenantId, async (tx) => {
+    const methods = await tx
+      .select()
+      .from(dbShippingMethods)
+      .where(eq(dbShippingMethods.tenantId, tenantId))
+      .orderBy(asc(dbShippingMethods.sortOrder))
 
-  return NextResponse.json({ methods });
+    return NextResponse.json({ methods })
+  })
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = await auth()
 
     if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const tenantId = session.user?.tenantId as string;
+    const tenantId = session.user?.tenantId as string
 
-    const body = await request.json();
+    const body = await request.json()
 
-    const validation = createShippingMethodSchema.safeParse(body);
+    const validation = createShippingMethodSchema.safeParse(body)
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Validación fallida", issues: validation.error.issues },
-        { status: 400 }
-      );
+        { error: 'Validación fallida', issues: validation.error.issues },
+        { status: 400 },
+      )
     }
 
-    const { name, description, price, freeShippingThreshold, estimatedDaysMin, estimatedDaysMax, isActive, sortOrder } = validation.data;
+    const {
+      name,
+      description,
+      price,
+      freeShippingThreshold,
+      estimatedDaysMin,
+      estimatedDaysMax,
+      isActive,
+      sortOrder,
+    } = validation.data
 
-    const now = new Date();
+    return await withTenantContext(tenantId, async (tx) => {
+      const now = new Date()
 
-    const [method] = await db
-      .insert(dbShippingMethods)
-      .values({
-        tenantId,
-        name,
-        description: description || null,
-        price,
-        freeShippingThreshold: freeShippingThreshold || null,
-        estimatedDaysMin: estimatedDaysMin || null,
-        estimatedDaysMax: estimatedDaysMax || null,
-        isActive: isActive ? "true" : "false",
-        sortOrder: sortOrder || 0,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning();
+      const [method] = await tx
+        .insert(dbShippingMethods)
+        .values({
+          tenantId,
+          name,
+          description: description || null,
+          price,
+          freeShippingThreshold: freeShippingThreshold || null,
+          estimatedDaysMin: estimatedDaysMin || null,
+          estimatedDaysMax: estimatedDaysMax || null,
+          isActive: isActive ? 'true' : 'false',
+          sortOrder: sortOrder || 0,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning()
 
-    return NextResponse.json({ method }, { status: 201 });
+      return NextResponse.json({ method }, { status: 201 })
+    })
   } catch (error) {
-    console.error("Error creating shipping method:", error);
+    logger.error({ error }, 'Error creating shipping method')
     return NextResponse.json(
-      { error: "Error al crear método de envío" },
-      { status: 500 }
-    );
+      { error: 'Error al crear método de envío' },
+      { status: 500 },
+    )
   }
 }

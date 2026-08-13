@@ -1,178 +1,141 @@
-import { describe, it, expect } from "vitest";
-import { NextResponse } from "next/server";
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { withTenantContext } from '@repo/db'
+import { makeTxMock, session, mockReq } from '@repo/test-utils'
 
-describe("GET /api/orders", () => {
-  describe("Authentication & Tenant Isolation", () => {
-    it("should return 401 when no session", async () => {
-      const session = null;
-      const handler = async (s: typeof session) => {
-        if (!s) {
-          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        return NextResponse.json({ error: "unexpected" }, { status: 500 });
-      };
+vi.mock('@/lib/auth', () => ({ auth: vi.fn() }))
 
-      const response = await handler(session);
-      expect(response.status).toBe(401);
-    });
+vi.mock('@/lib/logger', () => ({
+  createLogger: vi.fn().mockReturnValue({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}))
 
-    it("should filter orders by tenantId", () => {
-      const tenantId = "tenant-specific";
-      expect(tenantId).toBeDefined();
-    });
-  });
+vi.mock('@repo/db', async () => {
+  const actual = await vi.importActual<typeof import('@repo/db')>('@repo/db')
+  return { ...actual, withTenantContext: vi.fn(), db: undefined }
+})
 
-  describe("Order List Response", () => {
-    it("should return orders with correct structure", () => {
-      const mockOrder = {
-        id: "order-1",
-        customerEmail: "customer@test.com",
-        total: 10000,
-        status: "pending_payment",
-        createdAt: new Date(),
-      };
+import { auth } from '@/lib/auth'
+import { GET } from '../route'
 
-      expect(mockOrder).toHaveProperty("id");
-      expect(mockOrder).toHaveProperty("customerEmail");
-      expect(mockOrder).toHaveProperty("total");
-      expect(mockOrder).toHaveProperty("status");
-    });
+function mockOrdersReq(urlStr: string) {
+  const req = mockReq('GET')
+  ;(req as any).nextUrl = new URL(urlStr)
+  ;(req as any).url = urlStr
+  return req
+}
 
-    it("should use cents (integer) for total", () => {
-      const total = 10000;
-      expect(Number.isInteger(total)).toBe(true);
-    });
+function mockOrdersTx() {
+  const tx = makeTxMock({
+    select: [
+      {
+        data: [
+          {
+            id: 'order-1',
+            customerId: 'cust-1',
+            customerEmail: 'test@test.com',
+            total: 50000,
+            status: 'confirmed',
+            createdAt: new Date('2026-01-15'),
+            updatedAt: new Date('2026-01-15'),
+          },
+        ],
+        terminal: 'orderBy',
+      },
+    ],
+  })
+  tx.leftJoin = vi.fn().mockReturnValue(tx)
+  return tx
+}
 
-    it("should include valid order statuses", () => {
-      const validStatuses = [
-        "pending_payment",
-        "confirmed",
-        "processing",
-        "shipped",
-        "delivered",
-        "cancelled",
-        "refunded",
-        "payment_failed",
-      ];
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
-      const order = { status: "pending_payment" };
-      expect(validStatuses).toContain(order.status);
-    });
-  });
+describe('GET /api/orders', () => {
+  it('should return 401 when no session', async () => {
+    vi.mocked(auth).mockResolvedValue(null)
 
-  describe("Pagination", () => {
-    it("should support limit parameter", () => {
-      const limit = 10;
-      expect(Number.isInteger(limit)).toBe(true);
-      expect(limit).toBeGreaterThan(0);
-    });
-  });
+    const response = await GET(mockOrdersReq('http://localhost'))
+    const body = await response.json()
 
-  describe("Status Filter", () => {
-    const validStatuses = [
-      "pending_payment",
-      "confirmed",
-      "processing",
-      "shipped",
-      "delivered",
-      "cancelled",
-      "refunded",
-    ];
+    expect(response.status).toBe(401)
+    expect(body.error).toBe('No autorizado')
+  })
 
-    it("should accept valid status parameter", () => {
-      validStatuses.forEach((status) => {
-        expect(validStatuses).toContain(status);
-      });
-    });
+  it('should return 400 when tenant not found', async () => {
+    vi.mocked(auth).mockResolvedValue({
+      user: {} as any,
+      expires: '2099-01-01',
+    })
 
-    it("should reject invalid status parameter", () => {
-      const invalidStatus = "invalid_status";
-      expect(validStatuses).not.toContain(invalidStatus);
-    });
+    const response = await GET(mockOrdersReq('http://localhost'))
+    const body = await response.json()
 
-    it("should return all orders when no status provided", () => {
-      const status = undefined;
-      expect(status).toBeUndefined();
-    });
+    expect(response.status).toBe(400)
+    expect(body.error).toBe('Tenant no encontrado')
+  })
 
-    it("should filter orders by pending_payment status", () => {
-      const status = "pending_payment";
-      expect(validStatuses).toContain(status);
-    });
+  it('should return orders with correct structure', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockOrdersTx()),
+    )
 
-    it("should filter orders by confirmed status", () => {
-      const status = "confirmed";
-      expect(validStatuses).toContain(status);
-    });
+    const response = await GET(mockOrdersReq('http://localhost'))
+    const body = await response.json()
 
-    it("should filter orders by processing status", () => {
-      const status = "processing";
-      expect(validStatuses).toContain(status);
-    });
+    expect(response.status).toBe(200)
+    expect(body).toHaveLength(1)
+    expect(body[0].id).toBe('order-1')
+    expect(body[0].total).toBe(50000)
+    expect(body[0].status).toBe('confirmed')
+  })
 
-    it("should filter orders by shipped status", () => {
-      const status = "shipped";
-      expect(validStatuses).toContain(status);
-    });
+  it('should use cents (integer) for total', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockOrdersTx()),
+    )
 
-    it("should filter orders by delivered status", () => {
-      const status = "delivered";
-      expect(validStatuses).toContain(status);
-    });
+    const response = await GET(mockOrdersReq('http://localhost'))
+    const body = await response.json()
 
-    it("should filter orders by cancelled status", () => {
-      const status = "cancelled";
-      expect(validStatuses).toContain(status);
-    });
+    expect(Number.isInteger(body[0].total)).toBe(true)
+  })
 
-    it("should filter orders by refunded status", () => {
-      const status = "refunded";
-      expect(validStatuses).toContain(status);
-    });
-  });
-});
+  it('should filter by status parameter', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      const tx = makeTxMock({ select: [{ data: [], terminal: 'orderBy' }] })
+      tx.leftJoin = vi.fn().mockReturnValue(tx)
+      return cb(tx)
+    })
 
-describe("Order Status Updates", () => {
-  it("should have valid status transitions", () => {
-    const orderStatuses = [
-      "pending_payment",
-      "confirmed",
-      "processing",
-      "shipped",
-      "delivered",
-      "cancelled",
-      "refunded",
-      "payment_failed",
-    ];
+    const response = await GET(
+      mockOrdersReq('http://localhost?status=pending_payment'),
+    )
+    const body = await response.json()
 
-    expect(orderStatuses).toContain("pending_payment");
-    expect(orderStatuses).toContain("confirmed");
-    expect(orderStatuses).toContain("processing");
-  });
+    expect(response.status).toBe(200)
+    expect(body).toHaveLength(0)
+  })
 
-  it("should handle status update validation", async () => {
-    const validStatuses = [
-      "pending_payment",
-      "confirmed",
-      "processing",
-      "shipped",
-      "delivered",
-      "cancelled",
-      "refunded",
-      "payment_failed",
-    ];
+  it('should ignore invalid status parameter', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockOrdersTx()),
+    )
 
-    const handler = async (newStatus: string) => {
-      if (!validStatuses.includes(newStatus)) {
-        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
-      }
-      return NextResponse.json({ success: true });
-    };
+    const response = await GET(
+      mockOrdersReq('http://localhost?status=invalid_status'),
+    )
+    const body = await response.json()
 
-    const invalidResponse = await handler("invalid_status");
-    expect(invalidResponse.status).toBe(400);
-
-    const validResponse = await handler("confirmed");
-    expect(validResponse.status).toBe(200);
-  });
-});
+    expect(response.status).toBe(200)
+    expect(body).toHaveLength(1)
+  })
+})

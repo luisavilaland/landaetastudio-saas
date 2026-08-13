@@ -1,84 +1,94 @@
-"use client";
+'use client'
 
-import { signIn } from "next-auth/react";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { signIn } from 'next-auth/react'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function LoginForm() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+    e.preventDefault()
+    setError('')
+    setLoading(true)
 
     try {
-      const result = await signIn("credentials", {
+      const result = await signIn('credentials', {
         email,
         password,
         redirect: false,
-      });
+      })
 
       if (result?.error) {
-        setError("Credenciales inválidas");
+        setError('Credenciales inválidas')
       } else {
-        router.push("/tenants");
+        router.push('/tenants')
       }
     } catch {
-      setError("Error al iniciar sesión");
+      setError('Error al iniciar sesión')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50">
-      <div className="w-full max-w-md space-y-8 p-8 bg-white rounded-lg shadow-md">
+      <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-md">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-zinc-900">SuperAdmin</h2>
-          <p className="mt-2 text-sm text-zinc-600">Accede al panel de administración</p>
+          <p className="mt-2 text-sm text-zinc-600">
+            Accede al panel de administración
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
               {error}
             </div>
           )}
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-zinc-700"
+              >
                 Email
               </label>
               <input
                 id="email"
                 name="email"
                 type="email"
+                data-testid="superadmin-email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-zinc-500"
+                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-sm focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500 focus:outline-none"
                 placeholder="admin@tienda.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-zinc-700"
+              >
                 Contraseña
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
+                data-testid="superadmin-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:border-zinc-500"
+                className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 shadow-sm focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500 focus:outline-none"
                 placeholder="••••••••"
               />
             </div>
@@ -86,13 +96,14 @@ export default function LoginForm() {
 
           <button
             type="submit"
+            data-testid="superadmin-submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-zinc-900 text-white rounded-md hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-md bg-zinc-900 px-4 py-2 text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Iniciando..." : "Iniciar sesión"}
+            {loading ? 'Iniciando...' : 'Iniciar sesión'}
           </button>
         </form>
       </div>
     </div>
-  );
+  )
 }

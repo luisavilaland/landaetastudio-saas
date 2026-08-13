@@ -1,78 +1,79 @@
-"use client";
+'use client'
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { CSVImport } from "./csv-import";
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { CSVImport } from './csv-import'
+import { captureException } from '@sentry/nextjs'
 
 type ProductVariant = {
-  id: string;
-  sku: string;
-  price: number;
-  stock: number;
-  options: Record<string, unknown>;
-};
+  id: string
+  sku: string
+  price: number
+  stock: number
+  options: Record<string, unknown>
+}
 
 type Product = {
-  id: string;
-  name: string;
-  slug: string;
-  imageUrl: string | null;
-  description: string | null;
-  status: string;
-  createdAt: Date;
-  categoryName: string | null;
-  variants: ProductVariant[];
-  images?: { url: string }[];
-};
+  id: string
+  name: string
+  slug: string
+  imageUrl: string | null
+  description: string | null
+  status: string
+  createdAt: Date
+  categoryName: string | null
+  variants: ProductVariant[]
+  images?: { url: string }[]
+}
 
 export function ProductsTable({
   initialProducts,
 }: {
-  initialProducts: Product[];
+  initialProducts: Product[]
 }) {
-  const router = useRouter();
-  const [products, setProducts] = useState(initialProducts);
+  const router = useRouter()
+  const [products, setProducts] = useState(initialProducts)
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar este producto?")) return;
+    if (!confirm('¿Eliminar este producto?')) return
 
     try {
-      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
       if (res.ok) {
-        setProducts((prev) => prev.filter((p) => p.id !== id));
+        setProducts((prev) => prev.filter((p) => p.id !== id))
       }
     } catch (error) {
-      console.error("Error deleting product:", error);
+      captureException(error)
     }
-  };
+  }
 
   const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleDateString("es-UY");
-  };
+    return new Date(date).toLocaleDateString('es-UY')
+  }
 
   const formatPrice = (cents: number) => {
-    return new Intl.NumberFormat("es-UY", {
-      style: "currency",
-      currency: "UYU",
-    }).format(cents / 100);
-  };
+    return new Intl.NumberFormat('es-UY', {
+      style: 'currency',
+      currency: 'UYU',
+    }).format(cents / 100)
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Productos</h1>
         <div className="flex gap-3">
           <CSVImport onImportComplete={() => router.refresh()} />
           <button
-            onClick={() => router.push("/products/new")}
-            className="px-4 py-2 bg-zinc-900 text-white rounded-md hover:bg-zinc-800"
+            onClick={() => router.push('/products/new')}
+            className="rounded-md bg-zinc-900 px-4 py-2 text-white hover:bg-zinc-800"
           >
             Nuevo Producto
           </button>
         </div>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
+      <div className="overflow-hidden rounded-lg border">
         <table className="w-full">
           <thead className="bg-zinc-100">
             <tr>
@@ -120,12 +121,12 @@ export function ProductsTable({
               </tr>
             ) : (
               products.map((product) => {
-                const variantCount = product.variants.length;
+                const variantCount = product.variants.length
                 const totalStock = product.variants.reduce(
                   (sum, v) => sum + v.stock,
                   0,
-                );
-                const firstVariant = product.variants[0];
+                )
+                const firstVariant = product.variants[0]
 
                 return (
                   <tr key={product.id} className="hover:bg-zinc-50">
@@ -134,33 +135,33 @@ export function ProductsTable({
                         <img
                           src={product.images[0].url}
                           alt={product.name}
-                          className="w-12 h-12 object-cover rounded-md"
+                          className="h-12 w-12 rounded-md object-cover"
                         />
                       ) : product.imageUrl ? (
                         <img
                           src={product.imageUrl}
                           alt={product.name}
-                          className="w-12 h-12 object-cover rounded-md"
+                          className="h-12 w-12 rounded-md object-cover"
                         />
                       ) : (
-                        <div className="w-12 h-12 bg-zinc-100 rounded-md flex items-center justify-center text-zinc-400 text-xs">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-md bg-zinc-100 text-xs text-zinc-400">
                           Sin img
                         </div>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm">{product.name}</td>
                     <td className="px-4 py-3 text-sm">
-                      {product.categoryName || "-"}
+                      {product.categoryName || '-'}
                     </td>
                     <td className="px-4 py-3 text-sm">{product.slug}</td>
                     <td className="px-4 py-3 text-sm">
                       <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                          product.status === "active"
-                            ? "bg-green-100 text-green-700"
-                            : product.status === "draft"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-zinc-100 text-zinc-700"
+                        className={`rounded-full px-2 py-1 text-xs ${
+                          product.status === 'active'
+                            ? 'bg-green-100 text-green-700'
+                            : product.status === 'draft'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-zinc-100 text-zinc-700'
                         }`}
                       >
                         {product.status}
@@ -169,7 +170,7 @@ export function ProductsTable({
                     <td className="px-4 py-3 text-sm">
                       {variantCount > 0 ? (
                         <span className="text-sm">
-                          {variantCount} variante{variantCount !== 1 ? "s" : ""}
+                          {variantCount} variante{variantCount !== 1 ? 's' : ''}
                         </span>
                       ) : (
                         <span className="text-sm text-zinc-400">
@@ -178,7 +179,7 @@ export function ProductsTable({
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {firstVariant ? formatPrice(firstVariant.price) : "-"}
+                      {firstVariant ? formatPrice(firstVariant.price) : '-'}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span
@@ -196,24 +197,25 @@ export function ProductsTable({
                         onClick={() =>
                           router.push(`/products/${product.id}/edit`)
                         }
-                        className="px-3 py-1 text-sm text-zinc-600 hover:text-zinc-900 mr-2"
+                        className="mr-2 px-3 py-1 text-sm text-zinc-600 hover:text-zinc-900"
                       >
                         Editar
                       </button>
                       <button
                         onClick={() => handleDelete(product.id)}
+                        data-testid="delete-product"
                         className="px-3 py-1 text-sm text-red-600 hover:text-red-800"
                       >
                         Eliminar
                       </button>
                     </td>
                   </tr>
-                );
+                )
               })
             )}
           </tbody>
         </table>
       </div>
     </div>
-  );
+  )
 }

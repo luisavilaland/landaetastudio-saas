@@ -1,162 +1,440 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextResponse } from "next/server";
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-describe("Cart API - GET", () => {
-  describe("Anonymous Cart Support", () => {
-    it("should work without authentication for anonymous users", async () => {
-      const handler = async () => {
-        return NextResponse.json({ items: [], total: 0 });
-      };
+vi.mock('@/lib/tenant', () => ({
+  getTenantId: vi.fn(),
+}))
 
-      const response = await handler();
-      expect(response.status).toBe(200);
-      const body = await response.json();
-      expect(body).toHaveProperty("items");
-      expect(body).toHaveProperty("total");
-    });
+vi.mock('@/lib/redis', () => ({
+  safeGet: vi.fn(),
+  redisSetEx: vi.fn(),
+  redisDel: vi.fn(),
+}))
 
-    it("should use cart_session_id cookie", () => {
-      const sessionId = "session-123-abc";
-      const expectedCookieName = "cart_session_id";
+vi.mock('@/lib/logger', () => ({
+  createLogger: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}))
 
-      expect(expectedCookieName).toBe("cart_session_id");
-    });
-  });
+vi.mock('@repo/db', async () => {
+  const actual = await vi.importActual<typeof import('@repo/db')>('@repo/db')
+  return {
+    ...actual,
+    withTenantContext: vi.fn(),
+    db: { select: vi.fn(), update: vi.fn(), insert: vi.fn(), delete: vi.fn() },
+  }
+})
 
-  describe("Cart Structure", () => {
-    it("should return cart with items array", async () => {
-      const mockCart = {
-        items: [
-          {
-            variantId: "var-1",
-            productId: "prod-1",
-            quantity: 2,
-            price: 1999,
-            name: "Test Product",
-          },
-        ],
-        total: 3998,
-      };
+vi.mock('next/headers', () => ({
+  headers: vi.fn(),
+  cookies: vi.fn(),
+}))
 
-      expect(Array.isArray(mockCart.items)).toBe(true);
-      expect(mockCart.items[0]).toHaveProperty("variantId");
-      expect(mockCart.items[0]).toHaveProperty("quantity");
-    });
+import { NextRequest } from 'next/server'
+import { headers } from 'next/headers'
+import { db, withTenantContext } from '@repo/db'
+import { safeGet, redisSetEx, redisDel } from '@/lib/redis'
+import { getTenantId } from '@/lib/tenant'
+import { makeTxMock, mockReq } from '@repo/test-utils'
+import { GET, POST, PUT, DELETE } from '../route'
 
-    it("should use integer quantities", async () => {
-      const item = { quantity: 2 };
-      expect(Number.isInteger(item.quantity)).toBe(true);
-    });
+const TENANT_ID = 'tenant-123'
+const CROSS_TENANT_ID = 'tenant-b'
+const SESSION_ID = 'session-abc-123'
+const VARIANT_ID = 'variant-1'
 
-    it("should use cents for prices", async () => {
-      const item = { price: 1999 };
-      expect(Number.isInteger(item.price)).toBe(true);
-    });
-  });
-});
+const MOCK_VARIANT = {
+  id: VARIANT_ID,
+  tenantId: TENANT_ID,
+  productId: 'product-1',
+  sku: 'SKU-001',
+  price: 1999,
+  stock: 10,
+  options: {},
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}
 
-describe("Cart API - POST (Add Item)", () => {
-  describe("Quantity Validation", () => {
-    it("should reject negative quantities", async () => {
-      const handler = async (quantity: number) => {
-        if (quantity < 0) {
-          return NextResponse.json({ error: "Quantity must be positive" }, { status: 400 });
-        }
-        return NextResponse.json({ success: true });
-      };
+const MOCK_CART = {
+  items: [
+    { variantId: VARIANT_ID, quantity: 2, addedAt: new Date().toISOString() },
+  ],
+  updatedAt: new Date().toISOString(),
+}
 
-      const response = await handler(-1);
-      expect(response.status).toBe(400);
-    });
+const MOCK_EMPTY_CART = {
+  items: [],
+  updatedAt: new Date().toISOString(),
+}
 
-    it("should reject zero quantity", async () => {
-      const handler = async (quantity: number) => {
-        if (quantity <= 0) {
-          return NextResponse.json({ error: "Quantity must be positive" }, { status: 400 });
-        }
-        return NextResponse.json({ success: true });
-      };
+const MOCK_ENRICHED_VARIANT = {
+  variantId: VARIANT_ID,
+  variantPrice: 1999,
+  variantStock: 10,
+  variantSku: 'SKU-001',
+  variantOptions: {},
+  productId: 'product-1',
+  productName: 'Producto de prueba',
+  productSlug: 'producto-de-prueba',
+  productImage: 'https://example.com/img.jpg',
+}
 
-      const response = await handler(0);
-      expect(response.status).toBe(400);
-    });
+function createQuery<T>(resolveValue: T[]): any {
+  const q = {
+    from: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue(resolveValue),
+    orderBy: vi.fn().mockReturnThis(),
+    then: (onFulfilled: (v: T[]) => unknown) =>
+      Promise.resolve(resolveValue).then(onFulfilled),
+  }
+  return q
+}
 
-    it("should accept valid quantity", async () => {
-      const handler = async (quantity: number) => {
-        if (quantity <= 0) {
-          return NextResponse.json({ error: "Quantity must be positive" }, { status: 400 });
-        }
-        return NextResponse.json({ success: true });
-      };
+function setupHeaders(sessionId: string | undefined) {
+  const mockHeaders = { get: vi.fn() }
+  vi.mocked(headers).mockResolvedValue(mockHeaders as any)
+  mockHeaders.get.mockImplementation((key: string) => {
+    if (key === 'x-cart-session-id') return sessionId
+    return null
+  })
+}
 
-      const response = await handler(1);
-      expect(response.status).toBe(200);
-    });
-  });
+describe('POST /api/cart', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(getTenantId).mockResolvedValue(TENANT_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_EMPTY_CART))
+    vi.mocked(redisSetEx).mockResolvedValue(undefined)
+  })
 
-  describe("Product Variant Validation", () => {
-    it("should require variantId", async () => {
-      const handler = async (body: { variantId?: string; quantity: number }) => {
-        if (!body.variantId) {
-          return NextResponse.json({ error: "variantId is required" }, { status: 400 });
-        }
-        return NextResponse.json({ success: true });
-      };
+  it('debe devolver 400 cuando no hay session ID', async () => {
+    setupHeaders(undefined)
 
-      const response = await handler({ variantId: undefined, quantity: 1 });
-      expect(response.status).toBe(400);
-    });
+    const res = await POST(
+      mockReq('POST', { variantId: VARIANT_ID, quantity: 1 }),
+    )
 
-    it("should handle non-existent variant", async () => {
-      const handler = async (variantId: string) => {
-        if (variantId === "nonexistent") {
-          return NextResponse.json({ error: "Product not found" }, { status: 404 });
-        }
-        return NextResponse.json({ success: true });
-      };
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Sesión de carrito no encontrada')
+  })
 
-      const response = await handler("nonexistent");
-      expect(response.status).toBe(404);
-    });
-  });
-});
+  it('debe devolver 400 cuando no hay tenant', async () => {
+    setupHeaders(SESSION_ID)
+    vi.mocked(getTenantId).mockResolvedValue(null)
 
-describe("Cart API - DELETE", () => {
-  describe("Cart Clearing", () => {
-    it("should return 204 on successful clear", async () => {
-      const handler = async () => {
-        return new NextResponse(null, { status: 204 });
-      };
+    const res = await POST(
+      mockReq('POST', { variantId: VARIANT_ID, quantity: 1 }),
+    )
 
-      const response = await handler();
-      expect(response.status).toBe(204);
-    });
-  });
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Tienda no encontrada')
+  })
 
-  describe("Item Removal", () => {
-    it("should remove specific item from cart", async () => {
-      const handler = async (itemId: string) => {
-        if (!itemId) {
-          return NextResponse.json({ error: "itemId required" }, { status: 400 });
-        }
-        return NextResponse.json({ success: true });
-      };
+  it('debe devolver 400 cuando la validación Zod falla', async () => {
+    setupHeaders(SESSION_ID)
 
-      const response = await handler("item-123");
-      expect(response.status).toBe(200);
-    });
-  });
-});
+    const res = await POST(mockReq('POST', { quantity: -1 }))
 
-describe("Redis Session Storage", () => {
-  it("should use cart_session_id cookie", () => {
-    const cookieName = "cart_session_id";
-    expect(cookieName).toBeDefined();
-  });
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Validación fallida')
+  })
 
-  it("should have 7-day TTL", () => {
-    const ttlDays = 7;
-    const ttlSeconds = ttlDays * 24 * 60 * 60;
-    expect(ttlSeconds).toBe(604800);
-  });
-});
+  it('debe devolver 404 cross-tenant cuando la variante no pertenece al tenant', async () => {
+    setupHeaders(SESSION_ID)
+    vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID)
+    const mockTx = makeTxMock()
+    mockTx.select.mockReturnValueOnce(createQuery([]))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockTx),
+    )
+
+    const res = await POST(
+      mockReq('POST', { variantId: VARIANT_ID, quantity: 1 }),
+    )
+
+    expect(res.status).toBe(404)
+    const body = await res.json()
+    expect(body.error).toBe('Variante no encontrada')
+  })
+
+  it('debe devolver 400 cuando el stock es insuficiente', async () => {
+    setupHeaders(SESSION_ID)
+    const mockTx = makeTxMock()
+    mockTx.select.mockReturnValueOnce(
+      createQuery([{ ...MOCK_VARIANT, stock: 0 }]),
+    )
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockTx),
+    )
+
+    const res = await POST(
+      mockReq('POST', { variantId: VARIANT_ID, quantity: 1 }),
+    )
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Stock insuficiente')
+  })
+
+  it('debe agregar un ítem al carrito en caso feliz', async () => {
+    setupHeaders(SESSION_ID)
+    const mockTx = makeTxMock()
+    mockTx.select.mockReturnValueOnce(createQuery([MOCK_VARIANT]))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockTx),
+    )
+
+    const res = await POST(
+      mockReq('POST', { variantId: VARIANT_ID, quantity: 1 }),
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.cart.items).toHaveLength(1)
+    expect(body.cart.items[0].variantId).toBe(VARIANT_ID)
+  })
+
+  it('debe incrementar cantidad cuando la variante ya existe en el carrito', async () => {
+    setupHeaders(SESSION_ID)
+    const mockTx = makeTxMock()
+    mockTx.select.mockReturnValueOnce(createQuery([MOCK_VARIANT]))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockTx),
+    )
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
+
+    const res = await POST(
+      mockReq('POST', { variantId: VARIANT_ID, quantity: 3 }),
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.cart.items[0].quantity).toBe(5)
+  })
+})
+
+describe('GET /api/cart', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(getTenantId).mockResolvedValue(TENANT_ID)
+  })
+
+  it('debe devolver carrito vacío cuando no hay session ID', async () => {
+    setupHeaders(undefined)
+
+    const res = await GET()
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.items).toEqual([])
+  })
+
+  it('debe devolver 400 cuando no hay tenant', async () => {
+    setupHeaders(SESSION_ID)
+    vi.mocked(getTenantId).mockResolvedValue(null)
+
+    const res = await GET()
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Tienda no encontrada')
+  })
+
+  it('debe devolver items vacíos cuando el carrito está vacío', async () => {
+    setupHeaders(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_EMPTY_CART))
+
+    const res = await GET()
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.items).toEqual([])
+  })
+
+  it('debe devolver items enriquecidos en caso feliz', async () => {
+    setupHeaders(SESSION_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
+    const mockTx = makeTxMock()
+    mockTx.select
+      .mockReturnValueOnce(createQuery([MOCK_ENRICHED_VARIANT]))
+      .mockReturnValueOnce(createQuery([]))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockTx),
+    )
+
+    const res = await GET()
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.items).toHaveLength(1)
+    expect(body.items[0].variantId).toBe(VARIANT_ID)
+    expect(body.items[0].product.name).toBe('Producto de prueba')
+  })
+})
+
+describe('PUT /api/cart', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(getTenantId).mockResolvedValue(TENANT_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
+    vi.mocked(redisSetEx).mockResolvedValue(undefined)
+  })
+
+  it('debe devolver 400 cuando no hay session ID', async () => {
+    setupHeaders(undefined)
+
+    const res = await PUT(
+      mockReq('PUT', { variantId: VARIANT_ID, quantity: 3 }),
+    )
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Sesión de carrito no encontrada')
+  })
+
+  it('debe devolver 400 cuando no hay tenant', async () => {
+    setupHeaders(SESSION_ID)
+    vi.mocked(getTenantId).mockResolvedValue(null)
+
+    const res = await PUT(
+      mockReq('PUT', { variantId: VARIANT_ID, quantity: 3 }),
+    )
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Tienda no encontrada')
+  })
+
+  it('debe devolver 400 cuando la validación Zod falla', async () => {
+    setupHeaders(SESSION_ID)
+
+    const res = await PUT(mockReq('PUT', {}))
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Validación fallida')
+  })
+
+  it('debe actualizar cantidad en caso feliz', async () => {
+    setupHeaders(SESSION_ID)
+    const mockTx = makeTxMock()
+    mockTx.select
+      .mockReturnValueOnce(createQuery([MOCK_ENRICHED_VARIANT]))
+      .mockReturnValueOnce(createQuery([]))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockTx),
+    )
+
+    const res = await PUT(
+      mockReq('PUT', { variantId: VARIANT_ID, quantity: 5 }),
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.items).toHaveLength(1)
+    expect(body.items[0].variantId).toBe(VARIANT_ID)
+  })
+
+  it('debe devolver items vacíos cuando ninguna variante coincide con el tenant (cross-tenant)', async () => {
+    setupHeaders(SESSION_ID)
+    vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID)
+    const mockTx = makeTxMock()
+    mockTx.select
+      .mockReturnValueOnce(createQuery([]))
+      .mockReturnValueOnce(createQuery([]))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockTx),
+    )
+
+    const res = await PUT(
+      mockReq('PUT', { variantId: VARIANT_ID, quantity: 3 }),
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.items).toEqual([])
+  })
+})
+
+describe('DELETE /api/cart', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(getTenantId).mockResolvedValue(TENANT_ID)
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
+    vi.mocked(redisSetEx).mockResolvedValue(undefined)
+    vi.mocked(redisDel).mockResolvedValue(undefined)
+  })
+
+  it('debe devolver 400 cuando no hay session ID', async () => {
+    setupHeaders(undefined)
+
+    const res = await DELETE(mockReq('DELETE', { variantId: VARIANT_ID }))
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Sesión de carrito no encontrada')
+  })
+
+  it('debe devolver 400 cuando no hay tenant', async () => {
+    setupHeaders(SESSION_ID)
+    vi.mocked(getTenantId).mockResolvedValue(null)
+
+    const res = await DELETE(mockReq('DELETE', { variantId: VARIANT_ID }))
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Tienda no encontrada')
+  })
+
+  it('debe devolver 400 cuando la validación Zod falla', async () => {
+    setupHeaders(SESSION_ID)
+
+    const res = await DELETE(mockReq('DELETE', {}))
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Validación fallida')
+  })
+
+  it('debe limpiar todo el carrito cuando clearAll es true', async () => {
+    setupHeaders(SESSION_ID)
+
+    const res = await DELETE(mockReq('DELETE', { clearAll: true }))
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.items).toEqual([])
+  })
+
+  it('debe eliminar un ítem específico en caso feliz', async () => {
+    setupHeaders(SESSION_ID)
+    vi.mocked(db.select).mockReturnValueOnce(createQuery([]))
+
+    const res = await DELETE(mockReq('DELETE', { variantId: VARIANT_ID }))
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.items).toEqual([])
+  })
+
+  it('debe devolver items vacíos cuando ninguna variante coincide con el tenant (cross-tenant)', async () => {
+    setupHeaders(SESSION_ID)
+    vi.mocked(getTenantId).mockResolvedValue(CROSS_TENANT_ID)
+    vi.mocked(db.select).mockReturnValueOnce(createQuery([]))
+
+    const res = await DELETE(mockReq('DELETE', { variantId: VARIANT_ID }))
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.items).toEqual([])
+  })
+})

@@ -8,7 +8,10 @@
     ".": "./src/index.ts",
     "./cart": "./src/cart.ts",
     "./products": "./src/products.ts",
-    "./email": "./src/email.ts"
+    "./email": "./src/email.ts",
+    "./categories": "./src/categories.ts",
+    "./health": "./src/health.ts",
+    "./webhook-signature": "./src/webhook-signature.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -16,14 +19,13 @@
   "dependencies": {
     "@repo/db": "workspace:*",
     "@repo/logger": "workspace:*",
+    "@sentry/nextjs": "^10.69.0",
     "drizzle-orm": "^0.45.0",
     "ioredis": "^5.10.1",
-    "next": "^16.0.0",
-    "nodemailer": "^8.0.5",
-    "resend": "^6.12.2"
+    "next": "^16.2.12",
+    "resend": "^6.18.1"
   },
   "devDependencies": {
-    "@types/nodemailer": "^8.0.0",
     "typescript": "^5"
   }
 }
