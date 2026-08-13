@@ -967,4 +967,4 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
   - **Calidad:** 15 PRs dependabot mergeados (10 npm + 5 actions) con validacion completa; lockfile corrupto reparado 2 veces; limpieza de 13 dependencias muertas; guard de migraciones inmutables en CI; prettier global aplicado (285 archivos, 0 cambios funcionales); 430 tests / 55 archivos; E2E Playwright 15 specs con runner self-hosted; assertions de contenido en E2E admin.
 - **Verificacion pre-merge:** pnpm lint 6/6, pnpm typecheck 9/9, pnpm test 430/430 (55 archivos), pnpm build 3/3.
 - **Post-merge pendiente:** verificar deploys de produccion en Vercel (las 3 apps), confirmar health checks en dominios reales y revisar checklist de go-live (MP en modo produccion con token APP_USR-).
-- **Branch:** main (merge commit: PENDIENTE)
+- **Branch:** main (merge commit: b32cfe9, tag v0.9.0)
