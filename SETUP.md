@@ -226,7 +226,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**426 tests pasando, 0 fallos (55 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**430 tests pasando, 0 fallos (55 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
@@ -281,7 +281,7 @@ El carrito anónimo persiste en Redis vía ioredis. **Hay dos variables distinta
 ## E2E (Playwright)
 
 - Config en la raíz: `playwright.config.ts` (6 projects, `storageState` para admin/superadmin vía `global-setup.ts`).
-- Specs en `e2e/` (storefront, checkout, admin, superadmin, security) — 14 specs.
+- Specs en `e2e/` (storefront, checkout, admin, superadmin, security, webhook) — 15 specs.
 - Env vars (ver `.env.local.example`): `E2E_STOREFRONT_URL`, `E2E_STOREFRONT_T2_URL`, `E2E_ADMIN_URL`, `E2E_SUPERADMIN_URL`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`.
 - CI: `.github/workflows/e2e.yml` — corre en **runner self-hosted** (AlmaLinux). Requisitos del runner:
   - Egress TCP a Neon (puerto 5432, IPv4 o IPv6) y red a los 3 dominios Vercel.
@@ -322,7 +322,7 @@ El runner self-hosted no tiene ruta IPv6. El endpoint de Neon publica registros 
 
 ## Nota
 
-Última actualización: 10 de agosto de 2026 – Alineación documental post-PR44 (426 tests, factory de health check, E2E Playwright con CI self-hosted, sección Redis agregada). Rama `develop`. Build limpio.
+Última actualización: 12 de agosto de 2026 – Release v0.9.0 (430 tests, 15 specs E2E, factory de health check, E2E Playwright con CI self-hosted, sección Redis agregada). Rama `main`. Build limpio.
 
 ## URLs de producción (Vercel)
 

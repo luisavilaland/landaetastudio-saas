@@ -222,7 +222,7 @@
 pnpm test
 ```
 
-- [x] 426 tests pasando (55 archivos)
+- [x] 430 tests pasando (55 archivos)
 - [x] 0 tests fallando
 
 ```bash
@@ -236,7 +236,7 @@ pnpm build
 pnpm test:e2e
 ```
 
-- [x] 14 specs E2E pasando (Playwright, CI self-hosted)
+- [x] 15 specs E2E pasando (Playwright, CI self-hosted)
 
 ---
 

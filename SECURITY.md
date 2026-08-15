@@ -1,21 +1,30 @@
 # Security Policy
 
-## Supported Versions
+## Versión actual
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+| Versión | Estado |
+| ------- | ------ |
+| 0.9.x   | Activo |
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+## Reportar una vulnerabilidad
 
-## Reporting a Vulnerability
+Si encontrás una vulnerabilidad de seguridad, **no abras un issue público**. Enviá un email a la dirección de contacto del proyecto con:
 
-Use this section to tell people how to report a vulnerability.
+1. Descripción del hallazgo.
+2. Pasos para reproducir.
+3. Impacto potencial (qué datos o servicios se ven afectados).
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+## Respuesta
+
+- **Acuse de recibo:** dentro de las 48 horas hábiles.
+- **Evaluación y fix:** depende de la gravedad — críticas se atienden en la semana,其它问题 en el siguiente release.
+- **Disclosure:** se coordina la publicación del fix antes de dar details al reportador.
+
+## Medidas de seguridad activas
+
+- **RLS (Row Level Security):** FORCE ROW LEVEL SECURITY en todas las tablas de negocio con rol `app_user` (sin `BYPASSRLS`). Aislamiento multi-tenant garantizado a nivel de base de datos.
+- **Autenticación:** NextAuth v5 con JWT, `AUTH_SECRET` obligatorio (sin fallback hardcoded).
+- **Webhooks:** verificación HMAC con `timingSafeEqual`, anti-replay (ventana de 300s), fail-closed en producción.
+- **Rate limiting:** 10 req/min/IP en checkout/preference con Redis.
+- **Variables de entorno:** validación Zod al arrancar, la app no inicia si falta una variable crítica.
+- **CSRF:** activado automáticamente por NextAuth v5 en producción.
