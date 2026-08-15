@@ -17,7 +17,7 @@ Si encontrás una vulnerabilidad de seguridad, **no abras un issue público**. E
 ## Respuesta
 
 - **Acuse de recibo:** dentro de las 48 horas hábiles.
-- **Evaluación y fix:** depende de la gravedad — críticas se atienden en la semana,其它问题 en el siguiente release.
+- **Evaluación y fix:** depende de la gravedad — críticas se atienden en la semana, otros problemas en el siguiente release.
 - **Disclosure:** se coordina la publicación del fix antes de dar details al reportador.
 
 ## Medidas de seguridad activas

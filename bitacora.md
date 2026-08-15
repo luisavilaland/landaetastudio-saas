@@ -968,3 +968,11 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **Verificacion pre-merge:** pnpm lint 6/6, pnpm typecheck 9/9, pnpm test 430/430 (55 archivos), pnpm build 3/3.
 - **Post-merge pendiente:** verificar deploys de produccion en Vercel (las 3 apps), confirmar health checks en dominios reales y revisar checklist de go-live (MP en modo produccion con token APP_USR-).
 - **Branch:** main (merge commit: b32cfe9, tag v0.9.0)
+
+---
+
+## 2026-08-15 — Fix tipográfico en SECURITY.md
+
+- **SECURITY.md (línea 20):** corrección de artefacto de copia-pega — `其它问题` (chino, "otros problemas") → `otros problemas` en la política de respuesta ("críticas se atienden en la semana, otros problemas en el siguiente release.").
+- **Alcance verificado:** la frase solo existía en `SECURITY.md` (grep `其它问题`/`问题`/`siguiente release` → 1 match). Ningún otro archivo contiene la frase ni referencia `SECURITY.md`, así que no hubo otra documentación que actualizar.
+- **Branch:** `develop`
