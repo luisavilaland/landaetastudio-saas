@@ -976,3 +976,17 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **SECURITY.md (línea 20):** corrección de artefacto de copia-pega — `其它问题` (chino, "otros problemas") → `otros problemas` en la política de respuesta ("críticas se atienden en la semana, otros problemas en el siguiente release.").
 - **Alcance verificado:** la frase solo existía en `SECURITY.md` (grep `其它问题`/`问题`/`siguiente release` → 1 match). Ningún otro archivo contiene la frase ni referencia `SECURITY.md`, así que no hubo otra documentación que actualizar.
 - **Branch:** `develop`
+
+---
+
+## 2026-08-15 — Fix DoD post-Dependabot: compatibilidad TypeScript 6 + ioredis 6 en @repo/commerce
+
+- **Contexto:** los 11 PRs de Dependabot (TS 6.0.3 #70, ioredis 6.0.0 #71, next 16.3.x #68, next-auth beta.32 #73, turbo 2.10.11 #74, @sentry/nextjs 10.70.0 #76, @types/node 26.2.0 #75, eslint-config-next 16.3.1 #72, resend 6.20.0+ #69, tailwindcss 4.3.3 #67, pnpm/action-setup 4→6 #66) se mergearon a develop. Al correr el DoD (`pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm build && pnpm test`) fallaba.
+- **`pnpm install --frozen-lockfile` roto:** `ERR_PNPM_OUTDATED_LOCKFILE` — el root `package.json` declaraba `typescript ^5.8.3` pero el lockfile ya traía `^6.0.3` (mismatch introducido por los merges). Reparado con `pnpm install --no-frozen-lockfile` (regenera lockfile coherente con TS6).
+- **`pnpm lint` OK (6/6).** `pnpm typecheck` fallaba solo en `@repo/commerce` por dos causas:
+  1. **Deprecación TS6 de `moduleResolution: node`/`node10`** en el único paquete CommonJS del monorepo. Se alineó `packages/commerce/tsconfig.json` al estándar del resto del repo: `module: "ESNext"` + `moduleResolution: "bundler"` (como `@repo/db`, `@repo/logger`, etc.). Esto eliminó también el cascade de errores `shouldInlineParams` de drizzle-orm (identidad de tipos rota por frontera ESM/CJS bajo `node16`) y los `Cannot find module 'next/headers'` en `tenant.ts`.
+  2. **No se agregó `"type": "module"`** a `package.json` (se probó y revertió): con bundler resolution basta `module: ESNext` y los imports relativos quedan sin extensión `.js` (consistente con el resto de paquetes y con el consumo desde apps Next.js).
+- **`pnpm typecheck` 9/9, `pnpm build` 3/3 (apps Next 16.3.2), `pnpm test` 430/430 (55 archivos) — todos verdes.**
+- **Lecciones:** (a) tras merges de Dependabot que cambian versiones mayores de TS, regenerar el lockfile con `--no-frozen-lockfile` antes del DoD; (b) mantener todos los paquetes @repo/* con la misma config de módulo (ESNext/bundler) para evitar incompatibilidades de identidad de tipos de drizzle-orm bajo TS6.
+- **Pendiente:** el lockfile ahora declara `typescript ^6` en root y en `@repo/commerce`; conviene dejar `pnpm install --frozen-lockfile` habilitado en CI una vez que el lockfile regenerado se commitee.
+- **Branch:** `develop` (pendiente commit + push)
