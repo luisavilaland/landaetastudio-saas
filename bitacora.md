@@ -989,4 +989,17 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **`pnpm typecheck` 9/9, `pnpm build` 3/3 (apps Next 16.3.2), `pnpm test` 430/430 (55 archivos) — todos verdes.**
 - **Lecciones:** (a) tras merges de Dependabot que cambian versiones mayores de TS, regenerar el lockfile con `--no-frozen-lockfile` antes del DoD; (b) mantener todos los paquetes @repo/* con la misma config de módulo (ESNext/bundler) para evitar incompatibilidades de identidad de tipos de drizzle-orm bajo TS6.
 - **Pendiente:** el lockfile ahora declara `typescript ^6` en root y en `@repo/commerce`; conviene dejar `pnpm install --frozen-lockfile` habilitado en CI una vez que el lockfile regenerado se commitee.
-- **Branch:** `develop` (pendiente commit + push)
+- **Branch:** `develop` (commit `2f0e23f` + `12ae2d0` pushed)
+
+---
+
+## 2026-09-09 — Merge completo de dependabot PRs #77–#86, fix lockfile roto y alineación next-auth
+
+- **Contexto:** tras el merge de Dependabot PRs #78–#86 (previo a #77), se completó el merge de los 10 PRs restantes: #77 (next-auth β.31→β.32), #79 (typescript-eslint 8.67→8.69), #80 (@vitejs/plugin-react 6.0.5→6.1.1), #84 (next 16.3.2→16.3.4).
+- **TS6 typecheck fix:** el lockfile regenerado tras el merge de #81 requería `@types/node: ^20` → `^26` en `packages/validation/package.json`, y `"types": ["node"]` tanto en `packages/validation/tsconfig.json` como en `packages/db/tsconfig.json` para que TypeScript 6 resuelva el global `process` (TS6 no lo incluye implícitamente). Commits `d1c5036`, `12ae2d0`, `2f0e23f`.
+- **Lockfile desincronizado (post #77):** el merge de #77 (next-auth β.32) solo modificó el `pnpm-lock.yaml` pero no actualizó `apps/admin` ni `apps/superadmin` de β.31→β.32. El lockfile eliminó la entrada `@auth/core@0.41.2` (necesaria por β.31) pero las apps seguían en β.31 → `ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY` en CI. **Fix:** actualización explícita de `apps/admin/package.json` y `apps/superadmin/package.json` de `next-auth: 5.0.0-beta.31` a `5.0.0-beta.32`, seguido de `pnpm install --no-frozen-lockfile` para regenerar el lockfile limpio. Ahora todas las apps, root y `packages/auth` usan β.32 con `@auth/core@0.41.3`.
+- **Limpieza de disco:** la máquina estaba a 0 GB libres (237 GB usados). El directorio `.turbo` del monorepo ocupaba **~59 GB** (cache de builds incremental). Se limpió `.turbo` + los `.next` de las 3 apps, recuperando ~61 GB. **Lección:** `.turbo` y `.next` están en `.gitignore` pero el `node_modules/.pnpm` symlink farm los replica dentro de `node_modules`, lo que infla el disco. Agregar `.turbo` al `.gitignore` del workspace raíz y considerar `turbo prune` periódico en CI.
+- **DoD completo verificado:** `pnpm install --frozen-lockfile` ✓ (lockfile now in sync), `pnpm lint` 6/6 ✓, `pnpm typecheck` 9/9 ✓, `pnpm build` 3/3 ✓, `pnpm test` 430/430 ✓.
+- **Dependabot PRs cerrados/recién resueltos:** todos los 10 PRs originales (#66–#76) + los 10 PRs nuevos (#77–#86) están mergeados a `develop`. Pendiente: merge `develop` → `main` para release.
+- **PRs cerrados por el agente:** #80 (@vitejs/plugin-react) se determinó que SÍ se usa en `vitest.config.ts:3` (React component tests), por lo que se mergió en vez de cerrar. Si se prueba que los tests de componentes no se usan en CI, se puede revertir y cerrar el PR.
+- **Branch:** `develop` — pendiente commit + push de los cambios de next-auth β.32 en apps/admin y apps/superadmin.
