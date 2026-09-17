@@ -2,7 +2,15 @@
 
 Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al Cono Sur.
 
+> **Referencia vigente** — Última revisión: 2026-09-17.
+> Si el código diverge de este doc, **actualizar en el mismo PR**.
+> Ver también: Blueprint v2.6, ADR-023/024/025, `subscription-lifecycle.md`.
+
 # Roadmap
+
+## Blueprint vigente
+
+**Blueprint v2.6** (`docs/superpowers/specs/2026-09-blueprint-v2.6.md`) — Plan completo 10 fases para lanzamiento comercial con autoservicio, suscripciones, plantillas, cupones, banners, boletines y envíos.
 
 ## Fase 1 – Autenticación y Órdenes ✅ (Completada)
 
@@ -450,11 +458,13 @@ En storefront `/api/health` está excluida del matcher del proxy multi-tenant (`
 
 ## Documentación adicional
 
-- [Decisiones de arquitectura](./docs/arquitectura.md) – Por qué elegimos cada tecnología.
+- [Blueprint v2.6](./docs/superpowers/specs/2026-09-blueprint-v2.6.md) — Roadmap vigente (10 fases, pre-lanzamiento).
+- [Ciclo de vida de suscripciones](./docs/superpowers/specs/2026-09-subscription-lifecycle.md) — Spec transversal (5 estados, gracia 7d, retención 90d, prorrateo, 7 emails).
+- [Decisiones de arquitectura](./docs/arquitectura.md) – Por qué elegimos cada tecnología (incluye ADR-023/024/025 pendientes).
 - [Guía de setup](./SETUP.md) – Configuración del proyecto y solución de problemas.
 - [Guía para agentes de IA](./AGENTS.md) – Políticas y comandos para asistentes de código.
 - [Prompts reutilizables](./PROMPTS.md) – Plantillas de prompts para agentes de IA.
-- [Brief técnico Fase 5](./docs/brief%20tecnico%20fase%205.md) – Plan de producción.
+- [Brief técnico Fase 5](./docs/brief%20tecnico%20fase%205.md) – Plan de producción (completado).
 - [Checklist de pruebas manuales](./TESTING-MANUAL.md) – Verificación manual por área.
 
 ## Tests
@@ -471,4 +481,4 @@ pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 
 ---
 
-**Última actualización:** 12 de agosto de 2026 – Release develop → main (430 tests, 15 specs E2E, factory de health check, decisión E2E_WEBHOOK_TEST). Rama `main`. Build limpio.
+**Última actualización:** 17 de septiembre de 2026 – v0.10.0 released (Dependabot sept 2026: TS6, Next 16.3, ioredis 6, vitest 5, NextAuth β.32). Blueprint v2.6 aprobado. Rama `main`. Build limpio.

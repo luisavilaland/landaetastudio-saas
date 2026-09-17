@@ -109,6 +109,15 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - Paquetes actuales: `@repo/db`, `@repo/storage`, `@repo/auth`, `@repo/validation`, `@repo/commerce`.
 - `normalizeSlug` está centralizado en `@repo/validation/src/utils.ts`.
 
+## Estructura documental
+
+- **Blueprint v2.6:** `docs/superpowers/specs/2026-09-blueprint-v2.6.md` — plan completo 10 fases (pre-lanzamiento).
+- **ADRs:** `docs/adr/` — decisiones de arquitectura (ADR-001 a ADR-025, ver `docs/arquitectura.md`).
+- **Specs por fase:** `docs/superpowers/specs/` — especificación técnica detallada por fase (ej: `subscription-lifecycle.md`).
+- **Plans por fase:** `docs/superpowers/plans/` — plan de ejecución con tasks, estimaciones, dependencias.
+
+> **Regla:** Antes de tocar código, verificar que existe ADR + spec + plan de la fase correspondiente. Si falta alguno, crearlo primero.
+
 ## Herramientas de desarrollo
 
 - pnpm para gestión de dependencias y monorepo.

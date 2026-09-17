@@ -95,22 +95,23 @@ El decremento calcula el valor nuevo a partir del leído (**no `stock - qty` at�
 
 ---
 
-## 4. Dependencias no declaradas que sobreviven por hoisting del root — PENDIENTE (2026-08-12)
+## 4. Dependencias no declaradas que sobreviven por hoisting del root — ✅ RESUELTO (2026-09-17)
 
 **Contexto real:** durante la limpieza de dependencias muertas (rama `chore/remove-dead-deps`) se detectaron imports que funcionan solo por el hoisting del `node_modules` raíz, sin declaración en el `package.json` del workspace:
 
-- `packages/storage` → importa `minio` (packages/storage/src/index.ts) pero su `package.json` no tiene `dependencies` ni `devDependencies`.
+- `packages/storage` → importa `minio` (packages/storage/src/index.ts) pero su `package.json` no tenía `dependencies` ni `devDependencies`.
 - `apps/storefront` → importa `bcryptjs` (lib/customer-auth.ts, app/api/register/route.ts) sin declararlo (lo declara el root; sobrevive por hoisting).
 
-Riesgo: un futuro cambio de `pnpm.hoistPattern` / instalación sin hoisting / extracción del paquete rompe el import sin aviso. Funciona hoy, pero es frágil.
+Riesgo: un futuro cambio de `pnpm.hoistPattern` / instalación sin hoisting / extracción del paquete rompe el import sin aviso. Funcionaba, pero era frágil.
 
-**Plan propuesto (no implementar ahora):**
+**Implementación (2026-09-17, sesión de verificación post-tarea):**
 
-1. Declarar `minio` como dependencia explícita en `packages/storage/package.json`.
-2. Declarar `bcryptjs` como dependencia explícita en `apps/storefront/package.json` (o mover el hashing a `@repo/auth`, que ya lo usa — mejor diseño).
+1. **`packages/storage/package.json`**: agregada `"minio": "^8.0.7"` en `dependencies`.
+2. **`apps/storefront/package.json`**: agregada `"bcryptjs": "^3.0.3"` en `dependencies`.
+3. **`pnpm install`**: ejecutado para actualizar lockfile.
+4. **DoD verificado:** `pnpm lint` 6/6 ✓, `pnpm typecheck` 9/9 ✓, `pnpm build` 3/3 ✓, `pnpm test` 430/430 ✓.
 
-**Criterios de aceptación:** `pnpm install` y `pnpm typecheck` sin cambios de comportamiento; los imports resuelven desde el workspace que los declara.
-
+**Criterios de aceptación cumplidos:** imports resuelven desde el workspace que los declara; sin cambios de comportamiento.
 ---
 
 ## Referencia

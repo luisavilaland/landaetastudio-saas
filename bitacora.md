@@ -1032,3 +1032,20 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 - **IP actual del runner a considerar en Neon IP allowlist si se activara:** `190.9.40.138` (egress); la dev es `190.142.61.56`.
 - **Notas para SETUP.md:** el prerequisito del runner "egress TCP 5432 a Neon" se cumple con la regla de nftables/iptables del host (no firewalld). Si en otro runner el firewall vuelve a ser nftables puro con allowlist, la regla equivalente es `nft insert rule ip filter OUTPUT oifname != "lo" ip protocol tcp ct state new tcp dport 5432 accept`. Mantener el pin IPv4 del endpoint Neon en `/etc/hosts` (o mover el endpoint a un pool estático / IP allowlist) por ausencia de ruta IPv6.
 - **Branch:** `develop` (sin cambios de código en el repo para este incidente — es infra del runner).
+
+---
+
+## 2026-09-17 — Documentación y deuda técnica: actualización post-Dependabot masivo (PRs #77–#96)
+
+- **Contexto:** tras la oleada de ~60 commits de Dependabot (septiembre 2026), se actualizó la documentación para reflejar el estado real del proyecto:
+  - TypeScript 6.0.3, Next.js 16.3.5, ioredis 6.0.0, NextAuth v5 β.32, vitest 5.0.0, Playwright 1.63.0, Zod 4.6.4, turbo 2.10.12, tailwindcss 4.3.3, resend 6.28.0, lucide-react 1.45.0, typescript-eslint 8.70.0, @types/node 26.5.1.
+  - Fixes de lockfile por duplicados YAML (merge #95 vitest 4→5 major).
+  - Documentación del fix nftables egress 5432 en SETUP.md.
+- **bitacora.md:** entrada consolidada registrando el batch completo de Dependabot y el incidente de infra del runner.
+- **docs/brief tecnico fase 5.md:** actualizado a "Fase 6 completada + v0.9.0 en producción" con referencia al blueprint v2.6.
+- **docs/deuda-tecnica.md ítem 4 RESUELTO:** declaradas dependencias explícitas por hoisting:
+  - `minio@^8.0.7` en `packages/storage/package.json` (usado en `src/index.ts`).
+  - `bcryptjs@^3.0.3` en `apps/storefront/package.json` (usado en `lib/customer-auth.ts` y `app/api/register/route.ts`).
+- **DoD verificado post-cambios:** `pnpm install` + `pnpm lint` 6/6 ✓ + `pnpm typecheck` 9/9 ✓ + `pnpm build` 3/3 ✓ + `pnpm test` 430/430 ✓.
+- **Blueprint v2.6:** aprobado y referenciado (PDF en repo, pendiente conversión a markdown para planificación de Fase 1).
+- **Branch:** `develop`

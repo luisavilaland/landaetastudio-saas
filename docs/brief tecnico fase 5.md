@@ -395,7 +395,9 @@ Observabilidad — Antes de escalar
 
 *SaaS eCommerce — Brief Técnico Fase 5 — Abril 2026 — Confidencial*
 
-*Actualizado 6 de mayo 2026: Fase 5 completada exitosamente. Todas las tareas de seguridad, observabilidad y hardening implementadas. 225/225 tests pasando. Build limpio en las 3 apps.*
+*Actualizado 17 de septiembre 2026: Fase 6 completada + v0.9.0 en producción (merge develop→main 2026-08-12). Todas las tareas de seguridad, observabilidad, hardening, RLS real (withTenantContext), FORCE ROW LEVEL SECURITY con rol app_user, y E2E Playwright (15 specs) implementadas. 430/430 tests pasando, 55 archivos. Build limpio en las 3 apps (Next.js 16.3.5, TS 6.0.3).*
+
+*Plan vigente: **Blueprint SaaS eCommerce v2.6** (aprobado, PDF en repo — conversión a markdown pendiente para planificación de Fase 1).*
 
 ---
 
@@ -410,4 +412,20 @@ La Fase 5 fue completada exitosamente el 6 de mayo de 2026. Todos los objetivos 
 - **Calidad del código**: 225 tests pasando, build limpio en las 3 apps, lint y typecheck sin errores.
 
 El sistema está listo para el deploy a producción en Vercel con infraestructura cloud (Neon PostgreSQL, Upstash Redis, Cloudflare R2, Resend).
-$$
+
+---
+
+## Estado Final de la Fase 6 ✅ (2026-08-12, merge develop→main, tag v0.9.0)
+
+La Fase 6 llevó el RLS de decorativo a **real y forzado** en producción:
+
+- **RLS real**: `withTenantContext` wireado en 27 handlers API + 9 Server Components (patrón `return await withTenantContext(tenantId, cb)` con `db.transaction` + `SET LOCAL`).
+- **FORCE ROW LEVEL SECURITY** en 8 tablas de negocio + rol `app_user` sin `rolbypassrls` → RLS se aplica al owner de tabla.
+- **DATABASE_APP_URL** obligatorio en runtime (rol `app_user`); `DATABASE_URL` (owner) solo para migraciones/seed.
+- **E2E Playwright**: 15 specs (storefront, checkout, admin, superadmin, security, webhook) con CI self-hosted (AlmaLinux).
+- **Carrito resiliente**: wrappers progresivos `safeGet`/`redisSetEx`/`redisDel`/`redisIncr`/`redisPexpire` + `whenReady` (cold-start Vercel) — fail-open.
+- **Barrido `console.*`**: 0 instancias en `apps/` (excepción intencional: `seed.ts` y `env.ts`).
+- **Webhook MP**: firma HMAC canónica `id:;request-id:;ts:` + anti-replay 300s + magic IDs solo con firma válida.
+- **TOCTOU fixes**: checkout con decremento atómico de stock (`WHERE stock >= qty`); PUT products `[id]` con 409 si producto borrado durante update.
+- **Health checks**: factory `createHealthCheckHandler` compartido + alertas Sentry en degradación.
+- **Calidad**: 430 tests (55 archivos), 15 specs E2E, build limpio, lint/typecheck verdes.

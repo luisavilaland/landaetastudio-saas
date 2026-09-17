@@ -1,5 +1,7 @@
 # Decisiones de arquitectura – saas-ecommerce
 
+**Última revisión: 2026-09-17**
+
 Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada ADR está documentada individualmente en `docs/adr/`.
 
 ## ADRs
@@ -28,6 +30,13 @@ Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada AD
 | [ADR-020](adr/ADR-020-normalizacion-slugs.md)           | Normalización de slugs                                | Aceptada — ver discrepancia |
 | [ADR-021](adr/ADR-021-placeholder.md)                   | Gap de numeración (no emitido)                        | —                           |
 | [ADR-022](adr/ADR-022-rls-status.md)                    | Estado de RLS (decorativo → activo con app_user)      | Aceptada — actualizada      |
+| [ADR-023](adr/ADR-023-dos-flujos-mp.md)                 | Dos flujos MP independientes (plataforma vs tenant)   | Aceptada                    |
+| [ADR-024](adr/ADR-024-pgcrypto-tokens.md)               | Cifrado de tokens con pgcrypto + clave en env var     | Aceptada                    |
+| [ADR-025](adr/ADR-025-plantillas-composiciones.md)      | Sistema de plantillas intercambiables (composiciones) | Aceptada                    |
+
+## Blueprint vigente
+
+- **Blueprint v2.6:** `docs/superpowers/specs/2026-09-blueprint-v2.6.md` — plan completo 10 fases (pre-lanzamiento)
 
 ## Convenciones clave
 

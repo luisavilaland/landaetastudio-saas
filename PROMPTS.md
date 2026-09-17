@@ -18,6 +18,7 @@
 | 8   | [Varios](#8-varios)                                   | Salud, dependencias, revert             |
 | 9   | [Seed](#9-seed)                                       | Actualizar datos de prueba              |
 | 10  | [Infra y Deploy](#10-infra-y-deploy)                  | Vercel, env vars, CI                    |
+| 11  | [Planificación y arquitectura](#11-planificación-y-arquitectura) | ADRs, specs, plans, fases |
 
 ---
 
@@ -26,7 +27,7 @@
 ### Calibración Rápida (diaria)
 
 ```
-Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md y docs/arquitectura.md. Confirmame que entendés: stack, restricciones multi-tenant, DoD, herramientas de desarrollo, regla sobre comandos git y estructura del monorepo. Dame un visto bueno breve.
+Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, docs/arquitectura.md, blueprint v2.6 y specs de fase. Confirmame que entendés: stack, restricciones multi-tenant, DoD, herramientas de desarrollo, regla sobre comandos git, estructura del monorepo y workflow blueprint→ADR→spec→plan→fase. Dame un visto bueno breve.
 ```
 
 ### Análisis Completo
@@ -34,7 +35,7 @@ Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md y docs/arquitectura.md. Confirmam
 ```
 Actuá como un desarrollador senior que se reincorpora al proyecto. Sin modificar archivos:
 
-1. Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, docs/arquitectura.md y bitacora.md.
+1. Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, docs/arquitectura.md, bitacora.md, blueprint v2.6 y specs de fase.
 2. Ejecuta `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test`.
 3. Explorá la estructura de apps/ y packages/ para detectar cambios.
 
@@ -322,6 +323,7 @@ Revisa los cambios realizados. Indica para cada archivo si necesita actualizarse
 - SETUP.md: ¿cambió el setup, troubleshooting o datos de prueba?
 - docs/arquitectura.md: ¿nuevas decisiones de diseño?
 - .gitignore: ¿nuevos artefactos que ignorar?
+- blueprint v2.6 / specs de fase / ADRs: **¿este cambio invalida algún ADR, spec o el blueprint?**
 
 Muéstrame la modificación propuesta. No la apliques sin confirmación.
 ```
@@ -427,4 +429,105 @@ Agregué la variable [NOMBRE] al proyecto. Verificá antes del deploy:
 3. ¿Está configurada en los proyectos de Vercel que la necesitan?
 4. ¿Está validada en packages/validation/src/env.ts si es crítica?
 5. Si reemplaza una variable anterior, ¿se eliminó la vieja de Vercel?
+```
+
+---
+
+## 11. Planificación y Arquitectura
+
+### Crear un ADR
+
+```
+Voy a proponer una decisión de arquitectura: [TÍTULO/TEMA].
+
+Antes de escribir el ADR:
+1. Confirmá que es una decisión arquitectónica real (difícil de revertir, impacto transversal).
+2. Verificá si ya existe un ADR relacionado en docs/adr/.
+3. Identificá: contexto, decisión, consecuencias, alternativas consideradas.
+
+Formato (docs/adr/ADR-XXX-titulo.md):
+- Título
+- Fecha
+- Contexto
+- Decisión
+- Estado (Propuesta/Aceptada/Rechazada/Suplantada)
+- Consecuencias
+
+No crear ADR para decisiones de producto (tiers, límites, emails) — eso va en spec/plan.
+```
+
+### Crear un spec de fase
+
+```
+Voy a escribir el spec técnico para la Fase [N]: [NOMBRE].
+
+Estructura (docs/superpowers/specs/2026-09-faseN-nombre.md):
+- Objetivo de la fase
+- Dependencias (qué fases deben estar completas)
+- Modelo de datos (tablas nuevas, cambios a existentes, RLS)
+- API endpoints (nuevos + modificados, métodos, validaciones Zod)
+- Flujo de datos (secuencia, webhooks, eventos)
+- UI/UX (páginas, componentes, estados)
+- Variables de entorno nuevas
+- Tests requeridos (unitarios + E2E)
+- Riesgos y mitigaciones
+- Referencias: ADRs relacionados, blueprint sección X, spec transversal si aplica
+
+Regla: Si el spec toca suscripciones, referenciar `subscription-lifecycle.md` en lugar de duplicar lógica.
+```
+
+### Crear el plan de una fase
+
+```
+Voy a escribir el plan de ejecución para la Fase [N]: [NOMBRE].
+
+Estructura (docs/superpowers/plans/2026-09-faseN-nombre.md):
+- Resumen de la fase (1-2 líneas)
+- Tasks desglosadas (cada task: descripción, archivos a tocar, estimación)
+- Dependencias entre tasks (orden, paralelizables)
+- Criterios de aceptación por task
+- Tests a crear (archivos, patrones)
+- DoD específico de la fase
+- Riesgos y mitigaciones
+- Estimación total (días hábiles)
+
+Referencias: spec de la fase, blueprint sección X, ADRs relacionados.
+```
+
+### Cerrar una fase
+
+```
+Fase [N] completada. Verificación de cierre:
+
+1. **DoD técnico:**
+   - [ ] pnpm lint, typecheck, build, test — todo verde
+   - [ ] Tests nuevos pasando (unitarios + E2E si aplica)
+   - [ ] Sin `any`, `console.log` fuera del logger, imports zigzagueantes
+
+2. **Documentación actualizada en mismo PR:**
+   - [ ] Spec de la fase (si cambió algo vs original)
+   - [ ] Plan de la fase (marcar tasks completadas)
+   - [ ] README.md (roadmap, endpoints, stack si cambió)
+   - [ ] docs/arquitectura.md (ADRs nuevos/actualizados)
+   - [ ] AGENTS.md (nuevas convenciones/restricciones)
+   - [ ] SETUP.md (env vars, comandos, troubleshooting)
+   - [ ] TESTING.md / TESTING-MANUAL.md (nuevos tests/áreas)
+   - [ ] bitacora.md (entrada con fecha, cambios, decisiones)
+
+3. **Blueprint sync:**
+   - [ ] Marcar fase como completada en blueprint v2.6
+   - [ ] Verificar que no hay drift en fases siguientes
+
+4. **Infra/Deploy:**
+   - [ ] Variables de entorno en Vercel (prod + preview)
+   - [ ] Migraciones aplicadas en Neon (prod)
+   - [ ] Health checks OK en 3 apps
+   - [ ] E2E pasando en CI (self-hosted)
+
+5. **Git:**
+   - [ ] Commit Conventional Commits en español
+   - [ ] Push a develop
+   - [ ] PR develop → main si es release (tag vX.Y.Z)
+
+Solo cerrar fase cuando TODO esté ✅.
 ```
