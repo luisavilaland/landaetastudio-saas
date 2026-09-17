@@ -1002,4 +1002,16 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **DoD completo verificado:** `pnpm install --frozen-lockfile` ✓ (lockfile now in sync), `pnpm lint` 6/6 ✓, `pnpm typecheck` 9/9 ✓, `pnpm build` 3/3 ✓, `pnpm test` 430/430 ✓.
 - **Dependabot PRs cerrados/recién resueltos:** todos los 10 PRs originales (#66–#76) + los 10 PRs nuevos (#77–#86) están mergeados a `develop`. Pendiente: merge `develop` → `main` para release.
 - **PRs cerrados por el agente:** #80 (@vitejs/plugin-react) se determinó que SÍ se usa en `vitest.config.ts:3` (React component tests), por lo que se mergió en vez de cerrar. Si se prueba que los tests de componentes no se usan en CI, se puede revertir y cerrar el PR.
-- **Branch:** `develop` — pendiente commit + push de los cambios de next-auth β.32 en apps/admin y apps/superadmin.
+- **Branch:** `develop` — commit `58e11f7` pushed.
+
+---
+
+## 2026-09-17 — Merge Dependabot PRs #87–#96, fix lockfile corrompido por duplicados YAML
+
+- **Contexto:** 10 PRs Dependabot nuevos (#87–#96) se mergearon a develop. El PR #95 (vitest 4→5, major) quedó pendiente por riesgo. El merge de los 9 PRs corrompió el `pnpm-lock.yaml` introduciendo **cientos de entradas YAML duplicadas** (el mismo paquete aparecía múltiples veces con la misma key, violando YAML `mapping key`).
+- **Causa raíz de la corrupción:** los merges de Dependabot en GitHub resuelven conflictos de texto línea-por-línea, pero el lockfile de pnpm es una estructura YAML con secciones `packages` y `resolutions` que deben ser únicas. Cuando múltiples PRs cambian el lockfile simultáneamente, el merge de GitHub duplica bloques enteros en lugar de fusionarlos correctamente. Esto es un patrón conocido en monorepos con múltiples PRs de Dependabot simultáneos.
+- **Fix:** `pnpm install --no-frozen-lockfile` regeneró el lockfile limpio desde cero, eliminando todas las entradas duplicadas. El lockfile pasó de ~8400+ líneas corruptas a ~5000 líneas válidas.
+- **DoD completo verificado:** `pnpm install --frozen-lockfile` ✓, `pnpm lint` 6/6 ✓, `pnpm typecheck` 9/9 ✓, `pnpm build` 3/3 ✓, `pnpm test` 430/430 ✓.
+- **Lección:** en monorepos con múltiples PRs Dependabot simultáneos, merge uno por uno o hacer squash-merge de todos juntos con regeneración de lockfile. El merge de GitHub UI no puede fusionar YAML de lockfile de pnpm correctamente cuando hay cambios en múltiples paquetes.
+- **Dependabot PRs mergeados esta ronda:** #87 (tsx 4.23.12→4.23.13), #88 (eslint-config-next 16.3.4→16.3.5), #89 (resend 6.22→6.28), #90 (@types/node 26.2→26.5.1), #91 (zod 4.5.4→4.6.4), #92 (next 16.3.4→16.3.5), #93 (typescript-eslint 8.69→8.70), #94 (lucide-react 1.37→1.45), #96 (playwright/test 1.62→1.63). **Pendiente:** #95 (vitest 4→5, major — requiere migration guide).
+- **Branch:** `develop` — pendiente commit + push del lockfile regenerado.
