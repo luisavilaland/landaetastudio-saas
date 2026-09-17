@@ -1,0 +1,55 @@
+name: "Tarea de fase"
+description: "Tarea específica dentro de una fase del blueprint"
+title: "[Fase N]: "
+labels: ["type:task"]
+body:
+  - type: input
+    id: phase
+    attributes:
+      label: Fase del blueprint
+      description: Nombre exacto de la fase
+      placeholder: "Fase 1 — Modelo de datos"
+    validations:
+      required: true
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objetivo de la tarea
+      description: Qué se debe lograr con esta tarea, entregable esperado
+      placeholder: "Crear tablas plans, subscriptions, tenant_mp_config con RLS y migración Drizzle..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterio de aceptación / DoD
+      description: Checklist de qué debe pasar para considerar la tarea completa
+      placeholder: |
+        - [ ] Tablas creadas en schema Drizzle con RLS
+        - [ ] Migración generada con `pnpm db:generate`
+        - [ ] Migración aplicada en Neon (`pnpm db:migrate`)
+        - [ ] Seed actualizado con 3 planes
+        - [ ] Tests unitarios pasando
+        - [ ] `pnpm lint && pnpm typecheck && pnpm build && pnpm test` todo verde
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencias
+      description: Qué tareas deben completarse antes, o qué bloquea esta tarea (opcional)
+      placeholder: "Depende de que Fase 0 (infra) esté completa. Bloquea Fase 2."
+    validations:
+      required: false
+
+  - type: textarea
+    id: references
+    attributes:
+      label: Spec / ADR referenciado
+      description: Links a spec transversal, ADRs, o sección del blueprint (opcional)
+      placeholder: "Spec: subscription-lifecycle.md — ADR-023, ADR-024 — Blueprint v2.6 sección 'Fase 1'"
+    validations:
+      required: false

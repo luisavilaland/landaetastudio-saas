@@ -1,0 +1,52 @@
+name: "Feature request"
+description: "Proponer una nueva funcionalidad"
+title: "[Feature]: "
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema que resuelve
+      description: Qué dolor o necesidad tiene el usuario/tenant
+      placeholder: "Los tenants necesitan poder configurar X porque hoy no pueden..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta
+      description: Qué funcionalidad proponés, cómo se vería, flujo básico
+      placeholder: "Agregar endpoint /api/x que permita Y, con validación Z..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+      description: Qué otras opciones evaluaste y por qué las descartaste (opcional)
+      placeholder: "Opción A: ... descartada por... Opción B: ..."
+    validations:
+      required: false
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Fase del blueprint
+      description: A qué fase del blueprint v2.6 pertenece (opcional)
+      options:
+        - "Fase 1 — Modelo de datos"
+        - "Fase 2 — Webhook suscripciones"
+        - "Fase 3 — Autoservicio"
+        - "Fase 4 — Personalización + dominio"
+        - "Fase 5 — Cupones"
+        - "Fase 6 — Banners"
+        - "Fase 7 — Plantillas"
+        - "Fase 8 — Boletines"
+        - "Fase 9 — Envíos"
+        - "Fase 10 — Go-live"
+        - "Post-lanzamiento"
+        - "No aplica / otro"
+    validations:
+      required: false

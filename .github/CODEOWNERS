@@ -1,0 +1,32 @@
+# CODEOWNERS — SaaS eCommerce
+# Equipo: 2 personas + agentes
+# - EdgarVz: implementación (open source con opencode)
+# - luisavilaland: planificación y revisión (con Claude)
+#
+# Sintaxis: path @usuario
+# El orden importa: la última coincidencia gana
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Por defecto: todos los PRs notifican a luisavilaland (planificación/revisión)
+* @luisavilaland
+
+# Apps: ambos (implementación + revisión)
+/apps/ @EdgarVz @luisavilaland
+
+# Packages: ambos (lógica de negocio compartida)
+/packages/ @EdgarVz @luisavilaland
+
+# Documentación y specs: luisavilaland (dueño de arquitectura y specs)
+/docs/ @luisavilaland
+
+# GitHub workflows/config: luisavilaland (infra y proceso)
+/.github/ @luisavilaland
+
+# Migraciones DB: doble review obligatorio (riesgo alto, rompió 2 veces antes)
+/packages/db/migrations/ @EdgarVz @luisavilaland
+
+# Turbo config: ambos (afecta build de las 3 apps)
+/turbo.json @EdgarVz @luisavilaland
+
+# Lockfile: ambos (se rompió 2 veces por merges Dependabot concurrentes)
+/pnpm-lock.yaml @EdgarVz @luisavilaland

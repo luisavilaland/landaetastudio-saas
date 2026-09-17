@@ -1,20 +1,57 @@
-## ¿Qué cambia?
+## Descripción
 
-<!-- Descripción clara y concisa de lo que hace este PR -->
+**Qué cambia y por qué:**
+<!-- Descripción clara y concisa de los cambios -->
 
-## ¿Por qué?
+**Fase del blueprint (si aplica):**
+<!-- Ej: Fase 1 — Modelo de datos, Fase 2 — Webhook suscripciones, etc. -->
 
-<!-- Motivación y contexto. Enlaza issues relacionados si aplica -->
+**Issue relacionado:**
+Closes #<!-- número del issue -->
 
-## Screenshots
+**Spec/Plan referenciado:**
+<!-- Enlace al spec o plan en docs/superpowers/specs/ o docs/superpowers/plans/ -->
 
-<!-- Si aplica, agrega capturas de pantalla del cambio -->
+**ADRs referenciados:**
+<!-- Ej: ADR-023, ADR-024, ADR-025 -->
 
-## Checklist
+---
 
-- [ ] `pnpm lint` — sin errores
-- [ ] `pnpm typecheck` — sin errores
-- [ ] `pnpm build` — sin errores
-- [ ] `pnpm test` — sin errores
-- [ ] Tests nuevos para la funcionalidad (si aplica)
-- [ ] Probado manualmente en navegador
+## Tipo de cambio
+
+- [ ] feat — Nueva funcionalidad
+- [ ] fix — Corrección de bug
+- [ ] docs — Solo documentación
+- [ ] chore — Tareas de mantenimiento (deps, configs, etc.)
+- [ ] refactor — Refactorización sin cambio de comportamiento
+- [ ] test — Agregar o corregir tests
+
+---
+
+## Checklist del autor
+
+- [ ] Tests pasan localmente (`pnpm test`)
+- [ ] Lint y typecheck pasan (`pnpm lint && pnpm typecheck`)
+- [ ] Build pasa (`pnpm build`)
+- [ ] Tests agregados para nueva funcionalidad (unitarios + E2E si aplica)
+- [ ] Documentación actualizada (README, AGENTS, spec, bitácora)
+- [ ] Env vars nuevas en `.env.local.example` y `turbo.json`
+- [ ] Migraciones: respetar guard de CI (`pnpm db:generate` sin modificar existentes)
+
+---
+
+## Checklist del revisor
+
+- [ ] Respeta AGENTS.md (tenantId en queries, precios en centavos, Zod, logger `@repo/logger`)
+- [ ] Tests cubren lógica nueva y fallan si se revierte el código
+- [ ] No hay código duplicado, imports sin usar, `any`, ni `console.log` fuera del logger
+- [ ] Cambios coinciden con el spec/plan referenciado
+- [ ] Hay algún ADR que debería crearse o actualizarse
+- [ ] Documentación del blueprint sigue siendo válida (no hay drift)
+- [ ] Deuda técnica nueva registrada en `docs/deuda-tecnica.md`
+
+---
+
+## Notas adicionales
+
+<!-- Screenshots, decisiones de diseño, dudas abiertas, contexto extra -->
