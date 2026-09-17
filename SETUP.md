@@ -284,8 +284,16 @@ El carrito anónimo persiste en Redis vía ioredis. **Hay dos variables distinta
 - Specs en `e2e/` (storefront, checkout, admin, superadmin, security, webhook) — 15 specs.
 - Env vars (ver `.env.local.example`): `E2E_STOREFRONT_URL`, `E2E_STOREFRONT_T2_URL`, `E2E_ADMIN_URL`, `E2E_SUPERADMIN_URL`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`.
 - CI: `.github/workflows/e2e.yml` — corre en **runner self-hosted** (AlmaLinux). Requisitos del runner:
-  - Egress TCP a Neon (puerto 5432, IPv4 o IPv6) y red a los 3 dominios Vercel.
-  - Si el host no tiene ruta IPv6, pin IPv4 del endpoint Neon en `/etc/hosts` (ver procedimiento completo abajo).
+- Egress TCP a Neon (puerto 5432, IPv4 o IPv6) y red a los 3 dominios Vercel.
+   - Si el host no tiene ruta IPv6, pin IPv4 del endpoint Neon en `/etc/hosts` (ver procedimiento completo abajo).
+   - **Egress 5432 por firewall del host:** el runner actual (`mj20`) tiene firewall **nftables con front-end iptables-nft**, `policy drop` en la cadena OUTPUT con allowlist de puertos egress fijos (incluye 22/80/443 pero *no* 5432). `firewalld` está `masked`. Si el SYN a Neon 5432 da "Connection refused" desde el runner pero la IP responde desde otro host, falta abrir el egress (incidente 2026-09-17):
+   ```bash
+   iptables -I OUTPUT 1 -p tcp --dport 5432 -j ACCEPT
+   # y persistir en el ruleset que carga en boot (/etc/nftables.conf con nftables.service,
+   # o la regla equivalente en nft puro):
+   # nft insert rule ip filter OUTPUT oifname != "lo" ip protocol tcp ct state new tcp dport 5432 accept
+   ```
+   Verificar con `timeout 3 bash -c 'echo >/dev/tcp/<IP-neon>/5432'` → `5432 OPEN`.
   - Libs de sistema de Chromium instaladas vía `dnf` (nss, atk, at-spi2-atk, cups-libs, libdrm, libxkbcommon, libXcomposite, libXdamage, libXfixes, libXrandr, mesa-libgbm, alsa-lib, pango, cairo, gtk3).
   - Guard anti-fork: los jobs se saltan PRs de forks (repo público + runner self-hosted = riesgo RCE).
 

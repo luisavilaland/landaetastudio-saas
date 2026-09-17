@@ -1015,3 +1015,20 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 - **Lección:** en monorepos con múltiples PRs Dependabot simultáneos, merge uno por uno o hacer squash-merge de todos juntos con regeneración de lockfile. El merge de GitHub UI no puede fusionar YAML de lockfile de pnpm correctamente cuando hay cambios en múltiples paquetes.
 - **Dependabot PRs mergeados esta ronda:** #87 (tsx 4.23.12→4.23.13), #88 (eslint-config-next 16.3.4→16.3.5), #89 (resend 6.22→6.28), #90 (@types/node 26.2→26.5.1), #91 (zod 4.5.4→4.6.4), #92 (next 16.3.4→16.3.5), #93 (typescript-eslint 8.69→8.70), #94 (lucide-react 1.37→1.45), #96 (playwright/test 1.62→1.63). **Pendiente:** #95 (vitest 4→5, major — requiere migration guide).
 - **Branch:** `develop` — pendiente commit + push del lockfile regenerado.
+
+---
+
+## 2026-09-17 — Cierre del incidente de seed en CI: el egress 5432 del runner se bloqueó por la rotación de firewall de mj20 a nftables/iptables-nft
+
+El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `mj20` (AlmaLinux) con `ECONNREFUSED 54.209.204.248:5432`. El fix previo del 2026-08-07 (regla rica de egress en **firewalld**) había dejado de regir: entre agosto y setiembre el host migró su firewall a **nftables con el front-end iptables-nft**, y `firewalld` quedó `masked`/`inactive`. Como el ruleset de nftables es `policy drop` en OUTPUT con un allowlist de puertos egress fijos (sin 5432), el SYN saliente a Neon moría en la cadena `LOGDROPOUT` (`reject` → `Connection refused`). Diagnóstico y cierre:
+
+- **Diagnóstico local (PC dev):** la misma IP `54.209.204.248:5432` abría sin problema (`Test-NetConnection` OK) → descartado Neon; era un bloqueo originado en el egress del runner, no en el destino.
+- **En `mj20`:** `/etc/hosts` seguía con el pin IPv4 correcto y resolvía `54.209.204.248`; `:443` abría, `:5432` daba "Connection refused"; `firewall-cmd` respondía "FirewallD is not running". El `nft list ruleset` mostró el allowlist de egress sin `5432` y el remate `jump LOGDROPOUT` (handle 534).
+- **Fix (operatorio, en el host, no en el repo):**
+  ```bash
+  iptables -I OUTPUT 1 -p tcp --dport 5432 -j ACCEPT   # abre egress 5432 al instante (iptables-nft = misma tabla nft)
+  ```
+  Verificado con `timeout 3 bash -c 'echo >/dev/tcp/54.209.204.248/5432'` → `5432 OPEN`. El seed y los tests e2e volvieron a pasar verdes en el rerun. La regla quedó persistida en `/etc/nftables.conf` (servicio `nftables.service` habilitado la aplica en boot; `nft -c -f` valida el ruleset completo OK).
+- **IP actual del runner a considerar en Neon IP allowlist si se activara:** `190.9.40.138` (egress); la dev es `190.142.61.56`.
+- **Notas para SETUP.md:** el prerequisito del runner "egress TCP 5432 a Neon" se cumple con la regla de nftables/iptables del host (no firewalld). Si en otro runner el firewall vuelve a ser nftables puro con allowlist, la regla equivalente es `nft insert rule ip filter OUTPUT oifname != "lo" ip protocol tcp ct state new tcp dport 5432 accept`. Mantener el pin IPv4 del endpoint Neon en `/etc/hosts` (o mover el endpoint a un pool estático / IP allowlist) por ausencia de ruta IPv6.
+- **Branch:** `develop` (sin cambios de código en el repo para este incidente — es infra del runner).
