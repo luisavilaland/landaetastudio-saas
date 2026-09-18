@@ -1067,7 +1067,7 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 - **Secuencia real:**
   1. Verificación inicial en SQL Editor de Neon: `SELECT extname FROM pg_extension WHERE extname = 'pgcrypto'` → **0 filas** (no estaba habilitado).
   2. Edgar ejecutó manualmente: `CREATE EXTENSION IF NOT EXISTS pgcrypto;`
-  3. Verificación posterior (script `scripts/pgcrypto-check.ts` con `DATABASE_URL`, rol owner):
+  3. Verificación posterior (desde worktree `chore/fase1-t1-pgcrypto-check`, rol owner vía `DATABASE_URL`):
      - `pg_extension` → 1 fila (`pgcrypto`)
      - `pgp_sym_encrypt('test', 'clave') IS NOT NULL AS roundtrip_ok` → `true`
      - Re-verificación final → 1 fila
