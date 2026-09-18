@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   dbTenants,
+  dbPlans,
   dbProducts,
   dbProductImages,
   dbProductVariants,
@@ -24,6 +25,25 @@ describe('DB Schema', () => {
     expect(dbTenants.settings).toBeDefined()
     expect(dbTenants.createdAt).toBeDefined()
     expect(dbTenants.updatedAt).toBeDefined()
+  })
+
+  it('should export dbPlans table with expected columns', () => {
+    expect(dbPlans).toBeDefined()
+    expect(dbPlans.id).toBeDefined()
+    expect(dbPlans.slug).toBeDefined()
+    expect(dbPlans.name).toBeDefined()
+    expect(dbPlans.displayName).toBeDefined()
+    expect(dbPlans.priceUyu).toBeDefined()
+    expect(dbPlans.productLimit).toBeDefined()
+    expect(dbPlans.variantLimitPerProduct).toBeDefined()
+    expect(dbPlans.adminLimit).toBeDefined()
+    expect(dbPlans.templateCount).toBeDefined()
+    expect(dbPlans.subscriberLimit).toBeDefined()
+    expect(dbPlans.features).toBeDefined()
+    expect(dbPlans.isActive).toBeDefined()
+    expect(dbPlans.createdAt).toBeDefined()
+    // dbPlans is a global catalog table: NO tenantId
+    expect('tenantId' in dbPlans).toBe(false)
   })
 
   it('should export dbProducts table with expected columns', () => {
