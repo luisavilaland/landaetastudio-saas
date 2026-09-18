@@ -4,6 +4,9 @@
 **Autor:** Equipo LandaetaStudio
 **Estado:** Aceptado
 
+> ⚠️ **Ver Enmienda 2026-09-18 al final de este documento.**
+> El mecanismo de paso de la clave cambió de `SET LOCAL` a **bind param directo**. El cuerpo describe la decisión original; la enmienda fija la decisión final.
+
 ## Contexto
 
 Los tenants configuran sus propias credenciales de MercadoPago (`ACCESS_TOKEN` + `WEBHOOK_SECRET`) para cobrar a sus clientes finales. Estas credenciales se almacenan en la tabla `tenant_mp_config` y son **secretos de alto valor**:
@@ -32,6 +35,7 @@ Cifrado simétrico a nivel de aplicación usando **pgcrypto** (extensión nativa
 - **Descifrado:** Solo en memoria, en el momento de uso (checkout dinámico, validación de webhook del tenant). Nunca se loguea el valor descifrado.
 
 ```sql
+-- ⚠️ Desactualizado: ver Enmienda 2026-09-18 (bind param directo)
 -- Ejemplo de cifrado/descifrado con pgcrypto
 INSERT INTO tenant_mp_config (tenant_id, access_token_enc, webhook_secret_enc)
 VALUES (
@@ -81,6 +85,24 @@ Si Neon tiene `log_statement = 'all'` o `log_min_duration_statement = 0`, el `SE
 - **Rotación de clave requiere migración de datos:** No es instantánea; script que recorre `tenant_mp_config` y re-cifra. Planificar ventana de mantenimiento.
 - **Complejidad operativa:** Una variable de entorno crítica más (`MP_TOKEN_ENCRYPTION_KEY`). Si se pierde, **no hay recuperación** de los tokens existentes (los tenants deben re-ingresar credenciales).
 - **Debugging limitado:** No se puede inspeccionar tokens en DB directamente. Herramientas de admin requieren función de descifrado controlada.
+
+## Enmienda 2026-09-18 — Mecanismo de paso de la clave (bind param directo)
+
+**Decisión final:** El helper de cifrado (`@repo/commerce/encryption`, Fase 1) NO usa `SET LOCAL` / `set_config` para la clave. La clave viaja como **parámetro bind** (bind param) directo a `pgp_sym_encrypt` / `pgp_sym_decrypt`:
+
+```sql
+-- Escritura
+INSERT INTO tenant_mp_config (tenantId, accessTokenEnc, webhookSecretEnc)
+VALUES ($1, pgp_sym_encrypt($2, $3), pgp_sym_encrypt($4, $3));
+
+-- Lectura
+SELECT pgp_sym_decrypt(accessTokenEnc, $3) AS access_token
+FROM tenant_mp_config WHERE tenantId = $1;
+```
+
+Donde `$3` es `MP_TOKEN_ENCRYPTION_KEY` (bind param, nunca interpolada).
+
+**Motivo:** mismo nivel de seguridad que `set_config` con query parameterizada (la clave nunca aparece en el texto SQL ni en logs), con menor superficie: no hace falta setear la clave en la sesión ni depurar leakage de `SET LOCAL` entre operaciones. El cuerpo de este ADR queda como especificación del *qué* (cifrado simétrico AES-256 con pgcrypto, BYTEA, clave fuera de la DB); esta enmienda fija el *cómo* de transporte de la clave en el helper.
 
 ## Referencias
 
