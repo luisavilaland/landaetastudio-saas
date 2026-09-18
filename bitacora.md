@@ -1059,3 +1059,19 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 - **Plan de Fase 1 actualizado:** T8 reescrito a estrategia backup-first (`pg_dump` → revisión del SQL → `db:migrate` → smoke tests → restauración con `psql` si falla), riesgos R2/R3 y criterio de cierre alineados.
 - **Registrado en:** `docs/deuda-tecnica.md` (ítem 5, reevaluar antes de Fase 3).
 - **Branch:** `docs/fase1-plan-adr024`
+
+---
+
+## 2026-09-18 — T1: pgcrypto habilitado en Neon
+
+- **Secuencia real:**
+  1. Verificación inicial en SQL Editor de Neon: `SELECT extname FROM pg_extension WHERE extname = 'pgcrypto'` → **0 filas** (no estaba habilitado).
+  2. Edgar ejecutó manualmente: `CREATE EXTENSION IF NOT EXISTS pgcrypto;`
+  3. Verificación posterior (desde worktree `chore/fase1-t1-pgcrypto-check`, rol owner vía `DATABASE_URL`):
+     - `pg_extension` → 1 fila (`pgcrypto`)
+     - `pgp_sym_encrypt('test', 'clave') IS NOT NULL AS roundtrip_ok` → `true`
+     - Re-verificación final → 1 fila
+- **Acción:** `CREATE EXTENSION` ejecutada manualmente (no-op en script posterior).
+- **Confirmación:** rol `app_user` (runtime vía `DATABASE_APP_URL`) NO tiene permisos para crear extensiones — solo owner `neondb_owner` (vía `DATABASE_URL`) puede.
+- **Evidencia:** queries de verificación ejecutadas desde worktree `chore/fase1-t1-pgcrypto-check`.
+- **Issue:** #101
