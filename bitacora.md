@@ -1049,3 +1049,13 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 - **DoD verificado post-cambios:** `pnpm install` + `pnpm lint` 6/6 ✓ + `pnpm typecheck` 9/9 ✓ + `pnpm build` 3/3 ✓ + `pnpm test` 430/430 ✓.
 - **Blueprint v2.6:** aprobado y referenciado (PDF en repo, pendiente conversión a markdown para planificación de Fase 1).
 - **Branch:** `develop`
+
+---
+
+## 2026-09-18 — Decisión de infra: Neon single-branch hasta Fase 3
+
+- **Contexto:** verificado Neon: solo hay 1 branch (`production`), compartida por local/preview/producción. Sin tenants reales ni tráfico.
+- **Decisión consciente:** una sola branch en Neon hasta Fase 3. Mitigación de migraciones = backup manual + revisión de SQL.
+- **Plan de Fase 1 actualizado:** T8 reescrito a estrategia backup-first (`pg_dump` → revisión del SQL → `db:migrate` → smoke tests → restauración con `psql` si falla), riesgos R2/R3 y criterio de cierre alineados.
+- **Registrado en:** `docs/deuda-tecnica.md` (ítem 5, reevaluar antes de Fase 3).
+- **Branch:** `docs/fase1-plan-adr024`

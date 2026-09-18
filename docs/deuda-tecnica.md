@@ -114,6 +114,16 @@ Riesgo: un futuro cambio de `pnpm.hoistPattern` / instalación sin hoisting / ex
 **Criterios de aceptación cumplidos:** imports resuelven desde el workspace que los declara; sin cambios de comportamiento.
 ---
 
+## 5. Neon single-branch — ✅ DECISIÓN REGISTRADA (2026-09-18)
+
+**Contexto real:** Neon tiene una sola branch (`production`), compartida por local/preview/producción. Todo apunta a la DB de producción.
+
+**Decisión consciente:** aceptable mientras no haya tráfico real. Mitigación de migraciones = backup manual (`pg_dump`) + revisión del SQL emitido antes de `db:migrate`; si algo falla, restaurar con `psql`.
+
+**Reevaluación:** antes de Fase 3 — crear branch `develop` en Neon o usar branches efímeras por PR.
+
+---
+
 ## Referencia
 
 Plan aprobado el 2026-08-08 (ítem 3 de la tarea de calidad: limpieza email + health check + deuda técnica). Rama `quality/calidad-y-monitoreo`. Ver bitacora.md → entrada 2026-08-08 — Calidad.
