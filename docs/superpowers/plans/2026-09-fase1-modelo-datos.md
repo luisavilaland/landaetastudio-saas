@@ -22,9 +22,11 @@ Crear las 3 tablas nuevas del modelo de suscripciones con todas sus garantías d
 - **`subscriptions`** — 1 suscripción por tenant, con RLS `tenant_isolation` y las columnas de retención del spec transversal (`expired_at`, `abandoned_at`, `last_processed_payment_id`).
 - **`tenant_mp_config`** — credenciales MP del tenant **cifradas con pgcrypto** (BYTEA) según ADR-024, con RLS `tenant_isolation`.
 
-Además: migración Drizzle inmutable aplicada en Neon (primero en branch efímera), seed de los 3 planes, y migración de los tenants existentes (`tienda1`, `tienda2`) a suscripción activa.
+Además: migración Drizzle inmutable aplicada en Neon (estrategia backup-first, ver T8), seed de los 3 planes, y migración de los tenants existentes (`tienda1`, `tienda2`) a suscripción activa.
 
 ## 2. Alcance
+
+> **Decisión consciente de Fase 1:** una sola branch en Neon (`production`). El proyecto no tiene tenants reales ni tráfico, así que el riesgo de aplicar migraciones directo es bajo. Se documenta como deuda técnica reevaluar branching antes de Fase 3.
 
 ### Qué entra
 
@@ -33,7 +35,7 @@ Además: migración Drizzle inmutable aplicada en Neon (primero en branch efíme
 - Migración generada con `pnpm db:generate` (3 `CREATE TABLE`; snapshot + `_journal.json` intacto y consistente).
 - RLS (`ENABLE` + `FORCE` + policy `tenant_isolation`) en `subscriptions` y `tenant_mp_config` como migración manual **post-generación** (patrón `0009_enable_rls.sql` / `0010_force_rls.sql`).
 - Helper de cifrado/descifrado pgcrypto (encrypt/decrypt roundtrip) en `@repo/commerce`, exportado como `@repo/commerce/encryption`, con la clave como **bind param directo** (enmienda ADR-024) y `MP_TOKEN_ENCRYPTION_KEY` required.
-- Migración aplicada con `pnpm db:migrate` en Neon (branch efímera para validar, luego develop).
+- Migración aplicada con `pnpm db:migrate` en Neon (estrategia backup-first: backup previo + revisión del SQL, ver T8).
 - Seed de los 3 planes (idempotente, `onConflictDoNothing` por `slug`).
 - Suscripciones activas para `tienda1` (plan `starter`) y `tienda2` (plan `business`).
 - `MP_TOKEN_ENCRYPTION_KEY` (required) y `MP_PLATFORM_ACCESS_TOKEN` / `MP_PLATFORM_WEBHOOK_SECRET` (**opcionales en Fase 1**, required en Fase 2 — ver §6 R6) en `.env.local.example` + validación Zod en `packages/validation/src/env.ts` + Vercel.
@@ -151,7 +153,7 @@ Además: migración Drizzle inmutable aplicada en Neon (primero en branch efíme
 
 ### T5 — Generar migración con `pnpm db:generate`
 
-**Descripción:** Con las 3 tablas en el schema (T2-T4), correr `pnpm db:generate` para producir la migración automática + snapshot. Genera **solo los `CREATE TABLE`**; la RLS se agrega aparte en T7 (después, respetando la inmutabilidad). Probar antes en branch efímera para confirmar que no rompe migraciones previas.
+**Descripción:** Con las 3 tablas en el schema (T2-T4), correr `pnpm db:generate` para producir la migración automática + snapshot. Genera **solo los `CREATE TABLE`**; la RLS se agrega aparte en T7 (después, respetando la inmutabilidad). Probar en local (o en la única branch de Neon con backup previo) para confirmar que no rompe migraciones previas.
 
 **Archivos:**
 - `packages/db/migrations/00XX_*.sql` (generado)
@@ -208,16 +210,24 @@ Además: migración Drizzle inmutable aplicada en Neon (primero en branch efíme
 
 ---
 
-### T8 — Aplicar migración en Neon (branch efímera primero, luego develop)
+### T8 — Aplicar migración en Neon (backup-first)
 
-**Descripción:** En Neon: crear branch efímera desde la base de datos actual, correr `pnpm db:migrate` ahí (aplica T5 + T7 en orden), validar con los smoke tests de lightning (queries manuales), y recién después aplicar en la base de develop. Si la branch efímera falla, no se toca develop.
+**Descripción:** Solo existe una branch en Neon (`production`, decisión consciente de Fase 1), así que no hay branch efímera donde validar. Estrategia **backup-first**:
+1. **Backup:** `pg_dump "$DATABASE_URL" > backup-pre-fase1-$(date +%Y%m%d-%H%M%S).sql`
+2. **Revisar el SQL de T5/T7 manualmente** (solo `CREATE TABLE` + RLS; sin `ALTER` destructivos sobre tablas existentes).
+3. **Correr `pnpm db:migrate`** (aplica T5 + T7 en orden).
+4. **Smoke tests** (queries manuales, sección 7).
+5. **Si falla:** restaurar con `psql "$DATABASE_URL" < backup-pre-fase1-*.sql`
 
 **Archivos:** ninguno (operación de DB).
 
 **DoD:**
-- En branch efímera: `pnpm db:migrate` sin errores; `SELECT * FROM plans` devuelve la tabla vacía; `\d subscriptions` muestra columnas BYTEA/state correctas; RLS `true/true`.
-- En develop (después de OK en efímera): migración aplicada sin pérdida de datos (`SELECT count(*) FROM tenants` conserva 2 filas).
+- Backup previo generado y verificado (existe, tamaño > 0).
+- SQL de T5/T7 revisado manualmente: solo los 3 `CREATE TABLE` + RLS; sin `ALTER` destructivo.
+- `pnpm db:migrate` sin errores; `SELECT * FROM plans` devuelve la tabla vacía; `\d subscriptions` muestra columnas BYTEA/state correctas; RLS `true/true`.
+- Sin pérdida de datos (`SELECT count(*) FROM tenants` conserva 2 filas).
 - `pg_extension` confirma `pgcrypto` activa (de T1).
+- **Deuda técnica:** reevaluar branching en Neon (branch `develop` en Neon o ramas efímeras por PR) antes de Fase 3.
 
 **Tests:** smoke manual en Neon (sección 7, Smoke test).
 
@@ -344,7 +354,7 @@ T6 helper (paralelo a T5) ───────────────┤
                                          │
                                          ▼
                               T8 migrate Neon
-                              (efímera → develop)
+                              (backup-first)
                                   │       │
                      ┌────────────┼───────┼────────────┐
                      ▼            ▼       ▼            ▼
@@ -379,8 +389,8 @@ T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 → T9 → T10 → T11 → T
 | # | Riesgo | Impacto | Mitigación |
 |---|--------|---------|------------|
 | R1 | **RLS mal aplicado** (falta `FORCE`, policy sin `current_setting` correcto, o se aplica RLS de más a `plans`) | Fuga de datos cross-tenant o queries devolviendo 0 filas | Test T11 cross-tenant obligatorio. Revisión humana de la migración RLS (T7) antes de merge. Verificar `relforcerowsecurity` en Neon. |
-| R2 | **pgcrypto mal configurado** (extensión creada con `app_user`, o falta en develop) | `pgp_sym_encrypt` falla en runtime → checkout/registro roto en Fase 2 | T1 verifica extensión con rol owner antes de aplicar migraciones (T8). Smoke test de `pgp_sym_encrypt` en T1 y T8. |
-| R3 | **Migración que rompe `_journal.json` o snapshots** (idx salteado, snapshot faltante, o RLS manual corrida antes de los `CREATE TABLE`) | `pnpm db:migrate` falla o deja la BD en estado inconsistente | Probar en branch efímera de Neon (T8) primero. Nunca modificar migraciones existentes. La RLS manual (T7) se numera **después** de la generada (T5); si drizzle-kit la saltea del journal, agregar la entrada manual con idx continuo y `when` UTC válido. |
+| R2 | **pgcrypto mal configurado** (extensión creada con `app_user`, o falta en la única branch `production`) | `pgp_sym_encrypt` falla en runtime → checkout/registro roto en Fase 2 | T1 verifica extensión con rol owner antes de aplicar migraciones (T8). Smoke test de `pgp_sym_encrypt` en T1 y T8. |
+| R3 | **Migración que rompe `_journal.json` o snapshots** (idx salteado, snapshot faltante, o RLS manual corrida antes de los `CREATE TABLE`) | `pnpm db:migrate` falla o deja la BD en estado inconsistente | Backup manual + revisión del SQL emitido antes de `db:migrate` (T8); si falla, restaurar con `psql`. Nunca modificar migraciones existentes. La RLS manual (T7) se numera **después** de la generada (T5); si drizzle-kit la saltea del journal, agregar la entrada manual con idx continuo y `when` UTC válido. |
 | R4 | **Pérdida de `MP_TOKEN_ENCRYPTION_KEY`** | Imposible descifrar tokens de tenants → deben re-ingresar credenciales | Documentar en bitácora (T14) y en `.env.local.example`. La clave se genera con `openssl rand -base64 32` y se guarda solo en Vercel/gestor de secrets nunca en el repo. |
 | R5 | **Seed que toca datos existentes** (trunca tenants, duplica planes) | Datos de dev perdidos / seed no idempotente | Seed de planes con `onConflictDoNothing` por `slug`. Nunca `TRUNCATE tenants` en esta fase (se conservan las 2 filas existentes). Correr seed 2 veces en DoD de T9. |
 | R6 | **Env vars MP_PLATFORM_* sin setear** | No bloquea Fase 1 (son opcionales); bloquea Fase 2 (webhook suscripciones) si no se setean | En Fase 1 quedan `.optional()` en Zod; el plan de Fase 2 los marca required y su DoD incluye el checklist de Vercel. Se recomienda setearlas en Fase 1. `MP_TOKEN_ENCRYPTION_KEY` (required) valida al boot. |
@@ -432,7 +442,7 @@ SELECT t.slug, s.status, p.slug AS plan FROM subscriptions s
 
 ## 8. Guía de revisión (para luisavilaland)
 
-> Este PR toca seguridad de datos (RLS + cifrado). Revisar en el orden de la checklist. Vas a necesitar acceso de lectura a la consola de Neon y las credenciales locales de la branch efímera.
+> Este PR toca seguridad de datos (RLS + cifrado). Revisar en el orden de la checklist. Vas a necesitar acceso de lectura a la consola de Neon y las credenciales de la única branch (`production`).
 
 ### Qué mirar en el PR
 
@@ -451,7 +461,7 @@ SELECT t.slug, s.status, p.slug AS plan FROM subscriptions s
 
 ```bash
 pnpm db:generate   # no debe producir ALTER sobre tablas existentes
-pnpm db:migrate    # solo contra branch efímera primero
+pnpm db:migrate    # única branch: backup manual antes, restaurar si falla
 pnpm db:seed       # 2 veces seguidas para probar idempotencia
 pnpm lint && pnpm typecheck && pnpm test
 ```
@@ -521,7 +531,8 @@ Desglose por track (paralelo):
 - [ ] RLS `ENABLE` + `FORCE` + policy `tenant_isolation` aplicada en `subscriptions` y `tenant_mp_config`; `plans` sin RLS (T7).
 - [ ] Test cross-tenant (T11) verde: tenant A no ve ni modifica filas de tenant B.
 - [ ] Helper de cifrado (T6) con roundtrip verde (T12); tokens almacenados como BYTEA; la clave nunca aparece en texto SQL ni logs.
-- [ ] Migración aplicada en Neon: primero branch efímera validada, luego develop sin pérdida de datos (T8).
+- [ ] Migración aplicada en Neon: estrategia backup-first (backup con `pg_dump` + revisión del SQL) sin pérdida de datos; si falla, restauración con `psql` (T8).
+- [ ] Decisión de branching en Neon registrada en docs/deuda-tecnica.md con fecha de reevaluación (post-Fase 3).
 - [ ] Seed idempotente con los 3 planes en centavos (T9) y suscripciones `active` para `tienda1` (starter) y `tienda2` (business) (T10); `tenants.plan` intacto con nota de depreciación post-Fase 3.
 - [ ] `MP_TOKEN_ENCRYPTION_KEY` required + `MP_PLATFORM_*` opcionales (Fase 1) en `.env.local.example` + Zod (T13).
 - [ ] `pnpm lint && pnpm typecheck && pnpm build && pnpm test` pasan en CI (DoD global).
