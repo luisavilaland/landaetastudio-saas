@@ -161,3 +161,16 @@ jobs:
                 body,
               });
             }
+
+  e2e-success:
+    if: always()
+    needs: [wait-for-deployments, seed, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all e2e jobs passed
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "Some e2e jobs failed"
+            exit 1
+          fi
+          echo "All e2e jobs passed or skipped"
