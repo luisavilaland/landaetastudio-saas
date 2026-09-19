@@ -1110,6 +1110,14 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 
 ---
 
+## 2026-09-19 — Fix T3: currentPeriodEnd nullable (PR #119)
+
+- **Contexto:** el PR #117 (T3) se mergeó sin el fix de currentPeriodEnd nullable que se acordó durante el review.
+- **Fix:** currentPeriodEnd pasó a nullable. Propagado a schema, tests, plan, spec transversal (§4) y blueprint v2.6 (línea 224).
+- **Motivo:** en pending_first_payment no existe período. El valor se setea a now() + 1 month al recibir el primer payment.created.
+- Aprobado en PR #119.
+---
+
 ## 2026-09-19 — T5: Migración 0012 (plans, subscriptions, tenant_mp_config)
 
 - **Migración generada:** `0012_tearful_supreme_intelligence.sql`
@@ -1120,11 +1128,3 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 - **Deuda técnica pre-existente detectada (no introducida por T5):**
   - gaps en _journal.json (idx 9→11, snapshots faltantes 3/4/9/10).
 
----
-
-## 2026-09-19 — Fix T3: currentPeriodEnd nullable (PR #119)
-
-- **Contexto:** el PR #117 (T3) se mergeó sin el fix de currentPeriodEnd nullable que se acordó durante el review.
-- **Fix:** currentPeriodEnd pasó a nullable. Propagado a schema, tests, plan, spec transversal (§4) y blueprint v2.6 (línea 224).
-- **Motivo:** en pending_first_payment no existe período. El valor se setea a now() + 1 month al recibir el primer payment.created.
-- Aprobado en PR #119.
