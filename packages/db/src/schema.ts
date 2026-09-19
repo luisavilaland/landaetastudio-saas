@@ -8,6 +8,7 @@ import {
   uniqueIndex,
   index,
   foreignKey,
+  boolean,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
@@ -26,6 +27,32 @@ export const dbTenants = pgTable('tenants', {
     .defaultNow()
     .notNull(),
 })
+
+export const dbPlans = pgTable(
+  'plans',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    slug: text('slug').unique().notNull(),
+    name: text('name').notNull(),
+    displayName: text('displayName').notNull(),
+    priceUyu: integer('priceUyu').notNull(),
+    productLimit: integer('productLimit'),
+    variantLimitPerProduct: integer('variantLimitPerProduct'),
+    adminLimit: integer('adminLimit'),
+    templateCount: integer('templateCount').notNull(),
+    subscriberLimit: integer('subscriberLimit'),
+    features: jsonb('features').default({}).notNull(),
+    isActive: boolean('isActive').default(true).notNull(),
+    createdAt: timestamp('createdAt', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => {
+    return {
+      slugUnique: uniqueIndex('plans_slug_idx').on(table.slug),
+    }
+  },
+)
 
 export const dbProducts = pgTable(
   'products',
@@ -236,6 +263,8 @@ export const dbOrderItems = pgTable(
 
 export type Tenant = typeof dbTenants.$inferSelect
 export type NewTenant = typeof dbTenants.$inferInsert
+export type Plan = typeof dbPlans.$inferSelect
+export type NewPlan = typeof dbPlans.$inferInsert
 export type Product = typeof dbProducts.$inferSelect
 export type NewProduct = typeof dbProducts.$inferInsert
 export type ProductVariant = typeof dbProductVariants.$inferSelect
