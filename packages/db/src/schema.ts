@@ -54,6 +54,39 @@ export const dbPlans = pgTable(
   },
 )
 
+export const dbSubscriptions = pgTable(
+  'subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenantId')
+      .notNull()
+      .references(() => dbTenants.id, { onDelete: 'cascade' }),
+    planId: uuid('planId')
+      .notNull()
+      .references(() => dbPlans.id, { onDelete: 'restrict' }),
+    status: text('status').notNull().default('pending_first_payment'),
+    currentPeriodEnd: timestamp('currentPeriodEnd', {
+      withTimezone: true,
+    }).notNull(),
+    mpPreapprovalId: text('mpPreapprovalId'),
+    expiredAt: timestamp('expiredAt', { withTimezone: true }),
+    abandonedAt: timestamp('abandonedAt', { withTimezone: true }),
+    lastProcessedPaymentId: text('lastProcessedPaymentId'),
+    createdAt: timestamp('createdAt', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => {
+    return {
+      tenantIdx: uniqueIndex('subscriptions_tenant_idx').on(table.tenantId),
+      statusIdx: index('subscriptions_status_idx').on(table.status),
+    }
+  },
+)
+
 export const dbProducts = pgTable(
   'products',
   {
@@ -265,6 +298,8 @@ export type Tenant = typeof dbTenants.$inferSelect
 export type NewTenant = typeof dbTenants.$inferInsert
 export type Plan = typeof dbPlans.$inferSelect
 export type NewPlan = typeof dbPlans.$inferInsert
+export type Subscription = typeof dbSubscriptions.$inferSelect
+export type NewSubscription = typeof dbSubscriptions.$inferInsert
 export type Product = typeof dbProducts.$inferSelect
 export type NewProduct = typeof dbProducts.$inferInsert
 export type ProductVariant = typeof dbProductVariants.$inferSelect
