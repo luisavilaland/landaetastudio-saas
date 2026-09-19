@@ -221,7 +221,7 @@ CREATE TABLE subscriptions (
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   plan_id UUID NOT NULL REFERENCES plans(id),
   status TEXT NOT NULL, -- pending_first_payment | active | past_due | cancelled | expired
-  current_period_end TIMESTAMPTZ NOT NULL,
+  current_period_end TIMESTAMPTZ,
   mp_preapproval_id TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );

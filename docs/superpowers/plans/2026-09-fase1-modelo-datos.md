@@ -125,7 +125,8 @@ Además: migración Drizzle inmutable aplicada en Neon (estrategia backup-first,
 - `packages/db/src/schema.ts` (tabla + tipos `Subscription`/`NewSubscription`)
 
 **DoD:**
-- Columnas presentes: `tenantId` NOT NULL, `planId` NOT NULL, `status` (default `'pending_first_payment'`), `currentPeriodEnd` TIMESTAMPTZ NOT NULL, `mpPreapprovalId` TEXT NULL, `expiredAt` TIMESTAMPTZ NULL, `abandonedAt` TIMESTAMPTZ NULL, `lastProcessedPaymentId` TEXT NULL, `createdAt`/`updatedAt` TIMESTAMPTZ.
+- Columnas presentes: `tenantId` NOT NULL, `planId` NOT NULL, `status` (default `'pending_first_payment'`), `currentPeriodEnd` TIMESTAMPTZ (nullable), `mpPreapprovalId` TEXT NULL, `expiredAt` TIMESTAMPTZ NULL, `abandonedAt` TIMESTAMPTZ NULL, `lastProcessedPaymentId` TEXT NULL, `createdAt`/`updatedAt` TIMESTAMPTZ.
+- **Nota:** `currentPeriodEnd` es NULL mientras la suscripción está en estado `pending_first_payment`. Se setea a `now() + 1 month` al recibir el primer `payment.created` (transición a `active`).
 - Índice único en `tenantId`; índice en `(status)` para crons futuros.
 - FK `tenant_id → tenants.id ON DELETE CASCADE` y `plan_id → plans.id`.
 - No hay `updatedAt` automático fancy: `expiredAt`/`abandonedAt` se setean solo en transición (documentado).
