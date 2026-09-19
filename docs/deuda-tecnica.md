@@ -226,19 +226,26 @@ Bajo — no rompe funcionalidad. Pero permite que errores de formato se acumulen
 
 ---
 
-## 11. Test bind params para decryptToken
+## 11. Test bind params para decryptToken — ✅ RESUELTO (2026-09-19)
 
 **Contexto:** El test `SQL bind params` en `packages/commerce/src/__tests__/encryption.test.ts` solo verifica que `encryptToken` usa bind params para la clave. Falta test equivalente para `decryptToken` que verifique que `${key}` y `${column}` viajan como bind params en el `SELECT pgp_sym_decrypt`.
 
 **Origen:** Regresión durante el rewrite del test (T6).
 
-**Impacto:** Bajo — la implementación sí usa bind params (template tag), pero no hay cobertura de test que lo garantice.
+**Implementación (commit fix del bug decryptToken):**
+- Tests añadidos en `packages/commerce/src/__tests__/encryption.test.ts` (sección `SQL bind params`):
+  - `decryptToken: clave en params, columna en SQL (raw hardcoded)` — verifica `accessTokenEnc`
+  - `decryptToken: webhookSecretEnc columna en SQL (raw hardcoded)` — verifica `webhookSecretEnc`
+- Ambos tests verifican:
+  - La columna aparece en el string SQL (raw hardcoded: `"accessTokenEnc"` / `"webhookSecretEnc"`)
+  - La clave NO aparece en el string SQL
+  - La clave SÍ aparece en el array de params
 
-**Mitigación:** Añadir test que inspeccione `mockTxExecute.mock.calls[0]` en `decryptToken` y verifique que la clave no aparece en el string SQL y sí en params.
+**Estado:** ✅ RESUELTO en PR #123 (commit del fix de bug decryptToken).
 
-**Urgencia:** 🟢 Bajo. Follow-up.
+**Urgencia:** 🟢 Bajo. Resuelto.
 
-**Fecha de reevaluación:** antes de Fase 2.
+**Fecha de reevaluación:** N/A.
 
 ---
 

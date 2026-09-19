@@ -199,6 +199,20 @@ Ver checklists específicas en cada sección de endpoint.
 
 - **Sin instrucción explícita:** el agente puede PROPONER subagentes, pero NO despachar autónomamente. El usuario decide.
 
+## Subagentes — confirmación obligatoria
+
+Al recibir un prompt que indica el uso de subagentes, el agente DEBE:
+1. Responder con un mensaje corto confirmando:
+   - Cantidad de subagentes (construcción + auditoría si aplica).
+   - Scope de cada uno.
+   - Modalidad (paralelo/secuencial).
+2. Esperar el OK del usuario.
+3. Solo entonces empezar.
+
+Si el agente empieza la tarea sin confirmar primero, el usuario debe interrumpirlo y pedir que reinicie con el proceso correcto.
+
+Nota: el agente violó esta regla en T2, T4, T5 y T6. La regla anterior ("avisar antes de empezar") no fue suficiente. Esta versión exige confirmación explícita ANTES de cualquier trabajo.
+
 ## Git y staging
 
 - Nunca usar `git add .` ni `git add -A`. Agregar archivos explícitamente: `git add <archivo1> <archivo2>`.
@@ -265,3 +279,13 @@ Antes de reportar un hallazgo, verificar si ya está registrado en docs/deuda-te
 
 - Solo el dueño del proyecto autoriza: operaciones destructivas, cambios de infraestructura, deploy a producción.
 - Cualquier usuario puede solicitar consultas de solo lectura.
+
+## Cuándo cerrar la sesión del agente
+
+Considerar cerrar y abrir una nueva cuando:
+- El agente comete el mismo error dos veces seguidas (loop sin progreso).
+- La sesión supera ~30 interacciones sin un checkpoint claro.
+- El agente empieza a "olvidar" instrucciones previas.
+- Después de completar una tarea, antes de arrancar la siguiente.
+
+Ejemplo: en T6, la sesión anterior quedó trabada ~17 minutos en un editor interactivo durante un rebase. Abrir sesión nueva con contexto explícito resolvió el problema en minutos.

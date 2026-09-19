@@ -1,5 +1,20 @@
 # Bitácora de cambios — saas-ecommerce
 
+## 2026-09-19 — T6: helper de cifrado/descifrado con pgcrypto
+
+- Implementado: `packages/commerce/src/encryption.ts`
+  - `encryptToken(tenantId, key, values)` → upsert cifrado con pgcrypto.
+  - `decryptToken(tenantId, key, column)` → descifra en memoria.
+  - Clave como bind param directo (ADR-024 enmienda 2026-09-18).
+  - `EncryptionError` tipado: `EMPTY_KEY`, `ENCRYPTION_FAILED`, `DECRYPTION_FAILED`, `INVALID_COLUMN`.
+- Exportado como `@repo/commerce/encryption`.
+- Tests: 19 (roundtrip, cross-tenant, bind params encrypt/decrypt, fail-closed, INVALID_COLUMN).
+- Auditoría (@QA + @Diseñador): 1 ALTO resuelto (try/catch en decryptToken) + 1 bug funcional detectado en review humano (decryptToken usaba `${column}` como bind param string, no como nombre de columna). Fix: mapa hardcodeado via `COLUMN_NAMES` + `getColumnRef()` (evita SQL injection de `sql.raw` directo).
+- Deuda registrada: ítems 11-13 en `docs/deuda-tecnica.md` (ítem 11 resuelto en este PR).
+- PR #123.
+
+---
+
 ## 2026-09-19 — T6: lección de proceso (subagentes)
 
 **Contexto**: por cuarta vez consecutiva (T2, T4, T5, T6), el agente no usó subagentes de construcción cuando el prompt lo indicaba explícitamente, y no avisó antes de empezar.

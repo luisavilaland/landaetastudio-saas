@@ -1,6 +1,19 @@
 import { withTenantContext } from '@repo/db'
 import { sql, type SQL } from 'drizzle-orm'
 
+const COLUMN_NAMES = {
+  accessTokenEnc: '"accessTokenEnc"',
+  webhookSecretEnc: '"webhookSecretEnc"',
+} as const
+
+function getColumnRef(column: keyof typeof COLUMN_NAMES): SQL {
+  const columnName = COLUMN_NAMES[column]
+  if (!columnName) {
+    throw new EncryptionError('INVALID_COLUMN', `Columna inválida: ${column}`)
+  }
+  return sql.raw(columnName)
+}
+
 /**
  * Cifra los tokens de MercadoPago del tenant y los guarda en tenant_mp_config.
  *
@@ -75,11 +88,16 @@ export async function decryptToken(
     throw new EncryptionError('EMPTY_KEY', 'Clave de descifrado vacía: MP_TOKEN_ENCRYPTION_KEY es requerida')
   }
 
+  const columnRef = getColumnRef(column)
+  if (!columnRef) {
+    throw new EncryptionError('INVALID_COLUMN', `Columna inválida: ${column}`)
+  }
+
   return await withTenantContext(tenantId, async (tx) => {
     let result: { value: string | null }[] = []
     try {
       result = await tx.execute(
-        sql`SELECT pgp_sym_decrypt(${column}, ${key}) AS value FROM "tenant_mp_config" WHERE "tenantId" = ${tenantId}`
+        sql`SELECT pgp_sym_decrypt(${columnRef}, ${key}) AS value FROM "tenant_mp_config" WHERE "tenantId" = ${tenantId}`
       )
     } catch (e: any) {
       throw new EncryptionError('DECRYPTION_FAILED', 'Error al descifrar token: clave inválida o datos corruptos', e)
@@ -98,6 +116,7 @@ export type EncryptionErrorCode =
   | 'TENANT_NOT_FOUND'
   | 'DECRYPTION_FAILED'
   | 'ENCRYPTION_FAILED'
+  | 'INVALID_COLUMN'
 
 /**
  * Error tipado para operaciones de cifrado/descifrado.

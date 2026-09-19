@@ -15,10 +15,17 @@ vi.mock('drizzle-orm', () => {
       if (i > 0) {
         const val = values[i - 1]
         if (val && typeof val === 'object' && val.strings && val.values) {
-          // It's a SQL object, flatten it
-          flattenedStrings.push(...val.strings.slice(1))
-          flattenedValues.push(...val.values)
+          // It's a SQL object (from template tag or sql.raw()), flatten it
+          if (val.strings.length === 1 && val.values.length === 0) {
+            // sql.raw() case: single string, no params - append directly to last string part
+            flattenedStrings[flattenedStrings.length - 1] += val.strings[0]
+          } else {
+            // Regular SQL template: flatten normally
+            flattenedStrings.push(...val.strings.slice(1))
+            flattenedValues.push(...val.values)
+          }
         } else {
+          // Regular parameter
           flattenedStrings.push(str)
           flattenedValues.push(val)
         }
@@ -28,7 +35,10 @@ vi.mock('drizzle-orm', () => {
     })
     return { strings: flattenedStrings, values: flattenedValues }
   }
-  sqlTag.raw = (sqlString: string) => sqlString
+  sqlTag.raw = (sqlString: string) => {
+    // Return a SQL object that the template tag will recognize
+    return { strings: [sqlString], values: [] }
+  }
   sqlTag.join = (chunks: any[], separator?: any) => {
     const combinedStrings: string[] = ['']
     const combinedValues: any[] = []
@@ -268,6 +278,46 @@ describe('encryption', () => {
       expect(sqlObj.strings.join('')).not.toContain('clave-secreta-123')
       expect(params).toContain('clave-secreta-123')
     })
+
+    it('decryptToken: clave en params, columna en SQL (raw hardcoded)', async () => {
+      mockWithTenantContext.mockImplementation(
+        async (_tenantId: string, callback: (tx: any) => Promise<any>) => {
+          return await callback({ execute: mockTxExecute })
+        },
+      )
+      mockTxExecute.mockResolvedValue([{ value: 'decrypted-value' }])
+
+      await decryptToken('tenant-1', 'clave-secreta-456', 'accessTokenEnc')
+
+      const call = mockTxExecute.mock.calls[0]
+      const sqlObj = call[0]
+      const params = sqlObj.values
+      const fullSql = sqlObj.strings.join('')
+
+      expect(fullSql).toContain('"accessTokenEnc"')
+      expect(fullSql).not.toContain('clave-secreta-456')
+      expect(params).toContain('clave-secreta-456')
+    })
+
+    it('decryptToken: webhookSecretEnc columna en SQL (raw hardcoded)', async () => {
+      mockWithTenantContext.mockImplementation(
+        async (_tenantId: string, callback: (tx: any) => Promise<any>) => {
+          return await callback({ execute: mockTxExecute })
+        },
+      )
+      mockTxExecute.mockResolvedValue([{ value: 'decrypted-value' }])
+
+      await decryptToken('tenant-1', 'clave-secreta-789', 'webhookSecretEnc')
+
+      const call = mockTxExecute.mock.calls[0]
+      const sqlObj = call[0]
+      const params = sqlObj.values
+      const fullSql = sqlObj.strings.join('')
+
+      expect(fullSql).toContain('"webhookSecretEnc"')
+      expect(fullSql).not.toContain('clave-secreta-789')
+      expect(params).toContain('clave-secreta-789')
+    })
   })
 
   describe('ENCRYPTION_FAILED (pgcrypto error)', () => {
@@ -315,6 +365,18 @@ describe('encryption', () => {
       } catch (e: any) {
         expect(e.message).toContain('Clave de cifrado vacía')
       }
+    })
+  })
+
+  describe('INVALID_COLUMN', () => {
+    it('decryptToken lanza EncryptionError con columna inválida', async () => {
+      await expect(
+        decryptToken('tenant-1', 'clave', 'otraCosa' as any),
+      ).rejects.toMatchObject({
+        name: 'EncryptionError',
+        code: 'INVALID_COLUMN',
+        message: expect.stringContaining('Columna inválida'),
+      })
     })
   })
 })
