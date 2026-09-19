@@ -1097,3 +1097,13 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 - **Observación cross-check:** 3 hallazgos no bloqueantes: (1) naming divergence spec usa snake_case vs camelCase real; (2) `currentPeriodEnd` NOT NULL sin default en estado inicial; (3) migración pendiente (T5).
 - **Branch:** `feature/fase1-t3-subscriptions`
 - **Issue:** #103
+
+---
+
+## 2026-09-19 — T4: tabla `tenant_mp_config` en schema Drizzle + tests
+
+- **Schema:** `dbTenantMpConfig` agregado a `packages/db/src/schema.ts` con 8 columnas (`id`, `tenantId`, `accessTokenEnc`, `webhookSecretEnc`, `publicKey`, `isVerified`, `createdAt`, `updatedAt`), FK `tenantId → tenants.id ON DELETE CASCADE`, índice único `tenant_mp_config_tenant_idx` (1 config por tenant), `isVerified` default `false`, y tipos `TenantMpConfig`/`NewTenantMpConfig`.
+- **Deviation del plan T4 (DoD):** el plan pedía importar `bytea` desde `drizzle-orm/pg-core`, pero **`bytea()` no existe en drizzle-orm 0.45.2** (verificado en node_modules; solo `gel-core/columns/bytes.cjs` lo menciona). Se usó `customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' })` — emite SQL `bytea`, manteniendo el cumplimiento de ADR-024.
+- **Tests:** `describe('tenant_mp_config table')` en `packages/db/src/__tests__/schema.test.ts` con 7 casos: export + 8 columnas, FK cascade vía `getTableConfig`, índice único sobre `tenantId`, `getSQLType() === 'bytea'` para ambos tokens (y `dataType !== 'string'`), ausencia de columnas plain-text (`accessToken`/`webhookSecret`), y `isVerified` default `false`.
+- **DoD verificado:** `pnpm test` 438/438 ✓ + `pnpm lint` 6/6 ✓ + `pnpm typecheck` 9/9 ✓ + `pnpm build` 3/3 ✓.
+- **Branch:** `feature/fase1-t4-tenant-mp-config`

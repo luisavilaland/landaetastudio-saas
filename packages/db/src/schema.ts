@@ -9,8 +9,15 @@ import {
   index,
   foreignKey,
   boolean,
+  customType,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return 'bytea'
+  },
+})
 
 export const dbTenants = pgTable('tenants', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -86,6 +93,36 @@ export const dbSubscriptions = pgTable(
     }
   },
 )
+
+export const dbTenantMpConfig = pgTable(
+  'tenant_mp_config',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenantId')
+      .notNull()
+      .references(() => dbTenants.id, { onDelete: 'cascade' }),
+    accessTokenEnc: bytea('accessTokenEnc').notNull(),
+    webhookSecretEnc: bytea('webhookSecretEnc').notNull(),
+    publicKey: text('publicKey'),
+    isVerified: boolean('isVerified').default(false).notNull(),
+    createdAt: timestamp('createdAt', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => {
+    return {
+      tenantIdUnique: uniqueIndex('tenant_mp_config_tenant_idx').on(
+        table.tenantId,
+      ),
+    }
+  },
+)
+
+export type TenantMpConfig = typeof dbTenantMpConfig.$inferSelect
+export type NewTenantMpConfig = typeof dbTenantMpConfig.$inferInsert
 
 export const dbProducts = pgTable(
   'products',
