@@ -1128,3 +1128,12 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 - **Deuda técnica pre-existente detectada (no introducida por T5):**
   - gaps en _journal.json (idx 9→11, snapshots faltantes 3/4/9/10).
 
+---
+
+## 2026-09-19 — Fix: guard de migraciones (falso positivo en CI)
+
+- **Contexto:** el guard `scripts/check-migrations.sh` fallaba con cualquier PR que agregara una migración nueva. Detectaba archivos agregados como si fueran modificaciones. El bug no se había expuesto antes porque T2/T3/T4 no agregaron migraciones.
+- **Fix:** `--diff-filter=M` para filtrar solo modificaciones reales, y restringir los paths a `*.sql` y `*_snapshot.json` (excluir `_journal.json`, que es metadata).
+- **Aplicado en PR #121 (T5) durante el review.**
+- **Documentado en AGENTS.md y en comentario inline del script.
+

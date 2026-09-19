@@ -4,6 +4,20 @@
 # _journal.json entry) is forbidden; schema changes must land as a NEW migration.
 # Fails closed: if the base ref is unavailable we cannot prove nothing changed,
 # so we exit with an error instead of silently passing.
+#
+# IMPORTANTE — decisiones no obvias:
+#
+# 1. --diff-filter=M (solo modificados)
+#    El guard debe fallar SOLO si un archivo de migración existente
+#    fue modificado. Los archivos nuevos (agregados) son esperados
+#    y válidos. Sin este flag, cualquier PR que agregue una
+#    migración nueva fallaría (bug encontrado en T5, PR #121).
+#
+# 2. _journal.json NO está en el check
+#    _journal.json es metadata de Drizzle que se modifica cada vez
+#    que se agrega una migración nueva. No es una migración en sí
+#    (no contiene SQL), así que no aplica la regla de inmutabilidad.
+#    Solo los *.sql y *_snapshot.json son inmutables.
 set -euo pipefail
 
 BASE_REF="origin/develop"
