@@ -89,9 +89,6 @@ export async function decryptToken(
   }
 
   const columnRef = getColumnRef(column)
-  if (!columnRef) {
-    throw new EncryptionError('INVALID_COLUMN', `Columna inválida: ${column}`)
-  }
 
   return await withTenantContext(tenantId, async (tx) => {
     let result: { value: string | null }[] = []
