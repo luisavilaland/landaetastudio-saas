@@ -85,3 +85,4 @@ e2e/playwright-report/
 # Scratch files del agente — nunca commitear
 issue-comment.md
 pr-body.md
+*.bak
