@@ -39,7 +39,7 @@ export const dbPlans = pgTable(
   'plans',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-slug: text('slug').notNull(),
+    slug: text('slug').notNull(),
     name: text('name').notNull(),
     displayName: text('displayName').notNull(),
     priceUyu: integer('priceUyu').notNull(),
