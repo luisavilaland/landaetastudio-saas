@@ -7,11 +7,13 @@
 #
 # IMPORTANTE — decisiones no obvias:
 #
-# 1. --diff-filter=M (solo modificados)
-#    El guard debe fallar SOLO si un archivo de migración existente
-#    fue modificado. Los archivos nuevos (agregados) son esperados
-#    y válidos. Sin este flag, cualquier PR que agregue una
-#    migración nueva fallaría (bug encontrado en T5, PR #121).
+# 1. --diff-filter=MD (modificados y eliminados)
+#    El guard debe fallar si un archivo de migración existente fue
+#    modificado (M) O eliminado (D). Los archivos nuevos (A, Added)
+#    son esperados y válidos. Sin este flag, cualquier PR que
+#    agregue una migración nueva fallaría (bug encontrado en T5,
+#    PR #121). Renamed (R) no aplica a migraciones porque cada
+#    archivo es único.
 #
 # 2. _journal.json NO está en el check
 #    _journal.json es metadata de Drizzle que se modifica cada vez
@@ -33,7 +35,7 @@ if ! git rev-parse --verify --quiet "${BASE_REF}" >/dev/null 2>&1; then
   fi
 fi
 
-changed_files="$(git diff --name-only --diff-filter=M "${BASE_REF}" -- \
+changed_files="$(git diff --name-only --diff-filter=MD "${BASE_REF}" -- \
   'packages/db/migrations/*.sql' \
   'packages/db/migrations/meta/*_snapshot.json')"
 

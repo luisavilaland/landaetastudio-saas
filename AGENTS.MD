@@ -72,8 +72,8 @@ Los servicios externos (R2, Resend, Sentry) deben tener fallback null si faltan 
 - Los snapshots (*_snapshot.json) también son inmutables.
 - _journal.json NO es inmutable: crece con cada migración nueva.
 - El guard en scripts/check-migrations.sh falla si detecta que un
-  .sql o _snapshot.json existente fue modificado. Los archivos
-  nuevos (agregados) no disparan el guard.
+  .sql o _snapshot.json existente fue modificado o eliminado.
+  Los archivos nuevos (agregados) no disparan el guard.
 - Si necesitás corregir una migración ya aplicada, creá una nueva
   migración con ALTER/DROP en lugar de editar la original.
 
