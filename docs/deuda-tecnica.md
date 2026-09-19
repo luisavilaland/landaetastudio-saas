@@ -124,6 +124,108 @@ Riesgo: un futuro cambio de `pnpm.hoistPattern` / instalación sin hoisting / ex
 
 ---
 
+## 6. Gaps en _journal.json (pre-existente)
+
+**Contexto:**
+El _journal.json no incluye entradas para varias migraciones:
+- 0010_force_rls.sql (salto idx 9 → 11, falta idx 10).
+- 0005_add_admin_users.sql (huérfano, no en journal, duplica parcialmente 0005_fluffy_triathlon).
+- Snapshots faltantes para idx 3, 4, 9, 10.
+
+**Impacto:**
+En entornos frescos (dev/CI/preview), `pnpm db:migrate` solo aplica las migraciones registradas. 0010_force_rls.sql nunca se aplica en esos entornos → FORCE RLS no se activa. Divergencia silenciosa de postura de seguridad con producción (que tiene 0010 aplicada manual).
+
+**Mitigación:**
+- Registrar 0010 en el journal con idx 10.
+- Decidir qué hacer con 0005_add_admin_users.sql (¿eliminar? ¿registrar?).
+- Verificar snapshots 3/4/9/10 (¿faltan o son huérfanos?).
+
+**Urgencia:** 🔴 Antes de T7 (RLS). Bloqueante: si T7 activa FORCE RLS en producción pero no en entornos frescos, futuros deploys tendrán comportamiento inconsistente.
+
+**Fecha de reevaluación:** antes de arrancar T7.
+
+---
+
+## 7. GRANTs a app_user faltantes en las 3 tablas nuevas
+
+**Contexto:**
+Las tablas plans, subscriptions y tenant_mp_config no tienen GRANT explícito para el rol app_user. Las 10 tablas pre-existentes obtuvieron permisos manualmente en Neon; las 3 nuevas no.
+
+En PostgreSQL, RLS (Row Level Security) y privileges (GRANT) son capas separadas. RLS no otorga privilegios.
+
+**Impacto:**
+Cuando T7 aplique FORCE RLS, app_user va a recibir "permission denied" al intentar SELECT/INSERT/UPDATE/DELETE sobre estas 3 tablas. Bloquea checkout (tenant_mp_config), webhooks de suscripciones (subscriptions) y cualquier operación sobre planes.
+
+**Mitigación:**
+- En T7 (o antes): GRANT SELECT, INSERT, UPDATE, DELETE ON plans, subscriptions, tenant_mp_config TO app_user;
+- Agregar ALTER DEFAULT PRIVILEGES para futuras tablas.
+- Incluir este paso en el checklist de T7.
+
+**Urgencia:** 🔴 Antes de T7. Bloqueante para que RLS funcione.
+
+**Fecha de reevaluación:** antes de arrancar T7.
+
+---
+
+## 8. FKs RESTRICT en 5 tablas pre-existentes
+
+**Contexto:**
+El spec transversal §4 exige ON DELETE CASCADE desde tenants para products, categories, customers, orders, shipping_methods. El schema actual tiene RESTRICT en esas 5 FKs.
+
+**Impacto:**
+El cron de purga (90 días, Fase 2/3) va a fallar al intentar DELETE FROM tenants porque las FKs RESTRICT lo bloquean con FK violation. También rompe el borrado de tenants desde el admin.
+
+**Mitigación:**
+- Migración para cambiar las 5 FKs RESTRICT → CASCADE.
+- Ejecutar antes de que el cron de purga entre en producción.
+- Verificar que el cambio de FK no rompa integridad referencial en datos existentes.
+
+**Urgencia:** 🟡 Antes de Fase 2.
+
+**Fecha de reevaluación:** antes de implementar el cron de purga.
+
+---
+
+## 9. Spec §4 usa snake_case en lugar de camelCase
+
+**Contexto:**
+El spec transversal (docs/superpowers/specs/2026-09-subscription-lifecycle.md §4) usa snake_case en sus queries de ejemplo: expired_at, abandoned_at, current_period_end, tenant_id. La BD real usa camelCase (convención del proyecto documentada en AGENTS.md).
+
+**Impacto:**
+Cuando se implementen los crons de purga y transiciones de estado (Fase 2/3), copiar queries del spec va a fallar con "column X does not exist". Mismo patrón que el incidente del grep de RLS.
+
+**Mitigación:**
+- Corregir el spec §4: reemplazar snake_case por camelCase.
+- Verificar que ninguna otra sección use snake_case.
+- Incluir esta revisión en el checklist de arranque de Fase 2.
+
+**Urgencia:** 🟡 Antes de Fase 2.
+
+**Fecha de reevaluación:** antes de implementar crons.
+
+---
+
+## 10. Prettier no corre en @repo/db
+
+**Contexto:**
+El DoD del proyecto dice "eslint + prettier", pero `pnpm lint` (via turbo) solo ejecuta eslint. @repo/db no tiene script `lint` en su package.json, así que turbo lo salta silenciosamente.
+
+Resultado: errores de formato en packages/db/src/schema.ts no son atrapados por CI. Ejemplo: la indentación rota en `slug:` (corregida en el PR #121) no fue detectada por el pipeline.
+
+**Impacto:**
+Bajo — no rompe funcionalidad. Pero permite que errores de formato se acumulen y que el DoD "eslint + prettier" no sea real.
+
+**Mitigación:**
+- Agregar script `lint` a packages/db/package.json que corra prettier --check + eslint.
+- Verificar que turbo lo recoja en `pnpm lint`.
+- Revisar si otros packages tienen el mismo hueco.
+
+**Urgencia:** 🟢 Bajo. Cuando haya tiempo.
+
+**Fecha de reevaluación:** sin fecha.
+
+---
+
 ## Referencia
 
 Plan aprobado el 2026-08-08 (ítem 3 de la tarea de calidad: limpieza email + health check + deuda técnica). Rama `quality/calidad-y-monitoreo`. Ver bitacora.md → entrada 2026-08-08 — Calidad.
