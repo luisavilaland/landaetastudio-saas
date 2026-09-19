@@ -165,8 +165,20 @@ stateDiagram-v2
 | `expired_at` | `TIMESTAMPTZ` | Se setea **solo** en transición a `expired`; se limpia (NULL) al reactivar a `active` |
 | `abandoned_at` | `TIMESTAMPTZ` | Se setea **solo** en transición a `abandoned`; se limpia si paga y va a `active` |
 | `last_processed_payment_id` | `TEXT` | `payment.id` del último `payment.created` procesado (idempotencia webhooks). NULL inicial. |
+| `current_period_end` | `TIMESTAMPTZ` | **Nullable.** NULL en `pending_first_payment` / `abandoned`. Seteado a `now() + 1 month` al activar (`active`), reseteado al recobrar (`past_due` → `active`), mantiene valor en `cancelled` hasta fin de período, histórico en `expired`. |
 
 > **Por qué no `updated_at`:** `updated_at` cambia con cualquier update (reintentos, webhooks, etc.) y no refleja el momento real de expiración/abandono.
+
+### Cuándo se setea `current_period_end` según estado
+
+| Estado | `currentPeriodEnd` |
+|--------|------------------|
+| `pending_first_payment` | NULL (todavía no hay período) |
+| `active` | `now() + 1 month` (seteado al activar) |
+| `past_due` | Se mantiene (el período pagado sigue) |
+| `cancelled` | Se mantiene hasta el fin del período pagado |
+| `expired` | Se mantiene (histórico) |
+| `abandoned` | NULL (nunca se pagó) |
 
 ### Tablas afectadas (CASCADE via FK)
 

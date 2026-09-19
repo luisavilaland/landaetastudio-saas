@@ -67,7 +67,7 @@ export const dbSubscriptions = pgTable(
     status: text('status').notNull().default('pending_first_payment'),
     currentPeriodEnd: timestamp('currentPeriodEnd', {
       withTimezone: true,
-    }).notNull(),
+    }),
     mpPreapprovalId: text('mpPreapprovalId'),
     expiredAt: timestamp('expiredAt', { withTimezone: true }),
     abandonedAt: timestamp('abandonedAt', { withTimezone: true }),

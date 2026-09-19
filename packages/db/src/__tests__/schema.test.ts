@@ -102,19 +102,19 @@ describe('DB Schema', () => {
       expect(dbSubscriptions.status.default).toBe('pending_first_payment')
     })
 
-    it('should have nullable mpPreapprovalId, expiredAt, abandonedAt and lastProcessedPaymentId columns', () => {
+    it('should have nullable mpPreapprovalId, expiredAt, abandonedAt, lastProcessedPaymentId and currentPeriodEnd columns', () => {
       expect(dbSubscriptions.mpPreapprovalId.notNull).toBe(false)
       expect(dbSubscriptions.expiredAt.notNull).toBe(false)
       expect(dbSubscriptions.abandonedAt.notNull).toBe(false)
       expect(dbSubscriptions.lastProcessedPaymentId.notNull).toBe(false)
+      expect(dbSubscriptions.currentPeriodEnd.notNull).toBe(false)
     })
 
-    it('should have NOT NULL id, tenantId, planId, status, currentPeriodEnd, createdAt and updatedAt columns', () => {
+    it('should have NOT NULL id, tenantId, planId, status, createdAt and updatedAt columns', () => {
       expect(dbSubscriptions.id.notNull).toBe(true)
       expect(dbSubscriptions.tenantId.notNull).toBe(true)
       expect(dbSubscriptions.planId.notNull).toBe(true)
       expect(dbSubscriptions.status.notNull).toBe(true)
-      expect(dbSubscriptions.currentPeriodEnd.notNull).toBe(true)
       expect(dbSubscriptions.createdAt.notNull).toBe(true)
       expect(dbSubscriptions.updatedAt.notNull).toBe(true)
     })
