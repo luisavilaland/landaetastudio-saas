@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
+import { getTableConfig } from 'drizzle-orm/pg-core'
 import {
   dbTenants,
   dbPlans,
+  dbSubscriptions,
   dbProducts,
   dbProductImages,
   dbProductVariants,
@@ -44,6 +46,78 @@ describe('DB Schema', () => {
     expect(dbPlans.createdAt).toBeDefined()
     // dbPlans is a global catalog table: NO tenantId
     expect('tenantId' in dbPlans).toBe(false)
+  })
+
+  describe('subscriptions table', () => {
+    it('should export dbSubscriptions table with expected columns', () => {
+      expect(dbSubscriptions).toBeDefined()
+      expect(dbSubscriptions.id).toBeDefined()
+      expect(dbSubscriptions.tenantId).toBeDefined()
+      expect(dbSubscriptions.planId).toBeDefined()
+      expect(dbSubscriptions.status).toBeDefined()
+      expect(dbSubscriptions.currentPeriodEnd).toBeDefined()
+      expect(dbSubscriptions.mpPreapprovalId).toBeDefined()
+      expect(dbSubscriptions.expiredAt).toBeDefined()
+      expect(dbSubscriptions.abandonedAt).toBeDefined()
+      expect(dbSubscriptions.lastProcessedPaymentId).toBeDefined()
+      expect(dbSubscriptions.createdAt).toBeDefined()
+      expect(dbSubscriptions.updatedAt).toBeDefined()
+    })
+
+    it('should have tenantId FK referencing tenants.id on delete cascade', () => {
+      const tenantFk = getTableConfig(dbSubscriptions).foreignKeys.find(
+        (fk) => fk.reference().columns[0] === dbSubscriptions.tenantId,
+      )
+      expect(tenantFk).toBeDefined()
+      expect(tenantFk?.reference().foreignTable).toBe(dbTenants)
+      expect(tenantFk?.reference().foreignColumns[0]).toBe(dbTenants.id)
+      expect(tenantFk?.onDelete).toBe('cascade')
+    })
+
+    it('should have planId FK referencing plans.id on delete restrict', () => {
+      const planFk = getTableConfig(dbSubscriptions).foreignKeys.find(
+        (fk) => fk.reference().columns[0] === dbSubscriptions.planId,
+      )
+      expect(planFk).toBeDefined()
+      expect(planFk?.reference().foreignTable).toBe(dbPlans)
+      expect(planFk?.reference().foreignColumns[0]).toBe(dbPlans.id)
+      expect(planFk?.onDelete).toBe('restrict')
+    })
+
+    it('should have a unique index on tenantId', () => {
+      const tenantIdx = getTableConfig(dbSubscriptions).indexes.find(
+        (index) => index.config.name === 'subscriptions_tenant_idx',
+      )
+      expect(tenantIdx).toBeDefined()
+      expect(tenantIdx?.config.unique).toBe(true)
+      expect(
+        tenantIdx?.config.columns.some(
+          (col) => 'name' in col && col.name === 'tenantId',
+        ),
+      ).toBe(true)
+    })
+
+    it('should default status to pending_first_payment', () => {
+      expect(dbSubscriptions.status.hasDefault).toBe(true)
+      expect(dbSubscriptions.status.default).toBe('pending_first_payment')
+    })
+
+    it('should have nullable mpPreapprovalId, expiredAt, abandonedAt and lastProcessedPaymentId columns', () => {
+      expect(dbSubscriptions.mpPreapprovalId.notNull).toBe(false)
+      expect(dbSubscriptions.expiredAt.notNull).toBe(false)
+      expect(dbSubscriptions.abandonedAt.notNull).toBe(false)
+      expect(dbSubscriptions.lastProcessedPaymentId.notNull).toBe(false)
+    })
+
+    it('should have NOT NULL id, tenantId, planId, status, currentPeriodEnd, createdAt and updatedAt columns', () => {
+      expect(dbSubscriptions.id.notNull).toBe(true)
+      expect(dbSubscriptions.tenantId.notNull).toBe(true)
+      expect(dbSubscriptions.planId.notNull).toBe(true)
+      expect(dbSubscriptions.status.notNull).toBe(true)
+      expect(dbSubscriptions.currentPeriodEnd.notNull).toBe(true)
+      expect(dbSubscriptions.createdAt.notNull).toBe(true)
+      expect(dbSubscriptions.updatedAt.notNull).toBe(true)
+    })
   })
 
   it('should export dbProducts table with expected columns', () => {
