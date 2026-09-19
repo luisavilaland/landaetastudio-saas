@@ -39,7 +39,7 @@ export const dbPlans = pgTable(
   'plans',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    slug: text('slug').unique().notNull(),
+slug: text('slug').notNull(),
     name: text('name').notNull(),
     displayName: text('displayName').notNull(),
     priceUyu: integer('priceUyu').notNull(),
@@ -90,6 +90,7 @@ export const dbSubscriptions = pgTable(
     return {
       tenantIdx: uniqueIndex('subscriptions_tenant_idx').on(table.tenantId),
       statusIdx: index('subscriptions_status_idx').on(table.status),
+      planIdx: index('subscriptions_plan_idx').on(table.planId),
     }
   },
 )

@@ -1110,6 +1110,18 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 
 ---
 
+## 2026-09-19 — T5: Migración 0012 (plans, subscriptions, tenant_mp_config)
+
+- **Migración generada:** `0012_tearful_supreme_intelligence.sql`
+- **3 tablas:** plans, subscriptions, tenant_mp_config con FKs y UNIQUEs.
+- **2 fixes incluidos en schema.ts durante el checkpoint de revisión:**
+  - Eliminada redundancia en plans.slug (UNIQUE CONSTRAINT + UNIQUE INDEX).
+  - Agregado índice en subscriptions.plan_idx (Postgres no auto-indexa FKs).
+- **Deuda técnica pre-existente detectada (no introducida por T5):**
+  - gaps en _journal.json (idx 9→11, snapshots faltantes 3/4/9/10).
+
+---
+
 ## 2026-09-19 — Fix T3: currentPeriodEnd nullable (PR #119)
 
 - **Contexto:** el PR #117 (T3) se mergeó sin el fix de currentPeriodEnd nullable que se acordó durante el review.
