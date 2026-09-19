@@ -4,6 +4,7 @@ import {
   dbTenants,
   dbPlans,
   dbSubscriptions,
+  dbTenantMpConfig,
   dbProducts,
   dbProductImages,
   dbProductVariants,
@@ -232,5 +233,65 @@ describe('DB Schema', () => {
     expect(dbShippingMethods.sortOrder).toBeDefined()
     expect(dbShippingMethods.createdAt).toBeDefined()
     expect(dbShippingMethods.updatedAt).toBeDefined()
+  })
+})
+
+describe('tenant_mp_config table', () => {
+  it('should export dbTenantMpConfig with the 8 expected columns', () => {
+    expect(dbTenantMpConfig).toBeDefined()
+    expect(dbTenantMpConfig.id).toBeDefined()
+    expect(dbTenantMpConfig.tenantId).toBeDefined()
+    expect(dbTenantMpConfig.accessTokenEnc).toBeDefined()
+    expect(dbTenantMpConfig.webhookSecretEnc).toBeDefined()
+    expect(dbTenantMpConfig.publicKey).toBeDefined()
+    expect(dbTenantMpConfig.isVerified).toBeDefined()
+    expect(dbTenantMpConfig.createdAt).toBeDefined()
+    expect(dbTenantMpConfig.updatedAt).toBeDefined()
+  })
+
+  it('should reference dbTenants via tenantId FK with ON DELETE CASCADE', () => {
+    const config = getTableConfig(dbTenantMpConfig)
+    const tenantFk = config.foreignKeys.find(
+      (fk) => fk.reference().columns[0] === dbTenantMpConfig.tenantId,
+    )
+    expect(tenantFk).toBeDefined()
+    expect(tenantFk?.reference().foreignTable).toBe(dbTenants)
+    expect(tenantFk?.reference().foreignColumns[0]).toBe(dbTenants.id)
+    expect(tenantFk?.onDelete).toBe('cascade')
+  })
+
+  it('should enforce one row per tenant with a unique index on tenantId', () => {
+    const config = getTableConfig(dbTenantMpConfig)
+    const tenantUniqueIndex = config.indexes.find(
+      (index) =>
+        index.config.unique &&
+        index.config.columns.some(
+          (column) => (column as { name?: string }).name === 'tenantId',
+        ),
+    )
+    expect(tenantUniqueIndex).toBeDefined()
+  })
+
+  it('should store accessTokenEnc as bytea (not text)', () => {
+    expect(dbTenantMpConfig.accessTokenEnc).toBeDefined()
+    expect(dbTenantMpConfig.accessTokenEnc.getSQLType()).toBe('bytea')
+    expect(dbTenantMpConfig.accessTokenEnc.dataType).not.toBe('string')
+  })
+
+  it('should store webhookSecretEnc as bytea (not text)', () => {
+    expect(dbTenantMpConfig.webhookSecretEnc).toBeDefined()
+    expect(dbTenantMpConfig.webhookSecretEnc.getSQLType()).toBe('bytea')
+    expect(dbTenantMpConfig.webhookSecretEnc.dataType).not.toBe('string')
+  })
+
+  it('should not define plain-text token columns', () => {
+    expect('accessToken' in dbTenantMpConfig).toBe(false)
+    expect('webhookSecret' in dbTenantMpConfig).toBe(false)
+  })
+
+  it('should default isVerified to false', () => {
+    expect(dbTenantMpConfig.isVerified).toBeDefined()
+    expect(dbTenantMpConfig.isVerified.hasDefault).toBe(true)
+    expect(dbTenantMpConfig.isVerified.default).toBe(false)
   })
 })
