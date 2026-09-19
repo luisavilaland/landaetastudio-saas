@@ -19,7 +19,9 @@ if ! git rev-parse --verify --quiet "${BASE_REF}" >/dev/null 2>&1; then
   fi
 fi
 
-changed_files="$(git diff --name-only "${BASE_REF}" -- "${MIGRATIONS_DIR}")"
+changed_files="$(git diff --name-only --diff-filter=M "${BASE_REF}" -- \
+  'packages/db/migrations/*.sql' \
+  'packages/db/migrations/meta/*_snapshot.json')"
 
 if [[ -n "${changed_files}" ]]; then
   echo "❌ Migración existente modificada — crea una nueva migración, no edites las anteriores."
