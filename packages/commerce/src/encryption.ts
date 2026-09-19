@@ -72,9 +72,14 @@ export async function decryptToken(
   }
 
   return await withTenantContext(tenantId, async (tx) => {
-    const result = await tx.execute(
-      sql`SELECT pgp_sym_decrypt(${column}, ${key}) AS value FROM "tenant_mp_config" WHERE "tenantId" = ${tenantId}`
-    )
+    let result: { value: string | null }[] = []
+    try {
+      result = await tx.execute(
+        sql`SELECT pgp_sym_decrypt(${column}, ${key}) AS value FROM "tenant_mp_config" WHERE "tenantId" = ${tenantId}`
+      )
+    } catch (e: any) {
+      throw new EncryptionError('DECRYPTION_FAILED', 'Error al descifrar token: clave inválida o datos corruptos', e)
+    }
 
     if (result.length === 0 || result[0].value === null) {
       return null
