@@ -1078,28 +1078,6 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 
 ---
 
-## 2026-09-18 — T2: tabla `plans` en schema Drizzle + tests
-
-- **Schema:** `dbPlans` agregado a `packages/db/src/schema.ts` con 13 columnas (`id`, `slug` unique, `name`, `displayName`, `priceUyu` integer centavos, `productLimit`, `variantLimitPerProduct`, `adminLimit`, `templateCount`, `subscriberLimit`, `features` jsonb, `isActive` boolean, `createdAt`), tabla global (sin tenantId, sin RLS), índice único `plans_slug_idx`, y tipos `Plan`/`NewPlan`.
-- **Tests:** `describe('plans table')` en `packages/db/src/__tests__/schema.test.ts` verificando 13 columnas, `priceUyu` integer, y ausencia de `tenantId`.
-- **DoD verificado:** `pnpm lint` 6/6 ✓ + `pnpm typecheck` 9/9 ✓ + `pnpm test` 11/11 ✓ + `pnpm build` 3/3 ✓.
-- **Branch:** `feature/fase1-t2-plans` (mergeado en PR #116)
-- **Issue:** #102
-
----
-
-## 2026-09-19 — T3: tabla `subscriptions` en schema Drizzle + tests
-
-- **Schema:** `dbSubscriptions` agregado a `packages/db/src/schema.ts` con 12 columnas (`id`, `tenantId` FK→tenants cascade UNIQUE, `planId` FK→plans restrict, `status` default `pending_first_payment`, `currentPeriodEnd`, `mpPreapprovalId`, `expiredAt`, `abandonedAt`, `lastProcessedPaymentId`, `createdAt`, `updatedAt`), índices: único en `tenantId` (`subscriptions_tenant_idx`) y en `status` (`subscriptions_status_idx`), y tipos `Subscription`/`NewSubscription`.
-- **Tests:** `describe('subscriptions table')` en `packages/db/src/__tests__/schema.test.ts` con 7 casos: 11 columnas, FKs (tenantId cascade, planId restrict), unique index en tenantId, default status, nullabilidad de 4 columnas, NOT NULL en 7 columnas core.
-- **DoD verificado:** `pnpm lint` 6/6 ✓ + `pnpm typecheck` 9/9 ✓ + `pnpm test` 18/18 ✓ + `pnpm build` 3/3 ✓.
-- **Subagentes:** A (schema), B (tests), C (cross-check vs spec §4).
-- **Observación cross-check:** 3 hallazgos no bloqueantes: (1) naming divergence spec usa snake_case vs camelCase real; (2) `currentPeriodEnd` NOT NULL sin default en estado inicial; (3) migración pendiente (T5).
-- **Branch:** `feature/fase1-t3-subscriptions`
-- **Issue:** #103
-
----
-
 ## 2026-09-19 — T4: tabla `tenant_mp_config` en schema Drizzle + tests
 
 - **Schema:** `dbTenantMpConfig` agregado a `packages/db/src/schema.ts` con 8 columnas (`id`, `tenantId`, `accessTokenEnc`, `webhookSecretEnc`, `publicKey`, `isVerified`, `createdAt`, `updatedAt`), FK `tenantId → tenants.id ON DELETE CASCADE`, índice único `tenant_mp_config_tenant_idx` (1 config por tenant), `isVerified` default `false`, y tipos `TenantMpConfig`/`NewTenantMpConfig`.
