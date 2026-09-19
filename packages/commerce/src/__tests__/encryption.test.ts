@@ -85,7 +85,11 @@ describe('encryption', () => {
     it('debe lanzar error si key está vacía', async () => {
       await expect(
         encryptToken('tenant-1', '', { accessToken: 'token' }),
-      ).rejects.toThrow('Clave de cifrado vacía')
+      ).rejects.toMatchObject({
+        name: 'EncryptionError',
+        code: 'EMPTY_KEY',
+        message: expect.stringContaining('Clave de cifrado vacía'),
+      })
     })
 
     it('no hace nada si no hay tokens para cifrar', async () => {
@@ -163,7 +167,11 @@ describe('encryption', () => {
     it('debe lanzar error si key está vacía', async () => {
       await expect(
         decryptToken('tenant-1', '', 'accessTokenEnc'),
-      ).rejects.toThrow('Clave de descifrado vacía')
+      ).rejects.toMatchObject({
+        name: 'EncryptionError',
+        code: 'EMPTY_KEY',
+        message: expect.stringContaining('Clave de descifrado vacía'),
+      })
     })
   })
 
@@ -262,17 +270,43 @@ describe('encryption', () => {
     })
   })
 
+  describe('ENCRYPTION_FAILED (pgcrypto error)', () => {
+    it('encryptToken lanza EncryptionError cuando pgp_sym_encrypt falla', async () => {
+      mockWithTenantContext.mockImplementation(
+        async (_tenantId: string, callback: (tx: any) => Promise<any>) => {
+          return await callback({
+            execute: vi.fn().mockRejectedValue(new Error('Wrong key or corrupt data')),
+          })
+        },
+      )
+
+      await expect(
+        encryptToken('tenant-1', 'clave-secreta', { accessToken: 'token' }),
+      ).rejects.toMatchObject({
+        name: 'EncryptionError',
+        code: 'ENCRYPTION_FAILED',
+        message: expect.stringContaining('Error al cifrar token'),
+      })
+    })
+  })
+
   describe('Fail-closed en key vacía', () => {
-    it('encryptToken lanza error con key vacía', async () => {
+    it('encryptToken lanza EncryptionError con key vacía', async () => {
       await expect(
         encryptToken('t1', '', { accessToken: 'x' }),
-      ).rejects.toThrow('Clave de cifrado vacía')
+      ).rejects.toMatchObject({
+        name: 'EncryptionError',
+        code: 'EMPTY_KEY',
+        message: expect.stringContaining('Clave de cifrado vacía'),
+      })
     })
 
-    it('decryptToken lanza error con key vacía', async () => {
-      await expect(decryptToken('t1', '', 'accessTokenEnc')).rejects.toThrow(
-        'Clave de descifrado vacía',
-      )
+    it('decryptToken lanza EncryptionError con key vacía', async () => {
+      await expect(decryptToken('t1', '', 'accessTokenEnc')).rejects.toMatchObject({
+        name: 'EncryptionError',
+        code: 'EMPTY_KEY',
+        message: expect.stringContaining('Clave de descifrado vacía'),
+      })
     })
 
     it('error es en español', async () => {

@@ -19,14 +19,14 @@ export async function encryptToken(
   values: { accessToken?: string; webhookSecret?: string }
 ): Promise<void> {
   if (!key) {
-    throw new Error('Clave de cifrado vacía: MP_TOKEN_ENCRYPTION_KEY es requerida')
+    throw new EncryptionError('EMPTY_KEY', 'Clave de cifrado vacía: MP_TOKEN_ENCRYPTION_KEY es requerida')
   }
 
   if (!values.accessToken && !values.webhookSecret) {
     return
   }
 
-await withTenantContext(tenantId, async (tx) => {
+  await withTenantContext(tenantId, async (tx) => {
     const setClauses: SQL[] = []
     const params: unknown[] = []
 
@@ -43,7 +43,11 @@ await withTenantContext(tenantId, async (tx) => {
     if (setClauses.length > 0) {
       params.push(tenantId)
       const query = sql`UPDATE "tenant_mp_config" SET ${sql.join(setClauses, sql`, `)} WHERE "tenantId" = ${params[params.length - 1]}`
-      await tx.execute(query)
+      try {
+        await tx.execute(query)
+      } catch (e: any) {
+        throw new EncryptionError('ENCRYPTION_FAILED', 'Error al cifrar token: clave inválida o datos corruptos', e)
+      }
     }
   })
 }
@@ -68,7 +72,7 @@ export async function decryptToken(
   column: 'accessTokenEnc' | 'webhookSecretEnc'
 ): Promise<string | null> {
   if (!key) {
-    throw new Error('Clave de descifrado vacía: MP_TOKEN_ENCRYPTION_KEY es requerida')
+    throw new EncryptionError('EMPTY_KEY', 'Clave de descifrado vacía: MP_TOKEN_ENCRYPTION_KEY es requerida')
   }
 
   return await withTenantContext(tenantId, async (tx) => {
