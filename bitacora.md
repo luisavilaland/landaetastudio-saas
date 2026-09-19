@@ -1107,3 +1107,12 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 - **Tests:** `describe('tenant_mp_config table')` en `packages/db/src/__tests__/schema.test.ts` con 7 casos: export + 8 columnas, FK cascade vía `getTableConfig`, índice único sobre `tenantId`, `getSQLType() === 'bytea'` para ambos tokens (y `dataType !== 'string'`), ausencia de columnas plain-text (`accessToken`/`webhookSecret`), y `isVerified` default `false`.
 - **DoD verificado:** `pnpm test` 438/438 ✓ + `pnpm lint` 6/6 ✓ + `pnpm typecheck` 9/9 ✓ + `pnpm build` 3/3 ✓.
 - **Branch:** `feature/fase1-t4-tenant-mp-config`
+
+---
+
+## 2026-09-19 — Fix T3: currentPeriodEnd nullable (PR #119)
+
+- **Contexto:** el PR #117 (T3) se mergeó sin el fix de currentPeriodEnd nullable que se acordó durante el review.
+- **Fix:** currentPeriodEnd pasó a nullable. Propagado a schema, tests, plan, spec transversal (§4) y blueprint v2.6 (línea 224).
+- **Motivo:** en pending_first_payment no existe período. El valor se setea a now() + 1 month al recibir el primer payment.created.
+- Aprobado en PR #119.

@@ -81,3 +81,7 @@ e2e/playwright-report/
 
 # Worktrees
 .worktrees/
+
+# Scratch files del agente — nunca commitear
+issue-comment.md
+pr-body.md

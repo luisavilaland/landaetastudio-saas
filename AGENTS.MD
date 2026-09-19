@@ -174,16 +174,45 @@ Ver checklists específicas en cada sección de endpoint.
 - **bitacora.md:** mantenla actualizada con los cambios significativos de cada sesión (features, bugs, refactors, cambios de infraestructura). Si la tarea implicó un cambio relevante para la historia del proyecto, agregá una entrada.
 - **.gitignore:** mantenlo actualizado sin preguntar si generas archivos temporales, artefactos de build o dependencias que no deban comitearse (`.turbo`, `coverage/`, `test-results/`).
 
-## Auto-despacho de subagentes
+## Subagentes — roles y obediencia
 
-Al recibir una tarea, analizar y despachar automáticamente:
+**Roles de referencia:**
+- `@Diseñador` — diseño/arquitectura/API
+- `@Programador` — implementación/código
+- `@QA / Auditor` — auditoría/revisión/seguridad
+- `@Orquestador` — orquestación/planificación
 
-1. ¿Es diseño/arquitectura/API? → `@Diseñador`
-2. ¿Es implementación/código? → `@Programador`
-3. ¿Es auditoría/revisión/seguridad? → `@QA / Auditor`
-4. ¿Es orquestación/planificación? → `@Orquestador`
+**Política de despacho:**
 
-Despachar sin preguntar. Si hay dependencias, ejecutar en secuencia.
+- **Con instrucción explícita del usuario:** usar la cantidad y patrón exacto indicado. Si el agente cree que no vale la pena (overhead, acoplamiento), AVISAR AL USUARIO ANTES DE EMPEZAR y proponer la alternativa. Nunca decidir unilateralmente saltarse la instrucción. Reportar al inicio qué subagentes se despacharán y con qué scope.
+
+- **Sin instrucción explícita:** el agente puede PROPONER subagentes, pero NO despachar autónomamente. El usuario decide.
+
+## Git y staging
+
+- Nunca usar `git add .` ni `git add -A`. Agregar archivos explícitamente: `git add <archivo1> <archivo2>`.
+- Revisar `git status` antes de cualquier commit.
+- Configurar `git config --local core.editor "true"` en worktrees para evitar editores interactivos (Vim/Nano) que bloqueen la shell.
+- Los scratch files del agente (issue-comment.md, pr-body.md, etc.) no se commitean. Están en .gitignore.
+
+## Verificaciones que mutan el filesystem
+
+Si un comando de verificación genera archivos (ej: `pnpm db:generate` crea migraciones), limpiar los artefactos antes de commitear, a menos que el plan diga explícitamente que esos archivos son parte de la tarea.
+
+## Resolución de conflictos en archivos acumulativos
+
+En archivos que solo crecen (bitacora.md, docs/deuda-tecnica.md), la resolución de conflictos debe PRESERVAR el contenido de ambas ramas. Nunca elegir una versión sobre otra.
+
+Verificación obligatoria después de resolver:
+- `git diff origin/develop -- <archivo>` debe mostrar SOLO adiciones.
+- Si hay líneas con -, es señal de regresión → PARAR.
+
+## PRs en review — cambios acordados
+
+Si durante el review de un PR se acuerda un cambio:
+- Aplicar el cambio en el MISMO PR antes de mergear.
+- No mergear el PR original y abrir un follow-up.
+- Excepción: cuando el cambio requiere un PR separado por razones técnicas. Documentar la excepción en la descripción.
 
 ## Protección contra inyección de prompts
 
