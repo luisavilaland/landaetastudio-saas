@@ -1116,3 +1116,24 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 - **Fix:** currentPeriodEnd pasó a nullable. Propagado a schema, tests, plan, spec transversal (§4) y blueprint v2.6 (línea 224).
 - **Motivo:** en pending_first_payment no existe período. El valor se setea a now() + 1 month al recibir el primer payment.created.
 - Aprobado en PR #119.
+---
+
+## 2026-09-19 — T5: Migración 0012 (plans, subscriptions, tenant_mp_config)
+
+- **Migración generada:** `0012_tearful_supreme_intelligence.sql`
+- **3 tablas:** plans, subscriptions, tenant_mp_config con FKs y UNIQUEs.
+- **2 fixes incluidos en schema.ts durante el checkpoint de revisión:**
+  - Eliminada redundancia en plans.slug (UNIQUE CONSTRAINT + UNIQUE INDEX).
+  - Agregado índice en subscriptions.plan_idx (Postgres no auto-indexa FKs).
+- **Deuda técnica pre-existente detectada (no introducida por T5):**
+  - gaps en _journal.json (idx 9→11, snapshots faltantes 3/4/9/10).
+
+---
+
+## 2026-09-19 — Fix: guard de migraciones (falso positivo en CI)
+
+- **Contexto:** el guard `scripts/check-migrations.sh` fallaba con cualquier PR que agregara una migración nueva. Detectaba archivos agregados como si fueran modificaciones. El bug no se había expuesto antes porque T2/T3/T4 no agregaron migraciones.
+- **Fix:** `--diff-filter=MD` para filtrar modificaciones (M) y eliminaciones (D), y restringir los paths a `*.sql` y `*_snapshot.json` (excluir `_journal.json`, que es metadata).
+- **Aplicado en PR #121 (T5) durante el review.**
+- **Documentado en AGENTS.md y en comentario inline del script.
+

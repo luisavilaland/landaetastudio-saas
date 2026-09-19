@@ -66,6 +66,17 @@ Los servicios externos (R2, Resend, Sentry) deben tener fallback null si faltan 
 - Webhooks protegidos con `MERCADOPAGO_WEBHOOK_SECRET` (verificación de firma).
 - IDs: UUIDs nativos de PostgreSQL (`gen_random_uuid()`).
 
+## Migraciones — reglas
+
+- Las migraciones son append-only. Nunca editar un .sql existente.
+- Los snapshots (*_snapshot.json) también son inmutables.
+- _journal.json NO es inmutable: crece con cada migración nueva.
+- El guard en scripts/check-migrations.sh falla si detecta que un
+  .sql o _snapshot.json existente fue modificado o eliminado.
+  Los archivos nuevos (agregados) no disparan el guard.
+- Si necesitás corregir una migración ya aplicada, creá una nueva
+  migración con ALTER/DROP en lugar de editar la original.
+
 ## Comandos obligatorios (Definition of DoD)
 
 Antes de considerar cualquier tarea como finalizada, el código debe ejecutar sin errores:
