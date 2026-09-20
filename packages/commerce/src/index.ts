@@ -23,5 +23,8 @@ export { getTenantId } from './tenant'
 // Webhook
 export { makeSignature, verifyMercadoPagoSignature } from './webhook-signature'
 
+// Encryption
+export { encryptToken, decryptToken, EncryptionError } from './encryption'
+
 // Redis (export for testing or direct access if needed)
 export { redisClient } from './redis'

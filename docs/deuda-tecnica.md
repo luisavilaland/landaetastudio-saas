@@ -226,6 +226,61 @@ Bajo — no rompe funcionalidad. Pero permite que errores de formato se acumulen
 
 ---
 
+## 11. Test bind params para decryptToken — ✅ RESUELTO (2026-09-19)
+
+**Contexto:** El test `SQL bind params` en `packages/commerce/src/__tests__/encryption.test.ts` solo verifica que `encryptToken` usa bind params para la clave. Falta test equivalente para `decryptToken` que verifique que `${key}` y `${column}` viajan como bind params en el `SELECT pgp_sym_decrypt`.
+
+**Origen:** Regresión durante el rewrite del test (T6).
+
+**Implementación (commit fix del bug decryptToken):**
+- Tests añadidos en `packages/commerce/src/__tests__/encryption.test.ts` (sección `SQL bind params`):
+  - `decryptToken: clave en params, columna en SQL (raw hardcoded)` — verifica `accessTokenEnc`
+  - `decryptToken: webhookSecretEnc columna en SQL (raw hardcoded)` — verifica `webhookSecretEnc`
+- Ambos tests verifican:
+  - La columna aparece en el string SQL (raw hardcoded: `"accessTokenEnc"` / `"webhookSecretEnc"`)
+  - La clave NO aparece en el string SQL
+  - La clave SÍ aparece en el array de params
+
+**Estado:** ✅ RESUELTO en PR #123 (commit del fix de bug decryptToken).
+
+**Urgencia:** 🟢 Bajo. Resuelto.
+
+**Fecha de reevaluación:** N/A.
+
+---
+
+## 12. TENANT_NOT_FOUND no usado en EncryptionError
+
+**Contexto:** El código `TENANT_NOT_FOUND` está exportado en `EncryptionErrorCode` (`packages/commerce/src/encryption.ts:94`) pero nunca se lanza. Cuando el tenant no existe, `decryptToken` retorna `null` (no lanza).
+
+**Origen:** Diseño especulativo — se añadió por completitud del enum pero sin caso de uso real.
+
+**Impacto:** Bajo — código muerto exportado públicamente.
+
+**Decisión pendiente:** (a) Usar: cambiar `decryptToken` para lanzar `EncryptionError('TENANT_NOT_FOUND')` cuando `result.length === 0`, o (b) Eliminar del enum y tipo.
+
+**Urgencia:** 🟢 Bajo. Follow-up.
+
+**Fecha de reevaluación:** antes de Fase 2.
+
+---
+
+## 13. Duplicación accessToken/webhookSecret en encrypt/decrypt
+
+**Contexto:** `encryptToken` tiene ramas casi idénticas para `accessToken` y `webhookSecret` (líneas 33-45 en `encryption.ts`). Lo mismo en `decryptToken` por la columna.
+
+**Origen:** Implementación directa sin refactor.
+
+**Impacto:** Bajo — código repetido que dificulta mantenimiento futuro (ej: añadir tercer campo cifrado).
+
+**Mitigación:** Refactor a loop sobre `Object.entries(values)` o helper interno `encryptField(fieldName, value, key)`.
+
+**Urgencia:** 🟢 Bajo. Follow-up.
+
+**Fecha de reevaluación:** antes de Fase 2.
+
+---
+
 ## Referencia
 
 Plan aprobado el 2026-08-08 (ítem 3 de la tarea de calidad: limpieza email + health check + deuda técnica). Rama `quality/calidad-y-monitoreo`. Ver bitacora.md → entrada 2026-08-08 — Calidad.

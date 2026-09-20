@@ -11,7 +11,8 @@
     "./email": "./src/email.ts",
     "./categories": "./src/categories.ts",
     "./health": "./src/health.ts",
-    "./webhook-signature": "./src/webhook-signature.ts"
+    "./webhook-signature": "./src/webhook-signature.ts",
+    "./encryption": "./src/encryption.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
