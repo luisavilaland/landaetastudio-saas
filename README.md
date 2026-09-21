@@ -42,7 +42,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ Página de perfil de tienda pública con SEO
 - ✅ Checkout con selector visual de envío y cálculo dinámico
 - ✅ Refactor de API: `NextResponse` unificado en todas las rutas
-- ✅ 464 tests (100% passing), build limpio en 3 apps (hoy)
+- ✅ 430 tests (100% passing), build limpio en 3 apps (hoy)
 
 ## Fase 5 – Producción ✅ (Completada)
 

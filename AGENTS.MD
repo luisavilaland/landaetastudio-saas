@@ -333,6 +333,16 @@ Contexto: en PR A (#124), la primera versión de la entrada 2026-09-20 sobrescri
 
 Closes #125 (parte 2).
 
+## Historial de releases — append-only
+
+Cualquier sección de "Última actualización", "Release Notes", "Changelog" o similar en README/SETUP/TESTING es append-only.
+
+- Para registrar un nuevo release: AGREGAR una línea nueva.
+- NUNCA modificar la línea anterior (incluso si tiene contadores viejos).
+- Contadores de "estado actual" (sin contexto de release) SÍ se actualizan.
+
+Closes #125 (extensión).
+
 ## Cuándo cerrar la sesión del agente
 
 Considerar cerrar y abrir una nueva cuando:

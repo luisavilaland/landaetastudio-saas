@@ -316,7 +316,8 @@ pnpm test
 
 ## Notas
 
-- Última actualización: 20 de septiembre de 2026 — Release v0.10.0 (464 tests, 15 specs E2E).
+- Última actualización: 12 de agosto de 2026 — Release v0.9.0 (430 tests, 15 specs E2E).
+- Actualización 20 de septiembre de 2026 – 464 tests, 15 specs E2E (post T6 + migración 0013). Rama `develop`.
 - Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
 - Fase 6 completada: withTenantContext real + FORCE RLS (app_user), E2E Playwright 15 specs con CI self-hosted, incidente RLS de 9 Server Components corregido (08-08).
 - 464 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
