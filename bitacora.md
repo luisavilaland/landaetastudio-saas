@@ -1130,6 +1130,15 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 
 ---
 
+## 2026-09-19 — Fix: guard de migraciones (falso positivo en CI)
+
+- **Contexto:** el guard `scripts/check-migrations.sh` fallaba con cualquier PR que agregara una migración nueva. Detectaba archivos agregados como si fueran modificaciones. El bug no se había expuesto antes porque T2/T3/T4 no agregaron migraciones.
+- **Fix:** `--diff-filter=MD` para filtrar modificaciones (M) y eliminaciones (D), y restringir los paths a `*.sql` y `*_snapshot.json` (excluir `_journal.json`, que es metadata).
+- **Aplicado en PR #121 (T5) durante el review.**
+- **Documentado en AGENTS.md y en comentario inline del script.
+
+---
+
 ## 2026-09-20 — Migración 0013: GRANTs y FORCE RLS idempotente (ítems 6-7)
 
 **Contexto:**
@@ -1169,5 +1178,5 @@ Regla a futuro (ver AGENTS.md):
 - packages/db/migrations/meta/0013_snapshot.json (nuevo, copia de 0012)
 - docs/deuda-tecnica.md (ítems 6 y 7 → RESUELTOS)
 
-**PR:** #<N>
+**PR:** #124
 
