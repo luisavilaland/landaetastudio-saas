@@ -19,6 +19,10 @@
 | 9   | [Seed](#9-seed)                                       | Actualizar datos de prueba              |
 | 10  | [Infra y Deploy](#10-infra-y-deploy)                  | Vercel, env vars, CI                    |
 | 11  | [Planificación y arquitectura](#11-planificación-y-arquitectura) | ADRs, specs, plans, fases |
+| 12  | [Verificar docs vs código](#12-verificar-docs-vs-código) | Comparar contadores, versión, blueprint |
+| 13  | [Auditoría por tarea](#13-auditoría-por-tarea) | @QA + @Diseñador, anti-duplicación |
+| 14  | [Cerrar sesión y transferir contexto](#14-cerrar-sesión-y-transferir-contexto) | Resumen ejecutivo para nueva sesión |
+| 15  | [Crear migración nueva](#15-crear-migración-nueva) | Checklist obligatorio antes del commit |
 
 ---
 
@@ -534,7 +538,7 @@ Solo cerrar fase cuando TODO esté ✅.
 
 ---
 
-## 11. Verificar docs vs código
+## 15. Verificar docs vs código
 
 Comparar los siguientes contadores/valores entre docs y código real:
 
@@ -547,7 +551,7 @@ Reportar discrepancias sin modificar nada.
 
 ---
 
-## 12. Auditoría por tarea
+## 16. Auditoría por tarea
 
 Después del PR de una tarea, despachar 2 subagentes en paralelo:
 
@@ -562,7 +566,7 @@ Bloqueantes (CRÍTICO/ALTO) → resolver antes de mergear.
 
 ---
 
-## 13. Cerrar sesión y transferir contexto
+## 17. Cerrar sesión y transferir contexto
 
 La sesión está larga / el agente se traba / empieza a olvidar instrucciones. Generar un resumen ejecutivo para transferir a una nueva sesión:
 
@@ -576,7 +580,7 @@ Formato: prompt listo para pegar en la nueva sesión.
 
 ---
 
-## 14. Crear migración nueva
+## 18. Crear migración nueva
 
 Crear migración XX_nombre.sql en packages/db/migrations/.
 

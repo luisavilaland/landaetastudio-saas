@@ -312,6 +312,7 @@ Si no cumple ambas → NO debe llevar RLS.
 Tablas globales conocidas (sin RLS por diseño):
 - `plans` (catálogo global)
 - `tenants` (tabla raíz)
+- `admin_users` (autenticación cross-tenant)
 
 Contexto: en el primer checkpoint de 0013, el agente incluyó ENABLE/FORCE RLS para `plans`. ENABLE RLS sin policy = fail-closed = 0 filas. Habría roto el landing público.
 
