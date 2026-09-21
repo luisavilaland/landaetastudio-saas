@@ -538,7 +538,7 @@ Solo cerrar fase cuando TODO esté ✅.
 
 ---
 
-## 15. Verificar docs vs código
+## 12. Verificar docs vs código
 
 Comparar los siguientes contadores/valores entre docs y código real:
 
@@ -551,7 +551,7 @@ Reportar discrepancias sin modificar nada.
 
 ---
 
-## 16. Auditoría por tarea
+## 13. Auditoría por tarea
 
 Después del PR de una tarea, despachar 2 subagentes en paralelo:
 
@@ -566,7 +566,7 @@ Bloqueantes (CRÍTICO/ALTO) → resolver antes de mergear.
 
 ---
 
-## 17. Cerrar sesión y transferir contexto
+## 14. Cerrar sesión y transferir contexto
 
 La sesión está larga / el agente se traba / empieza a olvidar instrucciones. Generar un resumen ejecutivo para transferir a una nueva sesión:
 
@@ -580,7 +580,7 @@ Formato: prompt listo para pegar en la nueva sesión.
 
 ---
 
-## 18. Crear migración nueva
+## 15. Crear migración nueva
 
 Crear migración XX_nombre.sql en packages/db/migrations/.
 
