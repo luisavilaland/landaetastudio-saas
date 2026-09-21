@@ -1130,10 +1130,44 @@ El `seed` (y con él todo el job e2e) volvió a caer en el runner self-hosted `m
 
 ---
 
-## 2026-09-19 — Fix: guard de migraciones (falso positivo en CI)
+## 2026-09-20 — Migración 0013: GRANTs y FORCE RLS idempotente (ítems 6-7)
 
-- **Contexto:** el guard `scripts/check-migrations.sh` fallaba con cualquier PR que agregara una migración nueva. Detectaba archivos agregados como si fueran modificaciones. El bug no se había expuesto antes porque T2/T3/T4 no agregaron migraciones.
-- **Fix:** `--diff-filter=MD` para filtrar modificaciones (M) y eliminaciones (D), y restringir los paths a `*.sql` y `*_snapshot.json` (excluir `_journal.json`, que es metadata).
-- **Aplicado en PR #121 (T5) durante el review.**
-- **Documentado en AGENTS.md y en comentario inline del script.
+**Contexto:**
+Ítems 6 y 7 de deuda técnica bloqueaban T7 (RLS):
+- Ítem 6: gaps en _journal.json (0010_force_rls.sql no registrado, envs frescos sin FORCE RLS).
+- Ítem 7: GRANTs a app_user faltantes en las 3 tablas nuevas. En Postgres, RLS y privileges son capas separadas: sin GRANT, el rol app_user recibe permission denied aunque las policies existan.
+
+**Estrategia elegida:**
+Migración 0013 IDEMPOTENTE en lugar de editar _journal.json retroactivamente. Razones:
+- Editar el journal para agregar 0010 rompería DBs ya migradas (drizzle intentaría re-aplicar CREATE POLICY sin IF NOT EXISTS).
+- Una migración idempotente garantiza el estado deseado en cualquier entorno (prod ya forzada, frescos sin forzar), sin tocar el historial.
+
+**Contenido de 0013:**
+- GRANT SELECT, INSERT, UPDATE, DELETE en plans, subscriptions, tenant_mp_config para app_user.
+- ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner: futuras tablas heredan los GRANTs.
+- FORCE ROW LEVEL SECURITY en las 8 tablas existentes con policies de 0009 (products, product_variants, product_images, categories, customers, orders, order_items, shipping_methods).
+- NOTA: subscriptions y tenant_mp_config reciben ENABLE + FORCE RLS + policies en T7, no en esta migración.
+
+**Decisiones clave:**
+- plans NO lleva RLS (es catálogo global, sin tenantId). ENABLE RLS sin policy sería fail-closed → landing roto.
+- subscriptions y tenant_mp_config tampoco reciben FORCE RLS en 0013: sin policies, fail-closed = checkout y panel admin bloqueados. Van en T7 junto con sus policies.
+- El gap histórico del journal (0005_add_admin_users, 0010_force_rls no registrados) queda como decisión consciente: no reconstruir, cubrir con migración nueva.
+
+**Lección aprendida (checklist de migraciones con RLS):**
+El checklist de verificación de migraciones no distinguía entre tablas con RLS (tenantId + policy) y tablas globales (sin tenantId, sin RLS). En este PR, el primer checkpoint incluía ENABLE/FORCE RLS para plans — habría roto el landing público.
+
+Regla a futuro (ver AGENTS.md):
+- Antes de aprobar un ALTER TABLE ... ENABLE ROW LEVEL SECURITY, verificar que la tabla:
+  a. Tiene columna tenantId.
+  b. Tiene una policy tenant_isolation correspondiente.
+- Si no cumple ambas → NO debe llevar RLS.
+- Tablas globales conocidas: plans, tenants.
+
+**Archivos:**
+- packages/db/migrations/0013_ensure_rls_and_grants.sql (nuevo)
+- packages/db/migrations/meta/_journal.json (idx 13 agregado)
+- packages/db/migrations/meta/0013_snapshot.json (nuevo, copia de 0012)
+- docs/deuda-tecnica.md (ítems 6 y 7 → RESUELTOS)
+
+**PR:** #<N>
 

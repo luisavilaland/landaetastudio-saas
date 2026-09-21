@@ -124,7 +124,7 @@ Riesgo: un futuro cambio de `pnpm.hoistPattern` / instalación sin hoisting / ex
 
 ---
 
-## 6. Gaps en _journal.json (pre-existente)
+## 6. Gaps en _journal.json (pre-existente) — ✅ RESUELTO (2026-09-20)
 
 **Contexto:**
 El _journal.json no incluye entradas para varias migraciones:
@@ -135,18 +135,18 @@ El _journal.json no incluye entradas para varias migraciones:
 **Impacto:**
 En entornos frescos (dev/CI/preview), `pnpm db:migrate` solo aplica las migraciones registradas. 0010_force_rls.sql nunca se aplica en esos entornos → FORCE RLS no se activa. Divergencia silenciosa de postura de seguridad con producción (que tiene 0010 aplicada manual).
 
-**Mitigación:**
-- Registrar 0010 en el journal con idx 10.
-- Decidir qué hacer con 0005_add_admin_users.sql (¿eliminar? ¿registrar?).
-- Verificar snapshots 3/4/9/10 (¿faltan o son huérfanos?).
+**Implementación (2026-09-20, rama `chore/fase1-migration-0013`):**
+- Migración 0013 idempotente que garantiza FORCE RLS en las 8 tablas existentes en **cualquier entorno** (prod ya forzada, frescos sin forzar).
+- Entrada idx 13 agregada a `_journal.json` + `0013_snapshot.json` creado.
+- El gap histórico del journal (0005_add_admin_users, 0010_force_rls no registrados) se documenta como decisión consciente: **no reconstruir retroactivamente** (rompería DBs ya migradas al re-aplicar CREATE POLICY sin IF NOT EXISTS). El estado real queda garantizado vía 0013.
 
-**Urgencia:** 🔴 Antes de T7 (RLS). Bloqueante: si T7 activa FORCE RLS en producción pero no en entornos frescos, futuros deploys tendrán comportamiento inconsistente.
+**Nota:** "Cubierto por migración 0013 idempotente. El gap histórico del journal (0005, 0010) se documenta como decisión consciente: no reconstruir retroactivamente. El estado real (FORCE RLS en las 8 tablas) queda garantizado en todos los entornos vía 0013."
 
-**Fecha de reevaluación:** antes de arrancar T7.
+**Urgencia:** ✅ Resuelto — bloqueante de T7 eliminado.
 
 ---
 
-## 7. GRANTs a app_user faltantes en las 3 tablas nuevas
+## 7. GRANTs a app_user faltantes en las 3 tablas nuevas — ✅ RESUELTO (2026-09-20)
 
 **Contexto:**
 Las tablas plans, subscriptions y tenant_mp_config no tienen GRANT explícito para el rol app_user. Las 10 tablas pre-existentes obtuvieron permisos manualmente en Neon; las 3 nuevas no.
@@ -156,14 +156,13 @@ En PostgreSQL, RLS (Row Level Security) y privileges (GRANT) son capas separadas
 **Impacto:**
 Cuando T7 aplique FORCE RLS, app_user va a recibir "permission denied" al intentar SELECT/INSERT/UPDATE/DELETE sobre estas 3 tablas. Bloquea checkout (tenant_mp_config), webhooks de suscripciones (subscriptions) y cualquier operación sobre planes.
 
-**Mitigación:**
-- En T7 (o antes): GRANT SELECT, INSERT, UPDATE, DELETE ON plans, subscriptions, tenant_mp_config TO app_user;
-- Agregar ALTER DEFAULT PRIVILEGES para futuras tablas.
-- Incluir este paso en el checklist de T7.
+**Implementación (2026-09-20, rama `chore/fase1-migration-0013`):**
+- GRANT SELECT, INSERT, UPDATE, DELETE en plans, subscriptions, tenant_mp_config para app_user (migración 0013).
+- ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public: futuras tablas creadas por el owner heredan los GRANTs automáticamente.
 
-**Urgencia:** 🔴 Antes de T7. Bloqueante para que RLS funcione.
+**Nota:** "GRANTs aplicados en 0013 + ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner para futuras tablas."
 
-**Fecha de reevaluación:** antes de arrancar T7.
+**Urgencia:** ✅ Resuelto — bloqueante de T7 eliminado.
 
 ---
 
