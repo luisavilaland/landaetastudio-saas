@@ -332,6 +332,8 @@ El runner self-hosted no tiene ruta IPv6. El endpoint de Neon publica registros 
 
 Última actualización: 12 de agosto de 2026 – Release v0.9.0 (430 tests, 15 specs E2E, factory de health check, E2E Playwright con CI self-hosted, sección Redis agregada). Rama `main`. Build limpio.
 
+Release v0.10.0 (2026-09-17) — Modernización stack (TS6, Next 16.3.5, ioredis 6, vitest 5) + docs/deuda. 430 tests, 55 archivos. Ramas main + develop.
+
 Actualización 20 de septiembre de 2026 – 464 tests, 15 specs E2E (post T6 + migración 0013). Rama `develop`.
 
 ## URLs de producción (Vercel)
