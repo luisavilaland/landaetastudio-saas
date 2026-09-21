@@ -531,3 +531,62 @@ Fase [N] completada. Verificación de cierre:
 
 Solo cerrar fase cuando TODO esté ✅.
 ```
+
+---
+
+## 11. Verificar docs vs código
+
+Comparar los siguientes contadores/valores entre docs y código real:
+
+- Cantidad de tests (pnpm test) vs README, SETUP, TESTING, TESTING-MANUAL.
+- Cantidad de archivos de test.
+- Última versión / tag (git tag) vs README, bitácora.
+- Estado de las fases del blueprint vs bitácora.
+
+Reportar discrepancias sin modificar nada.
+
+---
+
+## 12. Auditoría por tarea
+
+Después del PR de una tarea, despachar 2 subagentes en paralelo:
+
+- @QA: correctitud, seguridad, calidad.
+- @Diseñador: arquitectura, extensibilidad, coherencia.
+
+Aplicar regla anti-duplicación: verificar que los hallazgos no estén ya en docs/deuda-tecnica.md antes de reportar.
+
+Reporte breve. Publicar como comentario en el PR.
+Severidad: CRÍTICO / ALTO / MEDIO / BAJO.
+Bloqueantes (CRÍTICO/ALTO) → resolver antes de mergear.
+
+---
+
+## 13. Cerrar sesión y transferir contexto
+
+La sesión está larga / el agente se traba / empieza a olvidar instrucciones. Generar un resumen ejecutivo para transferir a una nueva sesión:
+
+- Tarea en curso (T?, rama, worktree path).
+- Estado del worktree (git status, commits).
+- Lo que falta (pendientes concretos).
+- Próximos pasos (orden).
+- Decisiones tomadas que la nueva sesión debe respetar.
+
+Formato: prompt listo para pegar en la nueva sesión.
+
+---
+
+## 14. Crear migración nueva
+
+Crear migración XX_nombre.sql en packages/db/migrations/.
+
+Checklist obligatorio antes del commit:
+[ ] Solo CREATE TABLE / ALTER TABLE / GRANT idempotente.
+[ ] Sin DROP.
+[ ] Sin ALTER destructivo sobre tablas existentes.
+[ ] No toca migraciones previas.
+[ ] _journal.json con idx secuencial.
+[ ] Snapshot coherente (si aplica).
+[ ] Sin scratch files en staging (git status limpio).
+
+CHECKPOINT: reportar el SQL completo y el checklist antes de commitear. La migración es inmutable una vez aplicada.

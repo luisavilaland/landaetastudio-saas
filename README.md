@@ -42,7 +42,7 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 - ✅ Página de perfil de tienda pública con SEO
 - ✅ Checkout con selector visual de envío y cálculo dinámico
 - ✅ Refactor de API: `NextResponse` unificado en todas las rutas
-- ✅ 430 tests (100% passing), build limpio en 3 apps (hoy)
+- ✅ 464 tests (100% passing), build limpio en 3 apps (hoy)
 
 ## Fase 5 – Producción ✅ (Completada)
 
@@ -474,7 +474,7 @@ pnpm test        # Unit + integración (vitest)
 pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 ```
 
-- **Total:** 430 tests pasando, 0 fallos (55 archivos).
+- **Total:** 464 tests pasando, 0 fallos (56 archivos).
 - Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 - Los endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, redis).
 - 15 specs E2E en `e2e/` (storefront, checkout, admin, superadmin, security, webhook) — CI con runner self-hosted.

@@ -226,7 +226,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**430 tests pasando, 0 fallos (55 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**464 tests pasando, 0 fallos (56 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
@@ -330,7 +330,7 @@ El runner self-hosted no tiene ruta IPv6. El endpoint de Neon publica registros 
 
 ## Nota
 
-Última actualización: 12 de agosto de 2026 – Release v0.9.0 (430 tests, 15 specs E2E, factory de health check, E2E Playwright con CI self-hosted, sección Redis agregada). Rama `main`. Build limpio.
+Última actualización: 20 de septiembre de 2026 – Release v0.10.0 (464 tests, 15 specs E2E, factory de health check, E2E Playwright con CI self-hosted, sección Redis agregada). Rama `develop`. Build limpio.
 
 ## URLs de producción (Vercel)
 
