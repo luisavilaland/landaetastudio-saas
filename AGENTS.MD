@@ -280,6 +280,89 @@ Antes de reportar un hallazgo, verificar si ya está registrado en docs/deuda-te
 - Solo el dueño del proyecto autoriza: operaciones destructivas, cambios de infraestructura, deploy a producción.
 - Cualquier usuario puede solicitar consultas de solo lectura.
 
+## DoD extendido — actualizar contadores
+
+Cuando una tarea agrega o modifica tests:
+- Actualizar el contador de tests en README.md.
+- Actualizar el contador en SETUP.md.
+- Actualizar los contadores en TESTING.md y TESTING-MANUAL.md.
+- Actualizar el número de archivos de test.
+
+El contador real se obtiene con `pnpm test` (output final).
+
+Razón: los contadores en docs son el primer dato que consultan los agentes al reincorporarse. Si están desactualizados, generan discrepancias falsas que consumen tiempo de auditoría.
+
+## Migraciones — procedimiento idempotente
+
+Cuando una migración ya aplicada tiene un problema:
+- NO editar el archivo .sql existente (guard de CI lo bloquea).
+- NO editar _journal.json retroactivamente (rompe DBs migradas con drizzle intentando re-aplicar).
+- SIEMPRE crear una migración nueva idempotente que garantice el estado deseado en cualquier entorno.
+
+Ejemplo: la migración 0013 cubre el gap de 0010_force_rls.sql (no registrado en journal) con ALTER TABLE FORCE RLS idempotente.
+
+## Checklist RLS — antes de aprobar ENABLE ROW LEVEL SECURITY
+
+Antes de aprobar un `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` en cualquier migración, verificar que la tabla:
+- Tiene columna `tenantId`.
+- Tiene una policy `tenant_isolation` correspondiente.
+
+Si no cumple ambas → NO debe llevar RLS.
+
+Tablas globales conocidas (sin RLS por diseño):
+- `plans` (catálogo global)
+- `tenants` (tabla raíz)
+- `admin_users` (autenticación cross-tenant)
+
+Contexto: en el primer checkpoint de 0013, el agente incluyó ENABLE/FORCE RLS para `plans`. ENABLE RLS sin policy = fail-closed = 0 filas. Habría roto el landing público.
+
+Closes #125 (parte 1).
+
+## Bitácora append-only — verificación post-edición
+
+Después de editar `bitacora.md`:
+
+    git diff origin/develop -- bitacora.md | grep "^-"
+
+Si hay líneas con `-` que contengan contenido real (no headers del diff), PARAR. Es una regresión.
+
+Corrección:
+    git checkout origin/develop -- bitacora.md
+    # Re-aplicar los cambios como append al final.
+
+Contexto: en PR A (#124), la primera versión de la entrada 2026-09-20 sobrescribió la entrada 2026-09-19. Tercera vez que ocurre (T4 rebase, lección T6, T7 pre-migración).
+
+Closes #125 (parte 2).
+
+## Bitácora — verificar ruta antes de editar
+
+Al editar la bitácora, el archivo correcto es `bitacora.md` en la
+RAÍZ del repo, NO `docs/bitacora.md`.
+
+Después de editar, verificar:
+
+    git status | grep bitacora
+
+Si aparece `docs/bitacora.md` → error. Eliminar el huérfano:
+
+    git rm docs/bitacora.md
+
+Y re-editar el archivo raíz.
+
+Contexto: en PR #123, un agente escribió `docs/bitacora.md` en
+lugar del root. Las entradas quedaron en el archivo equivocado
+durante varios PRs.
+
+## Historial de releases — append-only
+
+Cualquier sección de "Última actualización", "Release Notes", "Changelog" o similar en README/SETUP/TESTING es append-only.
+
+- Para registrar un nuevo release: AGREGAR una línea nueva.
+- NUNCA modificar la línea anterior (incluso si tiene contadores viejos).
+- Contadores de "estado actual" (sin contexto de release) SÍ se actualizan.
+
+Closes #125 (extensión).
+
 ## Cuándo cerrar la sesión del agente
 
 Considerar cerrar y abrir una nueva cuando:

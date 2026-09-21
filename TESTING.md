@@ -290,12 +290,12 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 pnpm test
 ```
 
-| Métrica      | Valor     |
-| ------------ | --------- |
-| **Total**    | 430 tests |
-| **Pasando**  | 430 ✅    |
-| **Fallas**   | 0 ✅      |
-| **Archivos** | 55        |
+| Métrica      | Valor      |
+| ------------ | ---------- |
+| **Total**    | 464 tests  |
+| **Pasando**  | 464 ✅     |
+| **Fallas**   | 0 ✅       |
+| **Archivos** | 56         |
 
 > Los tests de endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, Redis, storage). Helpers centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`). Además: 15 specs E2E en `e2e/` (Playwright, CI self-hosted).
 
@@ -317,9 +317,11 @@ pnpm test
 ## Notas
 
 - Última actualización: 12 de agosto de 2026 — Release v0.9.0 (430 tests, 15 specs E2E).
+- Release v0.10.0 (2026-09-17) — Modernización stack (TS6, Next 16.3.5, ioredis 6, vitest 5) + docs/deuda. 430 tests, 55 archivos. Ramas main + develop.
+- Actualización 20 de septiembre de 2026 – 464 tests, 15 specs E2E (post T6 + migración 0013). Rama `develop`.
 - Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
 - Fase 6 completada: withTenantContext real + FORCE RLS (app_user), E2E Playwright 15 specs con CI self-hosted, incidente RLS de 9 Server Components corregido (08-08).
-- 430 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
+- 464 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Sandbox manual de MercadoPago pendiente (cuenta de prueba de MP).
 - Ver AGENTS.md para detalles de convenciones de código y comandos obligatorios.
 
