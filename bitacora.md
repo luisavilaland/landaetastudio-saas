@@ -1180,3 +1180,72 @@ Regla a futuro (ver AGENTS.md):
 
 **PR:** #124
 
+---
+
+## 2026-09-19 — T6: helper de cifrado/descifrado con pgcrypto
+
+- Implementado: packages/commerce/src/encryption.ts
+  - encryptToken(tenantId, key, values) → upsert cifrado.
+  - decryptToken(tenantId, key, column) → descifra en memoria.
+  - Clave como bind param directo (ADR-024 enmienda 2026-09-18).
+  - EncryptionError tipado (EMPTY_KEY, ENCRYPTION_FAILED,
+    DECRYPTION_FAILED, INVALID_COLUMN).
+- Exportado como @repo/commerce/encryption.
+- Tests: 19 (roundtrip, cross-tenant, bind params, fail-closed,
+  columna inválida, columna hardcoded).
+- Auditoría QA + Diseñador: 1 ALTO resuelto (try/catch simétrico),
+  1 bug funcional detectado en review humano (decryptToken column
+  como bind param), fix con mapa hardcodeado.
+- Deuda registrada: ítems 11-13 (ítem 11 resuelto en este PR).
+- PR #123.
+- Merge: 2ca1ba8.
+
+---
+
+## 2026-09-19 — Lección de proceso: T6 sin subagentes
+
+- El agente implementó T6 sin usar subagentes de construcción,
+  violando la instrucción explícita del prompt.
+- Justificación: "T6 es una única tarea cohesiva". No es válida —
+  el prompt dividía T6 en 3 partes (implementación, tests,
+  verificación).
+- Cuarta vez consecutiva (T2, T4, T5, T6).
+- Regla reforzada en AGENTS.md (PR #120): "Subagentes — confirmación
+  obligatoria antes de empezar".
+- Auditoría posterior (con subagentes) sí se ejecutó y encontró
+  hallazgos reales.
+
+---
+
+## 2026-09-20 — Verificación app_user en Neon + grants
+
+- Verificación manual en SQL Editor de Neon (branch production):
+  - SELECT rolname, rolbypassrls, rolcanlogin FROM pg_roles WHERE
+    rolname = 'app_user' → app_user | f | t.
+  - Grants en tablas existentes: SELECT/INSERT/UPDATE/DELETE en
+    orders, products, tenants.
+- Confirmado: app_user existe, sin BYPASSRLS, con LOGIN.
+- Coincide con el connection string de DATABASE_APP_URL en runtime
+  (postgresql://app_user:***@ep-...).
+- Validación Zod en packages/validation/src/env.ts exige "app_user"
+  en DATABASE_APP_URL.
+- Esta verificación es pre-requisito del merge del PR #124
+  (migración 0013 hace GRANT ... TO app_user).
+
+---
+
+## 2026-09-20 — Release retroactiva v0.9.0
+
+- Creada GitHub Release de v0.9.0 retroactivamente.
+  - Tag existía (2026-08-12, commit b32cfe9) sin página de Release.
+  - v0.10.0 sí tenía Release, así que se creó la de v0.9.0 para
+    consistencia.
+- Contenido de la Release:
+  - RLS real + app_user + withTenantContext en 27 handlers +
+    9 Server Components.
+  - E2E Playwright (15 specs) + health checks + Sentry + UptimeRobot.
+  - Tests: 430 / 55 archivos.
+  - Rama: main.
+- Nota: GitHub no permite backdatear publishedAt (se registra
+  2026-09-21, aunque el tag es del 2026-08-12).
+
