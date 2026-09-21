@@ -86,3 +86,7 @@ e2e/playwright-report/
 issue-comment.md
 pr-body.md
 *.bak
+
+# Database backups
+backup-*.sql
+*.backup
