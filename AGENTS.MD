@@ -333,6 +333,25 @@ Contexto: en PR A (#124), la primera versión de la entrada 2026-09-20 sobrescri
 
 Closes #125 (parte 2).
 
+## Bitácora — verificar ruta antes de editar
+
+Al editar la bitácora, el archivo correcto es `bitacora.md` en la
+RAÍZ del repo, NO `docs/bitacora.md`.
+
+Después de editar, verificar:
+
+    git status | grep bitacora
+
+Si aparece `docs/bitacora.md` → error. Eliminar el huérfano:
+
+    git rm docs/bitacora.md
+
+Y re-editar el archivo raíz.
+
+Contexto: en PR #123, un agente escribió `docs/bitacora.md` en
+lugar del root. Las entradas quedaron en el archivo equivocado
+durante varios PRs.
+
 ## Historial de releases — append-only
 
 Cualquier sección de "Última actualización", "Release Notes", "Changelog" o similar en README/SETUP/TESTING es append-only.

@@ -1249,3 +1249,40 @@ Regla a futuro (ver AGENTS.md):
 - Nota: GitHub no permite backdatear publishedAt (se registra
   2026-09-21, aunque el tag es del 2026-08-12).
 
+---
+
+## 2026-09-20 — Incidente: docs/bitacora.md huérfano (PR #123)
+
+**Qué pasó:**
+El commit 5405afa (PR #123, T6) creó docs/bitacora.md como archivo
+nuevo en lugar de modificar el bitacora.md raíz. Resultado: dos
+archivos con entradas de bitácora; el root quedó sin las entradas
+de T6 durante días, y el huérfano tenía solo un subconjunto.
+
+**Impacto:**
+- Las entradas de T6 (helper de cifrado + lección de proceso) NO
+  llegaron al root durante el PR #123 ni el PR #124.
+- Detectado durante la verificación de bitácora del PR #126.
+- Ninguna entrada se perdió definitivamente (el huérfano se
+  conservó). Las 2 entradas se re-integraron al root en el commit
+  bd21103.
+
+**Causa raíz:**
+El agente escribió con una ruta relativa incorrecta (docs/bitacora.md
+en lugar de bitacora.md). No es un fallo del merge — es un fallo en
+la escritura del archivo.
+
+**Fix aplicado:**
+- docs/bitacora.md eliminado con git rm.
+- Entradas de T6 re-integradas al root (bd21103).
+- Verificado: no hay otros archivos .md mal ubicados en docs/.
+
+**Lección / regla:**
+Al editar bitacora.md, usar siempre la ruta raíz (bitacora.md, sin
+prefijo). Verificar después de escribir con:
+
+    git status  # no debe aparecer docs/bitacora.md
+
+Y agregar la verificación al listado de "Bitácora append-only" en
+AGENTS.md (PR B).
+
