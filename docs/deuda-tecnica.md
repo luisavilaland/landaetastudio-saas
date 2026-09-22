@@ -280,6 +280,34 @@ Bajo — no rompe funcionalidad. Pero permite que errores de formato se acumulen
 
 ---
 
-## Referencia
+## 14. Tracking de migraciones Drizzle incompleto en BD actual
+
+**Estado:** Solo la migración 0014 está trackeada en
+`public.__drizzle_migrations`. Las migraciones 0001-0013 se
+aplicaron manualmente (script `apply-all-migrations.ts` + seed)
+sin registrar en la tabla de tracking.
+
+**Impacto:**
+- `pnpm db:migrate` en la DB actual: OK ("Everything's fine").
+- `pnpm db:migrate` en un entorno fresco: intenta aplicar 0001+
+  y falla con "table already exists" (o "policy already exists"
+  para 0009/0010).
+- Afecta: CI si rota DB, previews si cambia branching, nuevos
+  devs que siguen SETUP.md.
+
+**Mitigación a corto plazo:**
+- Documentar en SETUP.md (ver FIX 2).
+- No hay acción inmediata en la DB actual (estado consistente).
+
+**Mitigación a mediano plazo:**
+- Fase 3 (branching en Neon): tracking se reconstruye desde cero
+  con `pnpm db:migrate` en un entorno nuevo.
+- O bien: script de reconstrucción de tracking (insertar los 14
+  hashes manualmente).
+
+**Severidad:** MEDIO. No bloquea producción pero rompe el flujo
+de onboarding y CI/entornos frescos.
+
+**Reevaluar:** antes de Fase 3 (branching Neon).
 
 Plan aprobado el 2026-08-08 (ítem 3 de la tarea de calidad: limpieza email + health check + deuda técnica). Rama `quality/calidad-y-monitoreo`. Ver bitacora.md → entrada 2026-08-08 — Calidad.
