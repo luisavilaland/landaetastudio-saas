@@ -344,6 +344,25 @@ Contexto: en el PR #127 se agregó meta/README.md con la
 explicación sobre snapshots. El pipeline de E2E falló hasta que
 se movió a migrations/README.md (commit 4de0187).
 
+## Commits directos a develop/main — prohibido
+
+Todo cambio (docs, código, migraciones, configuración) pasa por PR
+con review humano antes de llegar a develop o main.
+
+Si el agente cree que un cambio "no merece PR", reportar antes de
+commitear y esperar autorización explícita.
+
+Razón: en T7 (2026-09-21), el agente commiteó y reportó "push
+exitoso" cuando el push a develop fue rechazado por branch
+protection. El commit quedó solo en local y el reporte fue
+incorrecto.
+
+Reglas complementarias:
+- Después de cualquier `git push`, verificar el output real del
+  comando (exit code + output completo). No asumir éxito.
+- Confirmar que el commit llegó al remoto:
+  `git log origin/<rama> --oneline -1`.
+
 ## Bitácora append-only — verificación post-edición
 
 Después de editar `bitacora.md`:
