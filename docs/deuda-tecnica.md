@@ -310,4 +310,31 @@ de onboarding y CI/entornos frescos.
 
 **Reevaluar:** antes de Fase 3 (branching Neon).
 
+---
+
+## 15. Snapshot Drizzle no refleja isRLSEnabled
+
+**Estado:** Los snapshots de Drizzle generados para las migraciones
+0009-0014 muestran `"isRLSEnabled": false` para las tablas que SÍ
+tienen RLS activo en la DB real (products, orders, subscriptions,
+tenant_mp_config, etc.).
+
+**Causa:** Drizzle no trackea `ENABLE ROW LEVEL SECURITY` ni
+`CREATE POLICY` en el schema TypeScript. Esas sentencias se
+aplican vía migraciones manuales (0009, 0010, 0014) y no son
+parte del modelo que Drizzle genera.
+
+**Impacto:** un agente o dev futuro que lea el snapshot puede
+asumir que no hay RLS en esas tablas. Es un falso negativo
+documental, no un bug del código.
+
+**Mitigación:**
+- Documentar acá.
+- Agregar comentario inline en los snapshots relevantes (ver
+  `packages/db/migrations/meta/README.md`).
+- Al verificar RLS, consultar pg_class.relrowsecurity contra la
+  DB real, no el snapshot.
+
+**Severidad:** BAJO (documental, no afecta runtime).
+
 Plan aprobado el 2026-08-08 (ítem 3 de la tarea de calidad: limpieza email + health check + deuda técnica). Rama `quality/calidad-y-monitoreo`. Ver bitacora.md → entrada 2026-08-08 — Calidad.
