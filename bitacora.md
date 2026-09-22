@@ -1286,3 +1286,26 @@ prefijo). Verificar despu√©s de escribir con:
 Y agregar la verificaci√≥n al listado de "Bit√°cora append-only" en
 AGENTS.md (PR B).
 
+# # #   2 0 2 6 - 0 9 - 2 1   ‚ ¨    T 7 :   R L S   e n   s u b s c r i p t i o n s   y   t e n a n t _ m p _ c o n f i g  
+  
+ -   M i g r a c i √ ≥ n   0 0 1 4 _ e n a b l e _ r l s _ n e w _ t a b l e s . s q l :  
+     -   E N A B L E   +   F O R C E   R L S   +   p o l i c y   t e n a n t _ i s o l a t i o n   e n   l a s   2   t a b l a s .  
+     -   p l a n s   N O   l l e v a   R L S   ( c a t √ ° l o g o   g l o b a l ,   r e g l a   d e l   P R   # 1 2 6 ) .  
+     -   L a s   8   t a b l a s   d e   0 0 0 9   n o   s e   t o c a n .  
+ -   P a t r √ ≥ n   d e   p o l i c y   i d √ © n t i c o   a   0 0 0 9 :  
+     c u r r e n t _ s e t t i n g ( ' a p p . t e n a n t _ i d ' ,   t r u e ) .   E l   s e g u n d o   a r g u m e n t o  
+     ` t r u e `   e s   c r √ ≠ t i c o :   s i n   √ © l ,   q u e r i e s   s i n   t e n a n t   c o n t e x t   r o m p e n  
+     ( l a n d i n g   p √ ∫ b l i c a   i n c l u i d a ) .  
+ -   S m o k e   t e s t s   c o n   a p p _ u s e r   ( c r o s s - t e n a n t   b i d i r e c c i o n a l ) :  
+     t i e n d a 1   n o   v e   f i l a s   d e   t i e n d a 2   e n   n i n g u n a   d e   l a s   2   t a b l a s ,   y  
+     v i c e v e r s a .  
+ -   B a c k u p   p r e v i o   t o m a d o   y   m o v i d o   f u e r a   d e l   r e p o .   . g i t i g n o r e  
+     a c t u a l i z a d o   c o n   ` b a c k u p - * . s q l ` .  
+ -   C l e a n u p   p o s t - t e s t :   d a t o s   d e   p r u e b a   e l i m i n a d o s   ( t a b l a s   e n   0   f i l a s ) .  
+ -   D e u d a   t √ © c n i c a   r e g i s t r a d a :  
+     -   √ ç t e m   1 4 :   t r a c k i n g   d e   m i g r a c i o n e s   i n c o m p l e t o   e n   B D   a c t u a l .  
+     -   √ ç t e m   1 5 :   s n a p s h o t   D r i z z l e   n o   r e f l e j a   i s R L S E n a b l e d .  
+ -   I n c i d e n t e   e n   e l   P R :   R E A D M E   a g r e g a d o   e n   m e t a /   r o m p i √ ≥   d r i z z l e - k i t .  
+     F i x   e n   4 d e 0 1 8 7 :   m o v i d o   a   p a c k a g e s / d b / m i g r a t i o n s / .  
+ -   P R   # 1 2 7 .  
+ 
