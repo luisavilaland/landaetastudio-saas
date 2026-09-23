@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './src/schema'
 import bcrypt from 'bcryptjs'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 
 config({ path: '.env.local' })
 
@@ -11,9 +11,13 @@ const client = postgres(process.env.DATABASE_URL!)
 const db = drizzle(client, { schema })
 
 async function seed() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('❌ Seed no debe correr en producción (borra datos reales). Abortando.');
+  }
   console.log('🌱 Reseteando base de datos...')
 
   // 1. Limpiar todas las tablas (orden inverso por dependencias)
+  await db.execute(sql`TRUNCATE TABLE plans CASCADE`)
   await db.execute(sql`TRUNCATE TABLE order_items CASCADE`)
   await db.execute(sql`TRUNCATE TABLE orders CASCADE`)
   await db.execute(sql`TRUNCATE TABLE product_variants CASCADE`)
@@ -72,6 +76,133 @@ async function seed() {
     })
     .returning()
   console.log(`✅ Tenant creado: ${tenant2.slug} (ID: ${tenant2.id})`)
+
+  // 2c. Planes (catálogo global, idempotente por slug)
+  const plans = [
+    {
+      slug: 'starter',
+      name: 'Starter',
+      displayName: 'Starter',
+      priceUyu: 200000,
+      productLimit: 150,
+      variantLimitPerProduct: 5,
+      adminLimit: 1,
+      templateCount: 0,
+      subscriberLimit: 250,
+      features: {
+        mpPropio: true,
+        personalizacionVisual: true,
+        banners: true,
+        cupones: true,
+        metodosEnvio: true,
+        importacionCsv: true,
+        boletines: true,
+        plantillas: false,
+        dominioPersonalizado: false,
+        analyticsBasico: false,
+        soportePrioritario: false,
+        ejecutivoDedicado: false,
+        sla24hs: false,
+      },
+      isActive: true,
+    },
+    {
+      slug: 'pro',
+      name: 'Pro',
+      displayName: 'Pro',
+      priceUyu: 400000,
+      productLimit: 400,
+      variantLimitPerProduct: 10,
+      adminLimit: 5,
+      templateCount: 3,
+      subscriberLimit: 1000,
+      features: {
+        mpPropio: true,
+        personalizacionVisual: true,
+        banners: true,
+        cupones: true,
+        metodosEnvio: true,
+        importacionCsv: true,
+        boletines: true,
+        plantillas: true,
+        dominioPersonalizado: true,
+        analyticsBasico: true,
+        soportePrioritario: true,
+        ejecutivoDedicado: false,
+        sla24hs: false,
+      },
+      isActive: true,
+    },
+    {
+      slug: 'business',
+      name: 'Business',
+      displayName: 'Business',
+      priceUyu: 800000,
+      productLimit: null,
+      variantLimitPerProduct: null,
+      adminLimit: 10,
+      templateCount: 6,
+      subscriberLimit: null,
+      features: {
+        mpPropio: true,
+        personalizacionVisual: true,
+        banners: true,
+        cupones: true,
+        metodosEnvio: true,
+        importacionCsv: true,
+        boletines: true,
+        plantillas: true,
+        dominioPersonalizado: true,
+        analyticsBasico: true,
+        soportePrioritario: true,
+        ejecutivoDedicado: true,
+        sla24hs: true,
+      },
+      isActive: true,
+    },
+  ]
+
+  await db
+    .insert(schema.dbPlans)
+    .values(plans)
+    .onConflictDoNothing({ target: schema.dbPlans.slug })
+  console.log(
+    '✅ Planes creados: Starter, Pro, Business (200000/400000/800000)',
+  )
+
+  // 2d. Suscripciones activas para tenants existentes (idempotente por tenantId)
+  const [starterPlan] = await db
+    .select()
+    .from(schema.dbPlans)
+    .where(eq(schema.dbPlans.slug, 'starter'))
+  const [businessPlan] = await db
+    .select()
+    .from(schema.dbPlans)
+    .where(eq(schema.dbPlans.slug, 'business'))
+
+  const periodEnd = new Date()
+  periodEnd.setMonth(periodEnd.getMonth() + 1)
+
+  await db
+    .insert(schema.dbSubscriptions)
+    .values([
+      {
+        tenantId: tenant.id,
+        planId: starterPlan.id,
+        status: 'active',
+        currentPeriodEnd: periodEnd,
+      },
+      {
+        tenantId: tenant2.id,
+        planId: businessPlan.id,
+        status: 'active',
+        currentPeriodEnd: periodEnd,
+      },
+    ])
+    .onConflictDoNothing({ target: schema.dbSubscriptions.tenantId })
+  console.log(
+    '✅ Suscripciones activas creadas: tienda1 (starter), tienda2 (business)',
+  )
 
   // 3. Crear administrador (para admin y superadmin)
   const hashedPassword = await bcrypt.hash('123456', 10)

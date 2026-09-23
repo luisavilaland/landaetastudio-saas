@@ -1309,3 +1309,39 @@ AGENTS.md (PR B).
      F i x   e n   4 d e 0 1 8 7 :   m o v i d o   a   p a c k a g e s / d b / m i g r a t i o n s / .  
  -   P R   # 1 2 7 .  
  
+---
+
+## 2026-09-23 — T8-T10: Seed de planes y suscripciones (cierre Fase 1)
+
+- **T8 (verificación):** 0012/0013/0014 aplicadas en Neon
+  (verificado con pg_class + journal). RLS activo en subscriptions
+  y tenant_mp_config (relrowsecurity + relforcerowsecurity = true,
+  policy tenant_isolation). plans sin RLS (catálogo global).
+
+- **T9 (seed):** 3 planes insertados con onConflictDoNothing por
+  slug.
+  - Starter: 200000 centavos, 150 prod, 5 var/prod, 1 admin,
+    0 plantillas, 250 subs.
+  - Pro: 400000 centavos, 400 prod, 10 var/prod, 5 admin,
+    3 plantillas, 1000 subs.
+  - Business: 800000 centavos, ilimitados, 10 admin, 6 plantillas,
+    ilimitados.
+
+- **T10 (suscripciones):** tienda1 → Starter (active),
+  tienda2 → Business (active). currentPeriodEnd = now() + 1 month.
+
+- **Idempotencia:** verificada con 2 corridas consecutivas de
+  pnpm db:seed (3 planes, 2 subs, sin duplicados).
+
+- **Fix manual durante el desarrollo:** el seed no truncaba plans
+  (tabla global sin tenantId). Agregado TRUNCATE TABLE plans
+  CASCADE al inicio. Verificado empíricamente que CASCADE ignora
+  RESTRICT de la FK (RESTRICT aplica a DELETE, no a TRUNCATE).
+
+- **Guard de seguridad:** NODE_ENV === 'production' bloquea la
+  ejecución. Deuda técnica ítem 16 registrada (guard adicional
+  por DATABASE_URL antes de Fase 3).
+
+- **PR #137** (limpieza scratch files) + PR pendiente Fase 1.
+- **Fase 1 del blueprint v2.6:** ✅ completada.
+
