@@ -1,11 +1,19 @@
 import postgres from 'postgres';
 import { config } from 'dotenv';
 import { writeFileSync } from 'fs';
+import { join } from 'path';
 
-config({ path: '../../.env.local' });
+config({ path: join(__dirname, '../../.env.local') });
 
 const sql = postgres(process.env.DATABASE_URL!, { connect_timeout: 30 });
 
+/**
+ * Crea un dump SQL de las tablas públicas.
+ *
+ * Uso: pnpm tsx scripts/db/backup-db.ts [prefix]
+ * Si no se pasa prefix, usa "backup".
+ * Ejemplo: pnpm tsx scripts/db/backup-db.ts pre-migration
+ */
 async function backup() {
   try {
     const tables = await sql`
@@ -27,7 +35,9 @@ async function backup() {
         }
       }
     }
-    const filename = `backup-pre-t7-${new Date().toISOString().replace(/[:.]/g, '-')}.sql`;
+    const prefix = process.argv[2] || 'backup'
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const filename = `${prefix}-${timestamp}.sql`
     writeFileSync(filename, dump);
     console.log('Backup saved to:', filename);
     console.log('Size:', dump.length, 'bytes');

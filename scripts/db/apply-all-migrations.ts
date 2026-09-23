@@ -1,3 +1,7 @@
+// Nota: este script asume CommonJS (packages/db no es "type": "module").
+// Si en el futuro se migra a ESM, reemplazar __dirname por:
+//   const __dirname = dirname(fileURLToPath(import.meta.url))
+
 import postgres from 'postgres';
 import { config } from 'dotenv';
 import { readFileSync, readdirSync } from 'fs';
