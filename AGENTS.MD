@@ -318,6 +318,51 @@ Contexto: en el primer checkpoint de 0013, el agente incluyó ENABLE/FORCE RLS p
 
 Closes #125 (parte 1).
 
+## packages/db/migrations/meta/ — solo JSON
+
+El directorio `packages/db/migrations/meta/` contiene archivos que
+drizzle-kit lee y parsea como JSON en cada operación (`generate`,
+`up`, `migrate`). Cualquier archivo no-JSON (README.md, .txt,
+comentarios, etc.) rompe el pipeline completo con:
+
+    Unexpected token '#', "... is not valid JSON
+
+Consecuencias en cadena:
+`drizzle-kit up` falla → `pnpm db:migrate` falla → `pnpm db:seed`
+no corre → E2E bloqueado.
+
+Reglas:
+- En meta/ solo van archivos generados por drizzle-kit:
+  *_snapshot.json y _journal.json.
+- Documentación relacionada (snapshots, journal, RLS) va en
+  packages/db/migrations/README.md (un nivel arriba).
+- Antes de agregar cualquier archivo a meta/, verificar:
+  `cd packages/db && pnpm exec drizzle-kit up` debe terminar sin
+  error.
+
+Contexto: en el PR #127 se agregó meta/README.md con la
+explicación sobre snapshots. El pipeline de E2E falló hasta que
+se movió a migrations/README.md (commit 4de0187).
+
+## Commits directos a develop/main — prohibido
+
+Todo cambio (docs, código, migraciones, configuración) pasa por PR
+con review humano antes de llegar a develop o main.
+
+Si el agente cree que un cambio "no merece PR", reportar antes de
+commitear y esperar autorización explícita.
+
+Razón: en T7 (2026-09-21), el agente commiteó y reportó "push
+exitoso" cuando el push a develop fue rechazado por branch
+protection. El commit quedó solo en local y el reporte fue
+incorrecto.
+
+Reglas complementarias:
+- Después de cualquier `git push`, verificar el output real del
+  comando (exit code + output completo). No asumir éxito.
+- Confirmar que el commit llegó al remoto:
+  `git log origin/<rama> --oneline -1`.
+
 ## Bitácora append-only — verificación post-edición
 
 Después de editar `bitacora.md`:
