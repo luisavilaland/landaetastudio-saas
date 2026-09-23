@@ -280,6 +280,19 @@ Antes de reportar un hallazgo, verificar si ya está registrado en docs/deuda-te
 - Solo el dueño del proyecto autoriza: operaciones destructivas, cambios de infraestructura, deploy a producción.
 - Cualquier usuario puede solicitar consultas de solo lectura.
 
+## Credenciales en scripts scratch — prohibido
+
+Nunca hardcodear `DATABASE_URL`, tokens, passwords ni cualquier secreto en archivos scratch (`.mjs`, `.ts`, `.sh`), ni siquiera en worktrees sin commitear.
+
+Los scripts de verificación deben leer credenciales de `.env.local`:
+
+```ts
+import 'dotenv/config'
+const conn = postgres(process.env.DATABASE_URL)
+```
+
+Razón: los secrets en disco se filtran por backups, sync de worktrees, screenshots o commits accidentales.
+
 ## DoD extendido — actualizar contadores
 
 Cuando una tarea agrega o modifica tests:
