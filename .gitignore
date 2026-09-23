@@ -87,6 +87,12 @@ issue-comment.md
 pr-body.md
 *.bak
 
+# Scripts scratch con credenciales potenciales
+/*.mjs
+/check-*.mjs
+/verify-*.mjs
+/empirical-*.mjs
+
 # Database backups
 backup-*.sql
 *.backup
