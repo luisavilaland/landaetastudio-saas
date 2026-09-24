@@ -86,6 +86,15 @@ e2e/playwright-report/
 issue-comment.md
 pr-body.md
 *.bak
+docs_bitacora_dev.md
+t7-entry.md
+pr-body-*.txt
+query
+
+# Scripts de debug temporales — outputs
+packages/db/check-*.ts
+packages/db/*.json
+!packages/db/package.json
 
 # Database backups
 backup-*.sql
