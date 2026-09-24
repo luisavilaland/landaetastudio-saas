@@ -448,12 +448,14 @@ permisos va a leer esa clave como `undefined` (falsy) en lugar de
 
 ## 24. `db:migrate` ejecuta `drizzle-kit up` y `setup` puede seedar sin schema
 
-**Estado:** el script raíz `db:migrate` está definido como `cd packages/db && drizzle-kit up`, no como `drizzle-kit migrate`. Además, `setup` encadena `db:generate`, `db:migrate` y `db:seed` sin comprobar que el schema quedó aplicado.
+**Estado:** **Resuelto en esta PR (2026-09-24).** El script raíz `db:migrate` ahora ejecuta `drizzle-kit migrate`; el baseline único y el tracking canónico en `drizzle.__drizzle_migrations` fueron validados en un branch efímero y en production.
 
-**Impacto:** un desarrollador nuevo que siga `SETUP.md` puede terminar ejecutando el seed contra una base sin el schema esperado, con un flujo de errores poco claro.
+**Impacto original:** un desarrollador nuevo que siguiera `SETUP.md` podía terminar ejecutando el seed contra una base sin el schema esperado, con un flujo de errores poco claro.
 
-**Mitigación:** separar `db:migrate` de `drizzle-kit up`, validar el schema antes del seed y agregar un check de CI que ejecute el flujo de onboarding en una base limpia.
+**Resolución:** se archivó el historial incompleto, se regeneró `0000_baseline.sql` con las 13 tablas y su bloque de seguridad, se corrigió `db:migrate` y se actualizó `SETUP.md`. El tracking público obsoleto fue eliminado después de migrar el control a `drizzle.__drizzle_migrations`.
 
-**Urgencia:** alta para onboarding y antes de la siguiente fase.
+**Validación:** branch efímero v2 y production: `db:migrate` no-op, seed exitoso, smokes correctos y T11 RLS 8/8. DoD final: lint 6/6, typecheck 9/9, 474 tests en 57 archivos y build 3/3.
 
-**Contexto de esta ejecución:** 0015 se aplicó manualmente con SQL del owner y se verificó con smoke tests; el tracking y el bug de tooling quedaron registrados.
+**Urgencia:** cerrada para esta fase; queda como referencia para futuras migraciones.
+
+**Contexto de esta ejecución:** 0015 se aplicó manualmente con SQL del owner y se verificó con smoke tests; el reset posterior quedó validado con el plan aprobado de baseline limpio.

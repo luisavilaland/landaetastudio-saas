@@ -1361,3 +1361,34 @@ AGENTS.md (PR B).
 - **Bug de tooling:** el script raíz `db:migrate` ejecuta `drizzle-kit up` y `setup` encadena el flujo roto; queda registrado como ítem 24 de deuda.
 - **Corrección de estado:** la mención previa de que 0015 no se aplicaba correspondía al intento fallido de `drizzle-kit up`; después se aplicó manualmente el REVOKE y se insertó el tracking, como queda registrado arriba. El ítem 24 se refiere exclusivamente al bug de tooling, no a una conexión owner en admin.
 
+---
+
+## 2026-09-24 — Ítem 24: reset de migraciones con baseline limpio
+
+**Contexto.** El ítem 24 ("script db:migrate roto") resultó ser más profundo de lo estimado. El inventario read-only reveló 5 problemas entrelazados:
+
+1. `db:migrate` en `package.json` raíz corría `drizzle-kit up` (solo actualiza snapshots locales) en vez de `drizzle-kit migrate` (aplica a la DB).
+2. Las migraciones 0000-0004 estaban en el journal pero sin archivo `.sql` en disco (se perdieron).
+3. El tracking en `public.__drizzle_migrations` tenía solo 2 filas (0014, 0015), no las 16 esperadas.
+4. Faltaban snapshots 0003, 0004, 0009, 0010.
+5. `0005_add_admin_users.sql` era huérfana (en disco, fuera del journal).
+
+**Hallazgo raíz durante la aplicación.** El branch efímero v2 (`verify-baseline-v2-20260924-183415`) reveló que drizzle-kit 0.31.x usa `drizzle.__drizzle_migrations` (schema `drizzle`), NO `public.__drizzle_migrations`. Todo el tracking manual insertado en `public` durante T7/T8 nunca fue leído por drizzle-kit. Causa raíz de por qué `db:migrate` devolvía "Everything's fine" con migraciones pendientes.
+
+**Decisión (Estrategia B, aprobada por luisavilaland).** Reset con baseline limpio:
+- Archivar el historial completo en `docs/migrations-archive/2026-09-24/`.
+- Regenerar un único baseline (`0000_baseline.sql`) desde el schema actual (13 tablas).
+- Incluir RLS + policies + GRANTs en el baseline (no solo CREATE TABLE): 10 tablas tenant-scoped con `ENABLE` + `FORCE ROW LEVEL SECURITY` y policy `tenant_isolation`; `plans` con SELECT únicamente para `app_user` (REVOKE heredado de 0015); GRANTs para las 13 tablas; función `set_tenant_id(UUID)` (SECURITY INVOKER + `set_config(..., true)` = SET LOCAL); `ALTER DEFAULT PRIVILEGES` para futuras tablas.
+- Corregir `db:migrate`: `drizzle-kit up` → `drizzle-kit migrate`.
+- Configurar tracking canónico en `drizzle.__drizzle_migrations`.
+
+**Validación.** Branch efímero v2: `db:migrate` no-op, `db:seed` OK, smokes OK (`plans=3`, INSERT 42501, `subscriptions=2`), T11 RLS 8/8. Aplicado luego en production con la misma secuencia; T11 8/8, smokes OK. Backup: branch `pre-baseline-20260924` (`br-shiny-star-amlp7c0a`) desde production, con snapshot explícito y auto-delete de 7 días.
+
+**Producción.** `drizzle.__drizzle_migrations` creado con el hash del baseline (`2d3f2533...`). `public.__drizzle_migrations` dropeado (artefacto inútil). Seed production: 2 tenants, 3 planes, 2 suscripciones, 4 órdenes.
+
+**Deuda técnica.** Ítem 24 cerrado. `db:migrate` funciona ahora en entornos frescos. El script `setup` encadena `db:generate → db:migrate → db:seed` correctamente.
+
+**Nota.** Primer intento de `INSERT plans` en smoke dio 42703 en lugar de 42501 por `displayName` sin comillas; los identificadores camelCase requieren quoting explícito en Postgres. Repetido con `"displayName"` devolvió el 42501 esperado. No fue un problema de permisos.
+
+**DoD final.** Lint 6/6, typecheck 9/9, 474 tests en 57 archivos y build 3/3.
+
