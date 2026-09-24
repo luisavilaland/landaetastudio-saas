@@ -377,3 +377,83 @@ permisos va a leer esa clave como `undefined` (falsy) en lugar de
 
 **Severidad:** MEDIO.
 **Reevaluar:** antes de arrancar Fase 2.
+
+---
+
+## 18. `encryptToken` UPDATE-only, sin upsert
+
+**Estado:** `encryptToken` solo ejecuta `UPDATE` sobre `tenant_mp_config` y no crea la fila inicial cuando el tenant todavía no tiene configuración.
+
+**Impacto:** bloqueante para el autoservicio de Fase 3, donde el tenant debe registrar su primera credencial de MercadoPago.
+
+**Mitigación:** convertirlo en upsert atómico o agregar una ruta explícita de creación de `tenant_mp_config`, con tests de INSERT inicial y UPDATE posterior.
+
+**Urgencia:** antes de Fase 3.
+
+---
+
+## 19. T11 en CI
+
+**Estado:** `NEON_DATABASE_APP_URL` está configurada en GitHub Secrets y el workflow E2E ejecuta el test RLS real. No se aplicó skip en esta implementación.
+
+**Regla:** si el secret deja de estar disponible, el bloqueo debe reportarse antes de agregar un skip condicional; no se oculta un fallo de RLS detrás de un test omitido.
+
+**Urgencia:** reevaluar si cambia la configuración de CI.
+
+---
+
+## 20. Falta test del seed y de los datos de planes
+
+**Estado:** no existe un test dedicado que valide los tres planes, sus precios en centavos, límites y features, ni la idempotencia del seed.
+
+**Impacto:** una regresión en el catálogo o en los precios puede pasar hasta una ejecución de seed en un entorno compartido.
+
+**Mitigación:** extraer los datos del catálogo a una función testeable y agregar tests unitarios/integración del seed.
+
+**Urgencia:** antes de Fase 3.
+
+---
+
+## 21. `publicKey` e `isVerified` fuera de ADR-024
+
+**Estado:** **resuelto en esta PR.** ADR-024 ahora documenta ambas columnas y aclara que están fuera del mínimo original de T4/ADR-024.
+
+**Verificación:** el schema contiene `publicKey` e `isVerified`; no se agregan cambios de schema en esta tarea.
+
+---
+
+## 22. T12 mock-only; roundtrip real de DB en Fase 3
+
+**Estado:** T12 queda con DoD mock-only en este cierre. El PR declara `Cierra parcialmente #112 (mock-only)`.
+
+**Deuda:** el roundtrip real contra la base para cifrar y descifrar queda para Fase 3, con fixtures y cleanup controlados.
+
+**Urgencia:** antes de Fase 3.
+
+---
+
+## 23. Colisión de IDs en snapshots 0012–0014
+
+**Estado:** `drizzle-kit generate --custom` falla porque 0012, 0013 y 0014 comparten el mismo `id` y `prevId` de snapshot. Los snapshots existentes son inmutables y no se modificaron.
+
+**Impacto:** no se puede regenerar automáticamente una migración custom hasta reconstruir o normalizar la cadena histórica de snapshots.
+
+**Mitigación:** corregir la cadena en una tarea de migraciones dedicada, preservando el historial y nunca editando snapshots aplicados.
+
+**Urgencia:** antes de la siguiente migración generada por Drizzle.
+
+**Nota:** no se agrega ítem 24 por la verificación read-only de conexiones; el ítem 24 de esta sección registra exclusivamente el bug de tooling `db:migrate`/`setup`.
+
+---
+
+## 24. `db:migrate` ejecuta `drizzle-kit up` y `setup` puede seedar sin schema
+
+**Estado:** el script raíz `db:migrate` está definido como `cd packages/db && drizzle-kit up`, no como `drizzle-kit migrate`. Además, `setup` encadena `db:generate`, `db:migrate` y `db:seed` sin comprobar que el schema quedó aplicado.
+
+**Impacto:** un desarrollador nuevo que siga `SETUP.md` puede terminar ejecutando el seed contra una base sin el schema esperado, con un flujo de errores poco claro.
+
+**Mitigación:** separar `db:migrate` de `drizzle-kit up`, validar el schema antes del seed y agregar un check de CI que ejecute el flujo de onboarding en una base limpia.
+
+**Urgencia:** alta para onboarding y antes de la siguiente fase.
+
+**Contexto de esta ejecución:** 0015 se aplicó manualmente con SQL del owner y se verificó con smoke tests; el tracking y el bug de tooling quedaron registrados.

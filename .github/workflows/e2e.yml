@@ -107,6 +107,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Run RLS integration test
+        run: pnpm vitest run packages/db/src/__tests__/rls-cross-tenant.test.ts
+        env:
+          DATABASE_APP_URL: ${{ secrets.NEON_DATABASE_APP_URL }}
       - name: Install Playwright Chromium
         # Sin --with-deps: en AlmaLinux Playwright cae al fallback Ubuntu y usa apt-get (inexistente).
         # Las libs del sistema se instalan una vez en el runner vía dnf; Playwright 1.62 ya tiene

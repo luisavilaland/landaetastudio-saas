@@ -101,7 +101,7 @@ La plataforma maneja dos flujos de pago completamente independientes, cada uno c
 
 ## 🔄 Flujo de suscripciones — Ciclo de vida completo
 
-### Estados de suscripción (5)
+### Estados de suscripción (6)
 
 | ESTADO | CUÁNDO APLICA | ACCESO AL PANEL | TIENDA PÚBLICA |
 |--------|---------------|-----------------|----------------|
@@ -110,6 +110,7 @@ La plataforma maneja dos flujos de pago completamente independientes, cada uno c
 | `past_due` | Pago falló (dentro de gracia de 7 días) | ⚠ Limitado | ✅ Funcionando |
 | `cancelled` | Canceló voluntariamente | ⚠ Solo lectura hasta fin de período | ✅ Hasta fin de período |
 | `expired` | Pasó gracia sin pagar | ❌ Bloqueado | ❌ Despublicada |
+| `abandoned` | Nunca completó el primer pago en 7 días | ❌ Bloqueado | ❌ No publicada |
 
 ### Durante el período de gracia (7 días)
 
@@ -182,7 +183,7 @@ openssl rand -base64 32
 
 | # | FASE | DÍAS EST. | DEPENDENCIAS | ESTADO |
 |---|------|-----------|--------------|--------|
-| 1 | Modelo de datos (plans, subscriptions, mp_config) | 2-3 | — | ⏳ ARRANCAR |
+| 1 | Modelo de datos (plans, subscriptions, mp_config) | 2-3 | — | ✅ Completada |
 | 2 | Webhook suscripciones + checkout dinámico | 3-4 | Fase 1 | Pendiente |
 | 3 | Autoservicio (landing + registro + pago) | 5-7 | Fase 2 | Pendiente |
 | 4 | Personalización visual + dominio + infraestructura | 5-7 | Fase 3 | Pendiente |
@@ -201,7 +202,7 @@ openssl rand -base64 32
 
 ---
 
-## 🗄 Fase 1 — Modelo de datos ⏱ 2-3 días · ✅ Completada (2026-09-23)
+## 🗄 Fase 1 — Modelo de datos ⏱ 2-3 días · ✅ Completada (2026-09-24)
 
 **Objetivo:** Crear las tres tablas nuevas, aplicar RLS, y generar la migración con Drizzle ORM.
 
@@ -212,8 +213,11 @@ openssl rand -base64 32
 5. Insertar los tres planes en la tabla `plans` (UYU 2.000, 4.000, 8.000)
 6. Asignar suscripción activa a los tenants existentes (tienda1, tienda2)
 7. Agregar las 3 nuevas variables de entorno a Vercel
+8. Ejecutar T11 con un test real de RLS usando `app_user`
+9. Completar T13 en template, Zod, Turbo y SETUP
+10. Preparar la migración 0015 para revocar DML de `plans` y preservar `SELECT`
 
-**Estado:** ✅ Completada (2026-09-23). Ver bitácora para detalle. T8-T10 cerrados.
+**Estado:** ✅ Completada (2026-09-24). T8-T13 cerrados; 0015 fue aplicada manualmente por la limitación de `pg_dump`/`drizzle-kit up`, con tracking y smoke tests verificados. Ver bitácora para detalle.
 
 ### Tabla `subscriptions` (con RLS)
 
@@ -222,7 +226,7 @@ CREATE TABLE subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   plan_id UUID NOT NULL REFERENCES plans(id),
-  status TEXT NOT NULL, -- pending_first_payment | active | past_due | cancelled | expired
+  status TEXT NOT NULL, -- pending_first_payment | active | past_due | cancelled | expired | abandoned
   current_period_end TIMESTAMPTZ,
   mp_preapproval_id TEXT,
   created_at TIMESTAMPTZ DEFAULT now()

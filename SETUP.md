@@ -119,8 +119,8 @@ La aplicación valida automáticamente las variables de entorno al arrancar (`pa
 
 | Entorno                                 | Validación                                                                                                                                                                                                                                     |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Desarrollo** (`NODE_ENV=development`) | Valida solo las variables core (`DATABASE_URL`, `AUTH_SECRET`, `MERCADOPAGO_ACCESS_TOKEN`). `NEXTAUTH_URL` es opcional (NextAuth v5 la infiere del Host header). Las variables cloud son opcionales.                                           |
-| **Producción** (`NODE_ENV=production`)  | Valida core + todas las variables cloud (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `MERCADOPAGO_WEBHOOK_SECRET`, `STOREFRONT_URL`). |
+| **Desarrollo** (`NODE_ENV=development`) | Valida las variables core (`DATABASE_URL`, `DATABASE_APP_URL`, `AUTH_SECRET`, `MERCADOPAGO_ACCESS_TOKEN`, `MP_TOKEN_ENCRYPTION_KEY`). `MP_TOKEN_ENCRYPTION_KEY` requiere al menos 32 caracteres. `NEXTAUTH_URL` es opcional (NextAuth v5 la infiere del Host header). Las variables cloud son opcionales. |
+| **Producción** (`NODE_ENV=production`)  | Valida las variables core y cloud (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `MERCADOPAGO_WEBHOOK_SECRET`, `STOREFRONT_URL`). `MP_PLATFORM_ACCESS_TOKEN` y `MP_PLATFORM_WEBHOOK_SECRET` son opcionales hasta Fase 2. |
 
 ### Si falta una variable
 
@@ -131,6 +131,12 @@ La app **no arrancará** y mostrará un error claro indicando qué variable falt
   - RESEND_API_KEY: RESEND_API_KEY is required in production for email delivery
   - R2_ENDPOINT: R2_ENDPOINT must be a valid URL in production
 ```
+
+### Clave de cifrado de MercadoPago
+
+`MP_TOKEN_ENCRYPTION_KEY` es obligatoria en todos los entornos y debe tener al menos 32 caracteres. Generala localmente con `openssl rand -base64 32` y guardala únicamente en `.env.local` o en Vercel. La misma clave debe estar configurada en storefront, admin y superadmin; no se versiona ni se imprime.
+
+`MP_PLATFORM_ACCESS_TOKEN` y `MP_PLATFORM_WEBHOOK_SECRET` quedan opcionales hasta Fase 2.
 
 ### Agregar nuevas variables
 
@@ -244,7 +250,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**464 tests pasando, 0 fallos (56 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**474 tests pasando, 0 fallos (57 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
@@ -301,6 +307,7 @@ El carrito anónimo persiste en Redis vía ioredis. **Hay dos variables distinta
 - Config en la raíz: `playwright.config.ts` (6 projects, `storageState` para admin/superadmin vía `global-setup.ts`).
 - Specs en `e2e/` (storefront, checkout, admin, superadmin, security, webhook) — 15 specs.
 - Env vars (ver `.env.local.example`): `E2E_STOREFRONT_URL`, `E2E_STOREFRONT_T2_URL`, `E2E_ADMIN_URL`, `E2E_SUPERADMIN_URL`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_SUPERADMIN_EMAIL`, `E2E_SUPERADMIN_PASSWORD`.
+- GitHub Secrets del workflow: `NEON_DATABASE_URL` (owner, solo seed) y `NEON_DATABASE_APP_URL` (rol `app_user`, usado por T11 RLS).
 - CI: `.github/workflows/e2e.yml` — corre en **runner self-hosted** (AlmaLinux). Requisitos del runner:
 - Egress TCP a Neon (puerto 5432, IPv4 o IPv6) y red a los 3 dominios Vercel.
    - Si el host no tiene ruta IPv6, pin IPv4 del endpoint Neon en `/etc/hosts` (ver procedimiento completo abajo).
@@ -353,6 +360,8 @@ El runner self-hosted no tiene ruta IPv6. El endpoint de Neon publica registros 
 Release v0.10.0 (2026-09-17) — Modernización stack (TS6, Next 16.3.5, ioredis 6, vitest 5) + docs/deuda. 430 tests, 55 archivos. Ramas main + develop.
 
 Actualización 20 de septiembre de 2026 – 464 tests, 15 specs E2E (post T6 + migración 0013). Rama `develop`.
+
+Actualización 24 de septiembre de 2026 – 474 tests, 57 archivos, T11/T13 y 0015 preparada. Rama `chore/close-fase1`.
 
 ## URLs de producción (Vercel)
 
@@ -408,6 +417,8 @@ Todas las variables cloud deben estar configuradas en cada proyecto:
 
 - `DATABASE_URL`, `DATABASE_APP_URL`, `AUTH_SECRET` (core, obligatorias en todos)
 - `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET`
+- `MP_TOKEN_ENCRYPTION_KEY` (misma clave en las 3 apps, obligatoria en todos los entornos)
+- `MP_PLATFORM_ACCESS_TOKEN`, `MP_PLATFORM_WEBHOOK_SECRET` (opcionales hasta Fase 2)
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `REDIS_URL` (ioredis — storefront)
 - `RESEND_API_KEY`
 - `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
