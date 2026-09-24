@@ -20,6 +20,13 @@
 #    que se agrega una migración nueva. No es una migración en sí
 #    (no contiene SQL), así que no aplica la regla de inmutabilidad.
 #    Solo los *.sql y *_snapshot.json son inmutables.
+#
+# 3. Excepción: reset de baseline autorizado
+#    Si el diff incluye docs/migrations-archive/<fecha>/README.md,
+#    se trata de un reset documentado. En ese caso se permite M/D
+#    solo para archivos que tengan contraparte con el mismo basename
+#    en el directorio del archive. El resto sigue bloqueado.
+#    El README del archive es el marcador explícito de aprobación.
 set -euo pipefail
 
 BASE_REF="origin/develop"
@@ -35,14 +42,47 @@ if ! git rev-parse --verify --quiet "${BASE_REF}" >/dev/null 2>&1; then
   fi
 fi
 
+# Detectar reset de baseline autorizado: si el diff incluye el README
+# del archive, es un reset documentado. En ese caso se permite M/D
+# solo para archivos que tengan contraparte con el mismo basename en
+# el directorio del archive. El resto de modificaciones sigue bloqueado.
+archive_marker="$(git diff --name-only "${BASE_REF}" -- \
+  'docs/migrations-archive/*/README.md' | head -1)"
+
 changed_files="$(git diff --name-only --diff-filter=MD "${BASE_REF}" -- \
   'packages/db/migrations/*.sql' \
   'packages/db/migrations/meta/*_snapshot.json')"
 
+if [[ -n "${archive_marker}" && -n "${changed_files}" ]]; then
+  # Reset autorizado: filtrar los archivos que NO tienen contraparte
+  # en el archive.
+  archive_dir="$(dirname "${archive_marker}")"
+  truly_changed=""
+  while IFS= read -r file; do
+    [[ -z "${file}" ]] && continue
+    basename_file="$(basename "${file}")"
+    if ! find "${archive_dir}" -name "${basename_file}" -print -quit 2>/dev/null | grep -q .; then
+      truly_changed="${truly_changed}${file}"$'\n'
+    fi
+  done <<< "${changed_files}"
+
+  if [[ -n "${truly_changed}" ]]; then
+    echo "❌ Migración existente MODIFICADA sin contraparte archivada — crea una nueva migración, no edites las anteriores."
+    echo ""
+    echo "Archivos afectados:"
+    printf '%s' "${truly_changed}"
+    exit 1
+  fi
+
+  echo "✅ Reset de migraciones detectado (archive presente): archivos con contraparte en archive permitidos."
+  exit 0
+fi
+
+# Comportamiento normal (sin archive README): fail-closed sobre MD.
 if [[ -n "${changed_files}" ]]; then
-  echo "❌ Migración existente modificada — crea una nueva migración, no edites las anteriores."
+  echo "❌ Migración existente modificada o eliminada — crea una nueva migración, no edites ni borres las anteriores."
   echo ""
-  echo "Archivos modificados:"
+  echo "Archivos afectados:"
   echo "${changed_files}"
   exit 1
 fi
