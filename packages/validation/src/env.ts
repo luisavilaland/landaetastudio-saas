@@ -24,6 +24,11 @@ const coreSchema = z.object({
   MERCADOPAGO_ACCESS_TOKEN: z
     .string()
     .min(1, 'MERCADOPAGO_ACCESS_TOKEN is required for checkout and webhooks'),
+  MP_TOKEN_ENCRYPTION_KEY: z
+    .string()
+    .min(32, 'MP_TOKEN_ENCRYPTION_KEY must be at least 32 characters'),
+  MP_PLATFORM_ACCESS_TOKEN: z.string().min(1).optional(),
+  MP_PLATFORM_WEBHOOK_SECRET: z.string().min(1).optional(),
 })
 
 const productionSchema = coreSchema.extend({

@@ -1286,29 +1286,29 @@ prefijo). Verificar despuÃ©s de escribir con:
 Y agregar la verificaciÃ³n al listado de "BitÃ¡cora append-only" en
 AGENTS.md (PR B).
 
-# # #   2 0 2 6 - 0 9 - 2 1   â ¬    T 7 :   R L S   e n   s u b s c r i p t i o n s   y   t e n a n t _ m p _ c o n f i g  
-  
- -   M i g r a c i Ã ³ n   0 0 1 4 _ e n a b l e _ r l s _ n e w _ t a b l e s . s q l :  
-     -   E N A B L E   +   F O R C E   R L S   +   p o l i c y   t e n a n t _ i s o l a t i o n   e n   l a s   2   t a b l a s .  
-     -   p l a n s   N O   l l e v a   R L S   ( c a t Ã ¡ l o g o   g l o b a l ,   r e g l a   d e l   P R   # 1 2 6 ) .  
-     -   L a s   8   t a b l a s   d e   0 0 0 9   n o   s e   t o c a n .  
- -   P a t r Ã ³ n   d e   p o l i c y   i d Ã © n t i c o   a   0 0 0 9 :  
-     c u r r e n t _ s e t t i n g ( ' a p p . t e n a n t _ i d ' ,   t r u e ) .   E l   s e g u n d o   a r g u m e n t o  
-     ` t r u e `   e s   c r Ã ­ t i c o :   s i n   Ã © l ,   q u e r i e s   s i n   t e n a n t   c o n t e x t   r o m p e n  
-     ( l a n d i n g   p Ã º b l i c a   i n c l u i d a ) .  
- -   S m o k e   t e s t s   c o n   a p p _ u s e r   ( c r o s s - t e n a n t   b i d i r e c c i o n a l ) :  
-     t i e n d a 1   n o   v e   f i l a s   d e   t i e n d a 2   e n   n i n g u n a   d e   l a s   2   t a b l a s ,   y  
-     v i c e v e r s a .  
- -   B a c k u p   p r e v i o   t o m a d o   y   m o v i d o   f u e r a   d e l   r e p o .   . g i t i g n o r e  
-     a c t u a l i z a d o   c o n   ` b a c k u p - * . s q l ` .  
- -   C l e a n u p   p o s t - t e s t :   d a t o s   d e   p r u e b a   e l i m i n a d o s   ( t a b l a s   e n   0   f i l a s ) .  
- -   D e u d a   t Ã © c n i c a   r e g i s t r a d a :  
-     -   Ã  t e m   1 4 :   t r a c k i n g   d e   m i g r a c i o n e s   i n c o m p l e t o   e n   B D   a c t u a l .  
-     -   Ã  t e m   1 5 :   s n a p s h o t   D r i z z l e   n o   r e f l e j a   i s R L S E n a b l e d .  
- -   I n c i d e n t e   e n   e l   P R :   R E A D M E   a g r e g a d o   e n   m e t a /   r o m p i Ã ³   d r i z z l e - k i t .  
-     F i x   e n   4 d e 0 1 8 7 :   m o v i d o   a   p a c k a g e s / d b / m i g r a t i o n s / .  
- -   P R   # 1 2 7 .  
- 
+### 2026-09-21 â¬   T7: RLS en subscriptions y tenant_mp_config
+
+- MigraciÃ³n 0014_enable_rls_new_tables.sql:
+  - ENABLE + FORCE RLS + policy tenant_isolation en las 2 tablas.
+  - plans NO lleva RLS (catÃ¡logo global, regla del PR #126).
+  - Las 8 tablas de 0009 no se tocan.
+- PatrÃ³n de policy idÃ©ntico a 0009:
+  current_setting('app.tenant_id', true). El segundo argumento
+  `true` es crÃ­tico: sin Ã©l, queries sin tenant context rompen
+  (landing pÃºblica incluida).
+- Smoke tests con app_user (cross-tenant bidireccional):
+  tienda1 no ve filas de tienda2 en ninguna de las 2 tablas, y
+  viceversa.
+- Backup previo tomado y movido fuera del repo. .gitignore
+  actualizado con `backup-*.sql`.
+- Cleanup post-test: datos de prueba eliminados (tablas en 0 filas).
+- Deuda tÃ©cnica registrada:
+  - Ãtem 14: tracking de migraciones incompleto en BD actual.
+  - Ãtem 15: snapshot Drizzle no refleja isRLSEnabled.
+- Incidente en el PR: README agregado en meta/ rompiÃ³ drizzle-kit.
+  Fix en 4de0187: movido a packages/db/migrations/.
+- PR #127.
+
 ---
 
 ## 2026-09-23 — T8-T10: Seed de planes y suscripciones (cierre Fase 1)
@@ -1344,4 +1344,20 @@ AGENTS.md (PR B).
 
 - **PR #137** (limpieza scratch files) + PR pendiente Fase 1.
 - **Fase 1 del blueprint v2.6:** ✅ completada.
+
+---
+
+## 2026-09-24 — Cierre formal de Fase 1: T11, T13 y 0015 preparado
+
+- **T13:** `MP_TOKEN_ENCRYPTION_KEY` quedó required en todos los entornos con mínimo de 32 caracteres; las variables `MP_PLATFORM_*` quedaron opcionales hasta Fase 2. Se actualizaron `.env.local.example`, Zod, `turbo.json` y `SETUP.md`.
+- **T11:** se agregó `packages/db/src/__tests__/rls-cross-tenant.test.ts` con conexión real a `DATABASE_APP_URL`, rol sin `BYPASSRLS`, 8 casos de lectura/escritura y cliente dedicado para el caso sin contexto. El INSERT de B bajo contexto A fue rechazado por RLS.
+- **Grants:** se creó `0015_revoke_plans_dml.sql` para revocar solo INSERT/UPDATE/DELETE de `app_user` sobre `plans`, conservando SELECT. El grep de runtime solo encontró DML de planes en el seed.
+- **Snapshots:** `drizzle-kit generate --custom` quedó bloqueado por la colisión preexistente de `id`/`prevId` entre 0012, 0013 y 0014; se creó el snapshot 0015 derivado sin modificar snapshots previos. Se registra como ítem 23 de deuda.
+- **Verificación de conexiones:** storefront, admin y superadmin usan el cliente compartido `packages/db/src/index.ts`, con `DATABASE_APP_URL` y `app_user`; no se detectó uso de `DATABASE_URL` owner en runtime. No se agrega ítem 24 porque admin no usa owner.
+- **E2E:** `NEON_DATABASE_APP_URL` está disponible en GitHub Secrets; el workflow ejecuta T11 con esa URL. No se aplicó 0015 ni se ejecutó seed contra Neon.
+- **Nota:** reparación de corrupción UTF-16/NUL en entrada T7 (byte 128806). Excepción consciente al append-only: los bytes NUL no son contenido, son corrupción. Contenido textual preservado.
+- **Nota:** no se ejecutó `pg_dump` porque el entorno de operación (Paseo, sin acceso físico) no tiene el binario disponible. `pnpm db:migrate` terminó con `Everything's fine`, pero 0015 no se aplicó: el post-check sigue mostrando `DELETE`, `INSERT`, `SELECT` y `UPDATE`, y el tracking público solo contiene la entrada con timestamp de 0014. No se ejecutaron smoke tests ni rollback porque el REVOKE no llegó a aplicarse. El rollback previsto sigue siendo `GRANT INSERT, UPDATE, DELETE ON plans TO app_user`.
+- **Aplicación manual de 0015:** se ejecutó el REVOKE con owner, se verificó que `app_user` conserva solo `SELECT` y se insertó el hash de 0015 en `public.__drizzle_migrations` (2 filas). Smoke tests: `COUNT(*)=3` e INSERT rechazado con `42501 permission denied`. No se ejecutó seed.
+- **Bug de tooling:** el script raíz `db:migrate` ejecuta `drizzle-kit up` y `setup` encadena el flujo roto; queda registrado como ítem 24 de deuda.
+- **Corrección de estado:** la mención previa de que 0015 no se aplicaba correspondía al intento fallido de `drizzle-kit up`; después se aplicó manualmente el REVOKE y se insertó el tracking, como queda registrado arriba. El ítem 24 se refiere exclusivamente al bug de tooling, no a una conexión owner en admin.
 

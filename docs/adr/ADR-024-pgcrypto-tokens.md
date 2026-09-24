@@ -32,6 +32,7 @@ Cifrado simétrico a nivel de aplicación usando **pgcrypto** (extensión nativa
   - **Nunca** en código, **nunca** en la base de datos, **nunca** en logs.
   - Solo en memoria del proceso (inyectada por Vercel / runtime).
 - **Almacenamiento:** La tabla `tenant_mp_config` guarda `access_token_enc BYTEA` y `webhook_secret_enc BYTEA` (salida nativa de `pgp_sym_encrypt`, tipo `bytea`).
+- **Schema completo:** la tabla también contiene `publicKey TEXT` y `isVerified BOOLEAN`; estas dos columnas fueron agregadas durante la implementación y están fuera del mínimo originalmente descrito por T4/ADR-024. La decisión de cifrado sigue enfocada únicamente sobre los dos campos de credenciales.
 - **Descifrado:** Solo en memoria, en el momento de uso (checkout dinámico, validación de webhook del tenant). Nunca se loguea el valor descifrado.
 
 ```sql

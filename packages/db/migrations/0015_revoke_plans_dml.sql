@@ -1,0 +1,3 @@
+REVOKE INSERT ON TABLE plans FROM app_user;
+REVOKE UPDATE ON TABLE plans FROM app_user;
+REVOKE DELETE ON TABLE plans FROM app_user;
