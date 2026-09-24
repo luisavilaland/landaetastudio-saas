@@ -8,9 +8,33 @@ Monorepo del proyecto de SaaS de eCommerce headless, multi-tenant, orientado al 
 
 # Roadmap
 
-## Blueprint vigente
+### Histórico (v0.9.0 / v0.10.0)
 
-**Blueprint v2.6** (`docs/superpowers/specs/2026-09-blueprint-v2.6.md`) — Plan completo 10 fases para lanzamiento comercial con autoservicio, suscripciones, plantillas, cupones, banners, boletines y envíos.
+Fases 1-6 del roadmap original (auth, dashboard, tienda,
+autoservicio, producción, RLS real + E2E) — todas completadas.
+Ver bitácora para detalle.
+
+### Blueprint v2.6 (roadmap vigente)
+
+Plan de 10 fases para el lanzamiento comercial con autoservicio,
+suscripciones, plantillas, cupones, banners, boletines y envíos.
+
+| Fase | Nombre | Estado |
+|------|--------|--------|
+| **1** | **Modelo de datos** (plans, subscriptions, tenant_mp_config) | ✅ Completada (2026-09-23) |
+| 2 | Webhook suscripciones + checkout dinámico | 🔜 Pendiente |
+| 3 | Autoservicio (landing + registro + pago) | 🔜 Pendiente |
+| 4 | Personalización visual + dominio + infra | 🔜 Pendiente |
+| 5 | Cupones y descuentos | 🔜 Pendiente |
+| 6 | Banners (superior + popup) | 🔜 Pendiente |
+| 7 | Sistema de plantillas + 6 plantillas | 🔜 Pendiente |
+| 8 | Boletines (captura + envío) | 🔜 Pendiente |
+| 9 | Envíos (Correo Uruguayo + OCA) | 🔜 Pendiente |
+| 10 | Go-live y checklist final | 🔜 Pendiente |
+
+Detalle completo: [Blueprint v2.6](./docs/superpowers/specs/2026-09-blueprint-v2.6.md)
+
+---
 
 ## Fase 1 – Autenticación y Órdenes ✅ (Completada)
 
@@ -481,4 +505,4 @@ pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 
 ---
 
-**Última actualización:** 17 de septiembre de 2026 – v0.10.0 released (Dependabot sept 2026: TS6, Next 16.3, ioredis 6, vitest 5, NextAuth β.32). Blueprint v2.6 aprobado. Rama `main`. Build limpio.
+**Última actualización:** 23 de septiembre de 2026 – Fase 1 del Blueprint v2.6 completada (seed de planes + suscripciones). 464 tests pasando, 0 fallos (56 archivos). Rama `develop`. Build limpio.

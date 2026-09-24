@@ -338,3 +338,42 @@ documental, no un bug del código.
 **Severidad:** BAJO (documental, no afecta runtime).
 
 Plan aprobado el 2026-08-08 (ítem 3 de la tarea de calidad: limpieza email + health check + deuda técnica). Rama `quality/calidad-y-monitoreo`. Ver bitacora.md → entrada 2026-08-08 — Calidad.
+
+---
+
+## 16. Seed destructivo sin guard adicional por DATABASE_URL
+
+**Estado:** el seed hace TRUNCATE de todas las tablas (incluyendo
+plans CASCADE). Agregado guard `NODE_ENV === 'production'` en
+seed.ts (2026-09-23).
+
+**Riesgo residual:** si NODE_ENV=development pero DATABASE_URL
+apunta a Neon prod (configuración errónea), el guard no protege.
+
+**Mitigación a futuro (antes de Fase 3):**
+- Verificar que DATABASE_URL no contenga 'production' ni 'prod.'.
+- O requerir confirmación explícita (ALLOW_SEED_IN_PROD=true).
+
+**Severidad:** MEDIO.
+**Reevaluar:** antes de Fase 3 (onboarding de tenants reales).
+
+---
+
+### 17. features JSONB con claves hardcodeadas en seed
+
+**Estado:** el seed de planes inserta un objeto `features` con 13
+claves booleanas hardcodeadas.
+
+**Riesgo:** cuando se agregue una feature nueva en Fases 2+ y no se
+agregue al JSONB de los planes existentes en DB, el código que evalúe
+permisos va a leer esa clave como `undefined` (falsy) en lugar de
+`false`. Comportamiento silencioso.
+
+**Mitigación a futuro (antes de Fase 2):**
+- Agregar schema de validación (Zod) del JSONB `features` con todas
+  las claves requeridas y sus defaults.
+- O usar un helper `hasFeature(plan, key)` que devuelva `false` cuando
+  la clave no existe.
+
+**Severidad:** MEDIO.
+**Reevaluar:** antes de arrancar Fase 2.

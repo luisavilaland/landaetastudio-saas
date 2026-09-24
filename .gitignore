@@ -96,6 +96,12 @@ packages/db/check-*.ts
 packages/db/*.json
 !packages/db/package.json
 
+# Scripts scratch con credenciales potenciales
+/*.mjs
+/check-*.mjs
+/verify-*.mjs
+/empirical-*.mjs
+
 # Database backups
 backup-*.sql
 *.backup

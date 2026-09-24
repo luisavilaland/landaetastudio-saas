@@ -201,7 +201,7 @@ openssl rand -base64 32
 
 ---
 
-## 🗄 Fase 1 — Modelo de datos ⏱ 2-3 días · ARRANCAR AHORA
+## 🗄 Fase 1 — Modelo de datos ⏱ 2-3 días · ✅ Completada (2026-09-23)
 
 **Objetivo:** Crear las tres tablas nuevas, aplicar RLS, y generar la migración con Drizzle ORM.
 
@@ -212,6 +212,8 @@ openssl rand -base64 32
 5. Insertar los tres planes en la tabla `plans` (UYU 2.000, 4.000, 8.000)
 6. Asignar suscripción activa a los tenants existentes (tienda1, tienda2)
 7. Agregar las 3 nuevas variables de entorno a Vercel
+
+**Estado:** ✅ Completada (2026-09-23). Ver bitácora para detalle. T8-T10 cerrados.
 
 ### Tabla `subscriptions` (con RLS)
 
