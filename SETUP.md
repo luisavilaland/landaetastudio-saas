@@ -33,23 +33,20 @@ pnpm db:seed
 | `pnpm db:migrate`  | Aplica migraciones pendientes       |
 | `pnpm db:seed`     | Limpia la BD y crea datos de prueba |
 
-## Migraciones — Estado actual
+## Migraciones
 
-**Importante:** la base de datos actual de `develop` NO tiene el
-tracking completo de migraciones en `drizzle.__drizzle_migrations`.
-Solo la última migración (0014) está registrada.
+Para una base de datos nueva, el flujo es:
 
-Consecuencias:
-- `pnpm db:migrate` funciona contra la DB actual (no reintenta).
-- `pnpm db:migrate` en una DB fresca va a fallar ("already exists").
+```bash
+pnpm install
+pnpm db:migrate
+pnpm db:seed
+```
 
-Para trabajar con una DB fresca:
-- Opción A: usar el script `apply-all-migrations.ts` (pendiente de
-  documentar).
-- Opción B: esperar a Fase 3 (branching Neon).
-
-Tracking en CI: hoy apunta a la misma DB, funciona. Si se cambia,
-revisar este punto.
+- `pnpm db:migrate` ejecuta `drizzle-kit migrate` y aplica las migraciones del journal a la base de datos.
+- `pnpm db:generate` solo se ejecuta cuando se modifica el schema.
+- `0000_baseline.sql` representa el estado actual del schema.
+- El historial anterior al baseline está preservado en `docs/migrations-archive/2026-09-24/`.
 
 ## Datos de Prueba
 

@@ -5,7 +5,7 @@
     "dev": "turbo dev",
     "start": "turbo run start",
     "db:generate": "cd packages/db && drizzle-kit generate",
-    "db:migrate": "cd packages/db && drizzle-kit up",
+    "db:migrate": "cd packages/db && drizzle-kit migrate",
     "db:seed": "tsx packages/db/seed.ts",
     "setup": "pnpm install && pnpm db:generate && pnpm db:migrate && pnpm db:seed",
     "lint": "turbo run lint",
