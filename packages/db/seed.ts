@@ -180,6 +180,10 @@ async function seed() {
     .from(schema.dbPlans)
     .where(eq(schema.dbPlans.slug, 'business'))
 
+  // Nota: setMonth(+1) tiene un edge case en JS: si hoy es 31 de enero,
+  // setMonth(1) da 3 de marzo (febrero no tiene 31 días). Es aceptable
+  // para el seed de dev — en producción, currentPeriodEnd lo setea el
+  // webhook de payment.created de MercadoPago, no este seed.
   const periodEnd = new Date()
   periodEnd.setMonth(periodEnd.getMonth() + 1)
 

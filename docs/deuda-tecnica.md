@@ -356,3 +356,24 @@ apunta a Neon prod (configuración errónea), el guard no protege.
 
 **Severidad:** MEDIO.
 **Reevaluar:** antes de Fase 3 (onboarding de tenants reales).
+
+---
+
+### 17. features JSONB con claves hardcodeadas en seed
+
+**Estado:** el seed de planes inserta un objeto `features` con 13
+claves booleanas hardcodeadas.
+
+**Riesgo:** cuando se agregue una feature nueva en Fases 2+ y no se
+agregue al JSONB de los planes existentes en DB, el código que evalúe
+permisos va a leer esa clave como `undefined` (falsy) en lugar de
+`false`. Comportamiento silencioso.
+
+**Mitigación a futuro (antes de Fase 2):**
+- Agregar schema de validación (Zod) del JSONB `features` con todas
+  las claves requeridas y sus defaults.
+- O usar un helper `hasFeature(plan, key)` que devuelva `false` cuando
+  la clave no existe.
+
+**Severidad:** MEDIO.
+**Reevaluar:** antes de arrancar Fase 2.
