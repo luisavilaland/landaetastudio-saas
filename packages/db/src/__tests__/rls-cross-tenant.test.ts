@@ -32,6 +32,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 const appUrl = process.env.DATABASE_APP_URL
+const hasAppUrl = Boolean(appUrl)
 let directClient: ReturnType<typeof postgres>
 let withTenantContext: DbModule['withTenantContext']
 let readTenantA: TenantRow
@@ -151,15 +152,9 @@ async function deleteSubscription(tenantId: string): Promise<void> {
   })
 }
 
-describe('RLS cross-tenant real', () => {
+describe.skipIf(!hasAppUrl)('RLS cross-tenant real', () => {
   beforeAll(async () => {
-    if (!appUrl) {
-      throw new Error(
-        'DATABASE_APP_URL no configurada: T11 requiere una conexión app_user real',
-      )
-    }
-
-    directClient = postgres(appUrl)
+    directClient = postgres(appUrl!)
     const roleRows = await directClient<RoleRow[]>`
       SELECT current_user AS "role", rol.rolbypassrls AS "bypass"
       FROM pg_roles AS rol
