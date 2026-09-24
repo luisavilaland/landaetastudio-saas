@@ -31,8 +31,14 @@ function getErrorMessage(error: unknown): string {
   return String(error)
 }
 
+function isUsableUrl(url: string | undefined): url is string {
+  if (!url) return false
+  if (/localhost|127\.0\.0\.1|dummy/i.test(url)) return false
+  return true
+}
+
 const appUrl = process.env.DATABASE_APP_URL
-const hasAppUrl = Boolean(appUrl)
+const hasAppUrl = isUsableUrl(appUrl)
 let directClient: ReturnType<typeof postgres>
 let withTenantContext: DbModule['withTenantContext']
 let readTenantA: TenantRow
