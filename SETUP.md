@@ -214,6 +214,27 @@ Flags disponibles (vía `engram obsidian-export`):
 - **Nota**: Space Bunny es gratuito por tiempo limitado. Si deja de estar disponible, actualizar `.gga` (línea `PROVIDER`) y `~/.config/opencode/opencode.jsonc` (campo `model`).
 - **Alternativa estable**: `anthropic/claude-sonnet-4-5` o similar (pago, no expira).
 
+## Herramientas opcionales (ecosistema Gentleman)
+
+El proyecto integra herramientas globales del entorno de un dev
+(gentle-ai, Engram, GGA) pero son **opcionales para contribuir**:
+
+- `.gga` está commiteado, pero solo se usa si tenés `gga` en PATH.
+- El pre-commit hook de GGA es opt-in:
+
+      git config core.hooksPath .githooks
+
+- Si no tenés GGA instalado, el hook sale limpio (exit 0) y no
+  bloquea commits.
+- `pnpm vault:export` requiere Engram, pero no es obligatorio
+  para contribuir al código.
+- El MCP `obsidian` en `opencode.json` local requiere tener
+  `second-brain-lite-mcp` accesible, pero solo se activa si usás
+  OpenCode.
+
+Si clonás el repo sin estas herramientas, todo el flujo de
+desarrollo normal funciona sin cambios.
+
 ## Tunnel para Webhooks (dotunnel)
 
 Para recibir webhooks de MercadoPago en desarrollo, necesitas exponer tu localhost públicamente usando `dotunnel`.

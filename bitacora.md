@@ -1471,3 +1471,21 @@ y el ecosistema Gentleman (gentle-ai + Engram + GGA) al flujo de trabajo.
 git diff origin/develop -- bitacora.md | grep "^-" | grep -v "^---"
 -- Esperado: 0 lineas eliminadas.
 
+---
+
+## 2026-09-25 — Hook GGA tolerante (review #142)
+
+**Contexto.** Luis señaló en el review del PR #142 que el hook
+de GGA bloqueaba commits si el dev no tenía el ecosistema Gentleman
+instalado. Fix aplicado antes del merge.
+
+**Cambios:**
+
+- `.githooks/pre-commit` versionable, tolerante: verifica
+  `command -v gga` antes de ejecutar. Si no está, sale con 0.
+- Opt-in via `git config core.hooksPath .githooks`.
+- SETUP.md documenta que GGA/Engram/gentle-ai son opcionales.
+- `.gga` mantiene su config; solo se usan si `gga` está en PATH.
+
+**Verificación:** git diff append-only OK.
+
