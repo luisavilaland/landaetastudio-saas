@@ -1392,3 +1392,82 @@ AGENTS.md (PR B).
 
 **DoD final.** Lint 6/6, typecheck 9/9, 474 tests en 57 archivos y build 3/3.
 
+---
+
+## 2026-09-24 — Fase 0: vault de conocimiento
+
+- Se creó `vault/` con la estructura de carpetas y su README Markdown.
+- Se agregaron las exclusiones de Obsidian en `.gitignore`.
+- Se configuró el MCP `second-brain-lite-mcp` en la configuración global de opencode, apuntando a `vault/`.
+- Se documentó la apertura y el uso del vault en `SETUP.md`.
+- No se instalaron paquetes ni se ejecutó el servidor MCP.
+
+---
+
+## 2026-09-24 — Activación local del MCP Obsidian
+
+- La configuración global de opencode mantiene el MCP `obsidian` definido con `enabled: false`.
+- El `opencode.json` del proyecto lo habilita con `enabled: true` y conserva el plugin local existente.
+- La ruta `vault/` queda compartida por el patrón global + local.
+
+---
+
+## 2026-09-25 — Integracion Obsidian + ecosistema Gentleman
+
+**Contexto.** Se integra Obsidian como base de conocimiento del proyecto
+y el ecosistema Gentleman (gentle-ai + Engram + GGA) al flujo de trabajo.
+
+**Cambios:**
+
+1. vault/ creado en la raiz del repo con 7 carpetas (00_Inbox,
+   01_ADRs, 02_Bitacora, 03_Deuda, 04_Fases, 05_Specs, 06_Engram)
+   + README con convenciones.
+
+2. .gitignore: excluye vault/.obsidian/, vault/.trash/, .atl/.
+
+3. MCP obsidian en patron global + local:
+   - Global (~/.config/opencode/opencode.json): enabled: false.
+   - Local (opencode.json en la raiz): enabled: true.
+   Asi se activa solo en proyectos que tienen vault/.
+
+4. gentle-ai 3.7.0 instalado globalmente. Upgrade fallo primero desde
+   2.9.1 por un bug de module path (intentaba /v2 con tag v3.7.0).
+   Fix: instalar manualmente con
+   `go install github.com/gentleman-programming/gentle-ai/v3/cmd/gentle-ai@latest`.
+
+5. Engram 2.2.0 registrado como MCP en opencode.jsonc (mayor prioridad).
+
+6. GGA v2.10.1 instalado como pre-commit hook. Configuracion en `.gga`
+   (commiteada). Provider: opencode. Rules file: AGENTS.md.
+
+7. Script `pnpm vault:export` agregado para exportar memorias de Engram
+   al vault.
+
+**Hallazgos durante la instalacion:**
+
+- gentle-ai 2.9.1 tenia self-upgrade roto (module path incorrecto
+  para v3+). Fix manual documentado.
+- GGA v2.10.1 tiene un bug: `gga init --help` ejecuta `init` real
+  en vez de mostrar ayuda. Mismo problema con `install`. Reportado
+  para consideracion futura.
+- El install de gentle-ai con la v2.9.1 dejo Engram sin registrar.
+  El re-sync con la v3.7.0 lo registro correctamente.
+
+**Deuda tecnica:**
+
+- Pendiente: configurar `engram obsidian-export --watch` como proceso
+  en background si se quiere sincronizacion continua.
+- Pendiente: abrir el vault en Obsidian (GUI) para verificar la
+  estructura visualmente.
+
+**Validacion:**
+
+- `opencode mcp list`: 7 MCPs, incluye engram + obsidian.
+- `gentle-ai --version`: 3.7.0.
+- `engram --version`: 2.2.0.
+- `gga --version`: v2.10.1.
+
+**Verificar bitacora append-only:**
+git diff origin/develop -- bitacora.md | grep "^-" | grep -v "^---"
+-- Esperado: 0 lineas eliminadas.
+

@@ -158,6 +158,55 @@ pnpm --filter admin dev      # http://localhost:3001
 pnpm --filter superadmin dev # http://localhost:3002
 ```
 
+## Vault de Obsidian
+
+- El vault vive en `vault/` y se trackea con Git.
+- Para abrirlo en Obsidian: **File → Open folder as vault** y seleccionar `vault/`.
+- El agente puede leer y escribir Markdown del vault mediante MCP (`second-brain-lite-mcp`).
+- Engram exportará a `vault/06_Engram/` cuando esté instalado.
+- El MCP `obsidian` está definido globalmente en `~/.config/opencode/opencode.json` con `enabled: false`.
+- Cada proyecto que tenga un vault lo habilita creando un `opencode.json` local con:
+
+```json
+{
+  "mcp": {
+    "obsidian": { "enabled": true }
+  }
+}
+```
+
+- El path `vault/` se resuelve contra el root del proyecto, así que la misma config global sirve para todos los proyectos que sigan la convención `vault/`.
+
+## Exportación de Engram al vault
+
+`engram` exporta las memorias del agente a Markdown compatible con Obsidian. Comando:
+
+```bash
+pnpm vault:export
+```
+
+Flags disponibles (vía `engram obsidian-export`):
+
+- `--vault <path>`: raíz del vault (fijo: `vault/`).
+- `--project <name>`: filtrar por proyecto.
+- `--all`: exportar todos los proyectos.
+- `--limit <n>`: limitar la cantidad de observaciones exportadas.
+- `--since <date>`: exportar después de una fecha.
+- `--force`: ignorar el estado incremental y reexportar.
+- `--graph-config <mode>`: configurar el layout del grafo.
+- `--watch`: activar auto-sync.
+- `--interval <duration>`: intervalo de watch (default: `10m`).
+
+## Ecosistema Gentleman AI
+
+- gentle-ai 3.7.0 está instalado globalmente.
+- Engram 2.2.0 está registrado como MCP en `~/.config/opencode/opencode.jsonc` (mayor prioridad en el layering de OpenCode).
+- Los MCPs en `opencode.json` (menor prioridad) siguen activos: `open-design`, `supabase` y `obsidian` (`enabled: false` global).
+- GGA v2.10.1 está instalado como pre-commit hook (`.git/hooks/pre-commit`).
+- La configuración de GGA vive en `.gga` (commiteada).
+- Los archivos revisados por GGA están definidos en `FILE_PATTERNS`; se excluyen tests, `dist`, `build`, `node_modules` y `vault/`.
+- Para commits triviales (docs, configuración) se puede usar `git commit --no-verify` para saltar la revisión.
+
 ## Tunnel para Webhooks (dotunnel)
 
 Para recibir webhooks de MercadoPago en desarrollo, necesitas exponer tu localhost públicamente usando `dotunnel`.

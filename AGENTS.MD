@@ -430,3 +430,9 @@ Considerar cerrar y abrir una nueva cuando:
 - Después de completar una tarea, antes de arrancar la siguiente.
 
 Ejemplo: en T6, la sesión anterior quedó trabada ~17 minutos en un editor interactivo durante un rebase. Abrir sesión nueva con contexto explícito resolvió el problema en minutos.
+
+## Herramientas del ecosistema Gentleman
+
+- GGA valida cada commit contra este `AGENTS.md` a través de `.gga`.
+- Si GGA falla por razones de red o timeout, se puede saltar con `git commit --no-verify`.
+- Las reglas de este archivo siguen siendo la fuente de verdad.
