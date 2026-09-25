@@ -207,6 +207,13 @@ Flags disponibles (vía `engram obsidian-export`):
 - Los archivos revisados por GGA están definidos en `FILE_PATTERNS`; se excluyen tests, `dist`, `build`, `node_modules` y `vault/`.
 - Para commits triviales (docs, configuración) se puede usar `git commit --no-verify` para saltar la revisión.
 
+### Modelo de IA configurado
+
+- **OpenCode (default)**: `opencode/space-bunny-free` (Space Bunny Free).
+- **GGA (code review)**: mismo modelo via `PROVIDER="opencode:opencode/space-bunny-free"`.
+- **Nota**: Space Bunny es gratuito por tiempo limitado. Si deja de estar disponible, actualizar `.gga` (línea `PROVIDER`) y `~/.config/opencode/opencode.jsonc` (campo `model`).
+- **Alternativa estable**: `anthropic/claude-sonnet-4-5` o similar (pago, no expira).
+
 ## Tunnel para Webhooks (dotunnel)
 
 Para recibir webhooks de MercadoPago en desarrollo, necesitas exponer tu localhost públicamente usando `dotunnel`.
