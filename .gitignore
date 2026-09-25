@@ -105,3 +105,11 @@ packages/db/*.json
 # Database backups
 backup-*.sql
 *.backup
+
+# Obsidian
+vault/.obsidian/
+vault/.obsidian/workspace.json
+vault/.trash/
+
+# gentle-ai skill registry (artefacto local)
+.atl/

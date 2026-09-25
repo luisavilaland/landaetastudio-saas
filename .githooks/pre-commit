@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# GGA pre-commit hook (opcional)
+# Solo corre si GGA está disponible en PATH.
+# Si no, sale limpio para no bloquear commits de devs sin el
+# ecosistema Gentleman.
+if ! command -v gga >/dev/null 2>&1; then
+  exit 0
+fi
+gga run || exit 1
