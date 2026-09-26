@@ -53,17 +53,34 @@ El decremento calcula el valor nuevo a partir del leído (**no `stock - qty` at�
 
 ## 2. Política de migraciones inmutables — formalizar en CI
 
-**Contexto real:** AGENTS.md ya establece la regla _“Migraciones de DB inmutables: ante un cambio de schema, genera una nueva migración con `pnpm db:generate`. Jamás modifiques migraciones existentes”_. Hasta ahora es solo una regla de proceso (humana) — no hay guard automatizado.
+**Estado:** ⚠️ **PARCIAL** (verificado 2026-09-26). El guard existe, está cableado en CI y funciona; falta cerrar la cobertura del archive y documentar el comando en SETUP.md.
 
-**Plan propuesto (no implementar ahora):**
+**Lo que YA está hecho (implementado, no era lo que este item decía):**
 
-1. Script de verificación `packages/db/scripts/check-migrations.sh` (o task de turbo `db:check-migrations`):
-   - Compara los archivos `.sql` de `packages/db/migrations` contra el commit base de la rama (ej: `git diff --name-only origin/develop...HEAD -- packages/db/migrations`).
-   - Falla si algún `.sql` existente fue **modificado** (no debe permitirse; solo ADD de nuevos archivos).
-2. Hook en CI: agregar paso al workflow existente (o job nuevo `db-migrations-check` en `.github/workflows/`) que corre el script en cada PR a `develop`.
-3. Opcional: integración con `drizzle-kit generate` — documentar en AGENTS.md que el flujo canónico es `pnpm db:generate` y verificar que no genere diff en migraciones existentes (`git status` limpio después de generate).
+- `scripts/check-migrations.sh` (91 líneas, fail-closed) con comentarios de las decisiones no obvias.
+- Cableado en `.github/workflows/ci.yml` con `fetch-depth: 0` para poder diffear contra `origin/develop`.
+- Criterio 1 del plan (`.sql` viejo modificado → falla con mensaje claro) ✅
+- Criterio 2 del plan (`.sql` nuevo → pasa) ✅
 
-**Criterios de aceptación:** un `.sql` viejo modificado a mano → el check falla con mensaje claro; un `.sql` nuevo → pasa. Documentar el comando en SETUP.md → Comandos de Base de Datos.
+**Lo que FALTA:**
+
+1. Documentar el comando en `SETUP.md` → Comandos de Base de Datos. Hoy solo se menciona en `AGENTS.md:74`. _(criterio 3 del plan original)_
+2. ~~Cobertura del archive~~ → **resuelto 2026-09-26** (ver abajo).
+
+**Gap encontrado y corregido (2026-09-26).** El pathspec del guard cubría solo `packages/db/migrations/`. El squash del 2026-09-24 movió las migraciones incrementales `0005`–`0015` a `docs/migrations-archive/2026-09-24/`, **fuera de todo pathspec**: quedaban desprotegidas. Se podría reescribir `0013_ensure_rls_and_grants.sql` y el CI pasaba verde.
+
+Evidencia del gap (pathspec viejo vs nuevo sobre la misma edición):
+
+```
+PATHSPEC VIEJO  → (vacío)      el guard NO detectaba la edición
+PATHSPEC NUEVO  → docs/migrations-archive/2026-09-24/0013_ensure_rls_and_grants.sql
+```
+
+**Fix aplicado:** el pathspec ahora incluye `docs/migrations-archive/*/*.sql` y `*.json`. El bloque de excepción `archive_marker` quedó intacto. Verificado que editar un `.sql` del archive ahora falla con exit 1.
+
+**Nota sobre la excepción de agregados.** El guard usa `--diff-filter=MD`, que excluye `A` (Added) por diseño: las migraciones nuevas deben poder agregarse. Consecuencia: **un archivo nuevo dentro del archive también pasa**. Es coherente con la política append-only, pero si en el futuro el archive debe ser un congelado estricto (cero archivos nuevos), hace falta un flag dedicado. No se implementó porque excede el alcance de este cierre.
+
+**Lección de proceso.** Un guard puede pasar verde y aun así no cubrir lo que dice proteger. Eso es peor que no tener guard, porque genera confianza falsa. Al auditar un control, verificar **cobertura**, no presencia.
 
 **Implementación (2026-08-11, rama `chore/quality-and-docs`):**
 
