@@ -22,6 +22,18 @@ Este vault es la base de conocimiento del proyecto. Contiene la documentación, 
 
 Para exportar/refrescar: `pnpm vault:export`.
 
+### Nota sobre numeración
+
+La convención 00-05 aplica solo a contenido human-curated. El
+contenido tool-managed (`engram/`, `.obsidian/`, `.trash/`) no sigue
+la convención numerada porque su estructura la define la tool, no
+el proyecto.
+
+En particular, **no existe `vault/06_Engram/`**: `engram obsidian-export`
+escribe siempre en `vault/engram/` y el subdirectorio no es configurable.
+El directorio `06_Engram/` que existió brevemente en el PR #143 fue
+eliminado por estar vacío y ser engañoso.
+
 ## Convenciones
 
 - Los ADRs se guardan en `01_ADRs/`.

@@ -1554,3 +1554,8 @@ byte del em-dash). Irreparable automáticamente. Se deja como
 evidencia del daño original.
 
 **Backup:** `%TEMP%\opencode\bitacora-backup.md` (estado pre-fix).
+
+**Pérdida previa detectada.** Además del mojibake, hay 15 líneas
+con U+FFFD (replacement character) donde el byte fuente ya se
+había perdido antes de cualquier fix. Ejemplo: `simulaci�n` donde
+un `ó` desapareció. Irreparables sin inventar contenido.
