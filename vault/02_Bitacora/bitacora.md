@@ -1855,6 +1855,7 @@ Verificar cobertura, no presencia.
 **Nota sobre el test de archivo nuevo.** Se verificaron las dos
 variantes (untracked y trackeado con `git add`) y ambas pasan. No es
 un bug: las migraciones nuevas deben poder agregarse.
+
 ---
 
 ## 2026-09-26 - Completar cierre pre-Fase 2 (format:check, SETUP, item 32)
@@ -1891,5 +1892,3 @@ cambios -> Engram -> export al vault -> staging (incluyendo
 quedo fuera del commit y los archivos quedaron huerfanos.
 
 **Severidad:** CERRADA.
-
----
