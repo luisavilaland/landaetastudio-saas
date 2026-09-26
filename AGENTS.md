@@ -81,11 +81,14 @@ Los servicios externos (R2, Resend, Sentry) deben tener fallback null si faltan 
 Antes de considerar cualquier tarea como finalizada, el código debe ejecutar sin errores:
 
 ```bash
-pnpm lint        # eslint + prettier
-pnpm typecheck   # tsc --noEmit en todas las apps y paquetes
-pnpm build       # next build en las tres apps
-pnpm test        # vitest (todos los tests existentes)
+pnpm lint          # eslint (turbo run lint)
+pnpm format:check  # prettier --check sobre **/*.md (corre en CI)
+pnpm typecheck     # tsc --noEmit en todas las apps y paquetes
+pnpm build         # next build en las tres apps
+pnpm test          # vitest (todos los tests existentes)
 ```
+
+> `pnpm lint` NO corre prettier. El check de formato de markdown es `pnpm format:check`, y corre en el job `build` de CI. Si tocás archivos `.md`, corré `pnpm format:check` antes de commitear o el CI falla.
 
 ⚠️ `ignoreBuildErrors` DEBE ser `false` en `next.config.mjs`. Nunca usar `ignoreBuildErrors: true`.
 
@@ -520,7 +523,7 @@ Si terminaste una tarea con decisiones no triviales y NO grabaste memoria, la ta
 
 - [ ] ¿Grabaste las memorias clave en Engram proactivamente?
 - [ ] ¿Actualizaste la bitácora (append-only)?
-- [ ] ¿DoD verde (`pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm build`)?
+- [ ] ¿DoD verde (`pnpm lint` / `pnpm format:check` / `pnpm typecheck` / `pnpm test` / `pnpm build`)?
 - [ ] ¿GGA no bloqueó (o `--no-verify` documentado)?
 - [ ] ¿Exportaste Engram al vault? (`pnpm vault:export`)
 - [ ] ¿Docs afectadas actualizadas?

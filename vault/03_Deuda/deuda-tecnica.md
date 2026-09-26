@@ -53,21 +53,20 @@ El decremento calcula el valor nuevo a partir del leído (**no `stock - qty` at�
 
 ## 2. Política de migraciones inmutables — formalizar en CI
 
-**Estado:** ⚠️ **PARCIAL** (verificado 2026-09-26). El guard existe, está cableado en CI y funciona; falta cerrar la cobertura del archive y documentar el comando en SETUP.md.
+**Estado:** ✅ **RESUELTO** (verificado y completado 2026-09-26). Los tres criterios de aceptación del plan original se cumplen.
 
-**Lo que YA está hecho (implementado, no era lo que este item decía):**
+**Criterios de aceptación:**
 
-- `scripts/check-migrations.sh` (91 líneas, fail-closed) con comentarios de las decisiones no obvias.
-- Cableado en `.github/workflows/ci.yml` con `fetch-depth: 0` para poder diffear contra `origin/develop`.
-- Criterio 1 del plan (`.sql` viejo modificado → falla con mensaje claro) ✅
-- Criterio 2 del plan (`.sql` nuevo → pasa) ✅
+1. ✅ Un `.sql` viejo modificado a mano → el check falla con mensaje claro. Verificado con `0013_ensure_rls_and_grants.sql`: exit 1, nombra el archivo.
+2. ✅ Un `.sql` nuevo → pasa. Verificado en ambas variantes (untracked y con `git add`).
+3. ✅ Documentado en `SETUP.md` → sección **Migraciones → Guard de migraciones inmutables**, con fila agregada en la tabla de **Verificación del entorno**.
 
-**Lo que FALTA:**
+**Lo que YA estaba hecho (no era lo que este item decía):**
 
-1. Documentar el comando en `SETUP.md` → Comandos de Base de Datos. Hoy solo se menciona en `AGENTS.md:74`. _(criterio 3 del plan original)_
-2. ~~Cobertura del archive~~ → **resuelto 2026-09-26** (ver abajo).
+- `scripts/check-migrations.sh` (fail-closed) con comentarios de las decisiones no obvias.
+- Cableado en `.github/workflows/ci.yml` (job `build`) con `fetch-depth: 0` para poder diffear contra `origin/develop`.
 
-**Gap encontrado y corregido (2026-09-26).** El pathspec del guard cubría solo `packages/db/migrations/`. El squash del 2026-09-24 movió las migraciones incrementales `0005`–`0015` a `docs/migrations-archive/2026-09-24/`, **fuera de todo pathspec**: quedaban desprotegidas. Se podría reescribir `0013_ensure_rls_and_grants.sql` y el CI pasaba verde.
+**Gap encontrado y corregido (2026-09-26).** El pathspec del guard cubría solo `packages/db/migrations/`. El squash del 2026-09-24 movió las migraciones incrementales `0005`–`0015` a `docs/migrations-archive/2026-09-24/`, **fuera de todo pathspec**: quedaban desprotegidas. Se podía reescribir `0013_ensure_rls_and_grants.sql` y el CI pasaba verde.
 
 Evidencia del gap (pathspec viejo vs nuevo sobre la misma edición):
 
@@ -76,11 +75,15 @@ PATHSPEC VIEJO  → (vacío)      el guard NO detectaba la edición
 PATHSPEC NUEVO  → docs/migrations-archive/2026-09-24/0013_ensure_rls_and_grants.sql
 ```
 
-**Fix aplicado:** el pathspec ahora incluye `docs/migrations-archive/*/*.sql` y `*.json`. El bloque de excepción `archive_marker` quedó intacto. Verificado que editar un `.sql` del archive ahora falla con exit 1.
+**Fix aplicado:** el pathspec ahora incluye `docs/migrations-archive/*/*.sql` y `*.json`. El bloque de excepción `archive_marker` quedó intacto.
 
-**Nota sobre la excepción de agregados.** El guard usa `--diff-filter=MD`, que excluye `A` (Added) por diseño: las migraciones nuevas deben poder agregarse. Consecuencia: **un archivo nuevo dentro del archive también pasa**. Es coherente con la política append-only, pero si en el futuro el archive debe ser un congelado estricto (cero archivos nuevos), hace falta un flag dedicado. No se implementó porque excede el alcance de este cierre.
+**Nota informativa — agregados en el archive.** El guard usa `--diff-filter=MD`, que excluye `A` (Added) por diseño: las migraciones nuevas deben poder agregarse. Consecuencia: un archivo nuevo dentro del archive también pasa. Esto es **coherente con el criterio 2** y no queda pendiente. Si en el futuro el archive debe ser un congelado estricto (cero archivos nuevos), hace falta un flag dedicado; sería una decisión de producto, no un bug.
 
 **Lección de proceso.** Un guard puede pasar verde y aun así no cubrir lo que dice proteger. Eso es peor que no tener guard, porque genera confianza falsa. Al auditar un control, verificar **cobertura**, no presencia.
+
+**Severidad:** CERRADA.
+
+**Urgencia:** CERRADA.
 
 **Implementación (2026-08-11, rama `chore/quality-and-docs`):**
 
@@ -666,3 +669,27 @@ de un `prettier --write` global.
 **Severidad:** CERRADA.
 
 **Urgencia:** CERRADA.
+
+## 32. MCP GitHub con credenciales invalidas
+
+**Estado:** abierto (2026-09-26).
+
+**Contexto:** el servidor MCP de GitHub responde "Bad credentials" a
+cualquier operacion (`github_create_pull_request` fallo con
+`-32603 Authentication Failed`).
+
+**Consecuencia:** toda operacion de GitHub via MCP falla. Incluye
+crear PRs, comments, labels y issues.
+
+**Mitigacion actual:** usar `gh` CLI. No esta en PATH en esta maquina;
+vive en `C:\Users\exodo\AppData\Local\Temp\gh\bin\gh.exe` y autentica
+como `EdgarVz`. El metodo universal para localizarlo esta documentado
+en `PROMPTS.md`.
+
+**Resolucion:** re-autenticar el MCP o eliminarlo del `opencode.json`
+si no se usa. Mientras exista, cada agente que intente GitHub via MCP
+va a perder tiempo diagnosticando un fallo que no es del repo.
+
+**Severidad:** INFO.
+
+**Urgencia:** INFO.

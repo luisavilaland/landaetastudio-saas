@@ -1855,3 +1855,41 @@ Verificar cobertura, no presencia.
 **Nota sobre el test de archivo nuevo.** Se verificaron las dos
 variantes (untracked y trackeado con `git add`) y ambas pasan. No es
 un bug: las migraciones nuevas deben poder agregarse.
+---
+
+## 2026-09-26 - Completar cierre pre-Fase 2 (format:check, SETUP, item 32)
+
+**Contexto.** Segunda ronda del cierre pre-Fase 2, sobre el PR #150.
+Completa los pendientes que quedaron abiertos: `pnpm format:check`
+no estaba en el DoD de AGENTS.md pero corre en CI, y el criterio 3
+del item 2 (documentar el guard) seguia sin cumplirse.
+
+**Cambios.**
+
+- `AGENTS.md`: `pnpm format:check` agregado al DoD y al checklist de
+  cierre de PR. Ademas se corrigio una afirmacion falsa: el DoD decia
+  `pnpm lint # eslint + prettier`, pero `pnpm lint` es `turbo run lint`
+  y corre SOLO eslint. El check de markdown es `pnpm format:check`.
+- `SETUP.md`: nueva subseccion **Migraciones -> Guard de migraciones
+  inmutables** con el comando, que hace y cuando corre. Fila agregada
+  en la tabla de **Verificacion del entorno**.
+- `deuda-tecnica.md`: item 2 pasa de PARCIAL a **RESUELTO** (los 3
+  criterios cumplidos). Nuevo item 32: MCP GitHub con credenciales
+  invalidas.
+
+**Nota sobre la seccion de SETUP.** El guard se documento en
+`## Migraciones`, no en `## Verificacion del entorno` como se pedia:
+esa seccion es una tabla de herramientas externas (gentle-ai, engram,
+GGA, obsidian), no de scripts del repo. `## Migraciones` ya
+documentaba el baseline y el archive, asi que el guard queda al lado
+de lo que protege. Se agrego igual la fila en la tabla de
+Verificacion del entorno, para que quien valide el entorno lo vea.
+
+**Orden de cierre del PR.** Este PR respeta el orden correcto:
+cambios -> Engram -> export al vault -> staging (incluyendo
+`vault/engram/`) -> commit -> push. En el commit anterior el export
+quedo fuera del commit y los archivos quedaron huerfanos.
+
+**Severidad:** CERRADA.
+
+---
