@@ -44,3 +44,12 @@ eliminado por estar vacío y ser engañoso.
 
 - El vault se abre con Obsidian, pero sus archivos son Markdown plano.
 - Engram se exporta con `pnpm vault:export` (ver "Contenido tool-managed").
+
+## Uso del vault en el workflow
+
+- **Bitácora** (`02_Bitacora/bitacora.md`) — append-only, una entrada por PR.
+- **ADRs** (`01_ADRs/`) — una decisión por cambio arquitectónico.
+- **Deuda** (`03_Deuda/deuda-tecnica.md`) — un ítem por hallazgo.
+- **Fases** (`04_Fases/`) — cierre de cada fase.
+- **Specs** (`05_Specs/`) — blueprint, arquitectura, brief.
+- **Engram** (`engram/`) — tool-managed, se regenera con `pnpm vault:export`.

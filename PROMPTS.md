@@ -4,15 +4,24 @@
 
 ---
 
+## Prompts y el toolkit
+
+Cada prompt de este archivo asume que se usan las 7 herramientas del
+proyecto. Ver `AGENTS.md` sección "Toolkit del proyecto" para el detalle
+completo.
+
+---
+
 ## Tabla de Contenidos
 
 | #   | Sección                                               | Uso principal                           |
 | --- | ----------------------------------------------------- | --------------------------------------- |
+| 0   | [Prompts y el toolkit](#prompts-y-el-toolkit)         | Premisa común de las 7 herramientas     |
 | 1   | [Calibración y análisis](#1-calibración-y-análisis)   | Inicio de sesión, diagnóstico de estado |
 | 2   | [Desarrollo](#2-desarrollo)                           | Features, bugs, templates por tipo      |
 | 3   | [Revisión y verificación](#3-revisión-y-verificación) | Post-tarea, auditoría                   |
 | 4   | [Mantenimiento](#4-mantenimiento)                     | Limpieza, .gitignore                    |
-| 5   | [Commits](#5-commits)                                 | Commit y push                           |
+| 5   | [Commits](#5-commits)                                 | Commit, push, cierre de PR              |
 | 6   | [Documentación](#6-documentación)                     | Actualizar docs                         |
 | 7   | [Refactorización](#7-refactorización)                 | Refactors seguros                       |
 | 8   | [Varios](#8-varios)                                   | Salud, dependencias, revert             |
@@ -40,7 +49,7 @@ Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, vault/05_Specs/arquitectura.md, 
 Actuá como un desarrollador senior que se reincorpora al proyecto. Sin modificar archivos:
 
 1. Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, vault/05_Specs/arquitectura.md, vault/02_Bitacora/bitacora.md, blueprint v2.6 y specs de fase.
-2. Ejecuta `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test`.
+2. Ejecuta `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test`. Grabá las memorias relevantes en Engram y exportá al vault con `pnpm vault:export` antes de reportar.
 3. Explorá la estructura de apps/ y packages/ para detectar cambios.
 
 Reportá:
@@ -57,6 +66,39 @@ Al final preguntame: "¿Qué modalidad de trabajo deseas hoy?"
 4. Verificación post-tarea — DoD + smoke test
 5. Commit y push — git status + mensaje Conventional Commits
 ```
+
+### Verificación del Entorno
+
+Antes de arrancar un PR en un worktree nuevo, verificar:
+
+1. `git worktree list` — confirmar el worktree activo.
+2. `git branch --show-current` — confirmar la branch.
+3. `pnpm install` si falta `node_modules/`.
+4. Copiar `.env.local` del main worktree (gitignored, nunca se commitea).
+5. `opencode mcp list | grep engram` — confirmar "engram connected".
+6. Verificar permisos de edición en el worktree (si bloquea escritura en `vault/`, reportar al humano).
+
+Si algo falla, reportar antes de arrancar el trabajo.
+
+### Orquestar subagentes con Paseo
+
+Para un PR que requiere subagentes en paralelo:
+
+1. Verificar worktree + workspace de Paseo para la branch del PR.
+2. Reportar al humano el plan de despliegue:
+   - Qué subagentes (con perfil Paseo).
+   - Qué scope cada uno.
+   - Qué archivos escribe cada uno (deben ser disjuntos).
+3. Esperar OK humano antes de desplegar.
+4. El humano despliega desde Paseo. El agente NO usa Task(...).
+5. Cuando terminan: el Orquestador integra + bitácora + DoD + commit + PR.
+
+Perfiles disponibles:
+
+- Orquestador (Nemotron 3 Ultra Free).
+- QA/Auditor (MiMo-V2.6-Flash Free).
+- Programador (Big Pickle).
+- Diseñador (Ling 3.0 Flash Fin Free).
 
 ---
 
@@ -77,6 +119,11 @@ Durante la implementación:
 - Aplica la DoD al finalizar (pnpm lint, typecheck, build, test).
 - Si incluye endpoints nuevos o lógica de negocio, añade tests.
 - No ejecutes comandos git sin mi permiso explícito.
+- Grabá memorias en Engram PROACTIVAMENTE cuando:
+  - Tomás una decisión arquitectónica que afecta a futuro.
+  - Descubrís un patrón no obvio o un bug complejo.
+  - Cambiás una regla del proyecto o establecés una convención nueva.
+  NO grabar para tareas triviales (leer archivo, mover carpeta).
 
 Al terminar:
 - Resumen de lo hecho.
@@ -248,13 +295,17 @@ Revisa todos los cambios realizados en esta sesión:
 
 Ejecuta pnpm lint, pnpm typecheck, pnpm build y pnpm test. Si algo falla, corrígelo.
 
+Grabá las memorias clave en Engram (decisiones, bugs, convenciones) y exportá al vault con `pnpm vault:export`.
+
 Sugiere si algún documento debería actualizarse.
 ```
 
 ### Auditoría de Tests
 
 ```
-Audita la cobertura de tests actual. Para cada app y paquete:
+Audita la cobertura de tests actual. La revisión adversarial dual (workflow `judgment-day`) llega en un PR posterior.
+
+Para cada app y paquete:
 - Cuántos tests hay.
 - Qué funcionalidades críticas no tienen tests.
 - Tests redundantes o inestables.
@@ -291,13 +342,16 @@ Revisa artefactos generados en esta sesión. Si alguno no está en .gitignore, a
 ### Commit y Push
 
 ```
-Autorizo explícitamente comandos git.
+Autorizo comandos git.
 
-Haz commit de todos los cambios realizados en esta sesión.
+Hacé commit de los archivos que te indique explícitamente (staging
+explícito, archivo por archivo, NUNCA `git add .` ni `git add -A`).
 
 Antes del commit:
-- git status. Resumen de cambios.
-- Verifica que archivos no deseados estén en .gitignore.
+- `git status` — resumen de cambios.
+- Verificar que los archivos staged sean exactamente los esperados.
+- Verificar que archivos no deseados estén en `.gitignore`.
+- NO ejecutar commit/push/merge/PR sin autorización explícita.
 
 Mensaje en formato Conventional Commits en español:
 <tipo>: <resumen breve>
@@ -305,12 +359,38 @@ Mensaje en formato Conventional Commits en español:
 Cuerpo con viñetas de cambios principales.
 
 Push a la rama actual.
+
+Si GGA bloquea el commit por timeout del provider (red/rate-limit):
+usar `git commit --no-verify` y documentar el motivo en el body
+del commit.
+
+Si el PR corre en un worktree de Paseo: el Orquestador opera con
+`workdir` apuntando al path del worktree. El main worktree queda
+intacto.
 ```
 
 ### Commit y Push (rápido)
 
 ```
 Autorizo comandos git. Haz commit con mensaje Conventional Commits en español y push.
+```
+
+### Cierre de PR completo
+
+```
+Cierre de PR completo
+
+1. Verificar DoD: lint + typecheck + test + build.
+2. Grabación proactiva de memorias en Engram (decisiones, patrones,
+   bugs complejos, convenciones).
+3. Bitácora actualizada (append-only, verificar con
+   `git diff origin/develop -- vault/02_Bitacora/bitacora.md | grep "^-"`).
+4. GGA pre-commit (automático, verificar que no bloqueó; si bloqueó
+   por timeout → `--no-verify` documentado).
+5. Export Engram al vault: pnpm vault:export.
+6. Docs afectadas actualizadas.
+7. Commit + push + PR.
+8. Reportar al humano (NO esperar CI — el humano lo controla).
 ```
 
 ---
@@ -330,6 +410,11 @@ Revisa los cambios realizados. Indica para cada archivo si necesita actualizarse
 - blueprint v2.6 / specs de fase / ADRs: **¿este cambio invalida algún ADR, spec o el blueprint?**
 
 Muéstrame la modificación propuesta. No la apliques sin confirmación.
+
+Distinción docs/ vs vault/:
+- `docs/`: docs operativos que herramientas leen programáticamente (migrations-archive/, superpowers/specs, superpowers/plans) y docs de workflow (WORKFLOW.md, README stub).
+- `vault/`: docs narrativos para humanos (ADRs, bitácora, deuda, fases, specs narrativos).
+- Si una doc es para el agente → docs/. Si es para humanos → vault/.
 ```
 
 ---
@@ -485,6 +570,8 @@ Regla: Si el spec toca suscripciones, referenciar `subscription-lifecycle.md` en
 ```
 Voy a escribir el plan de ejecución para la Fase [N]: [NOMBRE].
 
+Creá el worktree de la fase con `paseo_create_workspace` y registrá el plan en Engram.
+
 Estructura (docs/superpowers/plans/2026-09-faseN-nombre.md):
 - Resumen de la fase (1-2 líneas)
 - Tasks desglosadas (cada task: descripción, archivos a tocar, estimación)
@@ -528,7 +615,11 @@ Fase [N] completada. Verificación de cierre:
    - [ ] Health checks OK en 3 apps
    - [ ] E2E pasando en CI (self-hosted)
 
-5. **Git:**
+5. **Memoria y docs:**
+   - [ ] Export de Engram al vault: `pnpm vault:export`
+   - [ ] Tabla de Contenidos de README.md actualizada (nuevas secciones/prompts)
+
+6. **Git:**
    - [ ] Commit Conventional Commits en español
    - [ ] Push a develop
    - [ ] PR develop → main si es release (tag vX.Y.Z)
@@ -553,10 +644,12 @@ Reportar discrepancias sin modificar nada.
 
 ## 13. Auditoría por tarea
 
-Después del PR de una tarea, despachar 2 subagentes en paralelo:
+Después del PR de una tarea, desplegar 2 subagentes en paralelo desde Paseo (NO con Task(...) interno):
 
-- @QA: correctitud, seguridad, calidad.
-- @Diseñador: arquitectura, extensibilidad, coherencia.
+- QA/Auditor (perfil Paseo, MiMo-V2.6-Flash Free): correctitud, seguridad, calidad.
+- Diseñador (perfil Paseo, Ling 3.0 Flash Fin Free): arquitectura, extensibilidad, coherencia.
+
+Los despliega el humano desde Paseo. El Orquestador integra.
 
 Aplicar regla anti-duplicación: verificar que los hallazgos no estén ya en vault/03_Deuda/deuda-tecnica.md antes de reportar.
 
@@ -586,7 +679,7 @@ Crear migración XX_nombre.sql en packages/db/migrations/.
 
 Checklist obligatorio antes del commit:
 [ ] Solo CREATE TABLE / ALTER TABLE / GRANT idempotente.
-[ ] Sin DROP.
+[ ] Sin DROP (excepto excepción documentada: DROP permitido solo con aprobación humana explícita + justificación en bitácora + PR de reset con README en docs/migrations-archive/).
 [ ] Sin ALTER destructivo sobre tablas existentes.
 [ ] No toca migraciones previas.
 [ ] _journal.json con idx secuencial.

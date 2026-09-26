@@ -1655,3 +1655,66 @@ Quedó `*test.ts,*spec.ts,*d.ts,dist/*,build/*,node_modules/*,vault/*`.
 registrado (no usar `git cherry` después de un squash).
 
 **Verificación:** append-only OK.
+
+---
+
+## 2026-09-26 - PR C: consolidación del toolkit + mecanismos de uso
+
+**Motivación.** En el PR B, Engram se usó solo retroactivamente
+(cuando el humano lo recordó). La documentación existente alcanzaba
+para describir las herramientas, pero no para forzar su uso. Este PR
+cierra esa brecha con reglas explícitas y checklists.
+
+**Alcance.** Documentación del toolkit de 7 herramientas (Paseo,
+Engram, GGA, Gentle-AI, vault, Context7, modelos de IA) más los
+mecanismos que obligan a usarlas. Fuera de alcance (PR D): SDD
+(`sdd-*`), `judgment-day`, review agents (`review-*`) y el piloto de
+SDD sobre Fase 2.
+
+**Ejecución.** 3 subagentes en paralelo vía Paseo sobre un worktree
+nuevo (`paseo_create_workspace`, rama
+`chore/docs-toolkit-consolidation`) con scopes disjuntos: QA/Auditor
+(`AGENTS.md`), Programador (`PROMPTS.md`), Diseñador (`SETUP.md`,
+`README.md`, `vault/README.md`, `docs/WORKFLOW.md`). El orquestador
+integró desde el mismo worktree.
+
+**Entregables.**
+
+- `AGENTS.md`: sección "Toolkit del proyecto" (6 subsecciones +
+  puntero a la 7ª en `SETUP.md`), reglas de Engram proactivo,
+  "Checklist de inicio de PR", "Checklist de cierre de PR" y "Nota
+  sobre worktrees de Paseo". Integra sin duplicar las secciones
+  preexistentes de "Herramientas del ecosistema Gentleman" y
+  "Orquestación con Paseo".
+- `PROMPTS.md`: sección "Prompts y el toolkit", prompts de workflow
+  actualizados y prompt nuevo "Cierre de PR completo".
+- `SETUP.md`: "Verificación del entorno" y "Worktrees de Paseo".
+- `README.md`: "Toolkit del desarrollador".
+- `vault/README.md`: "Uso del vault en el workflow".
+- `docs/WORKFLOW.md` (nuevo): flujo estándar de PR en 5 pasos.
+
+**Correcciones de integración (orquestador).** La instrucción que dio
+el subagente Diseñador para copiar `.env.local` era
+`cp ../.env.local .env.local`, que **no funciona**: los worktrees de
+Paseo viven en `~/.paseo/worktrees/<id>/<slug>`, fuera del
+repositorio, así que `../` no alcanza el worktree principal. Reemplazada
+por la instrucción de localizar el path con `git worktree list`. La
+sección "Toolkit del proyecto" quedó con 6 subsecciones bajo un título
+que dice "7 herramientas": se agregó el puntero explícito a la séptima
+(modelos de IA, en `SETUP.md`).
+
+**Decisión que NO se siguió del plan original.** La nota de permisos de
+worktree NO se agregó al item 28: ese item es sobre `git cherry` vs
+squash merge, tema sin relación. Se registró como item 30 nuevo.
+Mezclar dos temas en un item rompe la convención de "un item = un
+hallazgo".
+
+**Fix - item 27 (GGA `EXCLUDE_PATTERNS`).** La descripción del item
+documentaba `spec.ts` y `.d.ts` sin el wildcard inicial, mientras
+`.gga` siempre tuvo la forma correcta (`*spec.ts`, `*d.ts`). El error
+estaba solo en la descripción. Corregida la línea; `.gga` no se tocó.
+
+**Deuda:** item 30 registrado (permisos de edición en worktrees de
+Paseo).
+
+**Verificación:** append-only OK.

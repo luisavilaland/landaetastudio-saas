@@ -435,6 +435,83 @@ Ejemplo: en T6, la sesión anterior quedó trabada ~17 minutos en un editor inte
 - Si GGA falla por razones de red o timeout, se puede saltar con `git commit --no-verify`.
 - Las reglas de este archivo siguen siendo la fuente de verdad.
 
+## Toolkit del proyecto
+
+Este proyecto usa 7 herramientas que el agente DEBE usar consistentemente. Si terminás una tarea sin usar las relevantes, la tarea está incompleta.
+
+Las seis primeras tienen sección propia abajo. La séptima —los modelos de IA configurados para OpenCode y GGA— se documenta en `SETUP.md` ("Ecosistema Gentleman AI" → "Modelo de IA configurado").
+
+### Paseo — orquestación
+
+- Cada PR se ejecuta en un worktree + workspace de Paseo.
+- Los subagentes se despliegan con los perfiles configurados: Orquestador → Nemotron 3 Ultra Free, QA/Auditor → MiMo-V2.6-Flash Free, Programador → Big Pickle, Diseñador → Ling 3.0 Flash Fin Free (reglas completas en «Orquestación con Paseo»).
+- Los worktrees NO traen `node_modules` ni `.env.local` (ver «Nota sobre worktrees de Paseo»).
+- Cuando un plan diga "lanzar subagentes", pedirle al humano que los despliegue desde Paseo — NO lanzarlos con `Task(...)`.
+
+### Engram — memoria persistente (PROACTIVO)
+
+Engram NO es opcional. Grabar memoria PROACTIVAMENTE cuando:
+
+- Se toma una decisión arquitectónica que afecta a futuro.
+- Se descubre un patrón no obvio o un bug complejo.
+- Se cambia una regla del proyecto.
+- Se establece una convención nueva.
+
+NO grabar para:
+
+- Tareas triviales (leer archivo, mover carpeta).
+- Estado efímero de sesión.
+
+Si terminaste una tarea con decisiones no triviales y NO grabaste memoria, la tarea está INCOMPLETA. Exportar al vault al cerrar un PR o fase con `pnpm vault:export`.
+
+### GGA — pre-commit hook
+
+- Se ejecuta automáticamente en cada commit (reglas generales en «Herramientas del ecosistema Gentleman»).
+- Si el provider da timeout (red/rate-limit): usar `git commit --no-verify` y documentarlo en el body del commit.
+- Config en `.gga`.
+- Patrón de exclusión verificado: `*test.ts` (NO `*.test.*` ni `**/*.test.*`).
+
+### Gentle-AI skills
+
+- Skills globales en `~/.config/opencode/skills/` (41 únicas).
+- Skills del proyecto en `.opencode/skills/` (3): `rls-audit`, `migration-safety`, `webhook-debug`.
+- Se cargan bajo demanda por trigger (description del frontmatter).
+- Refrescar el registro con `gentle-ai skill-registry refresh` al agregar o cambiar una skill.
+
+### Vault de Obsidian
+
+- Contiene bitácora, ADRs, deuda, specs y fases.
+- Para abrir: Obsidian → Open folder as vault → `vault/`.
+- Ver `vault/README.md` para la estructura.
+
+### Context7 — doc actualizada
+
+- Consultar la doc actualizada de librerías (Next.js, Drizzle, etc.) cuando se necesite confirmar sintaxis o comportamiento.
+
+## Checklist de inicio de PR
+
+- [ ] Crear worktree + workspace en Paseo.
+- [ ] Copiar `.env.local` del main worktree (gitignored).
+- [ ] Verificar Engram MCP connected: `opencode mcp list | grep engram`.
+- [ ] Decidir si se usan subagentes (perfiles Paseo).
+- [ ] Leer bitácora reciente (últimas 3-5 entradas).
+- [ ] Verificar permisos de edición en el worktree nuevo.
+
+## Checklist de cierre de PR
+
+- [ ] ¿Grabaste las memorias clave en Engram proactivamente?
+- [ ] ¿Actualizaste la bitácora (append-only)?
+- [ ] ¿DoD verde (`pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm build`)?
+- [ ] ¿GGA no bloqueó (o `--no-verify` documentado)?
+- [ ] ¿Exportaste Engram al vault? (`pnpm vault:export`)
+- [ ] ¿Docs afectadas actualizadas?
+
+## Nota sobre worktrees de Paseo
+
+- No traen `node_modules/` → correr `pnpm install`.
+- No traen `.env.local` → copiar del main worktree.
+- Pueden tener permisos de edición restringidos: si bloquea escritura en `vault/`, reportar al humano (edición manual), NO sortear el bloqueo.
+
 ## Workflow de skill-improver
 
 - **Cuándo correr**: al cierre de cada fase del SaaS, antes de releases.

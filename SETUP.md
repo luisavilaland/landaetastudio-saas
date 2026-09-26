@@ -253,6 +253,36 @@ El proyecto integra herramientas globales del entorno de un dev
 Si clonás el repo sin estas herramientas, todo el flujo de
 desarrollo normal funciona sin cambios.
 
+## Verificación del entorno
+
+Antes de iniciar, confirmá que el entorno está listo:
+
+| Herramienta | Comando | Esperado |
+|-------------|---------|----------|
+| Gentle-AI | `gentle-ai --version` | 3.7.0+ |
+| Engram | `engram --version` | 2.2.0+ |
+| Engram MCP | `opencode mcp list \| grep engram` | connected |
+| GGA | `gga --version` | v2.10.1+ |
+| Hook GGA | `ls .git/hooks/pre-commit` | existe |
+| Obsidian | Abrir `vault/` como vault | vault reconocido |
+| Vault export | `pnpm vault:export` | sin errores |
+
+Si alguna falla, ver la sección correspondiente de este documento
+o de `AGENTS.md`.
+
+## Worktrees de Paseo
+
+Los worktrees creados por Paseo (`paseo_create_workspace`) NO
+traen consigo:
+
+- `node_modules/` → correr `pnpm install` al entrar.
+- `.env.local` → copiar del main worktree. Ubicarlo con `git worktree list` (la primera entrada es el worktree principal) y copiar desde esa ruta: los worktrees de Paseo viven fuera del repositorio, así que una ruta relativa (`../`) NO los alcanza.
+- `.atl/` → se regenera con `gentle-ai skill-registry refresh`.
+
+Pueden tener permisos de edición restringidos. Si Paseo bloquea
+escritura en `vault/`, reportar al humano (no intentar sortear
+el bloqueo).
+
 ## Tunnel para Webhooks (dotunnel)
 
 Para recibir webhooks de MercadoPago en desarrollo, necesitas exponer tu localhost públicamente usando `dotunnel`.
