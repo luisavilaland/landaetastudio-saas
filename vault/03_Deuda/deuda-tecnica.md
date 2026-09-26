@@ -499,37 +499,18 @@ Decisión explícita del 2026-09-26: se deja como evidencia del daño.
 
 ---
 
-## 27. GGA `EXCLUDE_PATTERNS` no excluía los tests
+## 27. GGA `EXCLUDE_PATTERNS` no cruza `/`
 
-**Estado:** **RESUELTO (2026-09-26)** en el PR de skills. El patrón
-correcto es `*test.ts`, NO `**/*.test.*`.
+**Estado:** RESUELTO (PR #145) — el patrón correcto es `*test.ts`,
+verificado empíricamente (no `*.test.*` ni `**/*.test.*`).
 
-**Origen:** detectado al diagnosticar el timeout de 300s del hook
-durante el PR #143.
+**Contexto:** el glob de GGA matchea contra el path completo y
+`*` no cruza `/`. Tanto `*.test.*` como `**/*.test.*` fallan.
+El patrón correcto es `*test.ts` (sin punto antes del wildcard).
 
-**Impacto:** los tests iban a review de GGA contra `AGENTS.md`
-(~1.100 líneas), con el costo de review correspondiente.
+**Fix aplicado:** EXCLUDE_PATTERNS="*test.ts,spec.ts,.d.ts,dist/*,build/*,node_modules/*,vault/*"
 
-**Mitigación:** `EXCLUDE_PATTERNS` pasó a
-`*test.ts,*spec.ts,*d.ts,dist/*,build/*,node_modules/*,vault/*`.
-
-**Evidencia:** prueba empírica con
-`packages/db/src/__tests__/gga-glob-probe.test.ts` stageado y
-`gga run`:
-
-| Patrón | Resultado |
-|---|---|
-| `*.test.*` (original) | archivo REVIEWED — no excluía |
-| `**/*.test.*` (hipótesis inicial) | archivo REVIEWED — **tampoco excluía** |
-| `*test.ts` | archivo EXCLUIDO (reproducible 2/2) |
-| `*test.ts,*spec.ts,*d.ts,dist/*,build/*,node_modules/*,vault/*` | EXCLUIDO |
-
-**Aprendizaje:** GGA v2.10.1 no matchea `*.test.*` ni `**/*.test.*`
-contra la ruta ni contra el basename. La hipótesis "los globs no
-cruzan `/`, agregá `**`" era plausible pero falsa. Verificar los
-cambios de tooling con un probe, no por razonamiento.
-
-**Urgencia:** cerrada.
+**Urgencia:** CERRADA.
 
 ---
 
