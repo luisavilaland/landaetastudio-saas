@@ -100,6 +100,18 @@ Perfiles disponibles:
 - Programador (Big Pickle).
 - Diseñador (Ling 3.0 Flash Fin Free).
 
+### Gotcha: Big Pickle con prompts narrativos
+
+Big Pickle se traba con prompts narrativos largos + rutas relativas. Observado 2 veces en el PR C (2026-09-26): emitía "I'll start by reading...", ejecutaba un `Test-Path` y terminaba sin editar nada.
+
+Fix:
+- Usar edits numeradas ("EDIT 1 — ...", "EDIT 2 — ...").
+- Paths absolutos, no relativos.
+- Si se traba: `paseo_get_agent_activity` para diagnosticar (el síntoma es `status: running` con `updatedAt` congelado).
+- Archivar el subagente (`paseo_archive_agent`) y relanzar con el nuevo formato. Re-promptar repite el loop.
+
+MiMo y Ling no tienen este problema.
+
 ---
 
 ## 2. Desarrollo
@@ -392,6 +404,34 @@ Cierre de PR completo
 7. Commit + push + PR.
 8. Reportar al humano (NO esperar CI — el humano lo controla).
 ```
+
+### Localizar gh si no está en PATH
+
+Si `gh` no está en PATH y no aparece en rutas estándar, buscar
+en el directorio temporal del usuario actual.
+
+PowerShell (método universal, sin hardcodear usuario):
+
+```
+Get-ChildItem -Path $env:LOCALAPPDATA\Temp\gh -Recurse -Filter gh.exe
+```
+
+Git Bash / WSL (equivalente):
+
+```
+find "$LOCALAPPDATA/Temp/gh" -name gh.exe 2>/dev/null
+```
+
+El path varía por usuario y versión de Windows. NO hardcodear
+nombres de usuario en docs — usar variables de entorno
+(`$env:LOCALAPPDATA`, `%LOCALAPPDATA%`, `$HOME`).
+
+Si aparece el binario, agregar su directorio al PATH de la sesión
+o invocarlo por path absoluto.
+
+Para el cuerpo del PR, usar `--body-file` con un archivo temporal
+(`$env:TEMP`), nunca `--body` inline: PowerShell manglea el quoting
+de cuerpos largos. El MCP de GitHub no sirve (responde Bad credentials).
 
 ---
 
