@@ -570,3 +570,49 @@ Reglas:
 - El Orquestador coordina, integra y hace commit/PR.
 - Los subagentes ejecutan un scope acotado y escriben en archivos disjuntos.
 - Esta regla **prevalece** sobre skills genéricas que proponen otro mecanismo de despacho, como `subagent-driven-development` (de superpowers), que sugiere usar `Task(...)`. Ante el conflicto, gana este archivo.
+
+## SDD Workflow (Spec-Driven Development)
+
+Workflow de gentle-ai para cambios que necesitan spec formal antes de código. Documenta el flujo; SDD todavía no está inicializado en este repo.
+
+- **Cuándo usar**: features nuevas complejas (>1 día, multi-archivo), refactors arquitectónicos, cambios que afectan contratos entre módulos.
+- **Cuándo NO usar**: bug fixes puntuales, docs, config, cleanup.
+
+Flujo típico (7 fases):
+
+1. `/sdd-explore` — entender el estado actual.
+2. Propuesta (`sdd-propose`).
+3. Spec formal + diseño (`sdd-spec`, `sdd-design`).
+4. Desglose en tareas (`sdd-tasks`).
+5. `/sdd-apply` — implementar, con subagentes.
+6. `/sdd-verify` — verificar contra el spec.
+7. `/sdd-archive` — cerrar el ciclo.
+
+- Los comandos delegan cada fase en el sub-agente `sdd-*` correspondiente, nunca la ejecutan inline. Para los subagentes del proyecto (@Programador, @QA, …) sigue mandando «Orquestación con Paseo».
+- **Meta-commands** (orquestan varios pasos, no tienen skill propia): `/sdd-new` (arranca un cambio: explore + propose), `/sdd-continue` (retoma el cambio activo en la siguiente fase de la cadena), `/sdd-ff` (fast-forward del planning: propose → spec → design → tasks), `/sdd-status` (estado del cambio activo, read-only).
+- **Fases sin command propio** (propose, spec, design, tasks): las lanza el orquestador; `/sdd-ff` las encadena.
+- **También con command**: `/sdd-init` (inicializar), `/sdd-research` (evidencia externa), `/sdd-onboard` (walkthrough guiado).
+- **Estado en este repo**: SDD NO está inicializado — no existen `openspec/`, `.sdd/` ni `changes/`. El primer uso requiere `/sdd-init`.
+
+## Judgment Day (revisión adversarial)
+
+Protocolo de revisión adversarial de gentle-ai (skill `judgment-day`).
+
+- **Cuándo usar**: PRs críticos (seguridad, RLS, migraciones, webhooks), cambios arquitectónicos, antes de releases.
+- **NO usar para**: docs, config, cleanup, bug fixes triviales.
+- **Cómo**: 2 jueces ciegos en paralelo — `jd-judge-a` y `jd-judge-b`, con lentes distintos y el mismo target congelado.
+- **Hallazgos**: cruzarlos con la regla anti-duplicación contra `vault/03_Deuda/deuda-tecnica.md` (mismo criterio que «Auditorías por tarea»; ese audit por Tn con @QA + @Diseñador es un protocolo distinto).
+- **Severidad**: CRÍTICO / ALTO / MEDIO / BAJO. Los bloqueantes (CRÍTICO/ALTO) se resuelven antes de mergear.
+- **Fixes**: los aplica `jd-fix-agent`; máximo 2 rondas de fix y 2 re-judgments. Solo se arreglan hallazgos severos confirmados por ambos jueces; si discrepan, se escala al humano.
+- **Alcance**: un judgment no autoriza por sí solo commit, push, PR ni release. Veredicto terminal: `APPROVED` o `ESCALATED`.
+
+## Review Agents
+
+9 agentes de revisión de gentle-ai:
+
+- 6 de revisión: `review-readability` (claridad y estilo), `review-risk` (riesgo arquitectónico), `review-reliability` (confiabilidad, edge cases, errores), `review-resilience` (resiliencia, fallos, retries), `review-refuter` (cuestiona decisiones; no se lanza durante Judgment Day), `review-validator` (validación adicional).
+- 3 de judgment-day: `jd-judge-a`, `jd-judge-b`, `jd-fix-agent`.
+
+**Disponibilidad**: Los review agents NO están en disco. No existen archivos de agente en `~/.config/opencode/agent/` ni en `agents/`. Los provee el runtime de gentle-ai, que requiere el ecosistema instalado.
+
+**Instalación**: `gentle-ai install --preset full-gentleman` (preset verificado, incluye el componente `sdd`). Sin el ecosistema gentle-ai instalado, los review agents no están disponibles.

@@ -7,5 +7,8 @@
   },
   "skills": {
     "paths": [".opencode/skills"]
+  },
+  "commands": {
+    "paths": [".opencode/commands"]
   }
 }

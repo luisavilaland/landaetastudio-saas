@@ -270,6 +270,22 @@ Antes de iniciar, confirmá que el entorno está listo:
 Si alguna falla, ver la sección correspondiente de este documento
 o de `AGENTS.md`.
 
+### Comandos SDD disponibles
+
+Estos 11 comandos están disponibles (copiados al proyecto en `.opencode/commands/`):
+
+`/sdd-apply`, `/sdd-archive`, `/sdd-continue`, `/sdd-explore`, `/sdd-ff`, `/sdd-init`, `/sdd-new`, `/sdd-onboard`, `/sdd-research`, `/sdd-status`, `/sdd-verify`
+
+Notar la diferencia con las skills: las skills SDD son 11 pero otras 4 (`sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`) NO tienen command equivalente; se invocan por skill, no por slash command. Los 4 commands sin skill propia son meta-commands: `continue`, `ff`, `new`, `status`.
+
+Verificar disponibilidad:
+```bash
+ls .opencode/commands/
+ls ~/.config/opencode/commands/
+```
+
+SDD NO está inicializado en este repo (no existen `openspec/`, `.sdd/` ni `changes/`). El primer uso requiere `sdd-init`.
+
 ## Worktrees de Paseo
 
 Los worktrees creados por Paseo (`paseo_create_workspace`) NO

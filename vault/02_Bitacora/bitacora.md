@@ -1718,3 +1718,59 @@ estaba solo en la descripción. Corregida la línea; `.gga` no se tocó.
 Paseo).
 
 **Verificación:** append-only OK.
+
+---
+
+## 2026-09-26 - PR D: documentar SDD + judgment-day + review agents
+
+**Alcance.** Documentar el workflow de gentle-ai (SDD, judgment-day,
+review agents). NO lo instala: `sdd-init` y el piloto sobre Fase 2
+quedan para una sesión aparte con `gentle-orchestrator`.
+
+**Ejecución.** 3 subagentes en paralelo vía Paseo sobre worktree
+propio, scopes disjuntos: QA/Auditor (MiMo, `AGENTS.md`),
+Programador (Big Pickle, `.opencode/commands/` + `opencode.json` +
+`PROMPTS.md`), Diseñador (Ling, `README.md` + `SETUP.md` +
+`docs/WORKFLOW.md`).
+
+**Big Pickle NO se trabó.** El formato de edits numeradas ("EDIT 1 —")
+con paths absolutos, que se validó en el PR C, funcionó a la primera.
+
+**La regla "no documentar a ciegas" se pagó sola.** Se verificó
+el plan contra disco antes de despachar y se corrigieron 3 errores
+(lista de commands con "11" que enumeraba 14, `review-refactor` que no
+existe, y "no están en disco" dicho como "no versionados"). Pero el
+subagente QA, al cumplir el paso de investigación, encontró 3 errores
+más que mi propia verificación había dejado pasar:
+
+1. **Los 4 comandos de planning no tienen slash command.**
+   `/sdd-propose`, `/sdd-spec`, `/sdd-design` y `/sdd-tasks` NO existen
+   como commands: son fases que lanza el orquestador, y que `/sdd-ff`
+   encadena. El flujo de 7 pasos que yo le pasé al subagente los
+   listaba como comandos.
+2. **`/sdd-ff` no hace lo que decía el plan.** Es fast-forward del
+   *planning* (propose → spec → design → tasks), no
+   "apply + verify + archive".
+3. **`/sdd-new` no incluye `init`.** Es explore + propose.
+
+Leccion: verificar la existencia de los archivos es necesario pero no
+suficiente. Las *funciones* de cada command hay que leerlas de su
+frontmatter, no deducirlas del nombre ni del contexto de sesiones
+previas.
+
+**Entregables.**
+
+- `AGENTS.md`: secciones "SDD Workflow", "Judgment Day" y "Review
+  Agents", con los 9 agentes reales y la aclaración de que los review
+  agents no están en disco (los provee el runtime).
+- `PROMPTS.md`: gotcha de Big Pickle y localización de `gh`.
+- `SETUP.md`, `README.md`, `docs/WORKFLOW.md`: doc de comandos y flujo.
+- `.opencode/commands/`: 11 `sdd-*.md` copiados del global.
+- `opencode.json`: `commands.paths` registrado.
+
+**Correcciones del orquestador.** El Diseñador escribió `/sdd-tareas`
+(nombre traducido, no existe) y luego los 4 comandos inexistentes en
+`docs/WORKFLOW.md`. Corregidos para alinearlos con la nomenclatura que
+usó el subagente QA en `AGENTS.md`.
+
+**Verificación:** append-only OK.

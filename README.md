@@ -492,6 +492,7 @@ detalles completos.
 - **Gentle-AI** — skills y convenciones del proyecto.
 - **Obsidian vault** — documentación navegable en `vault/`.
 - **Context7** — doc actualizada de librerías.
+- **SDD workflow** — Spec-Driven Development para features complejas. Ver `AGENTS.md` sección "SDD Workflow".
 
 ## Documentación adicional
 

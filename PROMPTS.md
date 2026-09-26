@@ -100,6 +100,18 @@ Perfiles disponibles:
 - Programador (Big Pickle).
 - Diseñador (Ling 3.0 Flash Fin Free).
 
+### Gotcha: Big Pickle con prompts narrativos
+
+Big Pickle se traba con prompts narrativos largos + rutas relativas. Observado 2 veces en el PR C (2026-09-26): emitía "I'll start by reading...", ejecutaba un `Test-Path` y terminaba sin editar nada.
+
+Fix:
+- Usar edits numeradas ("EDIT 1 — ...", "EDIT 2 — ...").
+- Paths absolutos, no relativos.
+- Si se traba: `paseo_get_agent_activity` para diagnosticar (el síntoma es `status: running` con `updatedAt` congelado).
+- Archivar el subagente (`paseo_archive_agent`) y relanzar con el nuevo formato. Re-promptar repite el loop.
+
+MiMo y Ling no tienen este problema.
+
 ---
 
 ## 2. Desarrollo
@@ -392,6 +404,16 @@ Cierre de PR completo
 7. Commit + push + PR.
 8. Reportar al humano (NO esperar CI — el humano lo controla).
 ```
+
+### Localizar gh si no está en PATH
+
+En esta máquina `gh` NO está en el PATH. Vive en:
+C:\Users\exodo\AppData\Local\Temp\gh\bin\gh.exe
+
+Para encontrarlo:
+Get-ChildItem -Path $env:LOCALAPPDATA\Temp\gh -Recurse -Filter gh.exe
+
+Usar `--body-file` con un archivo en `C:\Users\exodo\AppData\Local\Temp\opencode\`, nunca `--body` inline: PowerShell manglea el quoting de cuerpos largos. El MCP de GitHub no sirve (responde Bad credentials).
 
 ---
 
