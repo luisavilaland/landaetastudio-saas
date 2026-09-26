@@ -7,6 +7,7 @@
 ## Contexto
 
 El blueprint v2.6 define que:
+
 - **Starter** usa un layout base fijo.
 - **Pro** tiene 3 plantillas disponibles.
 - **Business** tiene 6 plantillas disponibles.
@@ -81,7 +82,11 @@ Las páginas del App Router (`apps/storefront/app/.../page.tsx`) son **wrappers 
 Ejemplo conceptual (`app/[tenant]/page.tsx`):
 
 ```tsx
-export default async function HomePage({ params }: { params: Promise<{ tenant: string }> }) {
+export default async function HomePage({
+  params,
+}: {
+  params: Promise<{ tenant: string }>
+}) {
   const { tenant } = await params
   const tenantId = await getTenantId(tenant)
   const template = await getTemplate(tenantId)
@@ -92,6 +97,7 @@ export default async function HomePage({ params }: { params: Promise<{ tenant: s
 ```
 
 > **Nota para implementación (Fase 7):** El patrón `import(\`@/templates/${template}/home\`)` con template literals **no funciona con Turbopack/Webpack** porque no pueden inferir los módulos estáticamente. La implementación real debe usar un mapa de imports estáticos:
+>
 > ```ts
 > const TEMPLATES: Record<string, () => Promise<{ Home: ComponentType }>> = {
 >   base: () => import('@/templates/base/home'),
@@ -101,9 +107,10 @@ export default async function HomePage({ params }: { params: Promise<{ tenant: s
 >   osca: () => import('@/templates/osca/home'),
 >   natura: () => import('@/templates/natura/home'),
 >   urbana: () => import('@/templates/urbana/home'),
-> };
+> }
 > // Uso: const Composition = await TEMPLATES[template]()
 > ```
+>
 > Esto permite tree-shaking y type-safety.
 
 - **Sin rebuild:** El dynamic import resuelve en runtime. Cambio de plantilla = próxima request usa la nueva composición.
@@ -119,11 +126,11 @@ export default async function HomePage({ params }: { params: Promise<{ tenant: s
 
 **Plantillas por tier (explícito):**
 
-| Tier | Layout base (`base`) | Plantillas elegibles |
-|------|---------------------|---------------------|
-| Starter | ✅ (obligatorio) | 0 |
-| Pro | ✅ | 3: `moderna`, `minimalista`, `clasica` |
-| Business | ✅ | 6: `moderna`, `minimalista`, `clasica`, `osca`, `natura`, `urbana` |
+| Tier     | Layout base (`base`) | Plantillas elegibles                                               |
+| -------- | -------------------- | ------------------------------------------------------------------ |
+| Starter  | ✅ (obligatorio)     | 0                                                                  |
+| Pro      | ✅                   | 3: `moderna`, `minimalista`, `clasica`                             |
+| Business | ✅                   | 6: `moderna`, `minimalista`, `clasica`, `osca`, `natura`, `urbana` |
 
 > `base` **no cuenta** como una de las 3/6 plantillas del tier. Es el layout por defecto que todos los tiers tienen. Starter solo puede usar `base`. Pro y Business pueden elegir entre sus plantillas elegibles + `base`.
 
@@ -137,6 +144,7 @@ export default async function HomePage({ params }: { params: Promise<{ tenant: s
 ## Consecuencias
 
 ### Positivas
+
 - **Componentes se mantienen una vez:** Fix en `ProductCard` aplica a las 6 plantillas instantáneamente.
 - **Agregar plantilla nueva = crear 4-6 archivos de composición:** Sin tocar componentes compartidos. ~5-7 días por plantilla (según blueprint).
 - **Cambio en caliente real:** El tenant elige plantilla en admin → próxima navegación ya la usa. Sin cache busting, sin rebuild.
@@ -144,6 +152,7 @@ export default async function HomePage({ params }: { params: Promise<{ tenant: s
 - **Testing centralizado:** Tests de `ProductCard` cubren todas las plantillas. Tests de composición solo verifican orden/props.
 
 ### Negativas
+
 - **Disciplina de diseño requerida:** Todos los componentes deben ser compatibles con todas las composiciones (mismas props, mismos slots, responsive). Un cambio en `ProductCard` que rompa una composición afecta a todas.
 - **CSS/estilos compartidos:** Requiere sistema de variables CSS por plantilla (colores, tipografía, spacing) que los componentes consuman via `var(--color-primary)`, etc. No hardcodear estilos en componentes.
 - **Complejidad de testing visual:** 6 plantillas × 4 páginas × breakpoints = matriz de testing. Automatizar con Playwright + visual regression (futuro).

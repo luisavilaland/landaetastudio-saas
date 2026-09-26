@@ -32,11 +32,11 @@ return withTenantContext(tenantId, async (tx) => { ... })
 
 No agregar RLS a estas. `admin_users` necesita login cross-tenant (NextAuth busca por email global), y las otras dos son la raiz del modelo.
 
-| Tabla | Por que queda fuera |
-| --- | --- |
-| `tenants` | Es la tabla raiz. El isolation se define por las tablas hijas. |
+| Tabla         | Por que queda fuera                                                  |
+| ------------- | -------------------------------------------------------------------- |
+| `tenants`     | Es la tabla raiz. El isolation se define por las tablas hijas.       |
 | `admin_users` | Autenticacion cross-tenant. Sin esta excepcion el login no funciona. |
-| `plans` | Catalogo global de la plataforma, no pertenece a ningun tenant. |
+| `plans`       | Catalogo global de la plataforma, no pertenece a ningun tenant.      |
 
 Cualquier otra tabla de negocio necesita columna `tenantId` **y** policy `tenant_isolation`.
 
@@ -61,9 +61,9 @@ Una tabla con `ENABLE RLS` pero sin policy es **fail-closed**: cero filas para t
 
 - [ ] No mockear `db.transaction`. `withTenantContext` cierra sobre el `db` real del modulo, no sobre la exportacion mockeada.
 - [ ] Mockear `withTenantContext` directo:
-      ```ts
-      vi.mock("@repo/db", async () => ({ ...actual, withTenantContext: vi.fn() }))
-      ```
+  ```ts
+  vi.mock('@repo/db', async () => ({ ...actual, withTenantContext: vi.fn() }))
+  ```
 - [ ] En `beforeEach`: `vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => cb(makeTxMock()))`
 - [ ] `makeTxMock()` (de `@repo/test-utils`) retorna `as any` para compatibilidad con `DbLike`.
 

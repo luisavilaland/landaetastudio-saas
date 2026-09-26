@@ -24,6 +24,7 @@
 ## Tarea 1 — T13: contrato de variables y documentación de setup
 
 **Archivos:**
+
 - Modificar: `.env.local.example:26-33`
 - Modificar: `packages/validation/src/env.ts:10-67`
 - Modificar: `turbo.json:8-28`
@@ -43,6 +44,7 @@
 ## Tarea 2 — T11: test real de RLS cross-tenant
 
 **Archivo:**
+
 - Crear: `packages/db/src/__tests__/rls-cross-tenant.test.ts`
 
 - [ ] Escribir el test antes de cualquier cambio de schema. Importar estáticamente solo `postgres`, `drizzle-orm` y el schema; importar `../index` dinámicamente dentro de `beforeAll` para que una URL ausente no provoque un error de import antes de la evaluación del caso. Para el caso 8, usar una conexión dedicada nueva o ejecutar `BEGIN; RESET app.tenant_id; SELECT ...; ROLLBACK;` explícito, garantizando que no existe contexto residual del pool.
@@ -60,6 +62,7 @@
 ## Tarea 3 — Migración 0015 y snapshot
 
 **Archivos:**
+
 - Crear: `packages/db/migrations/0015_revoke_plans_dml.sql`
 - Modificar: `packages/db/migrations/meta/_journal.json`
 - Crear: `packages/db/migrations/meta/0015_snapshot.json`
@@ -94,6 +97,7 @@ REVOKE DELETE ON TABLE plans FROM app_user;
 ## Tarea 5 — E2E workflow, solo si el secret existe
 
 **Archivo:**
+
 - Modificar: `.github/workflows/e2e.yml` solo si `NEON_DATABASE_APP_URL` apareció en el preflight
 
 - [ ] Si el secret no existe, no editar el workflow. Reportar que falta `NEON_DATABASE_APP_URL` y esperar confirmación humana antes de cualquier skip.
@@ -109,6 +113,7 @@ DATABASE_APP_URL: ${{ secrets.NEON_DATABASE_APP_URL }}
 ## Tarea 6 — Documentación, ADR y deuda
 
 **Archivos:**
+
 - Modificar: `docs/adr/ADR-024-pgcrypto-tokens.md`
 - Modificar: `docs/superpowers/specs/2026-09-blueprint-v2.6.md`
 - Modificar: `bitacora.md`

@@ -188,6 +188,7 @@ Ver checklists específicas en cada sección de endpoint.
 ## Subagentes — roles y obediencia
 
 **Roles de referencia:**
+
 - `@Diseñador` — diseño/arquitectura/API
 - `@Programador` — implementación/código
 - `@QA / Auditor` — auditoría/revisión/seguridad
@@ -202,6 +203,7 @@ Ver checklists específicas en cada sección de endpoint.
 ## Subagentes — confirmación obligatoria
 
 Al recibir un prompt que indica el uso de subagentes, el agente DEBE:
+
 1. Responder con un mensaje corto confirmando:
    - Cantidad de subagentes (construcción + auditoría si aplica).
    - Scope de cada uno.
@@ -229,12 +231,14 @@ Si un comando de verificación genera archivos (ej: `pnpm db:generate` crea migr
 En archivos que solo crecen (vault/02_Bitacora/bitacora.md, vault/03_Deuda/deuda-tecnica.md), la resolución de conflictos debe PRESERVAR el contenido de ambas ramas. Nunca elegir una versión sobre otra.
 
 Verificación obligatoria después de resolver:
+
 - `git diff origin/develop -- <archivo>` debe mostrar SOLO adiciones.
 - Si hay líneas con -, es señal de regresión → PARAR.
 
 ## PRs en review — cambios acordados
 
 Si durante el review de un PR se acuerda un cambio:
+
 - Aplicar el cambio en el MISMO PR antes de mergear.
 - No mergear el PR original y abrir un follow-up.
 - Excepción: cuando el cambio requiere un PR separado por razones técnicas. Documentar la excepción en la descripción.
@@ -244,17 +248,21 @@ Si durante el review de un PR se acuerda un cambio:
 Al terminar cada tarea (T1, T2, ..., T14) antes de mergear el PR, correr una auditoría con 2 subagentes (@QA + @Diseñador).
 
 ### Criterios de profundidad
+
 - Tarea de alto riesgo (código nuevo, migraciones, RLS, cifrado, webhooks, auth): auditoría COMPLETA.
 - Tarea de riesgo medio (schema, tests, endpoints): auditoría FOCALIZADA en lo que la tarea tocó.
 - Tarea de bajo riesgo (docs, fixes menores, formato): auditoría OMITIDA o LIMITADA a verificar que no rompió nada.
 
 ### Regla anti-duplicación
+
 Antes de reportar un hallazgo, verificar si ya está registrado en vault/03_Deuda/deuda-tecnica.md. Si ya existe:
+
 - NO crear nuevo ítem.
 - Mencionar en el reporte: "ya registrado como ítem N".
 - Si la tarea empeora el hallazgo existente, actualizar el ítem.
 
 ### Formato del reporte
+
 - 2 subagentes: @QA + @Diseñador en paralelo.
 - Reporte breve: solo hallazgos NUEVOS o cambios a existentes.
 - Categorías: Correctitud, Seguridad, Calidad, Extensibilidad.
@@ -262,11 +270,13 @@ Antes de reportar un hallazgo, verificar si ya está registrado en vault/03_Deud
 - Si no hay hallazgos nuevos → "sin hallazgos nuevos".
 
 ### Output
+
 - Hallazgos nuevos → vault/03_Deuda/deuda-tecnica.md.
 - Hallazgos bloqueantes de la próxima tarea → resolver antes de arrancarla.
 - Reporte completo → comentario en el PR de la tarea.
 
 ### Reglas
+
 - El audit es READ-ONLY. No modifica código.
 - Los hallazgos se registran, no se arreglan en el mismo audit.
 - Los arreglos van en PRs separados.
@@ -296,6 +306,7 @@ Razón: los secrets en disco se filtran por backups, sync de worktrees, screensh
 ## DoD extendido — actualizar contadores
 
 Cuando una tarea agrega o modifica tests:
+
 - Actualizar el contador de tests en README.md.
 - Actualizar el contador en SETUP.md.
 - Actualizar los contadores en TESTING.md y TESTING-MANUAL.md.
@@ -308,6 +319,7 @@ Razón: los contadores en docs son el primer dato que consultan los agentes al r
 ## Migraciones — procedimiento idempotente
 
 Cuando una migración ya aplicada tiene un problema:
+
 - NO editar el archivo .sql existente (guard de CI lo bloquea).
 - NO editar _journal.json retroactivamente (rompe DBs migradas con drizzle intentando re-aplicar).
 - SIEMPRE crear una migración nueva idempotente que garantice el estado deseado en cualquier entorno.
@@ -317,12 +329,14 @@ Ejemplo: la migración 0013 cubre el gap de 0010_force_rls.sql (no registrado en
 ## Checklist RLS — antes de aprobar ENABLE ROW LEVEL SECURITY
 
 Antes de aprobar un `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` en cualquier migración, verificar que la tabla:
+
 - Tiene columna `tenantId`.
 - Tiene una policy `tenant_isolation` correspondiente.
 
 Si no cumple ambas → NO debe llevar RLS.
 
 Tablas globales conocidas (sin RLS por diseño):
+
 - `plans` (catálogo global)
 - `tenants` (tabla raíz)
 - `admin_users` (autenticación cross-tenant)
@@ -345,6 +359,7 @@ Consecuencias en cadena:
 no corre → E2E bloqueado.
 
 Reglas:
+
 - En meta/ solo van archivos generados por drizzle-kit:
   *_snapshot.json y _journal.json.
 - Documentación relacionada (snapshots, journal, RLS) va en
@@ -371,6 +386,7 @@ protection. El commit quedó solo en local y el reporte fue
 incorrecto.
 
 Reglas complementarias:
+
 - Después de cualquier `git push`, verificar el output real del
   comando (exit code + output completo). No asumir éxito.
 - Confirmar que el commit llegó al remoto:
@@ -385,8 +401,11 @@ Después de editar `vault/02_Bitacora/bitacora.md`:
 Si hay líneas con `-` que contengan contenido real (no headers del diff), PARAR. Es una regresión.
 
 Corrección:
-    git checkout origin/develop -- vault/02_Bitacora/bitacora.md
-    # Re-aplicar los cambios como append al final.
+
+```bash
+git checkout origin/develop -- vault/02_Bitacora/bitacora.md
+# Re-aplicar los cambios como append al final.
+```
 
 Contexto: en PR A (#124), la primera versión de la entrada 2026-09-20 sobrescribió la entrada 2026-09-19. Tercera vez que ocurre (T4 rebase, lección T6, T7 pre-migración).
 
@@ -422,6 +441,7 @@ Closes #125 (extensión).
 ## Cuándo cerrar la sesión del agente
 
 Considerar cerrar y abrir una nueva cuando:
+
 - El agente comete el mismo error dos veces seguidas (loop sin progreso).
 - La sesión supera ~30 interacciones sin un checkpoint claro.
 - El agente empieza a "olvidar" instrucciones previas.
@@ -549,8 +569,8 @@ Si terminaste una tarea con decisiones no triviales y NO grabaste memoria, la ta
 
 ### Historial de auditorías
 
-| Fecha | Skills | Cambios |
-| --- | --- | --- |
+| Fecha      | Skills                                     | Cambios  |
+| ---------- | ------------------------------------------ | -------- |
 | 2026-09-26 | 41 con `SKILL.md` (48 nombres en 4 raíces) | Baseline |
 
 ## Orquestación con Paseo

@@ -1774,3 +1774,41 @@ previas.
 usó el subagente QA en `AGENTS.md`.
 
 **Verificación:** append-only OK.
+
+---
+
+## 2026-09-26 - PR E: mitigación de prettier en markdown (item 31)
+
+**Contexto.** El item 31 registró que el markdown del repo no pasaba
+`prettier --check` y que nada lo verificaba automáticamente: `pnpm lint`
+es `turbo run lint` y solo corre eslint. Este PR cierra esa brecha.
+
+**El conteo de 73 estaba desactualizado.** Al medirlo de nuevo eran
+**84** archivos: el PR #147 había agregado 10 archivos a `vault/engram/`
+y el PR #148 había agregado 11 en `.opencode/commands/`.
+
+**Mitigación en 2 partes (según `luisavilaland`).**
+
+1. `.prettierignore` ahora excluye `vault/engram/` (61 archivos
+   tool-managed, se regeneran en cada export), la bitácora (append-only)
+   y los artefactos de build.
+2. `prettier --write` sobre los 23 restantes.
+3. Script `format:check` en `package.json` y step en
+   `.github/workflows/ci.yml`, para que no vuelva a acumular.
+
+**Dos excepciones, documentadas en el item 31.** prettier no es
+idempotente con bloques de código indentados: los reinterpreta y los
+colapsa. Por eso dos archivos necesitaron un ajuste mínimo de contenido
+para formatar sin perder semántica:
+
+- `AGENTS.md`: un snippet shell en bloque indentado se convertía en una
+  línea con comentario inline. Pasó a bloque cercado `bash`.
+- `.opencode/skills/rls-audit/SKILL.md`: un bloque cercado `ts` con 6
+  espacios de indentación dentro de un item de lista. Bajó a 2.
+
+**La bitácora NO se formatea.** Es append-only: la historia es
+inmutable. Queda fuera de prettier por `.prettierignore`, igual que
+`vault/engram/`.
+
+**Verificación:** `prettier --check "**/*.md"` → 0 fallos. Bitácora y
+`vault/engram/` sin cambios.

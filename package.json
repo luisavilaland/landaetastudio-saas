@@ -10,6 +10,7 @@
     "setup": "pnpm install && pnpm db:generate && pnpm db:migrate && pnpm db:seed",
     "vault:export": "engram obsidian-export --vault vault/",
     "lint": "turbo run lint",
+    "format:check": "prettier --check \"**/*.md\"",
     "typecheck": "turbo run typecheck",
     "build": "turbo run build",
     "test": "vitest run",

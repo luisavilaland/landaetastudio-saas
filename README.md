@@ -19,18 +19,18 @@ Ver bitácora para detalle.
 Plan de 10 fases para el lanzamiento comercial con autoservicio,
 suscripciones, plantillas, cupones, banners, boletines y envíos.
 
-| Fase | Nombre | Estado |
-|------|--------|--------|
+| Fase  | Nombre                                                       | Estado                     |
+| ----- | ------------------------------------------------------------ | -------------------------- |
 | **1** | **Modelo de datos** (plans, subscriptions, tenant_mp_config) | ✅ Completada (2026-09-23) |
-| 2 | Webhook suscripciones + checkout dinámico | 🔜 Pendiente |
-| 3 | Autoservicio (landing + registro + pago) | 🔜 Pendiente |
-| 4 | Personalización visual + dominio + infra | 🔜 Pendiente |
-| 5 | Cupones y descuentos | 🔜 Pendiente |
-| 6 | Banners (superior + popup) | 🔜 Pendiente |
-| 7 | Sistema de plantillas + 6 plantillas | 🔜 Pendiente |
-| 8 | Boletines (captura + envío) | 🔜 Pendiente |
-| 9 | Envíos (Correo Uruguayo + OCA) | 🔜 Pendiente |
-| 10 | Go-live y checklist final | 🔜 Pendiente |
+| 2     | Webhook suscripciones + checkout dinámico                    | 🔜 Pendiente               |
+| 3     | Autoservicio (landing + registro + pago)                     | 🔜 Pendiente               |
+| 4     | Personalización visual + dominio + infra                     | 🔜 Pendiente               |
+| 5     | Cupones y descuentos                                         | 🔜 Pendiente               |
+| 6     | Banners (superior + popup)                                   | 🔜 Pendiente               |
+| 7     | Sistema de plantillas + 6 plantillas                         | 🔜 Pendiente               |
+| 8     | Boletines (captura + envío)                                  | 🔜 Pendiente               |
+| 9     | Envíos (Correo Uruguayo + OCA)                               | 🔜 Pendiente               |
+| 10    | Go-live y checklist final                                    | 🔜 Pendiente               |
 
 Detalle completo: [Blueprint v2.6](./docs/superpowers/specs/2026-09-blueprint-v2.6.md)
 

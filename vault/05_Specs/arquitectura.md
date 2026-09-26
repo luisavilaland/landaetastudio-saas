@@ -6,8 +6,8 @@ Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada AD
 
 ## ADRs
 
-| ADR                                                     | Título                                                | Estado                      |
-| ------------------------------------------------------- | ----------------------------------------------------- | --------------------------- |
+| ADR                                                            | Título                                                | Estado                      |
+| -------------------------------------------------------------- | ----------------------------------------------------- | --------------------------- |
 | [ADR-001](../01_ADRs/ADR-001-multi-tenant-columna-tenantid.md) | Multi-tenant con columna tenantId                     | Aceptada — ver discrepancia |
 | [ADR-002](../01_ADRs/ADR-002-nextauth-jwt.md)                  | NextAuth con JWT                                      | Aceptada                    |
 | [ADR-003](../01_ADRs/ADR-003-precios-centavos-integer.md)      | Precios en centavos (integer)                         | Aceptada                    |

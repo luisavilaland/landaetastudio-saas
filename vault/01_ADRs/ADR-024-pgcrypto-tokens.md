@@ -14,13 +14,14 @@ Los tenants configuran sus propias credenciales de MercadoPago (`ACCESS_TOKEN` +
 - Un `ACCESS_TOKEN` expuesto permite a un atacante cobrar en nombre del tenant, crear preferencias, reembolsar, acceder a datos de clientes.
 - El `WEBHOOK_SECRET` permite falsificar notificaciones de pago.
 
-La tabla tiene RLS (`tenant_isolation`) que protege contra *queries cruzadas entre tenants*, pero **RLS no protege contra**:
+La tabla tiene RLS (`tenant_isolation`) que protege contra _queries cruzadas entre tenants_, pero **RLS no protege contra**:
+
 - Backup de base de datos expuesto (pg_dump, snapshot, point-in-time recovery).
 - Un rol con `BYPASSRLS` (ej. `neondb_owner`, roles de administración de Neon).
 - Acceso directo a la consola de Neon / dashboard de base de datos.
 - Fuga de logs que incluyan la fila completa.
 
-Por tanto, **defensa en profundidad** exige cifrar los tokens *antes* de persistirlos, de modo que sean inútiles sin la clave de descifrado.
+Por tanto, **defensa en profundidad** exige cifrar los tokens _antes_ de persistirlos, de modo que sean inútiles sin la clave de descifrado.
 
 ## Decisión
 
@@ -57,6 +58,7 @@ La clave se setea por sesión vía `SET LOCAL app.mp_encryption_key = '...'` den
 Si Neon tiene `log_statement = 'all'` o `log_min_duration_statement = 0`, el `SET LOCAL` con la clave queda registrado en texto plano en los logs de PostgreSQL.
 
 **Mitigación:**
+
 - Verificar la configuración de logging de Neon (por defecto no loguea `SET LOCAL`).
 - Usar `set_config()` con query parameterizada en lugar de `SET LOCAL` con string interpolado:
   ```sql
@@ -77,12 +79,14 @@ Si Neon tiene `log_statement = 'all'` o `log_min_duration_statement = 0`, el `SE
 ## Consecuencias
 
 ### Positivas
+
 - **Defensa en profundidad real:** Token cifrado inútil sin `MP_TOKEN_ENCRYPTION_KEY`.
 - **Cumplimiento implícito:** Cumple principio de "encryption at rest" para secretos de pago.
 - **Rotación de clave posible:** Si se compromete la clave, se genera una nueva, se re-cifran todos los tokens existentes (migración one-off), se actualiza la env var.
 - **Performance marginal:** `pgp_sym_encrypt/decrypt` ~0.5-1ms por operación. Despreciable vs latencia de red a MP.
 
 ### Negativas
+
 - **Rotación de clave requiere migración de datos:** No es instantánea; script que recorre `tenant_mp_config` y re-cifra. Planificar ventana de mantenimiento.
 - **Complejidad operativa:** Una variable de entorno crítica más (`MP_TOKEN_ENCRYPTION_KEY`). Si se pierde, **no hay recuperación** de los tokens existentes (los tenants deben re-ingresar credenciales).
 - **Debugging limitado:** No se puede inspeccionar tokens en DB directamente. Herramientas de admin requieren función de descifrado controlada.
@@ -103,7 +107,7 @@ FROM tenant_mp_config WHERE tenantId = $1;
 
 Donde `$3` es `MP_TOKEN_ENCRYPTION_KEY` (bind param, nunca interpolada).
 
-**Motivo:** mismo nivel de seguridad que `set_config` con query parameterizada (la clave nunca aparece en el texto SQL ni en logs), con menor superficie: no hace falta setear la clave en la sesión ni depurar leakage de `SET LOCAL` entre operaciones. El cuerpo de este ADR queda como especificación del *qué* (cifrado simétrico AES-256 con pgcrypto, BYTEA, clave fuera de la DB); esta enmienda fija el *cómo* de transporte de la clave en el helper.
+**Motivo:** mismo nivel de seguridad que `set_config` con query parameterizada (la clave nunca aparece en el texto SQL ni en logs), con menor superficie: no hace falta setear la clave en la sesión ni depurar leakage de `SET LOCAL` entre operaciones. El cuerpo de este ADR queda como especificación del _qué_ (cifrado simétrico AES-256 con pgcrypto, BYTEA, clave fuera de la DB); esta enmienda fija el _cómo_ de transporte de la clave en el helper.
 
 ## Referencias
 

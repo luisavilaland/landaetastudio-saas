@@ -14,24 +14,24 @@ completo.
 
 ## Tabla de Contenidos
 
-| #   | Sección                                               | Uso principal                           |
-| --- | ----------------------------------------------------- | --------------------------------------- |
-| 0   | [Prompts y el toolkit](#prompts-y-el-toolkit)         | Premisa común de las 7 herramientas     |
-| 1   | [Calibración y análisis](#1-calibración-y-análisis)   | Inicio de sesión, diagnóstico de estado |
-| 2   | [Desarrollo](#2-desarrollo)                           | Features, bugs, templates por tipo      |
-| 3   | [Revisión y verificación](#3-revisión-y-verificación) | Post-tarea, auditoría                   |
-| 4   | [Mantenimiento](#4-mantenimiento)                     | Limpieza, .gitignore                    |
-| 5   | [Commits](#5-commits)                                 | Commit, push, cierre de PR              |
-| 6   | [Documentación](#6-documentación)                     | Actualizar docs                         |
-| 7   | [Refactorización](#7-refactorización)                 | Refactors seguros                       |
-| 8   | [Varios](#8-varios)                                   | Salud, dependencias, revert             |
-| 9   | [Seed](#9-seed)                                       | Actualizar datos de prueba              |
-| 10  | [Infra y Deploy](#10-infra-y-deploy)                  | Vercel, env vars, CI                    |
-| 11  | [Planificación y arquitectura](#11-planificación-y-arquitectura) | ADRs, specs, plans, fases |
-| 12  | [Verificar docs vs código](#12-verificar-docs-vs-código) | Comparar contadores, versión, blueprint |
-| 13  | [Auditoría por tarea](#13-auditoría-por-tarea) | @QA + @Diseñador, anti-duplicación |
-| 14  | [Cerrar sesión y transferir contexto](#14-cerrar-sesión-y-transferir-contexto) | Resumen ejecutivo para nueva sesión |
-| 15  | [Crear migración nueva](#15-crear-migración-nueva) | Checklist obligatorio antes del commit |
+| #   | Sección                                                                        | Uso principal                           |
+| --- | ------------------------------------------------------------------------------ | --------------------------------------- |
+| 0   | [Prompts y el toolkit](#prompts-y-el-toolkit)                                  | Premisa común de las 7 herramientas     |
+| 1   | [Calibración y análisis](#1-calibración-y-análisis)                            | Inicio de sesión, diagnóstico de estado |
+| 2   | [Desarrollo](#2-desarrollo)                                                    | Features, bugs, templates por tipo      |
+| 3   | [Revisión y verificación](#3-revisión-y-verificación)                          | Post-tarea, auditoría                   |
+| 4   | [Mantenimiento](#4-mantenimiento)                                              | Limpieza, .gitignore                    |
+| 5   | [Commits](#5-commits)                                                          | Commit, push, cierre de PR              |
+| 6   | [Documentación](#6-documentación)                                              | Actualizar docs                         |
+| 7   | [Refactorización](#7-refactorización)                                          | Refactors seguros                       |
+| 8   | [Varios](#8-varios)                                                            | Salud, dependencias, revert             |
+| 9   | [Seed](#9-seed)                                                                | Actualizar datos de prueba              |
+| 10  | [Infra y Deploy](#10-infra-y-deploy)                                           | Vercel, env vars, CI                    |
+| 11  | [Planificación y arquitectura](#11-planificación-y-arquitectura)               | ADRs, specs, plans, fases               |
+| 12  | [Verificar docs vs código](#12-verificar-docs-vs-código)                       | Comparar contadores, versión, blueprint |
+| 13  | [Auditoría por tarea](#13-auditoría-por-tarea)                                 | @QA + @Diseñador, anti-duplicación      |
+| 14  | [Cerrar sesión y transferir contexto](#14-cerrar-sesión-y-transferir-contexto) | Resumen ejecutivo para nueva sesión     |
+| 15  | [Crear migración nueva](#15-crear-migración-nueva)                             | Checklist obligatorio antes del commit  |
 
 ---
 
@@ -105,6 +105,7 @@ Perfiles disponibles:
 Big Pickle se traba con prompts narrativos largos + rutas relativas. Observado 2 veces en el PR C (2026-09-26): emitía "I'll start by reading...", ejecutaba un `Test-Path` y terminaba sin editar nada.
 
 Fix:
+
 - Usar edits numeradas ("EDIT 1 — ...", "EDIT 2 — ...").
 - Paths absolutos, no relativos.
 - Si se traba: `paseo_get_agent_activity` para diagnosticar (el síntoma es `status: running` con `updatedAt` congelado).

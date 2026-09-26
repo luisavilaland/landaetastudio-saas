@@ -12,13 +12,13 @@
 
 Comando: `Get-ChildItem <ruta> -Directory` (+ barrido recursivo de `SKILL.md`).
 
-| Raíz | Path | Directorios | Con `SKILL.md` | Sin `SKILL.md` |
-| --- | --- | --- | --- | --- |
-| opencode | `~/.config/opencode/skills/` | 26 | 19 | 7 |
-| claude | `~/.claude/skills/` | 33 | 7 | 26 |
-| superpowers | `~/.config/opencode/node_modules/superpowers/skills/` | 14 | 14 | 0 |
-| agents | `~/.agents/skills/` | 34 | 27 | 7 |
-| **Total** | | **107** | **67** | **40** |
+| Raíz        | Path                                                  | Directorios | Con `SKILL.md` | Sin `SKILL.md` |
+| ----------- | ----------------------------------------------------- | ----------- | -------------- | -------------- |
+| opencode    | `~/.config/opencode/skills/`                          | 26          | 19             | 7              |
+| claude      | `~/.claude/skills/`                                   | 33          | 7              | 26             |
+| superpowers | `~/.config/opencode/node_modules/superpowers/skills/` | 14          | 14             | 0              |
+| agents      | `~/.agents/skills/`                                   | 34          | 27             | 7              |
+| **Total**   |                                                       | **107**     | **67**         | **40**         |
 
 **Deduplicación por nombre de directorio:**
 
@@ -32,15 +32,15 @@ Comando: `Get-ChildItem <ruta> -Directory` (+ barrido recursivo de `SKILL.md`).
 
 Estos nombres existen en las raíces opencode + claude + agents pero **no son skills** (no hay frontmatter que leer):
 
-| Directorio | Contenido real |
-| --- | --- |
-| `branch-pr` | vacío |
-| `comment-writer` | vacío |
-| `gentle-ai-bench` | vacío |
-| `issue-creation` | solo `references/` |
-| `rdd-defect-workflow` | vacío |
-| `systemic-issue-triage` | vacío |
-| `_shared` | no es skill (contratos compartidos de SDD: `skill-resolver.md`, `sdd-phase-common.md`, etc.) |
+| Directorio              | Contenido real                                                                               |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
+| `branch-pr`             | vacío                                                                                        |
+| `comment-writer`        | vacío                                                                                        |
+| `gentle-ai-bench`       | vacío                                                                                        |
+| `issue-creation`        | solo `references/`                                                                           |
+| `rdd-defect-workflow`   | vacío                                                                                        |
+| `systemic-issue-triage` | vacío                                                                                        |
+| `_shared`               | no es skill (contratos compartidos de SDD: `skill-resolver.md`, `sdd-phase-common.md`, etc.) |
 
 Además, en `~/.claude/skills/` 19 directorios tienen solo `references/` o están vacíos (`chained-pr`, `cognitive-doc-design`, `go-testing`, `judgment-day`, `sdd-*` ×11, `skill-creator`, `skill-improver`, `skill-registry`, `work-unit-commits`): son copias incompletas. El contenido real de esos skills vive en `~/.config/opencode/skills/` y `~/.agents/skills/`.
 
@@ -54,58 +54,58 @@ Además, en `~/.claude/skills/` 19 directorios tienen solo `references/` o está
 
 ### 4. Clasificación de las 41 skills únicas
 
-| Skill | Raíz | Categoría | Razón | Mantener |
-| --- | --- | --- | --- | --- |
-| chained-pr | opencode/claude/agents | útil activa | PRs >400 líneas; el proyecto trabaja por PR | Sí |
-| cognitive-doc-design | opencode/claude/agents | útil activa | Docs/specs en español (`docs/superpowers/`, README, ADRs) | Sí |
-| go-testing | opencode/claude/agents | no aplica | Go; el stack es TypeScript/Next.js | No |
-| judgment-day | opencode/claude/agents | útil activa | Auditorías por tarea exigidas en AGENTS.md (@QA + @Diseñador) | Sí |
-| sdd-apply | opencode/claude/agents | útil activa | Flujo SDD por fases del blueprint v2.6 | Sí |
-| sdd-archive | opencode/claude/agents | útil activa | Cierre de cambios SDD | Sí |
-| sdd-design | opencode/claude/agents | útil activa | Diseño técnico por fase | Sí |
-| sdd-explore | opencode/claude/agents | útil activa | Exploración previa a specs | Sí |
-| sdd-init | opencode/claude/agents | útil activa | Inicialización SDD del proyecto | Sí |
-| sdd-onboard | opencode/claude/agents | útil latente | Onboarding al ciclo SDD; no se usó aún | Sí (latente) |
-| sdd-propose | opencode/claude/agents | útil activa | Propuestas de cambio | Sí |
-| sdd-research | opencode/claude/agents | útil activa | Evidencia externa antes de specs | Sí |
-| sdd-spec | opencode/claude/agents | útil activa | Specs por fase (`docs/superpowers/specs/`) | Sí |
-| sdd-tasks | opencode/claude/agents | útil activa | Plans por fase (`docs/superpowers/plans/`) | Sí |
-| sdd-verify | opencode/claude/agents | útil activa | Verificación post-implementación | Sí |
-| skill-creator | opencode/claude/agents | útil activa | Política de skills del proyecto (AGENTS.md) | Sí |
-| skill-improver | opencode/claude/agents | útil activa | Auditoría de skills al cierre de fase (AGENTS.md) | Sí |
-| skill-registry | opencode/claude/agents | útil activa | Registro `.atl/skill-registry.md` | Sí |
-| work-unit-commits | opencode/claude/agents | útil activa | Commits atómicos por unidad de trabajo | Sí |
-| paseo | claude/agents | útil activa | Paseo es el orquestador exclusivo de subagentes | Sí |
-| paseo-advisor | claude/agents | útil latente | Segunda opinión; no se usó aún | Sí (latente) |
-| paseo-committee | claude/agents | útil latente | Planificación de problemas duros; no se usó aún | Sí (latente) |
-| paseo-handoff | claude/agents | útil latente | Handoff entre agentes; no se usó aún | Sí (latente) |
-| paseo-help | claude/agents | útil latente | Soporte de Paseo; solo si hay dudas de config | Sí (latente) |
-| paseo-loop | claude/agents | útil latente | Loops/babysitting; no se usó aún | Sí (latente) |
-| paseo-plugin | claude/agents | genérica | Construcción de plugins de Paseo; sin relación con el SaaS | No |
-| find-skills | agents | útil latente | Descubrimiento/instalación de skills nuevas | Sí (latente) |
-| brainstorming | superpowers | útil latente | Relevante antes de features, pero el flujo SDD lo reemplaza | Sí (latente) |
-| dispatching-parallel-agents | superpowers | útil activa | Tareas independientes en paralelo (vía Paseo) | Sí |
-| executing-plans | superpowers | útil activa | Ejecución de los plans por fase | Sí |
-| finishing-a-development-branch | superpowers | útil latente | El proyecto usa flujo de PR, no merge local directo | Sí (latente) |
-| receiving-code-review | superpowers | útil activa | Review feedback en PRs | Sí |
-| requesting-code-review | superpowers | útil activa | Request de review antes de mergear | Sí |
-| subagent-driven-development | superpowers | útil latente | Choca con la regla "Paseo es el mecanismo exclusivo de subagentes"; revisar antes de usar | Sí (latente, con conflicto) |
-| systematic-debugging | superpowers | útil activa | Debug de bugs de RLS/webhooks/pagos | Sí |
-| test-driven-development | superpowers | útil activa | DoD exige tests para lógica nueva | Sí |
-| using-git-worktrees | superpowers | útil activa | Paseo crea worktrees automáticamente | Sí |
-| using-superpowers | superpowers | útil activa | Meta-skill: descubrimiento de skills (siempre cargada) | Sí |
-| verification-before-completion | superpowers | útil activa | DoD: `pnpm lint/typecheck/build/test` antes de afirmar éxito | Sí |
-| writing-plans | superpowers | útil activa | Plans de fases del blueprint | Sí |
-| writing-skills | superpowers | útil activa | Edición de skills del proyecto | Sí |
+| Skill                          | Raíz                   | Categoría    | Razón                                                                                     | Mantener                    |
+| ------------------------------ | ---------------------- | ------------ | ----------------------------------------------------------------------------------------- | --------------------------- |
+| chained-pr                     | opencode/claude/agents | útil activa  | PRs >400 líneas; el proyecto trabaja por PR                                               | Sí                          |
+| cognitive-doc-design           | opencode/claude/agents | útil activa  | Docs/specs en español (`docs/superpowers/`, README, ADRs)                                 | Sí                          |
+| go-testing                     | opencode/claude/agents | no aplica    | Go; el stack es TypeScript/Next.js                                                        | No                          |
+| judgment-day                   | opencode/claude/agents | útil activa  | Auditorías por tarea exigidas en AGENTS.md (@QA + @Diseñador)                             | Sí                          |
+| sdd-apply                      | opencode/claude/agents | útil activa  | Flujo SDD por fases del blueprint v2.6                                                    | Sí                          |
+| sdd-archive                    | opencode/claude/agents | útil activa  | Cierre de cambios SDD                                                                     | Sí                          |
+| sdd-design                     | opencode/claude/agents | útil activa  | Diseño técnico por fase                                                                   | Sí                          |
+| sdd-explore                    | opencode/claude/agents | útil activa  | Exploración previa a specs                                                                | Sí                          |
+| sdd-init                       | opencode/claude/agents | útil activa  | Inicialización SDD del proyecto                                                           | Sí                          |
+| sdd-onboard                    | opencode/claude/agents | útil latente | Onboarding al ciclo SDD; no se usó aún                                                    | Sí (latente)                |
+| sdd-propose                    | opencode/claude/agents | útil activa  | Propuestas de cambio                                                                      | Sí                          |
+| sdd-research                   | opencode/claude/agents | útil activa  | Evidencia externa antes de specs                                                          | Sí                          |
+| sdd-spec                       | opencode/claude/agents | útil activa  | Specs por fase (`docs/superpowers/specs/`)                                                | Sí                          |
+| sdd-tasks                      | opencode/claude/agents | útil activa  | Plans por fase (`docs/superpowers/plans/`)                                                | Sí                          |
+| sdd-verify                     | opencode/claude/agents | útil activa  | Verificación post-implementación                                                          | Sí                          |
+| skill-creator                  | opencode/claude/agents | útil activa  | Política de skills del proyecto (AGENTS.md)                                               | Sí                          |
+| skill-improver                 | opencode/claude/agents | útil activa  | Auditoría de skills al cierre de fase (AGENTS.md)                                         | Sí                          |
+| skill-registry                 | opencode/claude/agents | útil activa  | Registro `.atl/skill-registry.md`                                                         | Sí                          |
+| work-unit-commits              | opencode/claude/agents | útil activa  | Commits atómicos por unidad de trabajo                                                    | Sí                          |
+| paseo                          | claude/agents          | útil activa  | Paseo es el orquestador exclusivo de subagentes                                           | Sí                          |
+| paseo-advisor                  | claude/agents          | útil latente | Segunda opinión; no se usó aún                                                            | Sí (latente)                |
+| paseo-committee                | claude/agents          | útil latente | Planificación de problemas duros; no se usó aún                                           | Sí (latente)                |
+| paseo-handoff                  | claude/agents          | útil latente | Handoff entre agentes; no se usó aún                                                      | Sí (latente)                |
+| paseo-help                     | claude/agents          | útil latente | Soporte de Paseo; solo si hay dudas de config                                             | Sí (latente)                |
+| paseo-loop                     | claude/agents          | útil latente | Loops/babysitting; no se usó aún                                                          | Sí (latente)                |
+| paseo-plugin                   | claude/agents          | genérica     | Construcción de plugins de Paseo; sin relación con el SaaS                                | No                          |
+| find-skills                    | agents                 | útil latente | Descubrimiento/instalación de skills nuevas                                               | Sí (latente)                |
+| brainstorming                  | superpowers            | útil latente | Relevante antes de features, pero el flujo SDD lo reemplaza                               | Sí (latente)                |
+| dispatching-parallel-agents    | superpowers            | útil activa  | Tareas independientes en paralelo (vía Paseo)                                             | Sí                          |
+| executing-plans                | superpowers            | útil activa  | Ejecución de los plans por fase                                                           | Sí                          |
+| finishing-a-development-branch | superpowers            | útil latente | El proyecto usa flujo de PR, no merge local directo                                       | Sí (latente)                |
+| receiving-code-review          | superpowers            | útil activa  | Review feedback en PRs                                                                    | Sí                          |
+| requesting-code-review         | superpowers            | útil activa  | Request de review antes de mergear                                                        | Sí                          |
+| subagent-driven-development    | superpowers            | útil latente | Choca con la regla "Paseo es el mecanismo exclusivo de subagentes"; revisar antes de usar | Sí (latente, con conflicto) |
+| systematic-debugging           | superpowers            | útil activa  | Debug de bugs de RLS/webhooks/pagos                                                       | Sí                          |
+| test-driven-development        | superpowers            | útil activa  | DoD exige tests para lógica nueva                                                         | Sí                          |
+| using-git-worktrees            | superpowers            | útil activa  | Paseo crea worktrees automáticamente                                                      | Sí                          |
+| using-superpowers              | superpowers            | útil activa  | Meta-skill: descubrimiento de skills (siempre cargada)                                    | Sí                          |
+| verification-before-completion | superpowers            | útil activa  | DoD: `pnpm lint/typecheck/build/test` antes de afirmar éxito                              | Sí                          |
+| writing-plans                  | superpowers            | útil activa  | Plans de fases del blueprint                                                              | Sí                          |
+| writing-skills                 | superpowers            | útil activa  | Edición de skills del proyecto                                                            | Sí                          |
 
 **Conteo por categoría (41 únicas):**
 
-| Categoría | Cantidad |
-| --- | --- |
-| útil activa | 29 |
-| útil latente | 10 |
-| genérica | 1 |
-| no aplica | 1 |
+| Categoría    | Cantidad |
+| ------------ | -------- |
+| útil activa  | 29       |
+| útil latente | 10       |
+| genérica     | 1        |
+| no aplica    | 1        |
 
 Únicas por raíz de origen (donde el `SKILL.md` real existe): opencode 19, agents `find-skills` + paseo×7 = 8 (los paseo también están en claude), superpowers 14 → 19 + 8 + 14 = 41. `~/.claude/skills/` no aporta ninguna skill con contenido propio (sus 7 `SKILL.md` son copias de las de agents).
 
@@ -146,6 +146,7 @@ unpackedSize: 67.2 kB · published 3 months ago by param087
 **Comparación con las 41 únicas:** solape de nombres = **0**. Las nuestras son de proceso (SDD, PRs, reviews, Paseo); las suyas son de **dominio SaaS** — exactamente el hueco que nuestras 41 no cubren.
 
 **Recomendación: FUSIONAR (selectivamente).**
+
 - Adoptar y adaptar: `multi-tenancy` ( nuestro RLS por columna es el patrón más fino que el genérico), `subscription-billing` (blueprint v2.6 fase de suscripciones), `api-routes-and-validation` (checklist de endpoints de AGENTS.md), `database-schema` (migraciones append-only).
 - Adaptar o ignorar: `payments-stripe` → nuestro gateway es MercadoPago (webhook idempotente, `x-test-order-id`); usarlo solo como checklist genérico de idempotencia/retries.
 - Ignorar: `project-scaffolding`, `deployment-and-ci` (Vercel/CI propio ya definido), `background-jobs`, `file-uploads-and-storage` (ya resuelto con `@repo/storage`).
@@ -170,15 +171,15 @@ No es un paquete npm: es una lista curada en GitHub. Búsqueda web directa fall�
 
 **3-5 skills aplicables a este proyecto** (del listado de `jshsakura`):
 
-| Skill | Aplicación al proyecto |
-| --- | --- |
-| `nextjs-developer` | App Router, Server Components, server actions, modos de render — stack central |
-| `postgres-pro` | Schema, locks, índices, rendimiento de queries bajo RLS |
+| Skill                 | Aplicación al proyecto                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------ |
+| `nextjs-developer`    | App Router, Server Components, server actions, modos de render — stack central                   |
+| `postgres-pro`        | Schema, locks, índices, rendimiento de queries bajo RLS                                          |
 | `payment-integration` | Checkout, idempotencia de webhooks, retries, estados de settlement — mapea directo a MercadoPago |
-| `security-auditor` | Auth flows, secrets, validación de entrada — complementa las auditorías @QA |
-| `typescript-pro` | Tipado explícito obligatorio del stack (interface vs type, sin `any`) |
+| `security-auditor`    | Auth flows, secrets, validación de entrada — complementa las auditorías @QA                      |
+| `typescript-pro`      | Tipado explícito obligatorio del stack (interface vs type, sin `any`)                            |
 
-**Recomendación: IGNORAR la instalación masiva** (el `install.ps1` vuelca 175+ skills y diluiría el índice de 41). Adoptar caso por caso, 1 skill a la vez, con `skill-creator` y registrándolo después con `skill-registry`. Evita además el riesgo de skills no auditadas (el README advierte: *"We do not audit or guarantee the security or correctness of any subagent"*).
+**Recomendación: IGNORAR la instalación masiva** (el `install.ps1` vuelca 175+ skills y diluiría el índice de 41). Adoptar caso por caso, 1 skill a la vez, con `skill-creator` y registrándolo después con `skill-registry`. Evita además el riesgo de skills no auditadas (el README advierte: _"We do not audit or guarantee the security or correctness of any subagent"_).
 
 ---
 
