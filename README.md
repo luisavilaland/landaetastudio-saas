@@ -480,6 +480,19 @@ En storefront `/api/health` está excluida del matcher del proxy multi-tenant (`
 - Cart funciona sin autenticación (usuarios anónimos).
 - Checkout requiere email para enviar confirmación.
 
+## Toolkit del desarrollador
+
+Este proyecto usa un toolkit específico para desarrollo asistido
+por IA; ver `AGENTS.md` sección "Toolkit del proyecto" para
+detalles completos.
+
+- **Paseo** — orquestación de agentes y workspaces.
+- **Engram** — memoria persistente del agente.
+- **GGA** — revisión de código automática en commits.
+- **Gentle-AI** — skills y convenciones del proyecto.
+- **Obsidian vault** — documentación navegable en `vault/`.
+- **Context7** — doc actualizada de librerías.
+
 ## Documentación adicional
 
 - [Blueprint v2.6](./docs/superpowers/specs/2026-09-blueprint-v2.6.md) — Roadmap vigente (10 fases, pre-lanzamiento).

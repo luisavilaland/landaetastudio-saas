@@ -508,7 +508,12 @@ verificado empíricamente (no `*.test.*` ni `**/*.test.*`).
 `*` no cruza `/`. Tanto `*.test.*` como `**/*.test.*` fallan.
 El patrón correcto es `*test.ts` (sin punto antes del wildcard).
 
-**Fix aplicado:** EXCLUDE_PATTERNS="*test.ts,spec.ts,.d.ts,dist/*,build/*,node_modules/*,vault/*"
+**Fix aplicado:** EXCLUDE_PATTERNS="*test.ts,*spec.ts,*d.ts,dist/*,build/*,node_modules/*,vault/*"
+
+> Corregido en PR C (2026-09-26): esta línea documentaba `spec.ts` y
+> `.d.ts` sin el wildcard inicial. La configuración real en `.gga`
+> siempre tuvo la forma correcta (`*spec.ts`, `*d.ts`); el error estaba
+> solo en la descripción.
 
 **Urgencia:** CERRADA.
 
@@ -537,5 +542,31 @@ El patrón correcto es `*test.ts` (sin punto antes del wildcard).
 **Impacto:** el plugin ponytail no se cargaba correctamente.
 
 **Mitigación:** resuelto por el subagente B en el mismo PR (eliminación o corrección de la referencia).
+
+**Urgencia:** INFO.
+
+---
+
+## 30. Permisos de edición en worktrees de Paseo
+
+**Estado:** INFO.
+
+**Origen:** PR #145 y PR C (`chore/docs-toolkit-consolidation`), donde
+los subagentes trabajan en un worktree creado por
+`paseo_create_workspace`.
+
+**Contexto:** los worktrees de Paseo pueden tener permisos de edición
+restringidos. Si el agente no puede escribir en `vault/`, el bloqueo se
+reporta al humano en lugar de sortearse.
+
+**Impacto:** ninguno en el producto. Es una condición operativa del
+entorno que puede bloquear la escritura de la bitácora o de la deuda
+técnica dentro del PR.
+
+**Mitigación:** el humano aplica el cambio manualmente en el path del
+worktree. Ojo: hay que editar el archivo en el path **del worktree**
+(`git worktree list` para ubicarlo), NO en el main worktree — son copias
+distintas del repo y un cambio en el main no aparece en la branch del
+PR.
 
 **Urgencia:** INFO.
