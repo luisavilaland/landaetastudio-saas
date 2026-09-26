@@ -1489,3 +1489,32 @@ instalado. Fix aplicado antes del merge.
 
 **Verificación:** git diff append-only OK.
 
+---
+
+## 2026-09-25 — Migración de documentación al vault
+
+**Contexto.** Se migró la documentación narrativa al vault de
+Obsidian. Los paths operativos (superpowers/, migrations-archive/)
+se mantuvieron en docs/ porque herramientas los leen.
+
+**Cambios:**
+
+- bitacora.md (raíz) → vault/02_Bitacora/bitacora.md
+- docs/adr/ (25) → vault/01_ADRs/
+- docs/deuda-tecnica.md → vault/03_Deuda/deuda-tecnica.md
+- docs/auditoria-fase1.md → vault/04_Fases/auditoria-fase1.md
+- docs/arquitectura.md → vault/05_Specs/arquitectura.md
+- docs/brief tecnico fase 5.md → vault/05_Specs/brief-tecnico-fase-5.md
+- docs/Blueprint ... .pdf → vault/05_Specs/blueprint-v2.6.pdf
+- AGENTS.MD → AGENTS.md (rename a minúsculas)
+
+**Lo que NO se movió:**
+- docs/superpowers/ (Paseo lo usa para plans/specs)
+- docs/migrations-archive/ (check-migrations.sh lo lee)
+- AGENTS.md, README.md, SETUP.md, TESTING.md, etc.
+
+**Referencias actualizadas:** path-ref en PROMPTS.md y otros.
+13 internas de bitacora y 2 textuales de ADR-022 no se tocaron.
+
+**Verificación:** append-only OK.
+

@@ -48,7 +48,7 @@ Closes #<!-- número del issue -->
 - [ ] Cambios coinciden con el spec/plan referenciado
 - [ ] Hay algún ADR que debería crearse o actualizarse
 - [ ] Documentación del blueprint sigue siendo válida (no hay drift)
-- [ ] Deuda técnica nueva registrada en `docs/deuda-tecnica.md`
+- [ ] Deuda técnica nueva registrada en `vault/03_Deuda/deuda-tecnica.md`
 
 ---
 

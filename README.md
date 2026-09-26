@@ -484,11 +484,11 @@ En storefront `/api/health` está excluida del matcher del proxy multi-tenant (`
 
 - [Blueprint v2.6](./docs/superpowers/specs/2026-09-blueprint-v2.6.md) — Roadmap vigente (10 fases, pre-lanzamiento).
 - [Ciclo de vida de suscripciones](./docs/superpowers/specs/2026-09-subscription-lifecycle.md) — Spec transversal (5 estados, gracia 7d, retención 90d, prorrateo, 7 emails).
-- [Decisiones de arquitectura](./docs/arquitectura.md) – Por qué elegimos cada tecnología (incluye ADR-023/024/025 pendientes).
+- [Decisiones de arquitectura](./vault/05_Specs/arquitectura.md) – Por qué elegimos cada tecnología (incluye ADR-023/024/025 pendientes).
 - [Guía de setup](./SETUP.md) – Configuración del proyecto y solución de problemas.
 - [Guía para agentes de IA](./AGENTS.md) – Políticas y comandos para asistentes de código.
 - [Prompts reutilizables](./PROMPTS.md) – Plantillas de prompts para agentes de IA.
-- [Brief técnico Fase 5](./docs/brief%20tecnico%20fase%205.md) – Plan de producción (completado).
+- [Brief técnico Fase 5](./vault/05_Specs/brief-tecnico-fase-5.md) – Plan de producción (completado).
 - [Checklist de pruebas manuales](./TESTING-MANUAL.md) – Verificación manual por área.
 
 ## Tests
