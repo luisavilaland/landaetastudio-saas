@@ -501,18 +501,41 @@ Decisión explícita del 2026-09-26: se deja como evidencia del daño.
 
 ## 27. GGA `EXCLUDE_PATTERNS` no cruza `/`
 
-**Estado:** en `.gga`, el patrón `*.test.*` no excluye
-`packages/db/src/__tests__/*.test.ts` porque el glob no cruza `/`
-(el match es contra el path relativo completo).
+**Estado:** RESUELTO (PR #145) — el patrón correcto es `*test.ts`,
+verificado empíricamente (no `*.test.*` ni `**/*.test.*`).
 
-**Origen:** detectado al diagnosticar el timeout de 300s del hook
-durante el PR #143.
+**Contexto:** el glob de GGA matchea contra el path completo y
+`*` no cruza `/`. Tanto `*.test.*` como `**/*.test.*` fallan.
+El patrón correcto es `*test.ts` (sin punto antes del wildcard).
 
-**Impacto:** tests grandes van a review de GGA contra `AGENTS.md`
-(~1.100 líneas). Ya no bloquea el hook desde que el provider es
-Nemotron 3 Ultra (~50s), pero el costo de review se mantiene.
+**Fix aplicado:** EXCLUDE_PATTERNS="*test.ts,spec.ts,.d.ts,dist/*,build/*,node_modules/*,vault/*"
 
-**Mitigación:** cambiar `EXCLUDE_PATTERNS` a
-`**/*.test.*,**/*.spec.*` y verificar que el hook salte los tests.
+**Urgencia:** CERRADA.
 
-**Urgencia:** MEDIA. A resolver en el PR de skills (F1-F5).
+---
+
+## 28. Limpieza de branches post-squash: no usar git cherry
+
+**Estado:** INFO.
+
+**Origen:** limpieza de `chore/obsidian-gentleman-integration` post PR #144.
+
+**Impacto:** `git cherry develop <branch>` marca commits como "+" (no mergeados) aunque estén en develop vía squash merge, porque el squash no preserva patch-por-patch. Genera falsos positivos al inspeccionar branches pendientes de merge.
+
+**Mitigación:** comparar árboles con `git diff <squash-commit> <branch>`; si idénticos, la branch es redundante y puede eliminarse sin riesgo.
+
+**Urgencia:** INFO.
+
+---
+
+## 29. Plugin ponytail roto en opencode.json
+
+**Estado:** RESUELTO en PR chore/skills-complete (lo resuelve el subagente B en el mismo PR).
+
+**Origen:** `opencode.json` referenciaba `.opencode/ponytail/.opencode/plugins/ponytail.mjs` que no existía.
+
+**Impacto:** el plugin ponytail no se cargaba correctamente.
+
+**Mitigación:** resuelto por el subagente B en el mismo PR (eliminación o corrección de la referencia).
+
+**Urgencia:** INFO.
