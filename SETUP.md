@@ -168,7 +168,14 @@ El vault vive en `vault/` y se trackea con Git. Contiene:
 - `03_Deuda/deuda-tecnica.md`: ítems de deuda técnica.
 - `04_Fases/`: auditorías y cierres de fases.
 - `05_Specs/`: arquitectura, brief técnico y blueprint.
-- `06_Engram/`: exportaciones de Engram.
+
+La convención `00-05` aplica solo a contenido **human-curated**. El contenido
+**tool-managed** no lleva numeración porque su estructura la define la tool:
+
+- `engram/`: exportaciones de Engram (auto-generado por `pnpm vault:export`,
+  NO editar manualmente). El cache `.engram-sync-state.json` está en `.gitignore`.
+- `.obsidian/`: config de Obsidian (ignorado en git).
+- `.trash/`: papelera de Obsidian (ignorada en git).
 
 `docs/` conserva únicamente los paths operativos que leen herramientas:
 `migrations-archive/` (CI) y `superpowers/` (Paseo), más su README índice.

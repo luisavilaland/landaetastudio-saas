@@ -14,7 +14,7 @@ La documentación narrativa se migró al vault de Obsidian (`vault/`):
 - Deuda técnica → `vault/03_Deuda/deuda-tecnica.md`
 - Auditorías → `vault/04_Fases/`
 - Arquitectura, brief, blueprint → `vault/05_Specs/`
-- Memoria de Engram → `vault/06_Engram/`
+- Memoria de Engram → `vault/engram/` (tool-managed, sin numeración)
 
 Para abrir el vault: Obsidian → File → Open folder as vault →
 seleccionar `vault/`.
