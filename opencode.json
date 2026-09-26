@@ -5,5 +5,7 @@
       "enabled": true
     }
   },
-  "plugin": [".opencode/ponytail/.opencode/plugins/ponytail.mjs"]
+  "skills": {
+    "paths": [".opencode/skills"]
+  }
 }

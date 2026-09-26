@@ -1607,3 +1607,51 @@ Es comportamiento esperado de git. No hay acción pendiente. Se
 documenta acá para futuras referencias — no requiere mitigación.
 
 Contexto: PR #143, review de luisavilaland en PR #144.
+---
+
+## 2026-09-26 — Cierre del meta-trabajo de skills (F1-F5)
+
+**Contexto.** Cierre del trabajo de skills post-Fase 1, ejecutado con
+3 subagentes en paralelo vía Paseo sobre el mismo worktree y scopes
+disjuntos: QA/Auditor (F1+F2), Programador (F3) y Diseñador
+(F4+F5).
+
+**F1 — Auditoría del inventario real.** 107 directorios en 4 raíces,
+48 nombres únicos, **41 skills con `SKILL.md`**. Clasificación: 29
+útil activa, 10 útil latente, 1 genérica, 1 no aplica. El "46" que
+figuraba en el plan no se reproduce en disco. Higiene pendiente: 6
+shells vacías sin `SKILL.md`. Reporte en
+`vault/04_Fases/2026-09-26-skills-audit.md`.
+
+**F2 — Externas.** `saas-starter-skills@0.1.0` tiene 15 skills de
+dominio con 0 solape: fusionar 4 a mano. `skilldoctor` da 404 en npm:
+no instalar. `awesome-opencode-skills`: adoptar 5 de forma
+individual, no instalar en masa.
+
+**F3 — 3 skills propias** en `.opencode/skills/`: `rls-audit`,
+`migration-safety`, `webhook-debug`. `opencode.json` ahora registra
+`skills.paths` (sin eso no se descubrían) y se eliminó la referencia
+muerta al plugin ponytail.
+
+**F4 + F5 — Política y workflow** en `AGENTS.md`: sección de
+skill-improver, política de ciclo de vida (crear/auditar/retirar) y
+sección de orquestación con Paseo, con precedencia explícita sobre
+skills genéricas que proponen otro mecanismo de despacho.
+
+**Fix verificado — GGA `EXCLUDE_PATTERNS`.** El item 27 quedó
+resuelto, pero **no con el patrón que decía el plan**. La hipótesis
+"los globs no cruzan `/`, agregá `**`" era falsa: `**/*.test.*`
+tampoco excluye los tests. Probado con un probe stageado:
+
+| Patrón | Resultado |
+|---|---|
+| `*.test.*` (original) | REVIEWED — no excluía |
+| `**/*.test.*` (hipótesis) | REVIEWED — tampoco excluía |
+| `*test.ts` | EXCLUIDO (2/2) |
+
+Quedó `*test.ts,*spec.ts,*d.ts,dist/*,build/*,node_modules/*,vault/*`.
+
+**Deuda:** item 29 registrado y resuelto (ponytail), item 28
+registrado (no usar `git cherry` después de un squash).
+
+**Verificación:** append-only OK.

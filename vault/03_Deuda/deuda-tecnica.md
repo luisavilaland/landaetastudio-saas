@@ -499,20 +499,62 @@ Decisión explícita del 2026-09-26: se deja como evidencia del daño.
 
 ---
 
-## 27. GGA `EXCLUDE_PATTERNS` no cruza `/`
+## 27. GGA `EXCLUDE_PATTERNS` no excluía los tests
 
-**Estado:** en `.gga`, el patrón `*.test.*` no excluye
-`packages/db/src/__tests__/*.test.ts` porque el glob no cruza `/`
-(el match es contra el path relativo completo).
+**Estado:** **RESUELTO (2026-09-26)** en el PR de skills. El patrón
+correcto es `*test.ts`, NO `**/*.test.*`.
 
 **Origen:** detectado al diagnosticar el timeout de 300s del hook
 durante el PR #143.
 
-**Impacto:** tests grandes van a review de GGA contra `AGENTS.md`
-(~1.100 líneas). Ya no bloquea el hook desde que el provider es
-Nemotron 3 Ultra (~50s), pero el costo de review se mantiene.
+**Impacto:** los tests iban a review de GGA contra `AGENTS.md`
+(~1.100 líneas), con el costo de review correspondiente.
 
-**Mitigación:** cambiar `EXCLUDE_PATTERNS` a
-`**/*.test.*,**/*.spec.*` y verificar que el hook salte los tests.
+**Mitigación:** `EXCLUDE_PATTERNS` pasó a
+`*test.ts,*spec.ts,*d.ts,dist/*,build/*,node_modules/*,vault/*`.
 
-**Urgencia:** MEDIA. A resolver en el PR de skills (F1-F5).
+**Evidencia:** prueba empírica con
+`packages/db/src/__tests__/gga-glob-probe.test.ts` stageado y
+`gga run`:
+
+| Patrón | Resultado |
+|---|---|
+| `*.test.*` (original) | archivo REVIEWED — no excluía |
+| `**/*.test.*` (hipótesis inicial) | archivo REVIEWED — **tampoco excluía** |
+| `*test.ts` | archivo EXCLUIDO (reproducible 2/2) |
+| `*test.ts,*spec.ts,*d.ts,dist/*,build/*,node_modules/*,vault/*` | EXCLUIDO |
+
+**Aprendizaje:** GGA v2.10.1 no matchea `*.test.*` ni `**/*.test.*`
+contra la ruta ni contra el basename. La hipótesis "los globs no
+cruzan `/`, agregá `**`" era plausible pero falsa. Verificar los
+cambios de tooling con un probe, no por razonamiento.
+
+**Urgencia:** cerrada.
+
+---
+
+## 28. Limpieza de branches post-squash: no usar git cherry
+
+**Estado:** INFO.
+
+**Origen:** limpieza de `chore/obsidian-gentleman-integration` post PR #144.
+
+**Impacto:** `git cherry develop <branch>` marca commits como "+" (no mergeados) aunque estén en develop vía squash merge, porque el squash no preserva patch-por-patch. Genera falsos positivos al inspeccionar branches pendientes de merge.
+
+**Mitigación:** comparar árboles con `git diff <squash-commit> <branch>`; si idénticos, la branch es redundante y puede eliminarse sin riesgo.
+
+**Urgencia:** INFO.
+
+---
+
+## 29. Plugin ponytail roto en opencode.json
+
+**Estado:** RESUELTO en PR chore/skills-complete (lo resuelve el subagente B en el mismo PR).
+
+**Origen:** `opencode.json` referenciaba `.opencode/ponytail/.opencode/plugins/ponytail.mjs` que no existía.
+
+**Impacto:** el plugin ponytail no se cargaba correctamente.
+
+**Mitigación:** resuelto por el subagente B en el mismo PR (eliminación o corrección de la referencia).
+
+**Urgencia:** INFO.

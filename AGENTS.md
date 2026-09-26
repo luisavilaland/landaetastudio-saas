@@ -434,3 +434,62 @@ Ejemplo: en T6, la sesión anterior quedó trabada ~17 minutos en un editor inte
 - GGA valida cada commit contra este `AGENTS.md` a través de `.gga`.
 - Si GGA falla por razones de red o timeout, se puede saltar con `git commit --no-verify`.
 - Las reglas de este archivo siguen siendo la fuente de verdad.
+
+## Workflow de skill-improver
+
+- **Cuándo correr**: al cierre de cada fase del SaaS, antes de releases.
+- **Cómo**: invocar `/skill-improver` sobre las skills del proyecto (`~/.config/opencode/skills/`).
+- **Qué hacer con los resultados**: mejoras aplicadas → commit directo; skills obsoletas o demasiado genéricas → mover a `.opencode/skills-archive/`.
+
+## Política de skills del proyecto
+
+### Cuándo crear una skill
+
+- Repetición de la misma tarea ≥3 veces.
+- Checklist compleja de 5+ pasos que se repite.
+- Redescubrimiento: el agente re-aprende lo mismo en sesiones distintas.
+- Error repetido 2+ veces por falta de regla documentada.
+- Pregunta recurrente del humano sobre el mismo procedimiento.
+
+### Cuándo auditar
+
+- Al cierre de cada fase del SaaS.
+- Antes de cada release.
+- Cuando una skill falle o no se active inesperadamente.
+
+### Cuándo retirar
+
+- Sin uso durante 3+ meses → mover a `.opencode/skills-archive/`.
+- Obsoleta (tool o dependencia deprecada) → eliminar con nota en bitácora.
+- Duplicada con otra skill existente → fusionar y eliminar la copia.
+- Muy genérica (no específica del proyecto) → eliminar.
+
+### Cómo crear/editar
+
+- Crear o editar con `skill-creator` de gentle-ai.
+- Refrescar el registro con `gentle-ai skill-registry refresh`.
+- Auditar con `skill-improver`.
+
+### Historial de auditorías
+
+| Fecha | Skills | Cambios |
+| --- | --- | --- |
+| 2026-09-26 | 41 con `SKILL.md` (48 nombres en 4 raíces) | Baseline |
+
+## Orquestación con Paseo
+
+El proyecto usa Paseo como orquestador de subagentes con perfiles por rol:
+
+- **Orquestador** (Nemotron 3 Ultra Free): coordina, integra y hace commit/PR.
+- **QA / Auditor** (MiMo-V2.6-Flash Free): auditoría y revisión de calidad.
+- **Programador** (Big Pickle): implementación de código.
+- **Diseñador** (Ling 3.0 Flash Fin Free): diseño y arquitectura de API.
+
+Reglas:
+
+- Cuando un plan pida lanzar subagentes, se crean con el mecanismo de Paseo (`paseo_create_workspace` + `paseo_create_agent`) con el perfil del rol correspondiente.
+- **NO** usar `Task(...)` interno para despachar subagentes; Paseo es el mecanismo exclusivo.
+- Los worktrees los crea Paseo automáticamente.
+- El Orquestador coordina, integra y hace commit/PR.
+- Los subagentes ejecutan un scope acotado y escriben en archivos disjuntos.
+- Esta regla **prevalece** sobre skills genéricas que proponen otro mecanismo de despacho, como `subagent-driven-development` (de superpowers), que sugiere usar `Task(...)`. Ante el conflicto, gana este archivo.
