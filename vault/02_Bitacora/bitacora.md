@@ -1559,3 +1559,36 @@ evidencia del daño original.
 con U+FFFD (replacement character) donde el byte fuente ya se
 había perdido antes de cualquier fix. Ejemplo: `simulaci�n` donde
 un `ó` desapareció. Irreparables sin inventar contenido.
+---
+
+## 2026-09-26 — Auditoría de docs post-migración (PR #143)
+
+**Contexto.** Barrido comprehensivo de referencias a paths viejos
+tras la migración al vault del PR #143. El pre-flight de ese PR solo
+cubrió las referencias a la bitácora; esta auditoría amplía el
+barrido a README, SECURITY, TESTING, TESTING-MANUAL, PROMPTS, ADRs
+internos, `.gga`, workflows y scripts.
+
+**Resultado del inventario:** 0 referencias huérfanas en zonas
+editables. Los 46 matches de paths viejos caen en zonas protegidas:
+
+- `docs/superpowers/` (8) — lo lee Paseo, no se toca.
+- `docs/migrations-archive/` — lo lee CI, no se toca.
+- Bitácora (24) e historial en `vault/engram/` (12) — citas
+  históricas, la bitácora es append-only.
+- `vault/README.md` (2) — referencias negativas intencionales que
+  documentan que `06_Engram/` no existe.
+
+**Cambios:** ninguno en paths. No hubo refs que actualizar.
+
+**Verificaciones adicionales:** los 25 ADRs citan a otros ADRs sin
+referencias a paths viejos; `.gga`, `.github/workflows/ci.yml`,
+`scripts/check-migrations.sh` y el template de PR ya apuntan a los
+paths nuevos; `vault/03_Deuda/deuda-tecnica.md` y el resto del vault
+están limpios de mojibake (verificado a nivel de bytes).
+
+**Deuda registrada:** items 25-28 en `vault/03_Deuda/deuda-tecnica.md`
+(U+FFFD preexistente, residual L1289, `EXCLUDE_PATTERNS` de GGA, y
+delete+add de `arquitectura.md`).
+
+**Verificación:** append-only OK.

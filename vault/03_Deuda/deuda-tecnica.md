@@ -459,3 +459,79 @@ permisos va a leer esa clave como `undefined` (falsy) en lugar de
 **Urgencia:** cerrada para esta fase; queda como referencia para futuras migraciones.
 
 **Contexto de esta ejecución:** 0015 se aplicó manualmente con SQL del owner y se verificó con smoke tests; el reset posterior quedó validado con el plan aprobado de baseline limpio.
+---
+
+## 25. Bitácora con pérdida de datos preexistente (U+FFFD)
+
+**Estado:** 15 líneas de `vault/02_Bitacora/bitacora.md` contienen
+U+FFFD (replacement character) donde el byte fuente se perdió antes
+de cualquier fix (ej: `simulaci�n` en lugar de `simulación`).
+
+**Origen:** corrupción histórica anterior al PR #143. Detectada al
+reparar el doble-encoding UTF-8→CP1252 de la bitácora.
+
+**Impacto:** contenido histórico parcialmente ilegible. No afecta
+ejecución, tests ni tooling.
+
+**Mitigación:** ninguna posible sin inventar bytes. Queda documentado
+en la entrada del 2026-09-26 de la bitácora.
+
+**Urgencia:** sin plan de fix. Severidad BAJA.
+
+---
+
+## 26. Residual `â¬` en bitácora L1289
+
+**Estado:** la línea `### 2026-09-21 â¬ <0x1D> T7:` conserva un
+mojibake incompleto: el tercer byte del em-dash fue reemplazado por
+el control char `0x1D` antes del fix del PR #143.
+
+**Origen:** corrupción histórica. El byte fuente está destruido, no
+solo mal decodificado.
+
+**Impacto:** estético. Una sola línea de encabezado queda con un
+carácter ilegible; el resto del contenido es legible.
+
+**Mitigación:** no se puede reparar sin inventar el byte original.
+Decisión explícita del 2026-09-26: se deja como evidencia del daño.
+
+**Urgencia:** sin plan de fix. Severidad BAJA.
+
+---
+
+## 27. GGA `EXCLUDE_PATTERNS` no cruza `/`
+
+**Estado:** en `.gga`, el patrón `*.test.*` no excluye
+`packages/db/src/__tests__/*.test.ts` porque el glob no cruza `/`
+(el match es contra el path relativo completo).
+
+**Origen:** detectado al diagnosticar el timeout de 300s del hook
+durante el PR #143.
+
+**Impacto:** tests grandes van a review de GGA contra `AGENTS.md`
+(~1.100 líneas). Ya no bloquea el hook desde que el provider es
+Nemotron 3 Ultra (~50s), pero el costo de review se mantiene.
+
+**Mitigación:** cambiar `EXCLUDE_PATTERNS` a
+`**/*.test.*,**/*.spec.*` y verificar que el hook salte los tests.
+
+**Urgencia:** MEDIA. A resolver en el PR de skills (F1-F5).
+
+---
+
+## 28. `docs/arquitectura.md` aparece como delete+add en el historial
+
+**Estado:** el rename de `docs/arquitectura.md` a
+`vault/05_Specs/arquitectura.md` quedó registrado como delete+add en
+vez de rename, porque la similarity bajó del 50% al actualizar 25
+links internos.
+
+**Origen:** consecuencia de editar el contenido durante el mismo
+commit del move.
+
+**Impacto:** ninguno funcional. El historial sigue trazable porque
+el contenido es idéntico salvo los links actualizados.
+
+**Mitigación:** ninguna necesaria. No reescribir historia.
+
+**Urgencia:** INFO. Sin acción.
