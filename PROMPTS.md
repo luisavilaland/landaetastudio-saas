@@ -406,6 +406,8 @@ Cierre de PR completo
 8. Reportar al humano (NO esperar CI — el humano lo controla).
 ```
 
+**Nota — verificaciones que no se automatizan.** Si una verificación automática falla pero el contenido parece correcto, **leer el diff manualmente** antes de asumir corrupción. Algunos cambios (formato, encoding) no se verifican con scripts triviales; el agente del PR E lo descubrió empíricamente con `prettier` sobre markdown. Evidencia: los snippets de código con indentación se reinterpretaban y los bloques `U+FFFD` de la bitácora no son validación de CI, son damage histórico. La automatización es una red de seguridad, no un oráculo.
+
 ### Localizar gh si no está en PATH
 
 Si `gh` no está en PATH y no aparece en rutas estándar, buscar

@@ -27,6 +27,16 @@
 #    solo para archivos que tengan contraparte con el mismo basename
 #    en el directorio del archive. El resto sigue bloqueado.
 #    El README del archive es el marcador explícito de aprobación.
+#
+# 4. El archive también es inmutable (2026-09-26)
+#    Antes del squash, todo el historial vivía en
+#    packages/db/migrations/. El squash del 2026-09-24 movió las
+#    migraciones incrementales 0005-0015 a docs/migrations-archive/,
+#    fuera del pathspec: quedaban desprotegidas y el CI pasaba verde
+#    mientras alguien podia reescribir 0013_ensure_rls_and_grants.sql.
+#    Un guard que pasa sin cubrir lo que dice proteger es peor que no
+#    tener guard, porque genera confianza falsa. Por eso el pathspec
+#    incluye 'docs/migrations-archive/*/*.sql' y '*.json'.
 set -euo pipefail
 
 BASE_REF="origin/develop"
@@ -51,7 +61,9 @@ archive_marker="$(git diff --name-only "${BASE_REF}" -- \
 
 changed_files="$(git diff --name-only --diff-filter=MD "${BASE_REF}" -- \
   'packages/db/migrations/*.sql' \
-  'packages/db/migrations/meta/*_snapshot.json')"
+  'packages/db/migrations/meta/*_snapshot.json' \
+  'docs/migrations-archive/*/*.sql' \
+  'docs/migrations-archive/*/*.json')"
 
 if [[ -n "${archive_marker}" && -n "${changed_files}" ]]; then
   # Reset autorizado: filtrar los archivos que NO tienen contraparte

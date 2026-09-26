@@ -1812,3 +1812,83 @@ inmutable. Queda fuera de prettier por `.prettierignore`, igual que
 
 **Verificación:** `prettier --check "**/*.md"` → 0 fallos. Bitácora y
 `vault/engram/` sin cambios.
+
+---
+
+## 2026-09-26 - Auditoria de cierre pre-Fase 2 + fix guard migraciones
+
+**Contexto.** Auditoria de cierre del meta-trabajo antes de arrancar
+Fase 2. Se detectaron 4 discrepancias doc vs codigo y un gap de
+cobertura en el guard de migraciones.
+
+**Verificacion previa (read-only).** Tres items de deuda que el
+reporte de reincorporacion daba por abiertos se verificaron contra el
+codigo: items 24 y 29 estan **genuinamente resueltos** (`db:migrate`
+es `drizzle-kit migrate`; `ponytail` ya no esta en `opencode.json`).
+El item 2 era el problema: el entry lo describia como inexistente
+cuando el script ya existia y estaba cableado en CI.
+
+**Cambios.**
+
+- 4 discrepancias doc resueltas (README, AGENTS, blueprint).
+- Item 2 reescrito como PARCIAL, con evidencia del gap.
+- Guard de migraciones: pathspec extendido para cubrir
+  docs/migrations-archive/. Los 12 .sql historicos (0005-0015)
+  ahora estan protegidos contra edicion.
+- Checklist de cierre de PR: aviso explicito de que el Orquestador
+  saltea el paso de Engram.
+- PROMPTS.md: nota sobre verificaciones que no se automatizan.
+
+**Hallazgo critico.** El guard pasaba verde pero no cubria el
+archive. Un guard puede pasar y no cubrir lo que dice proteger.
+Verificar cobertura, no presencia.
+
+**Tests del guard.**
+
+- Archivo nuevo en el archive: **pasa** (por diseno, `--diff-filter=MD`
+  excluye agregados). La expectativa de que fallara era incorrecta.
+- Edicion de un .sql historico del archive: **falla** con exit 1 y
+  nombra el archivo. Correcto.
+- Pathspec viejo sobre la misma edicion: vacio. Gap confirmado.
+- Post-limpieza: vuelve a OK.
+
+**Nota sobre el test de archivo nuevo.** Se verificaron las dos
+variantes (untracked y trackeado con `git add`) y ambas pasan. No es
+un bug: las migraciones nuevas deben poder agregarse.
+
+---
+
+## 2026-09-26 - Completar cierre pre-Fase 2 (format:check, SETUP, item 32)
+
+**Contexto.** Segunda ronda del cierre pre-Fase 2, sobre el PR #150.
+Completa los pendientes que quedaron abiertos: `pnpm format:check`
+no estaba en el DoD de AGENTS.md pero corre en CI, y el criterio 3
+del item 2 (documentar el guard) seguia sin cumplirse.
+
+**Cambios.**
+
+- `AGENTS.md`: `pnpm format:check` agregado al DoD y al checklist de
+  cierre de PR. Ademas se corrigio una afirmacion falsa: el DoD decia
+  `pnpm lint # eslint + prettier`, pero `pnpm lint` es `turbo run lint`
+  y corre SOLO eslint. El check de markdown es `pnpm format:check`.
+- `SETUP.md`: nueva subseccion **Migraciones -> Guard de migraciones
+  inmutables** con el comando, que hace y cuando corre. Fila agregada
+  en la tabla de **Verificacion del entorno**.
+- `deuda-tecnica.md`: item 2 pasa de PARCIAL a **RESUELTO** (los 3
+  criterios cumplidos). Nuevo item 32: MCP GitHub con credenciales
+  invalidas.
+
+**Nota sobre la seccion de SETUP.** El guard se documento en
+`## Migraciones`, no en `## Verificacion del entorno` como se pedia:
+esa seccion es una tabla de herramientas externas (gentle-ai, engram,
+GGA, obsidian), no de scripts del repo. `## Migraciones` ya
+documentaba el baseline y el archive, asi que el guard queda al lado
+de lo que protege. Se agrego igual la fila en la tabla de
+Verificacion del entorno, para que quien valide el entorno lo vea.
+
+**Orden de cierre del PR.** Este PR respeta el orden correcto:
+cambios -> Engram -> export al vault -> staging (incluyendo
+`vault/engram/`) -> commit -> push. En el commit anterior el export
+quedo fuera del commit y los archivos quedaron huerfanos.
+
+**Severidad:** CERRADA.

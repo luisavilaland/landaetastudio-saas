@@ -68,25 +68,27 @@ Los servicios externos (R2, Resend, Sentry) deben tener fallback null si faltan 
 
 ## Migraciones — reglas
 
+- **Baseline único:** el estado vigente del schema vive en un solo archivo, `packages/db/migrations/0000_baseline.sql` (13 tablas + bloque de seguridad). Es el resultado de un squash del 2026-09-24.
+- **Historial archivado:** las migraciones incrementales `0005`–`0015` se movieron a `docs/migrations-archive/2026-09-24/`. Son historia inmutable: no se editan ni se borran.
 - Las migraciones son append-only. Nunca editar un .sql existente.
 - Los snapshots (*_snapshot.json) también son inmutables.
 - _journal.json NO es inmutable: crece con cada migración nueva.
-- El guard en scripts/check-migrations.sh falla si detecta que un
-  .sql o _snapshot.json existente fue modificado o eliminado.
-  Los archivos nuevos (agregados) no disparan el guard.
-- Si necesitás corregir una migración ya aplicada, creá una nueva
-  migración con ALTER/DROP en lugar de editar la original.
+- El guard en `scripts/check-migrations.sh` (cableado en `.github/workflows/ci.yml`) falla si detecta que un `.sql` o `_snapshot.json` del baseline **o del archive** fue modificado o eliminado. Los archivos nuevos (agregados) no disparan el guard.
+- Si necesitás corregir una migración ya aplicada, creá una nueva migración con ALTER/DROP en lugar de editar la original.
 
 ## Comandos obligatorios (Definition of DoD)
 
 Antes de considerar cualquier tarea como finalizada, el código debe ejecutar sin errores:
 
 ```bash
-pnpm lint        # eslint + prettier
-pnpm typecheck   # tsc --noEmit en todas las apps y paquetes
-pnpm build       # next build en las tres apps
-pnpm test        # vitest (todos los tests existentes)
+pnpm lint          # eslint (turbo run lint)
+pnpm format:check  # prettier --check sobre **/*.md (corre en CI)
+pnpm typecheck     # tsc --noEmit en todas las apps y paquetes
+pnpm build         # next build en las tres apps
+pnpm test          # vitest (todos los tests existentes)
 ```
+
+> `pnpm lint` NO corre prettier. El check de formato de markdown es `pnpm format:check`, y corre en el job `build` de CI. Si tocás archivos `.md`, corré `pnpm format:check` antes de commitear o el CI falla.
 
 ⚠️ `ignoreBuildErrors` DEBE ser `false` en `next.config.mjs`. Nunca usar `ignoreBuildErrors: true`.
 
@@ -117,7 +119,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 
 - Lógica de negocio centralizada en `packages/commerce` (carrito, productos, emails, tenant, Redis).
 - Cada app (storefront, admin, superadmin) solo expone UI y endpoints; la lógica pesada en paquetes.
-- Paquetes actuales: `@repo/db`, `@repo/storage`, `@repo/auth`, `@repo/validation`, `@repo/commerce`.
+- Paquetes actuales (7): `@repo/db`, `@repo/storage`, `@repo/auth`, `@repo/validation`, `@repo/commerce`, `@repo/logger`, `@repo/test-utils`.
 - `normalizeSlug` está centralizado en `@repo/validation/src/utils.ts`.
 
 ## Estructura documental
@@ -324,7 +326,7 @@ Cuando una migración ya aplicada tiene un problema:
 - NO editar _journal.json retroactivamente (rompe DBs migradas con drizzle intentando re-aplicar).
 - SIEMPRE crear una migración nueva idempotente que garantice el estado deseado en cualquier entorno.
 
-Ejemplo: la migración 0013 cubre el gap de 0010_force_rls.sql (no registrado en journal) con ALTER TABLE FORCE RLS idempotente.
+Ejemplo (histórico, ya archivado): `0013_ensure_rls_and_grants.sql` cubría el gap de `0010_force_rls.sql` (no registrado en journal) con `ALTER TABLE FORCE RLS` idempotente. Hoy ambos viven en `docs/migrations-archive/2026-09-24/` y su efecto ya está dentro de `0000_baseline.sql`.
 
 ## Checklist RLS — antes de aprobar ENABLE ROW LEVEL SECURITY
 
@@ -521,10 +523,12 @@ Si terminaste una tarea con decisiones no triviales y NO grabaste memoria, la ta
 
 - [ ] ¿Grabaste las memorias clave en Engram proactivamente?
 - [ ] ¿Actualizaste la bitácora (append-only)?
-- [ ] ¿DoD verde (`pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm build`)?
+- [ ] ¿DoD verde (`pnpm lint` / `pnpm format:check` / `pnpm typecheck` / `pnpm test` / `pnpm build`)?
 - [ ] ¿GGA no bloqueó (o `--no-verify` documentado)?
 - [ ] ¿Exportaste Engram al vault? (`pnpm vault:export`)
 - [ ] ¿Docs afectadas actualizadas?
+
+> **Aviso — el Orquestador tiende a olvidarlo.** Verificar el paso de Engram **explícitamente y antes de la bitácora**. Los subagentes lo hacen solos; el Orquestador es el que lo saltea. Si la sesión teve decisiones arquitectónicas, bugs no obvios o convenciones nuevas, la memoria es parte del entregable, no un extra.
 
 ## Nota sobre worktrees de Paseo
 

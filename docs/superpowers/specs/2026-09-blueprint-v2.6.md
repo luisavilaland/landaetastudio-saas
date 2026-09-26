@@ -4,7 +4,7 @@
 
 **Versión:** 2.6 Final
 **Fecha:** Septiembre 2026
-**Estado:** Para aprobación del equipo
+**Estado:** Aprobado (2026-09-24). Fase 1 completada.
 **Confidencial**
 
 > **Referencia vigente** — Última revisión: 2026-09-17.
