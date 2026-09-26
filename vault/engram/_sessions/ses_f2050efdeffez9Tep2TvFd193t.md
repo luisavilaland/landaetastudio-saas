@@ -21,3 +21,5 @@ tags:
 - [[format-check-corre-en-ci-pero-no-estaba-en-el-dod-leer-el-di-69]]
 - [[orden-de-cierre-de-pr-con-engram-cambios-engram-export-stagi-70]]
 - [[preferencia-mcp-github-tiene-credenciales-invalidas-usar-gh-71]]
+- [[session-summary-landaetastudio-saas-72]]
+- [[setext-heading-pegado-al-texto-sin-linea-en-blanco-renderiza-73]]

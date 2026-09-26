@@ -693,3 +693,29 @@ va a perder tiempo diagnosticando un fallo que no es del repo.
 **Severidad:** INFO.
 
 **Urgencia:** INFO.
+
+## 33. 21 entradas históricas de bitácora sin separador `---`
+
+**Estado:** abierto (2026-09-26). 21 entradas de `vault/02_Bitacora/bitacora.md`, entre 2026-07-10 y 2026-08-12, no tienen separador `---` antes del encabezado.
+
+**Impacto:** cosmético. Los encabezados `##` consecutivos renderizan como headers separados en Obsidian; no se fusionan en un bloque. No rompe la lectura ni la navegación.
+
+**Mitigación:** si se hace una pasada de normalización del vault, agregar `---` antes de cada entrada. Son 21 inserciones puramente aditivas, cero borrados, append-only intacto. Decisión de producto, no bug.
+
+**Severidad:** INFO.
+
+**Urgencia:** INFO.
+
+## 34. CI no valida setext headings en markdown
+
+**Estado:** abierto (2026-09-26).
+
+**Contexto:** `vault/02_Bitacora/bitacora.md` está en `.prettierignore` (línea 8) por ser append-only. Eso desactiva la única red que detectaría un setext heading: un párrafo seguido de `---` sin línea en blanco, que renderiza el párrafo entero como `<h2>`.
+
+**Impacto:** errores de formato markdown pasan inadvertidos en la bitácora. No hay lint, ni `format:check`, ni revisión que los detecte. El bug se encontró porque un humano lo vio en el renderizado de Obsidian.
+
+**Mitigación:** check en CI que valide que toda línea `---` tenga línea en blanco antes y después. Script propio (bash o node), independiente de prettier.
+
+**Severidad:** INFO.
+
+**Urgencia:** INFO.
