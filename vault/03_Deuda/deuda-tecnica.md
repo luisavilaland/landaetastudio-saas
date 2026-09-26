@@ -570,3 +570,69 @@ distintas del repo y un cambio en el main no aparece en la branch del
 PR.
 
 **Urgencia:** INFO.
+
+---
+
+## 31. 73 archivos markdown no pasan `prettier --check`
+
+**Estado:** OPEN. Preexistente en `develop`, no introducido por el
+PR #146.
+
+**Origen:** comentario de `luisavilaland` en el review del PR #146, que
+pedía registrar la deuda de prettier detectada durante ese PR.
+
+**Contexto:** el DoD declara `pnpm lint` como "eslint + prettier", pero
+`pnpm lint` es `turbo run lint` y solo ejecuta eslint por paquete.
+Prettier nunca corre sobre markdown en ninguna puerta automática: el
+`lint 6/6` del PR #146 no lo detecta. Este ítem es el contrapeso de lo
+que se detectó en el PR #146 y complementa el item 10 (que cubre el
+`lint` script faltante en `@repo/db`): son hallazgos distintos sobre la
+misma brecha, no duplicados.
+
+**Alcance real:** `pnpm exec prettier --check "**/*.md"` falla en **73
+archivos**, no en 4. El "4" que circulaba en el body del PR #146
+venía de un check acotado a los archivos modificados por ese PR, no de
+un barrido del repo.
+
+| Grupo | Archivos | Naturaleza |
+| --- | --- | --- |
+| `vault/engram/` | 51 | tool-managed, auto-generado por `pnpm vault:export` |
+| `vault/` (human-curated) | 9 | ADRs, bitácora, deuda, fases, specs |
+| raíz | 5 | `AGENTS.md`, `PROMPTS.md`, `README.md`, `SETUP.md`, `TESTING.md` |
+| `docs/` | 5 | `superpowers/specs`, `superpowers/plans`, `migrations-archive` |
+| `.opencode/skills/` | 3 | `SKILL.md` de `rls-audit`, `migration-safety`, `webhook-debug` |
+| **Total** | **73** | |
+
+(El resumen de prettier reporta 74; la diferencia es una ruta que se
+envuelve en la salida y no se captura en el parseo.)
+
+**Verificación de que es preexistente:** los 8 archivos que el PR #146
+tocó se compararon contra `origin/develop`. Los 6 que hoy fallan
+(`AGENTS.md`, `PROMPTS.md`, `SETUP.md`, `README.md`, `bitacora.md`,
+`deuda-tecnica.md`) **ya fallaban** en `develop`. Los 2 restantes
+(`vault/README.md` y `docs/WORKFLOW.md`, nuevo) **pasan**. El PR no
+introdujo ninguna regresión de formato.
+
+**Consecuencia:** no rompe el DoD ni el CI. El riesgo real es de
+operación: un `prettier --write` global reescribiría los 73 archivos
+enteros y produciría un diff masivo sin valor semántico, mezclado con
+cambios de contenido. Por eso no debe correr en un PR funcional.
+
+**Mitigación propuesta (elegir una):**
+
+1. Agregar `vault/engram/` al `.prettierignore` — son 51 de los 73 y son
+   tool-managed: se regeneran en cada export y no corresponde
+   formatearlos a mano. Reduce el alcance a 22.
+2. Correr `prettier --write` una sola vez sobre los 22 restantes en un
+   PR dedicado, sin cambios de contenido, y después agregar
+   `prettier --check "**/*.md"` al CI para que no vuelva a acumular.
+3. Alternativa de menor costo: actualizar el DoD para que diga "eslint"
+   y sacarse de encima la promesa de prettier. Es la opción honesta si
+   el proyecto no va a formatear markdown.
+
+**Severidad:** BAJO. Es deuda de higiene, no de correcto ni de
+funcionalidad.
+
+**Reevaluar:** en el PR D o en la auditoría de cierre pre-Fase 2.
+
+**Urgencia:** BAJO.
