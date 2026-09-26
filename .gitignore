@@ -111,5 +111,8 @@ vault/.obsidian/
 vault/.obsidian/workspace.json
 vault/.trash/
 
+# Engram sync state (cache local del tool)
+vault/engram/.engram-sync-state.json
+
 # gentle-ai skill registry (artefacto local)
 .atl/
