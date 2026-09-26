@@ -66,7 +66,7 @@ Detalle completo: [Blueprint v2.6](./docs/superpowers/specs/2026-09-blueprint-v2
 - ✅ Página de perfil de tienda pública con SEO
 - ✅ Checkout con selector visual de envío y cálculo dinámico
 - ✅ Refactor de API: `NextResponse` unificado en todas las rutas
-- ✅ 430 tests (100% passing), build limpio en 3 apps (hoy)
+- ✅ 474 tests (100% passing), build limpio en 3 apps
 
 ## Fase 5 – Producción ✅ (Completada)
 

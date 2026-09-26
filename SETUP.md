@@ -48,6 +48,20 @@ pnpm db:seed
 - `0000_baseline.sql` representa el estado actual del schema.
 - El historial anterior al baseline está preservado en `docs/migrations-archive/2026-09-24/`.
 
+### Guard de migraciones inmutables
+
+```bash
+bash scripts/check-migrations.sh
+```
+
+Verifica que no se modifiquen ni eliminen migraciones ya aplicadas. Corre como paso del job `build` en CI (`.github/workflows/ci.yml`).
+
+- Falla si un `.sql` o `_snapshot.json` del **baseline** o del **archive** fue modificado (M) o eliminado (D).
+- Pasa si el archivo es nuevo (A): las migraciones nuevas deben poder agregarse.
+- Falla cerrado: si no puede diffear contra `origin/develop`, sale con error en vez de pasar en silencio.
+
+Si necesitás corregir una migración ya aplicada, creá una nueva migración con `ALTER`/`DROP` en lugar de editar la original.
+
 ## Datos de Prueba
 
 ### admin
@@ -257,15 +271,16 @@ desarrollo normal funciona sin cambios.
 
 Antes de iniciar, confirmá que el entorno está listo:
 
-| Herramienta  | Comando                            | Esperado         |
-| ------------ | ---------------------------------- | ---------------- |
-| Gentle-AI    | `gentle-ai --version`              | 3.7.0+           |
-| Engram       | `engram --version`                 | 2.2.0+           |
-| Engram MCP   | `opencode mcp list \| grep engram` | connected        |
-| GGA          | `gga --version`                    | v2.10.1+         |
-| Hook GGA     | `ls .git/hooks/pre-commit`         | existe           |
-| Obsidian     | Abrir `vault/` como vault          | vault reconocido |
-| Vault export | `pnpm vault:export`                | sin errores      |
+| Herramienta       | Comando                            | Esperado                  |
+| ----------------- | ---------------------------------- | ------------------------- |
+| Gentle-AI         | `gentle-ai --version`              | 3.7.0+                    |
+| Engram            | `engram --version`                 | 2.2.0+                    |
+| Engram MCP        | `opencode mcp list \| grep engram` | connected                 |
+| GGA               | `gga --version`                    | v2.10.1+                  |
+| Hook GGA          | `ls .git/hooks/pre-commit`         | existe                    |
+| Obsidian          | Abrir `vault/` como vault          | vault reconocido          |
+| Vault export      | `pnpm vault:export`                | sin errores               |
+| Guard migraciones | `bash scripts/check-migrations.sh` | migraciones inmutables OK |
 
 Si alguna falla, ver la sección correspondiente de este documento
 o de `AGENTS.md`.

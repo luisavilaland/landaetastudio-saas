@@ -53,17 +53,37 @@ El decremento calcula el valor nuevo a partir del leído (**no `stock - qty` at�
 
 ## 2. Política de migraciones inmutables — formalizar en CI
 
-**Contexto real:** AGENTS.md ya establece la regla _“Migraciones de DB inmutables: ante un cambio de schema, genera una nueva migración con `pnpm db:generate`. Jamás modifiques migraciones existentes”_. Hasta ahora es solo una regla de proceso (humana) — no hay guard automatizado.
+**Estado:** ✅ **RESUELTO** (verificado y completado 2026-09-26). Los tres criterios de aceptación del plan original se cumplen.
 
-**Plan propuesto (no implementar ahora):**
+**Criterios de aceptación:**
 
-1. Script de verificación `packages/db/scripts/check-migrations.sh` (o task de turbo `db:check-migrations`):
-   - Compara los archivos `.sql` de `packages/db/migrations` contra el commit base de la rama (ej: `git diff --name-only origin/develop...HEAD -- packages/db/migrations`).
-   - Falla si algún `.sql` existente fue **modificado** (no debe permitirse; solo ADD de nuevos archivos).
-2. Hook en CI: agregar paso al workflow existente (o job nuevo `db-migrations-check` en `.github/workflows/`) que corre el script en cada PR a `develop`.
-3. Opcional: integración con `drizzle-kit generate` — documentar en AGENTS.md que el flujo canónico es `pnpm db:generate` y verificar que no genere diff en migraciones existentes (`git status` limpio después de generate).
+1. ✅ Un `.sql` viejo modificado a mano → el check falla con mensaje claro. Verificado con `0013_ensure_rls_and_grants.sql`: exit 1, nombra el archivo.
+2. ✅ Un `.sql` nuevo → pasa. Verificado en ambas variantes (untracked y con `git add`).
+3. ✅ Documentado en `SETUP.md` → sección **Migraciones → Guard de migraciones inmutables**, con fila agregada en la tabla de **Verificación del entorno**.
 
-**Criterios de aceptación:** un `.sql` viejo modificado a mano → el check falla con mensaje claro; un `.sql` nuevo → pasa. Documentar el comando en SETUP.md → Comandos de Base de Datos.
+**Lo que YA estaba hecho (no era lo que este item decía):**
+
+- `scripts/check-migrations.sh` (fail-closed) con comentarios de las decisiones no obvias.
+- Cableado en `.github/workflows/ci.yml` (job `build`) con `fetch-depth: 0` para poder diffear contra `origin/develop`.
+
+**Gap encontrado y corregido (2026-09-26).** El pathspec del guard cubría solo `packages/db/migrations/`. El squash del 2026-09-24 movió las migraciones incrementales `0005`–`0015` a `docs/migrations-archive/2026-09-24/`, **fuera de todo pathspec**: quedaban desprotegidas. Se podía reescribir `0013_ensure_rls_and_grants.sql` y el CI pasaba verde.
+
+Evidencia del gap (pathspec viejo vs nuevo sobre la misma edición):
+
+```
+PATHSPEC VIEJO  → (vacío)      el guard NO detectaba la edición
+PATHSPEC NUEVO  → docs/migrations-archive/2026-09-24/0013_ensure_rls_and_grants.sql
+```
+
+**Fix aplicado:** el pathspec ahora incluye `docs/migrations-archive/*/*.sql` y `*.json`. El bloque de excepción `archive_marker` quedó intacto.
+
+**Nota informativa — agregados en el archive.** El guard usa `--diff-filter=MD`, que excluye `A` (Added) por diseño: las migraciones nuevas deben poder agregarse. Consecuencia: un archivo nuevo dentro del archive también pasa. Esto es **coherente con el criterio 2** y no queda pendiente. Si en el futuro el archive debe ser un congelado estricto (cero archivos nuevos), hace falta un flag dedicado; sería una decisión de producto, no un bug.
+
+**Lección de proceso.** Un guard puede pasar verde y aun así no cubrir lo que dice proteger. Eso es peor que no tener guard, porque genera confianza falsa. Al auditar un control, verificar **cobertura**, no presencia.
+
+**Severidad:** CERRADA.
+
+**Urgencia:** CERRADA.
 
 **Implementación (2026-08-11, rama `chore/quality-and-docs`):**
 
@@ -649,3 +669,53 @@ de un `prettier --write` global.
 **Severidad:** CERRADA.
 
 **Urgencia:** CERRADA.
+
+## 32. MCP GitHub con credenciales invalidas
+
+**Estado:** abierto (2026-09-26).
+
+**Contexto:** el servidor MCP de GitHub responde "Bad credentials" a
+cualquier operacion (`github_create_pull_request` fallo con
+`-32603 Authentication Failed`).
+
+**Consecuencia:** toda operacion de GitHub via MCP falla. Incluye
+crear PRs, comments, labels y issues.
+
+**Mitigacion actual:** usar `gh` CLI. No esta en PATH en esta maquina;
+vive en `C:\Users\exodo\AppData\Local\Temp\gh\bin\gh.exe` y autentica
+como `EdgarVz`. El metodo universal para localizarlo esta documentado
+en `PROMPTS.md`.
+
+**Resolucion:** re-autenticar el MCP o eliminarlo del `opencode.json`
+si no se usa. Mientras exista, cada agente que intente GitHub via MCP
+va a perder tiempo diagnosticando un fallo que no es del repo.
+
+**Severidad:** INFO.
+
+**Urgencia:** INFO.
+
+## 33. 21 entradas históricas de bitácora sin separador `---`
+
+**Estado:** abierto (2026-09-26). 21 entradas de `vault/02_Bitacora/bitacora.md`, entre 2026-07-10 y 2026-08-12, no tienen separador `---` antes del encabezado.
+
+**Impacto:** cosmético. Los encabezados `##` consecutivos renderizan como headers separados en Obsidian; no se fusionan en un bloque. No rompe la lectura ni la navegación.
+
+**Mitigación:** si se hace una pasada de normalización del vault, agregar `---` antes de cada entrada. Son 21 inserciones puramente aditivas, cero borrados, append-only intacto. Decisión de producto, no bug.
+
+**Severidad:** INFO.
+
+**Urgencia:** INFO.
+
+## 34. CI no valida setext headings en markdown
+
+**Estado:** abierto (2026-09-26).
+
+**Contexto:** `vault/02_Bitacora/bitacora.md` está en `.prettierignore` (línea 8) por ser append-only. Eso desactiva la única red que detectaría un setext heading: un párrafo seguido de `---` sin línea en blanco, que renderiza el párrafo entero como `<h2>`.
+
+**Impacto:** errores de formato markdown pasan inadvertidos en la bitácora. No hay lint, ni `format:check`, ni revisión que los detecte. El bug se encontró porque un humano lo vio en el renderizado de Obsidian.
+
+**Mitigación:** check en CI que valide que toda línea `---` tenga línea en blanco antes y después. Script propio (bash o node), independiente de prettier.
+
+**Severidad:** INFO.
+
+**Urgencia:** INFO.

@@ -21,3 +21,4 @@ tags:
 - [[verificar-worktrees-huerfanos-por-blob-contra-el-historial-55]]
 - [[worktrees-de-paseo-no-son-checkouts-completos-56]]
 - [[checks-de-formato-excluir-tool-managed-y-append-only-antes-d-57]]
+- [[session-summary-landaetastudio-saas-58]]
