@@ -516,22 +516,3 @@ Nemotron 3 Ultra (~50s), pero el costo de review se mantiene.
 `**/*.test.*,**/*.spec.*` y verificar que el hook salte los tests.
 
 **Urgencia:** MEDIA. A resolver en el PR de skills (F1-F5).
-
----
-
-## 28. `docs/arquitectura.md` aparece como delete+add en el historial
-
-**Estado:** el rename de `docs/arquitectura.md` a
-`vault/05_Specs/arquitectura.md` quedó registrado como delete+add en
-vez de rename, porque la similarity bajó del 50% al actualizar 25
-links internos.
-
-**Origen:** consecuencia de editar el contenido durante el mismo
-commit del move.
-
-**Impacto:** ninguno funcional. El historial sigue trazable porque
-el contenido es idéntico salvo los links actualizados.
-
-**Mitigación:** ninguna necesaria. No reescribir historia.
-
-**Urgencia:** INFO. Sin acción.

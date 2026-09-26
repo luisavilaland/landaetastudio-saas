@@ -1592,3 +1592,18 @@ están limpios de mojibake (verificado a nivel de bytes).
 delete+add de `arquitectura.md`).
 
 **Verificación:** append-only OK.
+
+---
+
+## 2026-09-26 — Nota: similarity <50% en rename de arquitectura.md
+
+**Nota informativa (no es deuda técnica).** El rename
+`docs/arquitectura.md` → `vault/05_Specs/arquitectura.md` apareció como
+delete+add en el historial de git, no como rename, porque la
+similarity cayó por debajo del 50% (los 25 links fueron
+actualizados en el mismo commit).
+
+Es comportamiento esperado de git. No hay acción pendiente. Se
+documenta acá para futuras referencias — no requiere mitigación.
+
+Contexto: PR #143, review de luisavilaland en PR #144.
