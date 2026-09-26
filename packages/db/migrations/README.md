@@ -18,4 +18,4 @@ Para verificar si una tabla tiene RLS activo:
     SELECT relname, relrowsecurity, relforcerowsecurity
     FROM pg_class WHERE relname = '<tabla>';
 
-Ver docs/deuda-tecnica.md ítem 15.
+Ver vault/03_Deuda/deuda-tecnica.md ítem 15.

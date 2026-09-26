@@ -337,7 +337,7 @@ documental, no un bug del código.
 
 **Severidad:** BAJO (documental, no afecta runtime).
 
-Plan aprobado el 2026-08-08 (ítem 3 de la tarea de calidad: limpieza email + health check + deuda técnica). Rama `quality/calidad-y-monitoreo`. Ver bitacora.md → entrada 2026-08-08 — Calidad.
+Plan aprobado el 2026-08-08 (ítem 3 de la tarea de calidad: limpieza email + health check + deuda técnica). Rama `quality/calidad-y-monitoreo`. Ver vault/02_Bitacora/bitacora.md → entrada 2026-08-08 — Calidad.
 
 ---
 

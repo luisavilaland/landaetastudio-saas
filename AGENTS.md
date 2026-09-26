@@ -123,7 +123,7 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 ## Estructura documental
 
 - **Blueprint v2.6:** `docs/superpowers/specs/2026-09-blueprint-v2.6.md` — plan completo 10 fases (pre-lanzamiento).
-- **ADRs:** `docs/adr/` — decisiones de arquitectura (ADR-001 a ADR-025, ver `docs/arquitectura.md`).
+- **ADRs:** `vault/01_ADRs/` — decisiones de arquitectura (ADR-001 a ADR-025, ver `vault/05_Specs/arquitectura.md`).
 - **Specs por fase:** `docs/superpowers/specs/` — especificación técnica detallada por fase (ej: `subscription-lifecycle.md`).
 - **Plans por fase:** `docs/superpowers/plans/` — plan de ejecución con tasks, estimaciones, dependencias.
 
@@ -181,8 +181,8 @@ Ver checklists específicas en cada sección de endpoint.
 
 - **AGENTS.md:** si descubres una restricción, comando o convención importante no documentada aquí, proponé añadirla al finalizar la tarea.
 - **README.md y SETUP.md:** si la tarea implica cambios en setup, endpoints o info para desarrolladores, sugerí los cambios. No los apliques sin confirmación.
-- **docs/arquitectura.md:** si introduces o modificas una decisión de arquitectura, sugerí actualizarlo. No lo modifiques sin confirmación.
-- **bitacora.md:** mantenla actualizada con los cambios significativos de cada sesión (features, bugs, refactors, cambios de infraestructura). Si la tarea implicó un cambio relevante para la historia del proyecto, agregá una entrada.
+- **vault/05_Specs/arquitectura.md:** si introduces o modificas una decisión de arquitectura, sugerí actualizarlo. No lo modifiques sin confirmación.
+- **vault/02_Bitacora/bitacora.md:** mantenla actualizada con los cambios significativos de cada sesión (features, bugs, refactors, cambios de infraestructura). Si la tarea implicó un cambio relevante para la historia del proyecto, agregá una entrada.
 - **.gitignore:** mantenlo actualizado sin preguntar si generas archivos temporales, artefactos de build o dependencias que no deban comitearse (`.turbo`, `coverage/`, `test-results/`).
 
 ## Subagentes — roles y obediencia
@@ -226,7 +226,7 @@ Si un comando de verificación genera archivos (ej: `pnpm db:generate` crea migr
 
 ## Resolución de conflictos en archivos acumulativos
 
-En archivos que solo crecen (bitacora.md, docs/deuda-tecnica.md), la resolución de conflictos debe PRESERVAR el contenido de ambas ramas. Nunca elegir una versión sobre otra.
+En archivos que solo crecen (vault/02_Bitacora/bitacora.md, vault/03_Deuda/deuda-tecnica.md), la resolución de conflictos debe PRESERVAR el contenido de ambas ramas. Nunca elegir una versión sobre otra.
 
 Verificación obligatoria después de resolver:
 - `git diff origin/develop -- <archivo>` debe mostrar SOLO adiciones.
@@ -249,7 +249,7 @@ Al terminar cada tarea (T1, T2, ..., T14) antes de mergear el PR, correr una aud
 - Tarea de bajo riesgo (docs, fixes menores, formato): auditoría OMITIDA o LIMITADA a verificar que no rompió nada.
 
 ### Regla anti-duplicación
-Antes de reportar un hallazgo, verificar si ya está registrado en docs/deuda-tecnica.md. Si ya existe:
+Antes de reportar un hallazgo, verificar si ya está registrado en vault/03_Deuda/deuda-tecnica.md. Si ya existe:
 - NO crear nuevo ítem.
 - Mencionar en el reporte: "ya registrado como ítem N".
 - Si la tarea empeora el hallazgo existente, actualizar el ítem.
@@ -262,7 +262,7 @@ Antes de reportar un hallazgo, verificar si ya está registrado en docs/deuda-te
 - Si no hay hallazgos nuevos → "sin hallazgos nuevos".
 
 ### Output
-- Hallazgos nuevos → docs/deuda-tecnica.md.
+- Hallazgos nuevos → vault/03_Deuda/deuda-tecnica.md.
 - Hallazgos bloqueantes de la próxima tarea → resolver antes de arrancarla.
 - Reporte completo → comentario en el PR de la tarea.
 
@@ -378,14 +378,14 @@ Reglas complementarias:
 
 ## Bitácora append-only — verificación post-edición
 
-Después de editar `bitacora.md`:
+Después de editar `vault/02_Bitacora/bitacora.md`:
 
-    git diff origin/develop -- bitacora.md | grep "^-"
+    git diff origin/develop -- vault/02_Bitacora/bitacora.md | grep "^-"
 
 Si hay líneas con `-` que contengan contenido real (no headers del diff), PARAR. Es una regresión.
 
 Corrección:
-    git checkout origin/develop -- bitacora.md
+    git checkout origin/develop -- vault/02_Bitacora/bitacora.md
     # Re-aplicar los cambios como append al final.
 
 Contexto: en PR A (#124), la primera versión de la entrada 2026-09-20 sobrescribió la entrada 2026-09-19. Tercera vez que ocurre (T4 rebase, lección T6, T7 pre-migración).
@@ -394,18 +394,16 @@ Closes #125 (parte 2).
 
 ## Bitácora — verificar ruta antes de editar
 
-Al editar la bitácora, el archivo correcto es `bitacora.md` en la
-RAÍZ del repo, NO `docs/bitacora.md`.
+Al editar la bitácora, el archivo correcto es
+`vault/02_Bitacora/bitacora.md`. No debe existir `bitacora.md` en la
+raíz del repo ni `docs/bitacora.md`.
 
 Después de editar, verificar:
 
-    git status | grep bitacora
+    git status | grep -E "bitacora"
 
-Si aparece `docs/bitacora.md` → error. Eliminar el huérfano:
-
-    git rm docs/bitacora.md
-
-Y re-editar el archivo raíz.
+Si aparece `bitacora.md` en la raíz o `docs/bitacora.md` → error.
+Eliminar el huérfano y re-editar el archivo del vault.
 
 Contexto: en PR #123, un agente escribió `docs/bitacora.md` en
 lugar del root. Las entradas quedaron en el archivo equivocado

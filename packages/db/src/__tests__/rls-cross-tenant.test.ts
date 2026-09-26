@@ -327,6 +327,9 @@ describe.skipIf(!hasAppUrl)('RLS cross-tenant real', () => {
     expect(rows).toEqual([])
   })
 
+  // 15s: el caso abre una conexión nueva a Neon. Bajo carga del
+  // full suite (57 workers), el handshake puede tardar >5s.
+  // 15s da margen sin enmascarar fallos reales.
   it('sin set_tenant_id una conexión nueva devuelve cero filas RLS', async () => {
     if (!appUrl) {
       throw new Error('DATABASE_APP_URL no configurada para el caso sin contexto')
@@ -349,5 +352,5 @@ describe.skipIf(!hasAppUrl)('RLS cross-tenant real', () => {
     } finally {
       await cleanClient.end()
     }
-  })
+  }, 15000)
 })

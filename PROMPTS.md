@@ -31,7 +31,7 @@
 ### Calibración Rápida (diaria)
 
 ```
-Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, docs/arquitectura.md, blueprint v2.6 y specs de fase. Confirmame que entendés: stack, restricciones multi-tenant, DoD, herramientas de desarrollo, regla sobre comandos git, estructura del monorepo y workflow blueprint→ADR→spec→plan→fase. Dame un visto bueno breve.
+Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, vault/05_Specs/arquitectura.md, blueprint v2.6 y specs de fase. Confirmame que entendés: stack, restricciones multi-tenant, DoD, herramientas de desarrollo, regla sobre comandos git, estructura del monorepo y workflow blueprint→ADR→spec→plan→fase. Dame un visto bueno breve.
 ```
 
 ### Análisis Completo
@@ -39,7 +39,7 @@ Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, docs/arquitectura.md, blueprint 
 ```
 Actuá como un desarrollador senior que se reincorpora al proyecto. Sin modificar archivos:
 
-1. Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, docs/arquitectura.md, bitacora.md, blueprint v2.6 y specs de fase.
+1. Lee AGENTS.md, README.md, SETUP.md, PROMPTS.md, vault/05_Specs/arquitectura.md, vault/02_Bitacora/bitacora.md, blueprint v2.6 y specs de fase.
 2. Ejecuta `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test`.
 3. Explorá la estructura de apps/ y packages/ para detectar cambios.
 
@@ -325,7 +325,7 @@ Revisa los cambios realizados. Indica para cada archivo si necesita actualizarse
 - AGENTS.md: ¿nuevas restricciones, comandos o convenciones no documentadas?
 - README.md: ¿cambió el roadmap, endpoints, setup o stack?
 - SETUP.md: ¿cambió el setup, troubleshooting o datos de prueba?
-- docs/arquitectura.md: ¿nuevas decisiones de diseño?
+- vault/05_Specs/arquitectura.md: ¿nuevas decisiones de diseño?
 - .gitignore: ¿nuevos artefactos que ignorar?
 - blueprint v2.6 / specs de fase / ADRs: **¿este cambio invalida algún ADR, spec o el blueprint?**
 
@@ -446,10 +446,10 @@ Voy a proponer una decisión de arquitectura: [TÍTULO/TEMA].
 
 Antes de escribir el ADR:
 1. Confirmá que es una decisión arquitectónica real (difícil de revertir, impacto transversal).
-2. Verificá si ya existe un ADR relacionado en docs/adr/.
+2. Verificá si ya existe un ADR relacionado en vault/01_ADRs/.
 3. Identificá: contexto, decisión, consecuencias, alternativas consideradas.
 
-Formato (docs/adr/ADR-XXX-titulo.md):
+Formato (vault/01_ADRs/ADR-XXX-titulo.md):
 - Título
 - Fecha
 - Contexto
@@ -512,11 +512,11 @@ Fase [N] completada. Verificación de cierre:
    - [ ] Spec de la fase (si cambió algo vs original)
    - [ ] Plan de la fase (marcar tasks completadas)
    - [ ] README.md (roadmap, endpoints, stack si cambió)
-   - [ ] docs/arquitectura.md (ADRs nuevos/actualizados)
+   - [ ] vault/05_Specs/arquitectura.md (ADRs nuevos/actualizados)
    - [ ] AGENTS.md (nuevas convenciones/restricciones)
    - [ ] SETUP.md (env vars, comandos, troubleshooting)
    - [ ] TESTING.md / TESTING-MANUAL.md (nuevos tests/áreas)
-   - [ ] bitacora.md (entrada con fecha, cambios, decisiones)
+   - [ ] vault/02_Bitacora/bitacora.md (entrada con fecha, cambios, decisiones)
 
 3. **Blueprint sync:**
    - [ ] Marcar fase como completada en blueprint v2.6
@@ -558,7 +558,7 @@ Después del PR de una tarea, despachar 2 subagentes en paralelo:
 - @QA: correctitud, seguridad, calidad.
 - @Diseñador: arquitectura, extensibilidad, coherencia.
 
-Aplicar regla anti-duplicación: verificar que los hallazgos no estén ya en docs/deuda-tecnica.md antes de reportar.
+Aplicar regla anti-duplicación: verificar que los hallazgos no estén ya en vault/03_Deuda/deuda-tecnica.md antes de reportar.
 
 Reporte breve. Publicar como comentario en el PR.
 Severidad: CRÍTICO / ALTO / MEDIO / BAJO.

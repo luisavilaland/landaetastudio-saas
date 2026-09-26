@@ -160,12 +160,30 @@ pnpm --filter superadmin dev # http://localhost:3002
 
 ## Vault de Obsidian
 
-- El vault vive en `vault/` y se trackea con Git.
-- Para abrirlo en Obsidian: **File → Open folder as vault** y seleccionar `vault/`.
-- El agente puede leer y escribir Markdown del vault mediante MCP (`second-brain-lite-mcp`).
-- Engram exportará a `vault/06_Engram/` cuando esté instalado.
-- El MCP `obsidian` está definido globalmente en `~/.config/opencode/opencode.json` con `enabled: false`.
-- Cada proyecto que tenga un vault lo habilita creando un `opencode.json` local con:
+El vault vive en `vault/` y se trackea con Git. Contiene:
+
+- `00_Inbox/`: entradas pendientes.
+- `01_ADRs/`: 25 ADRs del proyecto.
+- `02_Bitacora/bitacora.md`: bitácora del proyecto (append-only).
+- `03_Deuda/deuda-tecnica.md`: ítems de deuda técnica.
+- `04_Fases/`: auditorías y cierres de fases.
+- `05_Specs/`: arquitectura, brief técnico y blueprint.
+
+La convención `00-05` aplica solo a contenido **human-curated**. El contenido
+**tool-managed** no lleva numeración porque su estructura la define la tool:
+
+- `engram/`: exportaciones de Engram (auto-generado por `pnpm vault:export`,
+  NO editar manualmente). El cache `.engram-sync-state.json` está en `.gitignore`.
+- `.obsidian/`: config de Obsidian (ignorado en git).
+- `.trash/`: papelera de Obsidian (ignorada en git).
+
+`docs/` conserva únicamente los paths operativos que leen herramientas:
+`migrations-archive/` (CI) y `superpowers/` (Paseo), más su README índice.
+
+Para abrir el vault: **File → Open folder as vault** y seleccionar `vault/`.
+
+El agente puede leer y escribir Markdown del vault mediante MCP (`second-brain-lite-mcp`).
+El MCP `obsidian` está definido globalmente en `~/.config/opencode/opencode.json` con `enabled: false`; cada proyecto lo habilita en su `opencode.json` local con:
 
 ```json
 {
@@ -175,7 +193,7 @@ pnpm --filter superadmin dev # http://localhost:3002
 }
 ```
 
-- El path `vault/` se resuelve contra el root del proyecto, así que la misma config global sirve para todos los proyectos que sigan la convención `vault/`.
+El path `vault/` se resuelve contra el root del proyecto.
 
 ## Exportación de Engram al vault
 
@@ -202,7 +220,7 @@ Flags disponibles (vía `engram obsidian-export`):
 - gentle-ai 3.7.0 está instalado globalmente.
 - Engram 2.2.0 está registrado como MCP en `~/.config/opencode/opencode.jsonc` (mayor prioridad en el layering de OpenCode).
 - Los MCPs en `opencode.json` (menor prioridad) siguen activos: `open-design`, `supabase` y `obsidian` (`enabled: false` global).
-- GGA v2.10.1 está instalado como pre-commit hook (`.git/hooks/pre-commit`).
+- GGA v2.10.1 tiene un hook versionable en `.githooks/pre-commit`; se activa con `git config core.hooksPath .githooks`.
 - La configuración de GGA vive en `.gga` (commiteada).
 - Los archivos revisados por GGA están definidos en `FILE_PATTERNS`; se excluyen tests, `dist`, `build`, `node_modules` y `vault/`.
 - Para commits triviales (docs, configuración) se puede usar `git commit --no-verify` para saltar la revisión.

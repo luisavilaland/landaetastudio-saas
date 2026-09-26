@@ -15,7 +15,7 @@ Usamos un monorepo con Turborepo y pnpm, separando las apps en `storefront`, `ad
 - ✅ 6 paquetes en `packages/`: `auth`, `commerce`, `db`, `logger`, `storage`, `validation`
 - ✅ `pnpm-workspace.yaml` incluye `apps/*` y `packages/*`
 - ✅ Turborepo configurado con pipelines de `lint`, `typecheck`, `build`, `test`
-- ⚠️ El documento original `docs/arquitectura.md` omitía `logger` de la lista de paquetes compartidos. Esta ADR corrige la omisión e incluye `logger` explícitamente.
+- ⚠️ El documento original `vault/05_Specs/arquitectura.md` omitía `logger` de la lista de paquetes compartidos. Esta ADR corrige la omisión e incluye `logger` explícitamente.
 
 ## Consecuencias
 
