@@ -407,13 +407,31 @@ Cierre de PR completo
 
 ### Localizar gh si no está en PATH
 
-En esta máquina `gh` NO está en el PATH. Vive en:
-C:\Users\exodo\AppData\Local\Temp\gh\bin\gh.exe
+Si `gh` no está en PATH y no aparece en rutas estándar, buscar
+en el directorio temporal del usuario actual.
 
-Para encontrarlo:
+PowerShell (método universal, sin hardcodear usuario):
+
+```
 Get-ChildItem -Path $env:LOCALAPPDATA\Temp\gh -Recurse -Filter gh.exe
+```
 
-Usar `--body-file` con un archivo en `C:\Users\exodo\AppData\Local\Temp\opencode\`, nunca `--body` inline: PowerShell manglea el quoting de cuerpos largos. El MCP de GitHub no sirve (responde Bad credentials).
+Git Bash / WSL (equivalente):
+
+```
+find "$LOCALAPPDATA/Temp/gh" -name gh.exe 2>/dev/null
+```
+
+El path varía por usuario y versión de Windows. NO hardcodear
+nombres de usuario en docs — usar variables de entorno
+(`$env:LOCALAPPDATA`, `%LOCALAPPDATA%`, `$HOME`).
+
+Si aparece el binario, agregar su directorio al PATH de la sesión
+o invocarlo por path absoluto.
+
+Para el cuerpo del PR, usar `--body-file` con un archivo temporal
+(`$env:TEMP`), nunca `--body` inline: PowerShell manglea el quoting
+de cuerpos largos. El MCP de GitHub no sirve (responde Bad credentials).
 
 ---
 
