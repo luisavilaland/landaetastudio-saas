@@ -30,11 +30,11 @@ La firma se calcula sobre el cuerpo crudo de la request. Cualquier middleware qu
 
 Magic IDs de testing:
 
-| paymentId | Estado simulado |
-| --- | --- |
-| `123456789` | approved |
-| `000000` | rejected |
-| `999999` | pending |
+| paymentId   | Estado simulado |
+| ----------- | --------------- |
+| `123456789` | approved        |
+| `000000`    | rejected        |
+| `999999`    | pending         |
 
 Se activan con `NODE_ENV=development` o `E2E_WEBHOOK_TEST=1`. **No son un bypass de seguridad**: solo tienen efecto despues de que `verifyMercadoPagoSignature` confirma el HMAC con el secret real. `E2E_WEBHOOK_TEST=1` esta configurada en el entorno Preview de Vercel del storefront, y aplica a todos los previews porque Vercel no permite acotar por rama. Se acepta conscientemente: la firma sigue siendo el gate real.
 
@@ -71,10 +71,10 @@ Corre con `total=0` para no disparar emails durante el test.
 
 El proyecto tiene dos flujos de pago deliberadamente separados. Antes de tocar cualquier handler, confirmar cual es:
 
-| Flujo | Quien cobra | Access Token | Webhook Secret |
-| --- | --- | --- | --- |
-| Suscripciones | Plataforma (LandaetaStudio) | `MP_PLATFORM_ACCESS_TOKEN` | `MP_PLATFORM_WEBHOOK_SECRET` |
-| Ordenes de tienda | El tenant, a sus clientes | `tenant_mp_config.access_token` (cifrado) | `MERCADOPAGO_WEBHOOK_SECRET` |
+| Flujo             | Quien cobra                 | Access Token                              | Webhook Secret               |
+| ----------------- | --------------------------- | ----------------------------------------- | ---------------------------- |
+| Suscripciones     | Plataforma (LandaetaStudio) | `MP_PLATFORM_ACCESS_TOKEN`                | `MP_PLATFORM_WEBHOOK_SECRET` |
+| Ordenes de tienda | El tenant, a sus clientes   | `tenant_mp_config.access_token` (cifrado) | `MERCADOPAGO_WEBHOOK_SECRET` |
 
 El token que el tenant pega en el onboarding es **exclusivamente** para cobrar a sus clientes, nunca para pagar la suscripcion a la plataforma.
 

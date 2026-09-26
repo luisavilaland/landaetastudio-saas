@@ -17,10 +17,10 @@ Ambos flujos tienen su propia cuenta MP, su propio webhook, su propio `ACCESS_TO
 
 Implementar dos flujos de MercadoPago completamente independientes:
 
-| Flujo | Quién cobra | Cuenta MP | Access Token | Webhook | Webhook Secret |
-|-------|-------------|-----------|--------------|---------|----------------|
-| Suscripciones | Plataforma (LandaetaStudio) | Nuestra cuenta | `MP_PLATFORM_ACCESS_TOKEN` | `/api/webhooks/mercadopago/subscriptions/:tenantId` | `MP_PLATFORM_WEBHOOK_SECRET` |
-| Órdenes de tienda | Tenant (cliente final) | Cuenta del tenant | `tenant_mp_config.access_token` (cifrado) | `/api/webhooks/mercadopago/:tenantId` | `MERCADOPAGO_WEBHOOK_SECRET` |
+| Flujo             | Quién cobra                 | Cuenta MP         | Access Token                              | Webhook                                             | Webhook Secret               |
+| ----------------- | --------------------------- | ----------------- | ----------------------------------------- | --------------------------------------------------- | ---------------------------- |
+| Suscripciones     | Plataforma (LandaetaStudio) | Nuestra cuenta    | `MP_PLATFORM_ACCESS_TOKEN`                | `/api/webhooks/mercadopago/subscriptions/:tenantId` | `MP_PLATFORM_WEBHOOK_SECRET` |
+| Órdenes de tienda | Tenant (cliente final)      | Cuenta del tenant | `tenant_mp_config.access_token` (cifrado) | `/api/webhooks/mercadopago/:tenantId`               | `MERCADOPAGO_WEBHOOK_SECRET` |
 
 El `external_reference` de la preapproval de suscripción lleva el `tenantId` para identificar qué tenant activar al recibir el pago.
 
@@ -33,12 +33,14 @@ El `external_reference` de la preapproval de suscripción lleva el `tenantId` pa
 ## Consecuencias
 
 ### Positivas
+
 - **Aislamiento financiero real:** La plataforma nunca toca el dinero de las órdenes de los clientes del tenant.
 - **Sin custodia de fondos:** Compliance simple (no somos PSP, no custodiase dinero ajeno).
 - **Responsabilidad clara:** Cada parte maneja su propia cuenta MP, sus propios chargebacks, sus propias comisiones.
 - **Escalabilidad:** El onboarding del tenant es autónomo (configura su MP, valida con `/users/me`).
 
 ### Negativas
+
 - **Dos webhooks que mantener:** Código duplicado conceptual (validación HMAC, idempotencia, manejo de estados) aunque se reutilice `verifyMercadoPagoSignature`.
 - **Dos ciclos de vida de pago:** Suscripciones (preapproval) vs órdenes (checkout pro). Distinta semántica de eventos MP.
 - **Onboarding más largo:** El tenant debe crear cuenta MP, obtener credenciales, configurarlas en la plataforma antes de poder operar.
@@ -46,10 +48,10 @@ El `external_reference` de la preapproval de suscripción lleva el `tenantId` pa
 
 ## Variables de entorno nuevas
 
-| Variable | Uso | Ámbito |
-|----------|-----|--------|
-| `MP_PLATFORM_ACCESS_TOKEN` | Token de nuestra cuenta MP para cobrar suscripciones | Vercel (todas las apps) |
-| `MP_PLATFORM_WEBHOOK_SECRET` | Secret del webhook de suscripciones (nuestra cuenta) | Vercel (storefront) |
+| Variable                     | Uso                                                  | Ámbito                  |
+| ---------------------------- | ---------------------------------------------------- | ----------------------- |
+| `MP_PLATFORM_ACCESS_TOKEN`   | Token de nuestra cuenta MP para cobrar suscripciones | Vercel (todas las apps) |
+| `MP_PLATFORM_WEBHOOK_SECRET` | Secret del webhook de suscripciones (nuestra cuenta) | Vercel (storefront)     |
 
 ## Referencias
 

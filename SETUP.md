@@ -114,9 +114,9 @@ La aplicación valida automáticamente las variables de entorno al arrancar (`pa
 
 ### Comportamiento por entorno
 
-| Entorno                                 | Validación                                                                                                                                                                                                                                     |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Desarrollo** (`NODE_ENV=development`) | Valida las variables core (`DATABASE_URL`, `DATABASE_APP_URL`, `AUTH_SECRET`, `MERCADOPAGO_ACCESS_TOKEN`, `MP_TOKEN_ENCRYPTION_KEY`). `MP_TOKEN_ENCRYPTION_KEY` requiere al menos 32 caracteres. `NEXTAUTH_URL` es opcional (NextAuth v5 la infiere del Host header). Las variables cloud son opcionales. |
+| Entorno                                 | Validación                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Desarrollo** (`NODE_ENV=development`) | Valida las variables core (`DATABASE_URL`, `DATABASE_APP_URL`, `AUTH_SECRET`, `MERCADOPAGO_ACCESS_TOKEN`, `MP_TOKEN_ENCRYPTION_KEY`). `MP_TOKEN_ENCRYPTION_KEY` requiere al menos 32 caracteres. `NEXTAUTH_URL` es opcional (NextAuth v5 la infiere del Host header). Las variables cloud son opcionales.                       |
 | **Producción** (`NODE_ENV=production`)  | Valida las variables core y cloud (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `MERCADOPAGO_WEBHOOK_SECRET`, `STOREFRONT_URL`). `MP_PLATFORM_ACCESS_TOKEN` y `MP_PLATFORM_WEBHOOK_SECRET` son opcionales hasta Fase 2. |
 
 ### Si falta una variable
@@ -257,15 +257,15 @@ desarrollo normal funciona sin cambios.
 
 Antes de iniciar, confirmá que el entorno está listo:
 
-| Herramienta | Comando | Esperado |
-|-------------|---------|----------|
-| Gentle-AI | `gentle-ai --version` | 3.7.0+ |
-| Engram | `engram --version` | 2.2.0+ |
-| Engram MCP | `opencode mcp list \| grep engram` | connected |
-| GGA | `gga --version` | v2.10.1+ |
-| Hook GGA | `ls .git/hooks/pre-commit` | existe |
-| Obsidian | Abrir `vault/` como vault | vault reconocido |
-| Vault export | `pnpm vault:export` | sin errores |
+| Herramienta  | Comando                            | Esperado         |
+| ------------ | ---------------------------------- | ---------------- |
+| Gentle-AI    | `gentle-ai --version`              | 3.7.0+           |
+| Engram       | `engram --version`                 | 2.2.0+           |
+| Engram MCP   | `opencode mcp list \| grep engram` | connected        |
+| GGA          | `gga --version`                    | v2.10.1+         |
+| Hook GGA     | `ls .git/hooks/pre-commit`         | existe           |
+| Obsidian     | Abrir `vault/` como vault          | vault reconocido |
+| Vault export | `pnpm vault:export`                | sin errores      |
 
 Si alguna falla, ver la sección correspondiente de este documento
 o de `AGENTS.md`.
@@ -279,6 +279,7 @@ Estos 11 comandos están disponibles (copiados al proyecto en `.opencode/command
 Notar la diferencia con las skills: las skills SDD son 11 pero otras 4 (`sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`) NO tienen command equivalente; se invocan por skill, no por slash command. Los 4 commands sin skill propia son meta-commands: `continue`, `ff`, `new`, `status`.
 
 Verificar disponibilidad:
+
 ```bash
 ls .opencode/commands/
 ls ~/.config/opencode/commands/
@@ -448,15 +449,15 @@ El carrito anónimo persiste en Redis vía ioredis. **Hay dos variables distinta
 - GitHub Secrets del workflow: `NEON_DATABASE_URL` (owner, solo seed) y `NEON_DATABASE_APP_URL` (rol `app_user`, usado por T11 RLS).
 - CI: `.github/workflows/e2e.yml` — corre en **runner self-hosted** (AlmaLinux). Requisitos del runner:
 - Egress TCP a Neon (puerto 5432, IPv4 o IPv6) y red a los 3 dominios Vercel.
-   - Si el host no tiene ruta IPv6, pin IPv4 del endpoint Neon en `/etc/hosts` (ver procedimiento completo abajo).
-   - **Egress 5432 por firewall del host:** el runner actual (`mj20`) tiene firewall **nftables con front-end iptables-nft**, `policy drop` en la cadena OUTPUT con allowlist de puertos egress fijos (incluye 22/80/443 pero *no* 5432). `firewalld` está `masked`. Si el SYN a Neon 5432 da "Connection refused" desde el runner pero la IP responde desde otro host, falta abrir el egress (incidente 2026-09-17):
-   ```bash
-   iptables -I OUTPUT 1 -p tcp --dport 5432 -j ACCEPT
-   # y persistir en el ruleset que carga en boot (/etc/nftables.conf con nftables.service,
-   # o la regla equivalente en nft puro):
-   # nft insert rule ip filter OUTPUT oifname != "lo" ip protocol tcp ct state new tcp dport 5432 accept
-   ```
-   Verificar con `timeout 3 bash -c 'echo >/dev/tcp/<IP-neon>/5432'` → `5432 OPEN`.
+  - Si el host no tiene ruta IPv6, pin IPv4 del endpoint Neon en `/etc/hosts` (ver procedimiento completo abajo).
+  - **Egress 5432 por firewall del host:** el runner actual (`mj20`) tiene firewall **nftables con front-end iptables-nft**, `policy drop` en la cadena OUTPUT con allowlist de puertos egress fijos (incluye 22/80/443 pero _no_ 5432). `firewalld` está `masked`. Si el SYN a Neon 5432 da "Connection refused" desde el runner pero la IP responde desde otro host, falta abrir el egress (incidente 2026-09-17):
+  ```bash
+  iptables -I OUTPUT 1 -p tcp --dport 5432 -j ACCEPT
+  # y persistir en el ruleset que carga en boot (/etc/nftables.conf con nftables.service,
+  # o la regla equivalente en nft puro):
+  # nft insert rule ip filter OUTPUT oifname != "lo" ip protocol tcp ct state new tcp dport 5432 accept
+  ```
+  Verificar con `timeout 3 bash -c 'echo >/dev/tcp/<IP-neon>/5432'` → `5432 OPEN`.
   - Libs de sistema de Chromium instaladas vía `dnf` (nss, atk, at-spi2-atk, cups-libs, libdrm, libxkbcommon, libXcomposite, libXdamage, libXfixes, libXrandr, mesa-libgbm, alsa-lib, pango, cairo, gtk3).
   - Guard anti-fork: los jobs se saltan PRs de forks (repo público + runner self-hosted = riesgo RCE).
 

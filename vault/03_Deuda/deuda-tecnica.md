@@ -128,6 +128,7 @@ Riesgo: un futuro cambio de `pnpm.hoistPattern` / instalación sin hoisting / ex
 
 **Contexto:**
 El _journal.json no incluye entradas para varias migraciones:
+
 - 0010_force_rls.sql (salto idx 9 → 11, falta idx 10).
 - 0005_add_admin_users.sql (huérfano, no en journal, duplica parcialmente 0005_fluffy_triathlon).
 - Snapshots faltantes para idx 3, 4, 9, 10.
@@ -136,6 +137,7 @@ El _journal.json no incluye entradas para varias migraciones:
 En entornos frescos (dev/CI/preview), `pnpm db:migrate` solo aplica las migraciones registradas. 0010_force_rls.sql nunca se aplica en esos entornos → FORCE RLS no se activa. Divergencia silenciosa de postura de seguridad con producción (que tiene 0010 aplicada manual).
 
 **Implementación (2026-09-20, rama `chore/fase1-migration-0013`):**
+
 - Migración 0013 idempotente que garantiza FORCE RLS en las 8 tablas existentes en **cualquier entorno** (prod ya forzada, frescos sin forzar).
 - Entrada idx 13 agregada a `_journal.json` + `0013_snapshot.json` creado.
 - El gap histórico del journal (0005_add_admin_users, 0010_force_rls no registrados) se documenta como decisión consciente: **no reconstruir retroactivamente** (rompería DBs ya migradas al re-aplicar CREATE POLICY sin IF NOT EXISTS). El estado real queda garantizado vía 0013.
@@ -157,6 +159,7 @@ En PostgreSQL, RLS (Row Level Security) y privileges (GRANT) son capas separadas
 Cuando T7 aplique FORCE RLS, app_user va a recibir "permission denied" al intentar SELECT/INSERT/UPDATE/DELETE sobre estas 3 tablas. Bloquea checkout (tenant_mp_config), webhooks de suscripciones (subscriptions) y cualquier operación sobre planes.
 
 **Implementación (2026-09-20, rama `chore/fase1-migration-0013`):**
+
 - GRANT SELECT, INSERT, UPDATE, DELETE en plans, subscriptions, tenant_mp_config para app_user (migración 0013).
 - ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public: futuras tablas creadas por el owner heredan los GRANTs automáticamente.
 
@@ -175,6 +178,7 @@ El spec transversal §4 exige ON DELETE CASCADE desde tenants para products, cat
 El cron de purga (90 días, Fase 2/3) va a fallar al intentar DELETE FROM tenants porque las FKs RESTRICT lo bloquean con FK violation. También rompe el borrado de tenants desde el admin.
 
 **Mitigación:**
+
 - Migración para cambiar las 5 FKs RESTRICT → CASCADE.
 - Ejecutar antes de que el cron de purga entre en producción.
 - Verificar que el cambio de FK no rompa integridad referencial en datos existentes.
@@ -194,6 +198,7 @@ El spec transversal (docs/superpowers/specs/2026-09-subscription-lifecycle.md §
 Cuando se implementen los crons de purga y transiciones de estado (Fase 2/3), copiar queries del spec va a fallar con "column X does not exist". Mismo patrón que el incidente del grep de RLS.
 
 **Mitigación:**
+
 - Corregir el spec §4: reemplazar snake_case por camelCase.
 - Verificar que ninguna otra sección use snake_case.
 - Incluir esta revisión en el checklist de arranque de Fase 2.
@@ -215,6 +220,7 @@ Resultado: errores de formato en packages/db/src/schema.ts no son atrapados por 
 Bajo — no rompe funcionalidad. Pero permite que errores de formato se acumulen y que el DoD "eslint + prettier" no sea real.
 
 **Mitigación:**
+
 - Agregar script `lint` a packages/db/package.json que corra prettier --check + eslint.
 - Verificar que turbo lo recoja en `pnpm lint`.
 - Revisar si otros packages tienen el mismo hueco.
@@ -232,6 +238,7 @@ Bajo — no rompe funcionalidad. Pero permite que errores de formato se acumulen
 **Origen:** Regresión durante el rewrite del test (T6).
 
 **Implementación (commit fix del bug decryptToken):**
+
 - Tests añadidos en `packages/commerce/src/__tests__/encryption.test.ts` (sección `SQL bind params`):
   - `decryptToken: clave en params, columna en SQL (raw hardcoded)` — verifica `accessTokenEnc`
   - `decryptToken: webhookSecretEnc columna en SQL (raw hardcoded)` — verifica `webhookSecretEnc`
@@ -288,6 +295,7 @@ aplicaron manualmente (script `apply-all-migrations.ts` + seed)
 sin registrar en la tabla de tracking.
 
 **Impacto:**
+
 - `pnpm db:migrate` en la DB actual: OK ("Everything's fine").
 - `pnpm db:migrate` en un entorno fresco: intenta aplicar 0001+
   y falla con "table already exists" (o "policy already exists"
@@ -296,10 +304,12 @@ sin registrar en la tabla de tracking.
   devs que siguen SETUP.md.
 
 **Mitigación a corto plazo:**
+
 - Documentar en SETUP.md (ver FIX 2).
 - No hay acción inmediata en la DB actual (estado consistente).
 
 **Mitigación a mediano plazo:**
+
 - Fase 3 (branching en Neon): tracking se reconstruye desde cero
   con `pnpm db:migrate` en un entorno nuevo.
 - O bien: script de reconstrucción de tracking (insertar los 14
@@ -329,6 +339,7 @@ asumir que no hay RLS en esas tablas. Es un falso negativo
 documental, no un bug del código.
 
 **Mitigación:**
+
 - Documentar acá.
 - Agregar comentario inline en los snapshots relevantes (ver
   `packages/db/migrations/meta/README.md`).
@@ -351,6 +362,7 @@ seed.ts (2026-09-23).
 apunta a Neon prod (configuración errónea), el guard no protege.
 
 **Mitigación a futuro (antes de Fase 3):**
+
 - Verificar que DATABASE_URL no contenga 'production' ni 'prod.'.
 - O requerir confirmación explícita (ALLOW_SEED_IN_PROD=true).
 
@@ -370,6 +382,7 @@ permisos va a leer esa clave como `undefined` (falsy) en lugar de
 `false`. Comportamiento silencioso.
 
 **Mitigación a futuro (antes de Fase 2):**
+
 - Agregar schema de validación (Zod) del JSONB `features` con todas
   las claves requeridas y sus defaults.
 - O usar un helper `hasFeature(plan, key)` que devuelva `false` cuando
@@ -508,7 +521,7 @@ verificado empíricamente (no `*.test.*` ni `**/*.test.*`).
 `*` no cruza `/`. Tanto `*.test.*` como `**/*.test.*` fallan.
 El patrón correcto es `*test.ts` (sin punto antes del wildcard).
 
-**Fix aplicado:** EXCLUDE_PATTERNS="*test.ts,*spec.ts,*d.ts,dist/*,build/*,node_modules/*,vault/*"
+**Fix aplicado:** EXCLUDE_PATTERNS="_test.ts,*spec.ts,*d.ts,dist/*,build/*,node_modules/_,vault/*"
 
 > Corregido en PR C (2026-09-26): esta línea documentaba `spec.ts` y
 > `.d.ts` sin el wildcard inicial. La configuración real en `.gga`
@@ -573,66 +586,66 @@ PR.
 
 ---
 
-## 31. 73 archivos markdown no pasan `prettier --check`
+## 31. Markdown sin `prettier --check` en el CI
 
-**Estado:** OPEN. Preexistente en `develop`, no introducido por el
-PR #146.
+**Estado:** RESUELTO (PR `chore/prettier-mitigation`).
 
 **Origen:** comentario de `luisavilaland` en el review del PR #146, que
 pedía registrar la deuda de prettier detectada durante ese PR.
 
-**Contexto:** el DoD declara `pnpm lint` como "eslint + prettier", pero
+**Contexto original:** el DoD declara `pnpm lint` como "eslint + prettier", pero
 `pnpm lint` es `turbo run lint` y solo ejecuta eslint por paquete.
-Prettier nunca corre sobre markdown en ninguna puerta automática: el
-`lint 6/6` del PR #146 no lo detecta. Este ítem es el contrapeso de lo
+Prettier nunca corría sobre markdown en ninguna puerta automática: el
+`lint 6/6` del PR #146 no lo detectaba. Este ítem es el contrapeso de lo
 que se detectó en el PR #146 y complementa el item 10 (que cubre el
 `lint` script faltante en `@repo/db`): son hallazgos distintos sobre la
 misma brecha, no duplicados.
 
-**Alcance real:** `pnpm exec prettier --check "**/*.md"` falla en **73
-archivos**, no en 4. El "4" que circulaba en el body del PR #146
-venía de un check acotado a los archivos modificados por ese PR, no de
-un barrido del repo.
+**Alcance real (medido):** el conteo de 73 se quedó corto. Al momento de
+mitigarlo eran **84** archivos: el PR #147 agregó 10 archivos a
+`vault/engram/` y el PR #148 agregó 11 en `.opencode/commands/`.
 
-| Grupo | Archivos | Naturaleza |
-| --- | --- | --- |
-| `vault/engram/` | 51 | tool-managed, auto-generado por `pnpm vault:export` |
-| `vault/` (human-curated) | 9 | ADRs, bitácora, deuda, fases, specs |
-| raíz | 5 | `AGENTS.md`, `PROMPTS.md`, `README.md`, `SETUP.md`, `TESTING.md` |
-| `docs/` | 5 | `superpowers/specs`, `superpowers/plans`, `migrations-archive` |
-| `.opencode/skills/` | 3 | `SKILL.md` de `rls-audit`, `migration-safety`, `webhook-debug` |
-| **Total** | **73** | |
+| Grupo                    | Archivos | Naturaleza                                                       |
+| ------------------------ | -------- | ---------------------------------------------------------------- |
+| `vault/engram/`          | 61       | tool-managed, auto-generado por `pnpm vault:export`              |
+| `vault/` (human-curated) | 9        | ADRs, bitácora, deuda, fases, specs                              |
+| raíz                     | 5        | `AGENTS.md`, `PROMPTS.md`, `README.md`, `SETUP.md`, `TESTING.md` |
+| `docs/`                  | 5        | `superpowers/specs`, `superpowers/plans`, `migrations-archive`   |
+| `.opencode/`             | 4        | 3 `SKILL.md` + `commands/sdd-apply.md`                           |
+| `.github/`               | 1        | `PULL_REQUEST_TEMPLATE.md`                                       |
+| **Total**                | **84**   |                                                                  |
 
-(El resumen de prettier reporta 74; la diferencia es una ruta que se
-envuelve en la salida y no se captura en el parseo.)
+**Mitigación aplicada (2 partes, según `luisavilaland`):**
 
-**Verificación de que es preexistente:** los 8 archivos que el PR #146
-tocó se compararon contra `origin/develop`. Los 6 que hoy fallan
-(`AGENTS.md`, `PROMPTS.md`, `SETUP.md`, `README.md`, `bitacora.md`,
-`deuda-tecnica.md`) **ya fallaban** en `develop`. Los 2 restantes
-(`vault/README.md` y `docs/WORKFLOW.md`, nuevo) **pasan**. El PR no
-introdujo ninguna regresión de formato.
+1. `.prettierignore` excluye:
+   - `vault/engram/` (61, tool-managed: se regenera en cada export).
+   - `vault/02_Bitacora/bitacora.md` (append-only: la historia es
+     inmutable).
+   - artefactos de build (`node_modules/`, `dist/`, `build/`, `.turbo/`,
+     `.next/`, `coverage/`).
+2. `prettier --write` sobre los **23** restantes.
+3. Script `format:check` en `package.json` + step en `.github/workflows/ci.yml`
+   para que no vuelva a acumular.
 
-**Consecuencia:** no rompe el DoD ni el CI. El riesgo real es de
-operación: un `prettier --write` global reescribiría los 73 archivos
-enteros y produciría un diff masivo sin valor semántico, mezclado con
-cambios de contenido. Por eso no debe correr en un PR funcional.
+**Excepciones documentadas dentro de los formateados.** Dos archivos
+requirieron un ajuste mínimo de contenido para ser idempotentes bajo
+prettier, porque sus bloques de código estaban indentados y prettier
+os reinterpretó:
 
-**Mitigación propuesta (elegir una):**
+- `AGENTS.md`: un snippet shell de bloque indentado pasaba a una línea
+  con comentario inline. Se convirtió a bloque cercado ` ```bash `,
+  que prettier preserva y que además renderiza igual o mejor.
+- `.opencode/skills/rls-audit/SKILL.md`: un bloque cercado ` ```ts `
+  con 6 espacios de indentación dentro de un item de lista. Se bajó a
+  2 espacios (la alineación correcta según el item).
 
-1. Agregar `vault/engram/` al `.prettierignore` — son 51 de los 73 y son
-   tool-managed: se regeneran en cada export y no corresponde
-   formatearlos a mano. Reduce el alcance a 22.
-2. Correr `prettier --write` una sola vez sobre los 22 restantes en un
-   PR dedicado, sin cambios de contenido, y después agregar
-   `prettier --check "**/*.md"` al CI para que no vuelva a acumular.
-3. Alternativa de menor costo: actualizar el DoD para que diga "eslint"
-   y sacarse de encima la promesa de prettier. Es la opción honesta si
-   el proyecto no va a formatear markdown.
+Ambos cambios conservan el significado y el renderizado.
 
-**Severidad:** BAJO. Es deuda de higiene, no de correcto ni de
-funcionalidad.
+**Nota sobre la bitácora:** excluida por la regla append-only. Si en el
+futuro se decide formatearla, hay que hacerlo con excepción documentada
+(mismo patrón que el fix de mojibake en el PR #143), nunca como parte
+de un `prettier --write` global.
 
-**Reevaluar:** en el PR D o en la auditoría de cierre pre-Fase 2.
+**Severidad:** CERRADA.
 
-**Urgencia:** BAJO.
+**Urgencia:** CERRADA.

@@ -104,27 +104,27 @@ No existen `apps/storefront/templates/`, `lib/templates.ts`, mapa de plantillas 
 
 ## 4. Blueprint v2.6 y spec transversal
 
-| Requisito | Estado | Evidencia |
-|---|---|---|
-| Tres tablas | ✅ | `packages/db/src/schema.ts:38-123` |
-| RLS en subscriptions y tenant_mp_config | ✅ | `0014_enable_rls_new_tables.sql` |
-| Precios en centavos | ✅ | `packages/db/seed.ts` |
-| Seed de planes y suscripciones | ✅ | `packages/db/seed.ts` |
-| `abandoned` en estados | ⚠️ | Spec sí; Blueprint enumera cinco |
-| Variables MP en template/Zod | ❌ | `.env.local.example` y `packages/validation/src/env.ts` no las contienen |
-| Cifrado como Blueprint/ADR | ⚠️ | Bind params conformes; lectura de env y upsert no conformes al plan |
-| Estado de Fase 1 documentado | ⚠️ | Sección principal completada, tabla Roadmap aún `ARRANCAR` |
+| Requisito                               | Estado | Evidencia                                                                |
+| --------------------------------------- | ------ | ------------------------------------------------------------------------ |
+| Tres tablas                             | ✅     | `packages/db/src/schema.ts:38-123`                                       |
+| RLS en subscriptions y tenant_mp_config | ✅     | `0014_enable_rls_new_tables.sql`                                         |
+| Precios en centavos                     | ✅     | `packages/db/seed.ts`                                                    |
+| Seed de planes y suscripciones          | ✅     | `packages/db/seed.ts`                                                    |
+| `abandoned` en estados                  | ⚠️     | Spec sí; Blueprint enumera cinco                                         |
+| Variables MP en template/Zod            | ❌     | `.env.local.example` y `packages/validation/src/env.ts` no las contienen |
+| Cifrado como Blueprint/ADR              | ⚠️     | Bind params conformes; lectura de env y upsert no conformes al plan      |
+| Estado de Fase 1 documentado            | ⚠️     | Sección principal completada, tabla Roadmap aún `ARRANCAR`               |
 
 La spec transversal define seis estados, incluyendo `abandoned`, y columnas `expiredAt`, `abandonedAt` y `lastProcessedPaymentId` (`docs/superpowers/specs/2026-09-subscription-lifecycle.md:11-22`). El schema las contiene. El drift de naming snake_case de la sección 4 de la spec ya está registrado como ítem 9.
 
 ## 5. Tests y cobertura
 
-| Área | Estado | Evidencia |
-|---|---|---|
-| Helper de cifrado | ⚠️ Parcial | `encryption.test.ts:209-320` cubre roundtrip mock, empty key y bind params |
-| RLS cross-tenant real | ❌ Ausente | No existe `packages/db/src/__tests__/rls-cross-tenant.test.ts` |
-| Seed/planes | ❌ Ausente | No hay `*seed*.test.ts` ni test de datos de planes |
-| Tests E2E existentes | ✅ | Hay specs cross-tenant para APIs, pero no reemplazan el test RLS de Fase 1 |
+| Área                  | Estado     | Evidencia                                                                  |
+| --------------------- | ---------- | -------------------------------------------------------------------------- |
+| Helper de cifrado     | ⚠️ Parcial | `encryption.test.ts:209-320` cubre roundtrip mock, empty key y bind params |
+| RLS cross-tenant real | ❌ Ausente | No existe `packages/db/src/__tests__/rls-cross-tenant.test.ts`             |
+| Seed/planes           | ❌ Ausente | No hay `*seed*.test.ts` ni test de datos de planes                         |
+| Tests E2E existentes  | ✅         | Hay specs cross-tenant para APIs, pero no reemplazan el test RLS de Fase 1 |
 
 El test de aislamiento en `encryption.test.ts:188-206` compara dos respuestas de mocks y no prueba una política RLS ni una transacción real.
 
@@ -157,12 +157,12 @@ El test de aislamiento en `encryption.test.ts:188-206` compara dos respuestas de
 
 ## 7. Estado de issues T11–T14
 
-| Issue | GitHub | Estado real | Recomendación |
-|---|---|---|---|
-| #111 T11 | OPEN | Test RLS real ausente | Mantener abierto; es bloqueante del DoD de Fase 1. |
-| #112 T12 | OPEN | Tests unitarios mock cubren bind params/empty key; falta DB roundtrip | Mantener abierto o ajustar DoD a cobertura mock-only. |
-| #113 T13 | OPEN | Template y Zod no contienen las tres variables | Mantener abierto; bloqueante antes de Fase 2. |
-| #114 T14 | OPEN | Bitácora parcial; README/AGENTS tienen cambios aislados | Mantener abierto hasta completar entrada consolidada. |
+| Issue    | GitHub | Estado real                                                           | Recomendación                                         |
+| -------- | ------ | --------------------------------------------------------------------- | ----------------------------------------------------- |
+| #111 T11 | OPEN   | Test RLS real ausente                                                 | Mantener abierto; es bloqueante del DoD de Fase 1.    |
+| #112 T12 | OPEN   | Tests unitarios mock cubren bind params/empty key; falta DB roundtrip | Mantener abierto o ajustar DoD a cobertura mock-only. |
+| #113 T13 | OPEN   | Template y Zod no contienen las tres variables                        | Mantener abierto; bloqueante antes de Fase 2.         |
+| #114 T14 | OPEN   | Bitácora parcial; README/AGENTS tienen cambios aislados               | Mantener abierto hasta completar entrada consolidada. |
 
 ## 8. Recomendaciones priorizadas
 

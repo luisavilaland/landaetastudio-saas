@@ -31,10 +31,10 @@ Un comercio puede registrarse por sí mismo (sin intervención del superadmin), 
 
 La plataforma maneja dos flujos de pago completamente independientes, cada uno con su propia cuenta de MercadoPago, su propio webhook y su propio ciclo de vida.
 
-| FLUJO | QUIÉN COBRA | CUENTA MP | WEBHOOK |
-|-------|-------------|-----------|---------|
-| Suscripciones | LandaetaStudio | Nuestra cuenta MP (`MP_PLATFORM_ACCESS_TOKEN`) | `/api/webhooks/mercadopago/subscriptions/:tenantId` |
-| Órdenes de tienda | Tenant (clientes finales) | Cuenta MP del tenant (`tenant_mp_config.access_token`) | `/api/webhooks/mercadopago/:tenantId` |
+| FLUJO             | QUIÉN COBRA               | CUENTA MP                                              | WEBHOOK                                             |
+| ----------------- | ------------------------- | ------------------------------------------------------ | --------------------------------------------------- |
+| Suscripciones     | LandaetaStudio            | Nuestra cuenta MP (`MP_PLATFORM_ACCESS_TOKEN`)         | `/api/webhooks/mercadopago/subscriptions/:tenantId` |
+| Órdenes de tienda | Tenant (clientes finales) | Cuenta MP del tenant (`tenant_mp_config.access_token`) | `/api/webhooks/mercadopago/:tenantId`               |
 
 ### Puntos clave
 
@@ -47,48 +47,48 @@ La plataforma maneja dos flujos de pago completamente independientes, cada uno c
 
 ## ✅ Decisiones aprobadas
 
-| DECISIÓN | ESTADO | RESPONSABLE |
-|----------|--------|-------------|
-| 3 tiers: Starter (UYU 2.000/mes), Pro (UYU 4.000/mes), Business (UYU 8.000/mes) | ✅ Aprobado | Producto |
-| Sin período de prueba. Pago antes de acceder al panel admin | ✅ Aprobado | Producto |
-| Suscripciones a nuestra MP; órdenes de clientes a la MP del tenant | ✅ Aprobado | Técnico |
-| RLS activo en todas las tablas nuevas | ✅ Aprobado | Técnico |
-| Cifrado de tokens con pgcrypto + clave en `MP_TOKEN_ENCRYPTION_KEY` | ✅ Aprobado | Técnico |
-| Cupones sin límite por tier (decisión actual, revisable) | ✅ Aprobado | Producto |
-| Banners: superior + popup configurable + input de cupón en carrito | ✅ Aprobado | Producto |
-| Boletines: con captura + envío completo. Límites por tier | ✅ Aprobado | Producto |
-| Plantillas: 3 en Pro, 6 en Business. Cambiables cuando el tenant quiera | ✅ Aprobado | Producto |
-| Personalización visual: colores, logo, tipografía sobre mismo layout | ✅ Aprobado | Producto |
-| Moneda: UYU (MercadoPago soporta preapproval en UYU) | ✅ Verificado | Técnico |
-| Multi-tienda, white-label, Enterprise, MercadoLibre, B2B: fuera de alcance | ❌ Fuera | Producto |
+| DECISIÓN                                                                        | ESTADO        | RESPONSABLE |
+| ------------------------------------------------------------------------------- | ------------- | ----------- |
+| 3 tiers: Starter (UYU 2.000/mes), Pro (UYU 4.000/mes), Business (UYU 8.000/mes) | ✅ Aprobado   | Producto    |
+| Sin período de prueba. Pago antes de acceder al panel admin                     | ✅ Aprobado   | Producto    |
+| Suscripciones a nuestra MP; órdenes de clientes a la MP del tenant              | ✅ Aprobado   | Técnico     |
+| RLS activo en todas las tablas nuevas                                           | ✅ Aprobado   | Técnico     |
+| Cifrado de tokens con pgcrypto + clave en `MP_TOKEN_ENCRYPTION_KEY`             | ✅ Aprobado   | Técnico     |
+| Cupones sin límite por tier (decisión actual, revisable)                        | ✅ Aprobado   | Producto    |
+| Banners: superior + popup configurable + input de cupón en carrito              | ✅ Aprobado   | Producto    |
+| Boletines: con captura + envío completo. Límites por tier                       | ✅ Aprobado   | Producto    |
+| Plantillas: 3 en Pro, 6 en Business. Cambiables cuando el tenant quiera         | ✅ Aprobado   | Producto    |
+| Personalización visual: colores, logo, tipografía sobre mismo layout            | ✅ Aprobado   | Producto    |
+| Moneda: UYU (MercadoPago soporta preapproval en UYU)                            | ✅ Verificado | Técnico     |
+| Multi-tienda, white-label, Enterprise, MercadoLibre, B2B: fuera de alcance      | ❌ Fuera      | Producto    |
 
 ---
 
 ## 💰 Tiers definitivos
 
-| PLAN | UYU/MES | PRODUCTOS | VARIANTES/PROD | ADMINS | PLANTILLAS | SUSCRIPTORES |
-|------|---------|-----------|----------------|--------|------------|--------------|
-| Starter | UYU 2.000 | 150 | Máx. 5 | 1 | 0 (base) | 250 |
-| Pro | UYU 4.000 | 400 | Máx. 10 | 5 | 3 | 1.000 |
-| Business | UYU 8.000 | Ilimitados | Ilimitadas | 10 | 6 | Ilimitados |
+| PLAN     | UYU/MES   | PRODUCTOS  | VARIANTES/PROD | ADMINS | PLANTILLAS | SUSCRIPTORES |
+| -------- | --------- | ---------- | -------------- | ------ | ---------- | ------------ |
+| Starter  | UYU 2.000 | 150        | Máx. 5         | 1      | 0 (base)   | 250          |
+| Pro      | UYU 4.000 | 400        | Máx. 10        | 5      | 3          | 1.000        |
+| Business | UYU 8.000 | Ilimitados | Ilimitadas     | 10     | 6          | Ilimitados   |
 
 ### Features por tier
 
-| FEATURE | STARTER | PRO | BUSINESS |
-|---------|---------|-----|----------|
-| MP propio (ACCESS_TOKEN + WEBHOOK_SECRET) | ✅ | ✅ | ✅ |
-| Personalización visual (colores, logo, tipografía) | ✅ | ✅ | ✅ |
-| Banners (superior + popup) | ✅ | ✅ | ✅ |
-| Cupones de descuento | ✅ | ✅ | ✅ |
-| Métodos de envío configurables | ✅ | ✅ | ✅ |
-| Importación CSV de productos | ✅ | ✅ | ✅ |
-| Boletines (newsletter) | ✅ 250 | ✅ 1.000 | ✅ Ilimitados |
-| Plantillas de tienda | Layout base | 3 plantillas | 6 plantillas |
-| Dominio personalizado | ❌ | ✅ | ✅ |
-| Analytics básico | ❌ | ✅ | ✅ |
-| Soporte prioritario | ❌ | ✅ | ✅ |
-| Ejecutivo de cuenta dedicado | ❌ | ❌ | ✅ |
-| SLA respuesta 24hs | ❌ | ❌ | ✅ |
+| FEATURE                                            | STARTER     | PRO          | BUSINESS      |
+| -------------------------------------------------- | ----------- | ------------ | ------------- |
+| MP propio (ACCESS_TOKEN + WEBHOOK_SECRET)          | ✅          | ✅           | ✅            |
+| Personalización visual (colores, logo, tipografía) | ✅          | ✅           | ✅            |
+| Banners (superior + popup)                         | ✅          | ✅           | ✅            |
+| Cupones de descuento                               | ✅          | ✅           | ✅            |
+| Métodos de envío configurables                     | ✅          | ✅           | ✅            |
+| Importación CSV de productos                       | ✅          | ✅           | ✅            |
+| Boletines (newsletter)                             | ✅ 250      | ✅ 1.000     | ✅ Ilimitados |
+| Plantillas de tienda                               | Layout base | 3 plantillas | 6 plantillas  |
+| Dominio personalizado                              | ❌          | ✅           | ✅            |
+| Analytics básico                                   | ❌          | ✅           | ✅            |
+| Soporte prioritario                                | ❌          | ✅           | ✅            |
+| Ejecutivo de cuenta dedicado                       | ❌          | ❌           | ✅            |
+| SLA respuesta 24hs                                 | ❌          | ❌           | ✅            |
 
 ### Lógica de conteo
 
@@ -103,58 +103,58 @@ La plataforma maneja dos flujos de pago completamente independientes, cada uno c
 
 ### Estados de suscripción (6)
 
-| ESTADO | CUÁNDO APLICA | ACCESO AL PANEL | TIENDA PÚBLICA |
-|--------|---------------|-----------------|----------------|
-| `pending_first_payment` | Se registró, aún no pagó | ❌ Bloqueado | ❌ No publicada |
-| `active` | Al día | ✅ Completo | ✅ Funcionando |
-| `past_due` | Pago falló (dentro de gracia de 7 días) | ⚠ Limitado | ✅ Funcionando |
-| `cancelled` | Canceló voluntariamente | ⚠ Solo lectura hasta fin de período | ✅ Hasta fin de período |
-| `expired` | Pasó gracia sin pagar | ❌ Bloqueado | ❌ Despublicada |
-| `abandoned` | Nunca completó el primer pago en 7 días | ❌ Bloqueado | ❌ No publicada |
+| ESTADO                  | CUÁNDO APLICA                           | ACCESO AL PANEL                     | TIENDA PÚBLICA          |
+| ----------------------- | --------------------------------------- | ----------------------------------- | ----------------------- |
+| `pending_first_payment` | Se registró, aún no pagó                | ❌ Bloqueado                        | ❌ No publicada         |
+| `active`                | Al día                                  | ✅ Completo                         | ✅ Funcionando          |
+| `past_due`              | Pago falló (dentro de gracia de 7 días) | ⚠ Limitado                          | ✅ Funcionando          |
+| `cancelled`             | Canceló voluntariamente                 | ⚠ Solo lectura hasta fin de período | ✅ Hasta fin de período |
+| `expired`               | Pasó gracia sin pagar                   | ❌ Bloqueado                        | ❌ Despublicada         |
+| `abandoned`             | Nunca completó el primer pago en 7 días | ❌ Bloqueado                        | ❌ No publicada         |
 
 ### Durante el período de gracia (7 días)
 
-| ACCIÓN | ¿PERMITIDO? |
-|--------|-------------|
-| Acceder al panel de admin | ✅ Sí |
-| Ver datos (productos, órdenes, config) | ✅ Sí |
-| Crear/editar productos | ❌ No |
-| Crear/editar categorías | ❌ No |
-| Recibir órdenes | ✅ Sí |
-| Gestionar órdenes | ✅ Sí |
-| Configurar MP, envíos, etc. | ❌ No |
-| Cambiar de plan | ❌ No |
+| ACCIÓN                                 | ¿PERMITIDO? |
+| -------------------------------------- | ----------- |
+| Acceder al panel de admin              | ✅ Sí       |
+| Ver datos (productos, órdenes, config) | ✅ Sí       |
+| Crear/editar productos                 | ❌ No       |
+| Crear/editar categorías                | ❌ No       |
+| Recibir órdenes                        | ✅ Sí       |
+| Gestionar órdenes                      | ✅ Sí       |
+| Configurar MP, envíos, etc.            | ❌ No       |
+| Cambiar de plan                        | ❌ No       |
 
 ### Secuencia temporal de la gracia
 
-| DÍA | EVENTO | EMAIL | ESTADO |
-|-----|--------|-------|--------|
-| 0 | Pago falla | "Tu pago falló" | `past_due` |
-| 3 | Recordatorio | "Tu suscripción vence pronto" | `past_due` |
-| 5 | Último aviso | "Último aviso antes de suspensión" | `past_due` |
-| 7 | Suspensión | "Tu cuenta fue suspendida" | `expired` |
-| 90 | Borrado definitivo (no se envía) | — | — |
+| DÍA | EVENTO                           | EMAIL                              | ESTADO     |
+| --- | -------------------------------- | ---------------------------------- | ---------- |
+| 0   | Pago falla                       | "Tu pago falló"                    | `past_due` |
+| 3   | Recordatorio                     | "Tu suscripción vence pronto"      | `past_due` |
+| 5   | Último aviso                     | "Último aviso antes de suspensión" | `past_due` |
+| 7   | Suspensión                       | "Tu cuenta fue suspendida"         | `expired`  |
+| 90  | Borrado definitivo (no se envía) | —                                  | —          |
 
 ### Recuperación y cancelación
 
-| ESCENARIO | COMPORTAMIENTO |
-|-----------|----------------|
+| ESCENARIO               | COMPORTAMIENTO                                                                                                                          |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Recuperación tras fallo | Automática al recibir `payment.created` de MP. El webhook reactiva la suscripción (`expired` → `active`). Sin acción manual del tenant. |
-| Cancelación voluntaria | Al final del período pagado. Sigue activo hasta la fecha de renovación, luego pasa a `cancelled`. |
-| Retención de datos | 90 días desde la suspensión. Luego se borra toda la información. |
-| Cambio de plan | Upgrade y downgrade libres con prorrateo. Ej: Pro (4.000) día 1 → Business (8.000) día 15 = se acreditan 2.000, paga 6.000. |
+| Cancelación voluntaria  | Al final del período pagado. Sigue activo hasta la fecha de renovación, luego pasa a `cancelled`.                                       |
+| Retención de datos      | 90 días desde la suspensión. Luego se borra toda la información.                                                                        |
+| Cambio de plan          | Upgrade y downgrade libres con prorrateo. Ej: Pro (4.000) día 1 → Business (8.000) día 15 = se acreditan 2.000, paga 6.000.             |
 
 ### Emails al tenant (7)
 
-| # | EVENTO | CUÁNDO |
-|---|--------|--------|
-| 1 | Bienvenida | Al registrarse |
-| 2 | Pago confirmado | Al activarse la suscripción |
-| 3 | Pago fallido | Al detectar el primer fallo |
-| 4 | Recordatorio día 3 | 3 días después del fallo |
-| 5 | Último aviso día 5 | 5 días después del fallo |
-| 6 | Suscripción suspendida | Al día 7 |
-| 7 | Suscripción cancelada | Al confirmar la cancelación |
+| #   | EVENTO                 | CUÁNDO                      |
+| --- | ---------------------- | --------------------------- |
+| 1   | Bienvenida             | Al registrarse              |
+| 2   | Pago confirmado        | Al activarse la suscripción |
+| 3   | Pago fallido           | Al detectar el primer fallo |
+| 4   | Recordatorio día 3     | 3 días después del fallo    |
+| 5   | Último aviso día 5     | 5 días después del fallo    |
+| 6   | Suscripción suspendida | Al día 7                    |
+| 7   | Suscripción cancelada  | Al confirmar la cancelación |
 
 ### Webhook que nunca llega
 
@@ -166,11 +166,11 @@ Después de 2 horas, solo queda el botón manual.
 
 ## 🔐 Variables de entorno nuevas
 
-| VARIABLE | USO | ÁMBITO |
-|----------|-----|--------|
-| `MP_PLATFORM_ACCESS_TOKEN` | Token de nuestra cuenta MP para cobrar suscripciones | Vercel (todas las apps) |
-| `MP_PLATFORM_WEBHOOK_SECRET` | Secret del webhook de suscripciones (nuestra cuenta) | Vercel (storefront) |
-| `MP_TOKEN_ENCRYPTION_KEY` | Cifrar/descifrar tokens de tenants en la DB | Vercel (todas las apps) |
+| VARIABLE                     | USO                                                  | ÁMBITO                  |
+| ---------------------------- | ---------------------------------------------------- | ----------------------- |
+| `MP_PLATFORM_ACCESS_TOKEN`   | Token de nuestra cuenta MP para cobrar suscripciones | Vercel (todas las apps) |
+| `MP_PLATFORM_WEBHOOK_SECRET` | Secret del webhook de suscripciones (nuestra cuenta) | Vercel (storefront)     |
+| `MP_TOKEN_ENCRYPTION_KEY`    | Cifrar/descifrar tokens de tenants en la DB          | Vercel (todas las apps) |
 
 ```bash
 # Generar la clave de cifrado
@@ -181,18 +181,18 @@ openssl rand -base64 32
 
 ## 🗺 Hoja de ruta — 10 fases (todas pre-lanzamiento)
 
-| # | FASE | DÍAS EST. | DEPENDENCIAS | ESTADO |
-|---|------|-----------|--------------|--------|
-| 1 | Modelo de datos (plans, subscriptions, mp_config) | 2-3 | — | ✅ Completada |
-| 2 | Webhook suscripciones + checkout dinámico | 3-4 | Fase 1 | Pendiente |
-| 3 | Autoservicio (landing + registro + pago) | 5-7 | Fase 2 | Pendiente |
-| 4 | Personalización visual + dominio + infraestructura | 5-7 | Fase 3 | Pendiente |
-| 5 | Cupones y descuentos | 8-10 | Fase 3 | Pendiente |
-| 6 | Banners (superior + popup) | 4-6 | Fase 4 | Pendiente |
-| 7 | Sistema de plantillas + 6 plantillas | 33-47 | Fase 4 | Pendiente |
-| 8 | Boletines (captura + envío) | 5-7 | Fase 3 | Pendiente |
-| 9 | Envíos (Correo Uruguayo + OCA) | 4-6 | Fase 3 | Pendiente |
-| 10 | Go-live y checklist final | 2-3 | Fases 1-9 | Pendiente |
+| #   | FASE                                               | DÍAS EST. | DEPENDENCIAS | ESTADO        |
+| --- | -------------------------------------------------- | --------- | ------------ | ------------- |
+| 1   | Modelo de datos (plans, subscriptions, mp_config)  | 2-3       | —            | ✅ Completada |
+| 2   | Webhook suscripciones + checkout dinámico          | 3-4       | Fase 1       | Pendiente     |
+| 3   | Autoservicio (landing + registro + pago)           | 5-7       | Fase 2       | Pendiente     |
+| 4   | Personalización visual + dominio + infraestructura | 5-7       | Fase 3       | Pendiente     |
+| 5   | Cupones y descuentos                               | 8-10      | Fase 3       | Pendiente     |
+| 6   | Banners (superior + popup)                         | 4-6       | Fase 4       | Pendiente     |
+| 7   | Sistema de plantillas + 6 plantillas               | 33-47     | Fase 4       | Pendiente     |
+| 8   | Boletines (captura + envío)                        | 5-7       | Fase 3       | Pendiente     |
+| 9   | Envíos (Correo Uruguayo + OCA)                     | 4-6       | Fase 3       | Pendiente     |
+| 10  | Go-live y checklist final                          | 2-3       | Fases 1-9    | Pendiente     |
 
 ### Estimación
 
@@ -367,41 +367,41 @@ Los componentes (`ProductCard`, `CartDrawer`, `ProductGallery`) se escriben una 
 
 ## ⚠ Riesgos y mitigaciones
 
-| RIESGO | MITIGACIÓN |
-|--------|------------|
-| Fuga de tokens de MP si la base se filtra | Cifrado con pgcrypto. Clave en `MP_TOKEN_ENCRYPTION_KEY`, nunca en código ni DB. |
-| Confusión entre los dos flujos de MP | Documentar claramente en el código con comentarios y en AGENTS.md. Variables separadas para cada flujo. |
-| Abuso en el registro público | Rate limiting: 5 registros/hora por IP. |
-| Webhook de suscripciones mal configurado | Reutilizar `verifyMercadoPagoSignature`. Fail-closed: si firma falla, rechazar. |
-| Panel admin accesible sin suscripción activa | Middleware verifica `subscriptions.status` en cada request a `/admin/*`. |
-| Tenant no recibe el webhook | UI "esperando confirmación" + botón "Ya pagué" + reintento automático cada 5 min por 2 horas. |
-| Fase 7 (plantillas) se extiende | Paralelizar con Fases 8 y 9. Priorizar 3 plantillas de Pro primero. |
-| Costos de Resend por boletines | Límite por tier (250/1.000/ilimitados). Monitorear uso mensual. |
+| RIESGO                                       | MITIGACIÓN                                                                                              |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Fuga de tokens de MP si la base se filtra    | Cifrado con pgcrypto. Clave en `MP_TOKEN_ENCRYPTION_KEY`, nunca en código ni DB.                        |
+| Confusión entre los dos flujos de MP         | Documentar claramente en el código con comentarios y en AGENTS.md. Variables separadas para cada flujo. |
+| Abuso en el registro público                 | Rate limiting: 5 registros/hora por IP.                                                                 |
+| Webhook de suscripciones mal configurado     | Reutilizar `verifyMercadoPagoSignature`. Fail-closed: si firma falla, rechazar.                         |
+| Panel admin accesible sin suscripción activa | Middleware verifica `subscriptions.status` en cada request a `/admin/*`.                                |
+| Tenant no recibe el webhook                  | UI "esperando confirmación" + botón "Ya pagué" + reintento automático cada 5 min por 2 horas.           |
+| Fase 7 (plantillas) se extiende              | Paralelizar con Fases 8 y 9. Priorizar 3 plantillas de Pro primero.                                     |
+| Costos de Resend por boletines               | Límite por tier (250/1.000/ilimitados). Monitorear uso mensual.                                         |
 
 ---
 
 ## 🔮 Post-lanzamiento — Fuera de este blueprint
 
-| FEATURE | DESCRIPCIÓN |
-|---------|-------------|
-| Multi-tienda | 1 tenant con múltiples tiendas. Requiere rediseño estructural del modelo de datos. |
-| White-label | Agencias que revenden la plataforma con su propia marca. |
-| Sincronización MercadoLibre | Stock y precios bidireccional. Panel unificado. |
-| B2B nativo | Listas de precio, aprobaciones, crédito, pedidos mayoristas. |
-| POS físico | App PWA sincronizada con inventario del ecommerce. |
-| Analytics avanzado | Embudos, LTV, predicción de stock, cohorts. |
-| Page builder avanzado | Secciones configurables drag & drop (opción E, ver abajo). |
-| App mobile nativa | React Native / Expo con notificaciones push. |
+| FEATURE                     | DESCRIPCIÓN                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------- |
+| Multi-tienda                | 1 tenant con múltiples tiendas. Requiere rediseño estructural del modelo de datos. |
+| White-label                 | Agencias que revenden la plataforma con su propia marca.                           |
+| Sincronización MercadoLibre | Stock y precios bidireccional. Panel unificado.                                    |
+| B2B nativo                  | Listas de precio, aprobaciones, crédito, pedidos mayoristas.                       |
+| POS físico                  | App PWA sincronizada con inventario del ecommerce.                                 |
+| Analytics avanzado          | Embudos, LTV, predicción de stock, cohorts.                                        |
+| Page builder avanzado       | Secciones configurables drag & drop (opción E, ver abajo).                         |
+| App mobile nativa           | React Native / Expo con notificaciones push.                                       |
 
 ### Frontend personalizable — Opciones evaluadas
 
-| OPCIÓN | DESCRIPCIÓN | VIABILIDAD | ESTIMACIÓN |
-|--------|-------------|------------|------------|
-| A — Page builder visual | Editor tipo Shopify donde el tenant arrastra secciones | ⚠ Complejo | 3-6 meses |
-| B — Inyección de código | El tenant pega HTML/CSS/JS propio | ❌ Descartado | — |
-| C — Modo headless | API pública + frontend propio del tenant | ⚠ Solo para clientes técnicos | 2-3 meses |
-| D — Work custom | Nuestro equipo construye a medida | ⚠ No es SaaS, es agencia | Variable |
-| E — Secciones configurables | Secciones predefinidas que el tenant activa/desactiva y reordena | ✅ Alcanzable | 5-8 días |
+| OPCIÓN                      | DESCRIPCIÓN                                                      | VIABILIDAD                    | ESTIMACIÓN |
+| --------------------------- | ---------------------------------------------------------------- | ----------------------------- | ---------- |
+| A — Page builder visual     | Editor tipo Shopify donde el tenant arrastra secciones           | ⚠ Complejo                    | 3-6 meses  |
+| B — Inyección de código     | El tenant pega HTML/CSS/JS propio                                | ❌ Descartado                 | —          |
+| C — Modo headless           | API pública + frontend propio del tenant                         | ⚠ Solo para clientes técnicos | 2-3 meses  |
+| D — Work custom             | Nuestro equipo construye a medida                                | ⚠ No es SaaS, es agencia      | Variable   |
+| E — Secciones configurables | Secciones predefinidas que el tenant activa/desactiva y reordena | ✅ Alcanzable                 | 5-8 días   |
 
 ### Por qué se descartó la Opción B
 

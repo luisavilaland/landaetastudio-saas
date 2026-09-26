@@ -429,3 +429,4 @@ La Fase 6 llevó el RLS de decorativo a **real y forzado** en producción:
 - **TOCTOU fixes**: checkout con decremento atómico de stock (`WHERE stock >= qty`); PUT products `[id]` con 409 si producto borrado durante update.
 - **Health checks**: factory `createHealthCheckHandler` compartido + alertas Sentry en degradación.
 - **Calidad**: 430 tests (55 archivos), 15 specs E2E, build limpio, lint/typecheck verdes.
+$$

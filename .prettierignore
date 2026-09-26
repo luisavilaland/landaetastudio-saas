@@ -1,2 +1,16 @@
 pnpm-lock.yaml
 packages/db/migrations/
+
+# Tool-managed: se regenera con `pnpm vault:export`, no editar manualmente
+vault/engram/
+
+# Append-only: la historia es inmutable, no formatear
+vault/02_Bitacora/bitacora.md
+
+# Artefactos de build
+node_modules/
+dist/
+build/
+.turbo/
+.next/
+coverage/

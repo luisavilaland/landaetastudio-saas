@@ -23,12 +23,12 @@ pnpm db:seed       # tsx packages/db/seed.ts
 
 ## Que es inmutable y que no
 
-| Artefacto | Inmutable | Nota |
-| --- | --- | --- |
-| `packages/db/migrations/*.sql` | Si | Editar o borrar rompe el guard. |
-| `packages/db/migrations/meta/*_snapshot.json` | Si | Los snapshots son parte del estado. |
-| `packages/db/migrations/meta/_journal.json` | No | Crece con cada migracion nueva. Es metadata, no contiene SQL. |
-| Archivos nuevos (agregados) | N/A | El guard los espera y permite. |
+| Artefacto                                     | Inmutable | Nota                                                          |
+| --------------------------------------------- | --------- | ------------------------------------------------------------- |
+| `packages/db/migrations/*.sql`                | Si        | Editar o borrar rompe el guard.                               |
+| `packages/db/migrations/meta/*_snapshot.json` | Si        | Los snapshots son parte del estado.                           |
+| `packages/db/migrations/meta/_journal.json`   | No        | Crece con cada migracion nueva. Es metadata, no contiene SQL. |
+| Archivos nuevos (agregados)                   | N/A       | El guard los espera y permite.                                |
 
 El guard es `scripts/check-migrations.sh`. Falla si detecta un `.sql` o `_snapshot.json` existente que fue modificado o eliminado. Usa `--diff-filter=MD` a proposito: los archivos agregados son esperados y validos, y sin ese flag cualquier PR que agregue una migracion nueva fallaria.
 
