@@ -1892,3 +1892,77 @@ cambios -> Engram -> export al vault -> staging (incluyendo
 quedo fuera del commit y los archivos quedaron huerfanos.
 
 **Severidad:** CERRADA.
+---
+
+## 2026-10-01 - Planning Fase 2 (SDD): webhook suscripciones + checkout dinamico
+
+**Contexto.** Inicializacion del workflow SDD y planning completo de
+Fase 2. SOLO planning: cero lineas de codigo de producto. El plan se
+entrega para revision de luisavilaland antes de cualquier
+implementacion.
+
+**Proceso.** `sdd-init` (modo hybrid) -> `sdd-explore` -> propose ->
+spec -> design -> tasks. El explore se ejecuto con herramientas
+nativas en lugar del subagente `sdd-explore`, que rechazo el preflight
+heredado. Decision: la exploracion es read-only, no necesita la
+autoridad de preflight.
+
+**Artefactos.**
+
+- `openspec/config.yaml` (creado por sdd-init)
+- `docs/superpowers/specs/2026-10-01-fase2-webhook-checkout.md`
+- `docs/superpowers/specs/2026-10-01-fase2-design.md`
+- `docs/superpowers/plans/2026-10-01-fase2.md` (9 tasks, 10 dias)
+
+**Hallazgo principal.** El spec transversal documenta el contrato de
+MercadoPago con **3 errores factuales** contra la documentacion real de
+MP (verificada 2026-10-01):
+
+1. Los nombres de evento `preapproval.created` / `payment.failed` /
+   `preapproval.canceled` **no existen**. Los topics reales son
+   `subscription_preapproval`, `subscription_authorized_payment`,
+   `payment`, `subscription_preapproval_plan`. El payload trae `type` +
+   `action` separados, no un evento compuesto. Quien implemente contra
+   el transversal construye un dispatcher que nunca matchea.
+2. `notification_url` **no esta documentado** en `POST /preapproval`,
+   pero la doc de Suscripciones->Webhooks afirma que para Suscripciones
+   la URL debe configurarse "al crear el pago". MP se contradice.
+3. La `Webhook URL: .../subscriptions/:tenantId` es **imposible**: MP
+   registra una URL literal, sin path templating.
+
+Ademas, MP expone `auto_recurring.billing_day_proportional`, lo que
+contradicte la afirmacion del transversal §5 de que "MP no soporta
+prorrateo nativo". La conclusion del transversal sigue siendo valida
+(la logica la maneja nuestra app), pero la premisa es falsa.
+
+**Hallazgo de seguridad contractual.** `external_reference` **no viene
+en el payload** del webhook. Solo se obtiene consultando
+`GET /preapproval/{id}` o `GET /authorized_payments/{id}`. El handler
+necesita `MP_PLATFORM_ACCESS_TOKEN` y hace una llamada saliente a MP en
+cada webhook para resolver el tenant.
+
+**Correccion de ubicacion.** Los endpoints van en `apps/admin/`, no en
+`apps/storefront/`. `apps/storefront/proxy.ts` resuelve tenant por
+subdominio, lo que rompe un webhook de plataforma (por cuenta, no por
+tenant). `apps/admin` no tiene `proxy.ts` y obtiene `tenantId` del JWT
+de sesion.
+
+**Decision de diseño relevante.** El mapeo local
+`preapproval_id -> tenant_id` que se evaluaba como tabla nueva **ya
+existe en la base**: `subscriptions` tiene `mpPreapprovalId` +
+`tenantId` con una fila por tenant. La migracion de Fase 2 es un unico
+indice unico parcial, justificado por integridad (impide que dos
+tenants compartan un preapproval_id) y no por performance.
+
+**Riesgo abierto.** `GET /authorized_payments/{id}` no tiene verificado
+si expone `external_reference` ni `preapproval_id`. Si no expone
+ninguno, un cobro recurrente no se puede atribuir a un tenant. Por eso
+el plan arranca con T0 (spike) contra la cuenta real de MP, que bloquea
+el handler del webhook (T5) pero no los endpoints (T4).
+
+**Nota sobre estimacion.** El propose estimaba 10-12 dias. Quedo en
+10: `POST /preapproval` y `POST /checkout/subscription/preference`
+resultaron ser la misma operacion y se fusionaron, y no hay migracion
+de columnas.
+
+**Severidad:** planificado. Sin codigo de producto tocado.

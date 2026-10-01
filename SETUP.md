@@ -271,19 +271,32 @@ desarrollo normal funciona sin cambios.
 
 Antes de iniciar, confirmá que el entorno está listo:
 
-| Herramienta       | Comando                            | Esperado                  |
-| ----------------- | ---------------------------------- | ------------------------- |
-| Gentle-AI         | `gentle-ai --version`              | 3.7.0+                    |
-| Engram            | `engram --version`                 | 2.2.0+                    |
-| Engram MCP        | `opencode mcp list \| grep engram` | connected                 |
-| GGA               | `gga --version`                    | v2.10.1+                  |
-| Hook GGA          | `ls .git/hooks/pre-commit`         | existe                    |
-| Obsidian          | Abrir `vault/` como vault          | vault reconocido          |
-| Vault export      | `pnpm vault:export`                | sin errores               |
-| Guard migraciones | `bash scripts/check-migrations.sh` | migraciones inmutables OK |
+| Herramienta       | Comando                                   | Esperado                  |
+| ----------------- | ----------------------------------------- | ------------------------- |
+| Gentle-AI         | `gentle-ai --version`                     | 3.7.0+                    |
+| Engram            | `engram --version`                        | 2.2.0+                    |
+| Engram MCP        | `opencode mcp list \| grep engram`        | connected                 |
+| GGA               | `gga --version`                           | v2.10.1+                  |
+| Hook GGA          | `ls .git/hooks/pre-commit`                | existe                    |
+| Obsidian          | Abrir `vault/` como vault                 | vault reconocido          |
+| Vault export      | `pnpm vault:export`                       | sin errores               |
+| Guard migraciones | `bash scripts/check-migrations.sh`        | migraciones inmutables OK |
+| GitHub CLI        | `& "$env:TEMP\gh\bin\gh.exe" auth status` | sesión activa             |
 
 Si alguna falla, ver la sección correspondiente de este documento
 o de `AGENTS.md`.
+
+> **GitHub CLI en Windows.** `gh` **no está en el PATH**: es una instalación
+> portable en `$env:TEMP\gh\bin\gh.exe`. Además hay un `GITHUB_TOKEN`
+> inválido en el entorno (lo consume el MCP de GitHub, ver ítem 32 de deuda
+> técnica) que eclipsa la credencial del keyring. Para usar `gh`:
+>
+> ```powershell
+> $gh = "$env:TEMP\gh\bin\gh.exe"; Remove-Item Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
+> & $gh pr create --base develop --head <rama> --title "..." --body-file <path>
+> ```
+>
+> El MCP de GitHub falla con `Bad credentials` hasta que se renueve el token.
 
 ### Comandos SDD disponibles
 

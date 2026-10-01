@@ -1,0 +1,156 @@
+context: |
+  SaaS e-commerce monorepo (Turborepo + pnpm) with 3 Next.js apps (storefront, admin, superadmin)
+  and 7 shared packages (@repo/db, @repo/auth, @repo/commerce, @repo/storage, @repo/logger,
+  @repo/validation, @repo/test-utils). Multi-tenant by column (tenantId), RLS on all business tables.
+  Drizzle ORM + PostgreSQL (Neon), NextAuth v5 JWT, MercadoPago webhooks. Strict TypeScript,
+  Zod validation, Tailwind CSS. All artifacts in English.
+
+strict_tdd: true
+
+testing:
+  workspace_command: "pnpm test"
+  coverage_command: "pnpm test --coverage"
+  e2e_command: "pnpm test:e2e"
+  projects:
+    - path: "apps/storefront"
+      stack: "Next.js 16 (App Router, React 19, TypeScript)"
+      test_command: "pnpm test"
+      framework: "vitest"
+      layers:
+        unit: true
+        integration: true
+        e2e: false
+      quality:
+        lint: "pnpm lint"
+        typecheck: "pnpm typecheck"
+        format: "pnpm format:check"
+    - path: "apps/admin"
+      stack: "Next.js 16 (App Router, React 19, TypeScript)"
+      test_command: "pnpm test"
+      framework: "vitest"
+      layers:
+        unit: true
+        integration: true
+        e2e: false
+      quality:
+        lint: "pnpm lint"
+        typecheck: "pnpm typecheck"
+        format: "pnpm format:check"
+    - path: "apps/superadmin"
+      stack: "Next.js 16 (App Router, React 19, TypeScript)"
+      test_command: "pnpm test"
+      framework: "vitest"
+      layers:
+        unit: true
+        integration: true
+        e2e: false
+      quality:
+        lint: "pnpm lint"
+        typecheck: "pnpm typecheck"
+        format: "pnpm format:check"
+    - path: "packages/auth"
+      stack: "TypeScript (ESM, NextAuth v5)"
+      test_command: "pnpm test"
+      framework: "vitest"
+      layers:
+        unit: true
+        integration: false
+        e2e: false
+      quality:
+        lint: "pnpm lint"
+        typecheck: "pnpm typecheck"
+        format: "pnpm format:check"
+    - path: "packages/commerce"
+      stack: "TypeScript (ESM, Drizzle, Redis)"
+      test_command: "pnpm test"
+      framework: "vitest"
+      layers:
+        unit: true
+        integration: true
+        e2e: false
+      quality:
+        lint: "pnpm lint"
+        typecheck: "pnpm typecheck"
+        format: "pnpm format:check"
+    - path: "packages/db"
+      stack: "TypeScript (Drizzle ORM, PostgreSQL)"
+      test_command: "pnpm test"
+      framework: "vitest"
+      layers:
+        unit: true
+        integration: true
+        e2e: false
+      quality:
+        lint: "pnpm lint"
+        typecheck: "pnpm typecheck"
+        format: "pnpm format:check"
+    - path: "packages/logger"
+      stack: "TypeScript (ESM, pino)"
+      test_command: "pnpm test"
+      framework: "vitest"
+      layers:
+        unit: true
+        integration: false
+        e2e: false
+      quality:
+        lint: "pnpm lint"
+        typecheck: "pnpm typecheck"
+        format: "pnpm format:check"
+    - path: "packages/storage"
+      stack: "TypeScript (MinIO/R2 client)"
+      test_command: "pnpm test"
+      framework: "vitest"
+      layers:
+        unit: true
+        integration: false
+        e2e: false
+      quality:
+        lint: "pnpm lint"
+        typecheck: "pnpm typecheck"
+        format: "pnpm format:check"
+    - path: "packages/test-utils"
+      stack: "TypeScript (ESM, vitest utilities)"
+      test_command: "pnpm test"
+      framework: "vitest"
+      layers:
+        unit: true
+        integration: false
+        e2e: false
+      quality:
+        lint: "pnpm lint"
+        typecheck: "pnpm typecheck"
+        format: "pnpm format:check"
+    - path: "packages/validation"
+      stack: "TypeScript (ESM, Zod v4)"
+      test_command: "pnpm test"
+      framework: "vitest"
+      layers:
+        unit: true
+        integration: false
+        e2e: false
+      quality:
+        lint: "pnpm lint"
+        typecheck: "pnpm typecheck"
+        format: "pnpm format:check"
+
+phases:
+  proposal:
+    required: true
+    template: ".github/sdd-templates/proposal.md"
+  spec:
+    required: true
+    template: ".github/sdd-templates/spec.md"
+  design:
+    required: true
+    template: ".github/sdd-templates/design.md"
+  tasks:
+    required: true
+    template: ".github/sdd-templates/tasks.md"
+  apply:
+    required: true
+    subagents: true
+  verify:
+    required: true
+    diagnostics: true
+  archive:
+    required: true
