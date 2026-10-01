@@ -9,3 +9,4 @@ tags:
 
 ## Observations
 - [[session-summary-landaetastudio-saas-75]]
+- [[dependabot-pr-merge-order-completed-76]]
