@@ -18,3 +18,4 @@ tags:
 - [[session-summary-landaetastudio-saas-84]]
 - [[pr-163-mergeado-planning-fase-2-en-develop-9af860e-85]]
 - [[post-merge-pr-163-11-issues-transversal-corregido-deuda-35-3-86]]
+- [[issue-173-cerrado-t0-desbloqueado-para-sdd-apply-87]]
