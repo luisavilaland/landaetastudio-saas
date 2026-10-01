@@ -15,3 +15,4 @@ tags:
 - [[design-fase-2-7-decisiones-tecnicas-mapeo-local-reusando-sub-81]]
 - [[plan-fase-2-9-tasks-10-dias-spike-bloqueante-82]]
 - [[gh-cli-esta-en-env-temp-gh-bin-no-en-path-windows-83]]
+- [[session-summary-landaetastudio-saas-84]]
