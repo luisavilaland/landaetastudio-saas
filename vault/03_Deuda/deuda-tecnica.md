@@ -730,7 +730,7 @@ va a perder tiempo diagnosticando un fallo que no es del repo.
 
 1. **Nombres de evento que no existen (ALTA).** El transversal §1, §6 y §8 usa `preapproval.created`, `payment.created`, `payment.failed`, `payment.rejected`, `preapproval.canceled`, `preapproval.updated`. Ninguno es un topic de MercadoPago. Los topics reales son `subscription_preapproval`, `subscription_authorized_payment`, `payment`, `subscription_preapproval_plan`. Ademas el payload trae `type` + `action` **separados**, no un evento compuesto. Y `subscription_authorized_payment` se resuelve con `GET /authorized_payments/{id}`, **no** con `GET /v1/payments/{id}`: son recursos distintos.
 
-2. **`notification_url` (ALTA).** MP se contradice: la doc de *Subscriptions → Webhooks* dice que para Suscripciones la URL debe configurarse "al crear el pago", pero los body params de `POST /preapproval` **no documentan ese campo** (aparece en Preferences API e IPN). Si el campo existe y no se manda, ninguna suscripcion se activa nunca.
+2. **`notification_url` (ALTA).** MP se contradice: la doc de _Subscriptions → Webhooks_ dice que para Suscripciones la URL debe configurarse "al crear el pago", pero los body params de `POST /preapproval` **no documentan ese campo** (aparece en Preferences API e IPN). Si el campo existe y no se manda, ninguna suscripcion se activa nunca.
 
 3. **URL con `:tenantId` (ALTA).** El transversal §8 define `/api/webhooks/mercadopago/subscriptions/:tenantId` y `/api/webhooks/mercadopago/:tenantId`. **Imposible:** MP registra una URL literal por aplicacion y por modo. No hace path templating. El `tenantId` viaja en el `external_reference`.
 
@@ -757,9 +757,14 @@ va a perder tiempo diagnosticando un fallo que no es del repo.
 **Contexto:** el webhook de MercadoPago envia este body:
 
 ```json
-{ "id": 12345, "live_mode": true, "type": "payment",
-  "api_version": "v1", "action": "payment.created",
-  "data": { "id": "999999999" } }
+{
+  "id": 12345,
+  "live_mode": true,
+  "type": "payment",
+  "api_version": "v1",
+  "action": "payment.created",
+  "data": { "id": "999999999" }
+}
 ```
 
 **No trae `external_reference`.** Ese campo pertenece al objeto preapproval y solo se obtiene consultando `GET /preapproval/{id}` o `GET /authorized_payments/{id}`.
@@ -786,11 +791,11 @@ El mapeo local ya existia en `subscriptions` (`mpPreapprovalId` + `tenantId`, un
 
 **Mitigacion:** spike T0 (issue #164) lo determina empiricamente. Tres resultados posibles:
 
-| Resultado | Accion | Costo |
-|---|---|---|
-| trae `external_reference` | Estrategia R directa | 0 |
-| trae `preapproval_id` | Estrategia R encadenada con Estrategia L | 0 |
-| **no trae ninguno** | Tabla `subscription_payments` (`tenantId`, `mpInvoiceId` UNIQUE, `status`, `processedAt`) | **+1 dia, +1 migracion** |
+| Resultado                 | Accion                                                                                    | Costo                    |
+| ------------------------- | ----------------------------------------------------------------------------------------- | ------------------------ |
+| trae `external_reference` | Estrategia R directa                                                                      | 0                        |
+| trae `preapproval_id`     | Estrategia R encadenada con Estrategia L                                                  | 0                        |
+| **no trae ninguno**       | Tabla `subscription_payments` (`tenantId`, `mpInvoiceId` UNIQUE, `status`, `processedAt`) | **+1 dia, +1 migracion** |
 
 El ultimo escenario esta definido y estimado. No se construye la tabla preventivamente: MP necesita vincular la factura a la suscripcion para cobrarla, asi que el vinculo existe en algun campo.
 
