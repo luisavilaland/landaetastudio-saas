@@ -500,6 +500,20 @@ Si terminaste una tarea con decisiones no triviales y NO grabaste memoria, la ta
 - Se cargan bajo demanda por trigger (description del frontmatter).
 - Refrescar el registro con `gentle-ai skill-registry refresh` al agregar o cambiar una skill.
 
+### GitHub CLI (`gh`) — no está en el PATH
+
+En Windows el binario `gh` **no está en el PATH**. Es una instalación portable. Invocarlo siempre con path absoluto:
+
+```powershell
+$gh = "$env:TEMP\gh\bin\gh.exe"
+Remove-Item Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
+& $gh pr create --base develop --head <rama> --title "..." --body-file <path>
+```
+
+- **`Remove-Item Env:GITHUB_TOKEN` es obligatorio.** El entorno define `GITHUB_TOKEN` (lo consume `~/.config/opencode/gh-mcp-wrapper.cmd` para el MCP de GitHub). Ese token está inválido (ver ítem 32 de deuda técnica). Si se deja en el entorno, `gh` lo prioriza sobre su credencial del keyring y falla aunque `gh auth status` muestre la sesión activa. Al removerlo, `gh` usa el keyring y funciona.
+- El MCP de GitHub (`github_*`) falla con `Bad credentials` mientras el token no se renueve. Para PRs usar `gh`, no el MCP.
+- Sesión: cuenta `EdgarVz`, scopes `read:org`, `repo`, `workflow`, credencial en el keyring de Windows.
+
 ### Vault de Obsidian
 
 - Contiene bitácora, ADRs, deuda, specs y fases.
