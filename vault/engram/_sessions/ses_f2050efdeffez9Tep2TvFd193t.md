@@ -23,3 +23,4 @@ tags:
 - [[preferencia-mcp-github-tiene-credenciales-invalidas-usar-gh-71]]
 - [[session-summary-landaetastudio-saas-72]]
 - [[setext-heading-pegado-al-texto-sin-linea-en-blanco-renderiza-73]]
+- [[pr-150-mergeado-a-develop-squash-b924a7b-limpieza-de-branch-74]]
