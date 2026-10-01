@@ -719,3 +719,106 @@ va a perder tiempo diagnosticando un fallo que no es del repo.
 **Severidad:** INFO.
 
 **Urgencia:** INFO.
+
+## 35. Errores factuales en el spec transversal de suscripciones
+
+**Estado:** abierto (2026-10-01).
+
+**Contexto:** `docs/superpowers/specs/2026-09-subscription-lifecycle.md` documenta el contrato de MercadoPago con **3 errores factuales**, **1 premisa falsa** y **1 estado no modelado**. Detectados al verificar el spec contra la documentacion real de MP durante el planning de Fase 2 (PR #163).
+
+**Los 5 hallazgos:**
+
+1. **Nombres de evento que no existen (ALTA).** El transversal §1, §6 y §8 usa `preapproval.created`, `payment.created`, `payment.failed`, `payment.rejected`, `preapproval.canceled`, `preapproval.updated`. Ninguno es un topic de MercadoPago. Los topics reales son `subscription_preapproval`, `subscription_authorized_payment`, `payment`, `subscription_preapproval_plan`. Ademas el payload trae `type` + `action` **separados**, no un evento compuesto. Y `subscription_authorized_payment` se resuelve con `GET /authorized_payments/{id}`, **no** con `GET /v1/payments/{id}`: son recursos distintos.
+
+2. **`notification_url` (ALTA).** MP se contradice: la doc de _Subscriptions → Webhooks_ dice que para Suscripciones la URL debe configurarse "al crear el pago", pero los body params de `POST /preapproval` **no documentan ese campo** (aparece en Preferences API e IPN). Si el campo existe y no se manda, ninguna suscripcion se activa nunca.
+
+3. **URL con `:tenantId` (ALTA).** El transversal §8 define `/api/webhooks/mercadopago/subscriptions/:tenantId` y `/api/webhooks/mercadopago/:tenantId`. **Imposible:** MP registra una URL literal por aplicacion y por modo. No hace path templating. El `tenantId` viaja en el `external_reference`.
+
+4. **Premisa de prorrateo nativo falsa (MEDIA).** El transversal §5 decia "MP Preapproval no soporta prorrateo nativo". **Falso:** MP expone `auto_recurring.billing_day_proportional` y doc dedicada. La conclusion del transversal sigue siendo valida (la formula de credito/diferencia entre planes la maneja nuestra app), pero la premisa que la justificaba era incorrecta.
+
+5. **Estado `paused` no modelado (MEDIA).** MP tiene un estado `paused` para preapprovals que el transversal no contempla. Si el tenant pausa desde el panel de MP, la DB no lo refleja.
+
+**Impacto:** cualquiera que implemente contra el transversal construye un dispatcher que nunca matchea. Ese es el hallazgo mas grave.
+
+**Mitigacion:** PR `chore/fix-transversal-fase2` (issue #174). Las 5 correcciones aplicadas, con notas que citan la evidencia y remiten al spike T0 (#164) para los literales exactos de `type`/`action`.
+
+**Ademas:** el design de Fase 2 ya immuniza el codigo contra los 5 hallazgos — despacha por `topic` (no por `action`), usa URL fija sin path param, bloquea `notification_url` para el spike, y trata `paused` como no-op con log `warn`.
+
+**Severidad:** ALTA.
+
+**Urgencia:** ALTA.
+
+---
+
+## 36. `external_reference` no viene en el payload del webhook de MP
+
+**Estado:** abierto (2026-10-01).
+
+**Contexto:** el webhook de MercadoPago envia este body:
+
+```json
+{
+  "id": 12345,
+  "live_mode": true,
+  "type": "payment",
+  "api_version": "v1",
+  "action": "payment.created",
+  "data": { "id": "999999999" }
+}
+```
+
+**No trae `external_reference`.** Ese campo pertenece al objeto preapproval y solo se obtiene consultando `GET /preapproval/{id}` o `GET /authorized_payments/{id}`.
+
+**Impacto:** el handler de suscripciones necesita `MP_PLATFORM_ACCESS_TOKEN` y hace una llamada **saliente a MP en cada webhook** para resolver el tenant. Eso agrega latencia (200-400 ms) y un modo de falla nuevo: si MP esta caido, el evento no se puede enrutar. Dependencia de red en la ruta critica de activacion.
+
+Mitigacion de Fase 2: estrategia de resolucion en dos pasos. **Estrategia L** (local, sin red): `SELECT tenantId FROM subscriptions WHERE mpPreapprovalId = $1`. **Estrategia R** (remota): consulta a MP, lee `external_reference` o `preapproval_id`. Si ninguna resuelve, responde `200` + log `warn` (nunca `5xx`, para no generar reintentos infinitos de MP).
+
+El mapeo local ya existia en `subscriptions` (`mpPreapprovalId` + `tenantId`, una fila por tenant), asi que la unica migracion de Fase 2 es un indice unico parcial. Sin tabla nueva.
+
+**Severidad:** ALTA.
+
+**Urgencia:** MEDIA.
+
+---
+
+## 37. `GET /authorized_payments/{id}` sin documentacion verificable
+
+**Estado:** abierto (2026-10-01).
+
+**Contexto:** para resolver un cobro recurrente (`subscription_authorized_payment`), MP documenta `GET /authorized_payments/{id}` ("Get invoice data"). **No esta verificado si ese recurso expone `external_reference` ni `preapproval_id`.**
+
+**Impacto:** si no expone ninguno de los dos, **no hay forma de saber a que tenant pertenece un cobro recurrente**, y el webhook no se puede enrutar. Es el riesgo #1 de Fase 2.
+
+**Mitigacion:** spike T0 (issue #164) lo determina empiricamente. Tres resultados posibles:
+
+| Resultado                 | Accion                                                                                    | Costo                    |
+| ------------------------- | ----------------------------------------------------------------------------------------- | ------------------------ |
+| trae `external_reference` | Estrategia R directa                                                                      | 0                        |
+| trae `preapproval_id`     | Estrategia R encadenada con Estrategia L                                                  | 0                        |
+| **no trae ninguno**       | Tabla `subscription_payments` (`tenantId`, `mpInvoiceId` UNIQUE, `status`, `processedAt`) | **+1 dia, +1 migracion** |
+
+El ultimo escenario esta definido y estimado. No se construye la tabla preventivamente: MP necesita vincular la factura a la suscripcion para cobrarla, asi que el vinculo existe en algun campo.
+
+**Severidad:** ALTA.
+
+**Urgencia:** ALTA (bloqueante para `sdd-apply`).
+
+---
+
+## 38. Estado `paused` de MercadoPago no modelado
+
+**Estado:** abierto (2026-10-01).
+
+**Contexto:** MP tiene un estado `paused` para preapprovals (pausar una suscripcion sin cancelarla). El spec transversal no lo contempla.
+
+**Impacto:** si el tenant pausa desde el panel de MP, la DB no lo refleja. El estado sigue en `active` y el tenant conserva acceso completo, cuando la intencion de MP es suspenderse. Divergencia silenciosa entre MP y nuestra DB.
+
+**Decision (Luis, planning Fase 2):** documentar como **no soportado** en Fase 2. El webhook registra `warn` y **no transiciona** cuando recibe `paused`. No se inventa un estado nuevo ni se mapea a `past_due` (que tiene semantica de dunning, que es otra cosa).
+
+**Se agrega al transversal cuando Fase 3 defina la semantica de pausa:** ¿es `past_due`? ¿un estado nuevo? ¿bloquea el panel admin? ¿el storefront sigue accesible? Requiere decision de producto.
+
+**Nota:** `put /preapproval/{id} {status: "paused"}` es la via por API. Si Fase 3 expone pausar, debe decidir si pasa por la API nuestra o se deja solo el panel de MP.
+
+**Severidad:** MEDIA.
+
+**Urgencia:** BAJA.
