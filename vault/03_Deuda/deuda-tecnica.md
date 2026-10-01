@@ -822,3 +822,51 @@ El ultimo escenario esta definido y estimado. No se construye la tabla preventiv
 **Severidad:** MEDIA.
 
 **Urgencia:** BAJA.
+
+---
+
+## 39. BOM UTF-8 al inicio del spec transversal
+
+**Estado:** abierto (2026-10-01).
+
+**Contexto:** `docs/superpowers/specs/2026-09-subscription-lifecycle.md`
+empieza con un BOM UTF-8 (`EF BB BF`) antes del primer caracter.
+
+**Verificado:** los primeros 3 bytes del archivo son `EF BB BF`.
+
+**Impacto:** el BOM rompe herramientas que no lo toleran. Concretamente:
+
+- `grep -c '^#'` devuelve 0 en vez de 1 (el BOM se cuela en la primera linea)
+- Scripts que comparan la primera linea contra `# ...` fallan sin motivo apparent
+- Editores o linters viejos pueden mostrar un caracter fantasma al inicio
+- `head -c 3 file | xxd` no devuelve el Markdown esperado
+
+No rompio nada hoy: `prettier --check` lo acepta y el build de CI pasa. Es
+ruido latente, no un fallo activo.
+
+**Mitigacion:** quitar el BOM cuando se haga un PR de limpieza del transversal.
+No es urgente y **no conviene hacerlo en un PR que mezcle limpieza con otros
+cambios** (dificulta el review del diff).
+
+```bash
+sed -i '1s/^\xEF\xBB\xBF//' docs/superpowers/specs/2026-09-subscription-lifecycle.md
+```
+
+En Windows (PowerShell):
+
+```powershell
+$p = "docs/superpowers/specs/2026-09-subscription-lifecycle.md"
+$c = [System.IO.File]::ReadAllText($p)
+$c = $c.TrimStart([char]0xFEFF)
+[System.IO.File]::WriteAllText($p, $c, (New-Object System.Text.UTF8Encoding $false))
+```
+
+**Nota:** el item 5 del archivo usa `###` como prefijo en lugar de `##` como
+el resto. Mismo tipo de inconsistencia menor. No se corrigio aqui para evitar
+mezclar cambios.
+
+**Origen:** detectado por luisavilaland en el review del PR #175.
+
+**Severidad:** INFO.
+
+**Urgencia:** INFO.
