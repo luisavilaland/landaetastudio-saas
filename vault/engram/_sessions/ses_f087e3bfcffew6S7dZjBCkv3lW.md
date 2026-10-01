@@ -16,3 +16,5 @@ tags:
 - [[plan-fase-2-9-tasks-10-dias-spike-bloqueante-82]]
 - [[gh-cli-esta-en-env-temp-gh-bin-no-en-path-windows-83]]
 - [[session-summary-landaetastudio-saas-84]]
+- [[pr-163-mergeado-planning-fase-2-en-develop-9af860e-85]]
+- [[post-merge-pr-163-11-issues-transversal-corregido-deuda-35-3-86]]
