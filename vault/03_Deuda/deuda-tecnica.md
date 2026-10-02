@@ -1066,6 +1066,106 @@ aplica las migraciones.
 - **Opcion C:** ambas. Dotenv en el config mas la nota en `SETUP.md`,
   porque el error sigue siendo posible si alguien borra `.env.local`.
 
+---
+
+## 43. `drizzle-kit` no imprime errores en modo no-interactivo
+
+**Estado:** abierto (2026-10-02).
+
+**Versiones:** `drizzle-kit@0.31.10`, que embebe `hanji@0.0.8`.
+
+### Mecanismo
+
+`drizzle-kit migrate` delega la ejecucion en `hanji.renderWithTask()`:
+
+```js
+function renderWithTask(view, task) {
+  const terminal = new TaskTerminal(view, process.stdout);
+  terminal.requestLayout();
+  try {
+    const result = yield task;
+    terminal.clear();
+    return result;
+  } catch (err) {
+    terminal.reject(err);
+    process.exit(1);        // <- sincrono, gana la carrera
+  }
+}
+```
+
+`process.exit()` es sincrono: mata el proceso antes de que el terminal
+renderice la excepcion.
+
+Peor aun, la vista **no tiene rama para el error**:
+
+```js
+render(status) {
+  if (status === "pending" || status === "rejected") {
+    return `[${spin}] applying migrations...`;
+  }
+  return `[✓] migrations applied successfully!`;
+}
+```
+
+El estado `rejected` dibuja **el mismo spinner** que `pending`. El texto
+del error no se imprime por ningun camino.
+
+### Consecuencias
+
+- **Cualquier fallo de migracion en CI es indetectable.** Solo se ve
+  `exit code 1` sin mensaje. Ese es el motivo de que el item 41 fuera
+  indiagnosticable.
+- `stderr` queda **vacio**: todo sale por stdout, y a stdout no llega.
+- No existe flag `--verbose` en `migrate` en esta version:
+  `Unrecognized options for command 'migrate': --verbose`.
+- **`CI: true` NO sirve.** `process.env.CI` aparece **0 veces** en
+  `drizzle-kit/bin.cjs`. Se probo en el job `seed` y el output quedo
+  identico. Se revirtio.
+- Un shim que difiera `process.exit` **tampoco sirve**: como la vista no
+  renderiza el error, no hay nada que esperar.
+
+### Reproduccion local (sin CI)
+
+```powershell
+$env:DATABASE_URL = "postgresql://u:p@host.invalid.tld:5432/db"
+cd packages/db
+pnpm exec drizzle-kit migrate 2>&1
+# -> spinner + exit 1 + CERO mensaje. Identico a CI.
+```
+
+Esto permite iterar el diagnostico sin gastar un ciclo de CI de ~20 min.
+
+### Mitigaciones
+
+1. **Step de diagnostico previo en CI** que imprima el estado del entorno
+   (si `DATABASE_URL` esta seteada y su host). Implementado en `e2e.yml`.
+   Es lo que permite diagnosticar hoy.
+2. **Wrapper propio** que llame a la migracion sin pasar por
+   `renderWithTask`, para que la excepcion se propague y Node la
+   imprima. Requiere alcanzar internos de drizzle-kit, que no son
+   parte del API publico (`api.d.ts` solo exporta `generate*`, `push*` y
+   `studio*`).
+3. **Upgrade de `drizzle-kit`** cuando corrijan el bug. La ultima version
+   al 2026-10-02 es `0.31.11`, pero **hanji sigue en `0.0.8`**: el bug
+   vive en hanji, asi que actualizar drizzle podria no bastar. Probar el
+   upgrade es barato, pero no esta garantizado.
+
+**Nota sobre el estado de hanji:** es una libreria muy chica
+(versiones `0.0.3` a `0.0.8`) y tightly coupled al flujo de
+renderizado de drizzle. El riesgo de que el fix upstream llegue rapido
+es bajo.
+
+**Origen:** descubierto durante el diagnostico del item 41.
+
+**Severidad:** ALTA.
+
+**Urgencia:** MEDIA-ALTA. No bloquea el desarrollo local (ahi el error
+si se ve porque hay TTY), pero hace **indiagnosticable cualquier fallo
+de migraciones en CI**, que es donde las migraciones se ejecutan de
+verdad.
+
+**Referencias:** `drizzle-kit@0.31.10`, `hanji@0.0.8`, item 41.
+
 **Nota:** `ci.yml` crea un `.env.local` propio con URLs dummy, asi que el
 job `build` no esta afectado. El job `seed` de `e2e.yml` exporta
 `DATABASE_URL` como env var del step, tampoco afectado. El problema es

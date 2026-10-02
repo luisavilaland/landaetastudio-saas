@@ -34,3 +34,5 @@ tags:
 - [[pr-178-mergeado-e97b0c8-deuda-item-41-seed-rojo-en-ci-100]]
 - [[diagnostico-item-41-local-ok-baseline-no-idempotente-trackin-101]]
 - [[items-40-y-42-de-deuda-registrados-ci-true-en-e2e-yml-para-r-102]]
+- [[ci-true-no-funciono-causa-raiz-en-hanji-0-0-8-traga-el-error-103]]
+- [[revertido-ci-true-step-de-diagnostico-seguro-sin-fuga-de-cre-104]]
