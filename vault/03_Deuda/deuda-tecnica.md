@@ -873,6 +873,77 @@ mezclar cambios.
 
 ---
 
+## 40. Reglas de escritura de `.md` en Windows/PowerShell
+
+**Estado:** abierto (2026-10-02). Registra una serie de errores
+recurrentes al editar `.md` desde PowerShell.
+
+**1. `format:check` no se corre despues de editar.**
+
+`pnpm format:check` corre en el job `build` de CI. Editar un `.md` sin
+correrlo produce un PR rojo por formato, aunque el contenido este bien.
+
+**2. `Add-Content` con here-strings rompe el encoding.**
+
+`Add-Content` / `Set-Content` con `-Encoding UTF8` en PowerShell 5.1
+introducen caracteres corruptos en texto con acentos o no-ASCII. En
+este repo se detectaron dos variantes:
+
+- **U+FFFD** (caracter de reemplazo Unicode) donde deberia ir un acento.
+- Caracteres CJK colados en comentarios, que swept como basura invisible.
+
+## Reglas
+
+1. Despues de **CUALQUIER** escritura sobre un `.md` fuera de
+   `.prettierignore`, correr `pnpm format:check`. No al final del
+   trabajo: despues de cada escritura.
+
+2. Para texto con acentos o no-ASCII, usar la herramienta `write`, **no**
+   `Add-Content` con here-strings. `Add-Content` solo para texto plano
+   ASCII.
+
+3. Despues de escribir con `Add-Content`, escanear en busca de CJK y de
+   U+FFFD. Si hay matches: **PARAR y corregir antes de commitear.**
+
+   ```powershell
+   $l = Get-Content <archivo> -Encoding UTF8
+   for ($i=0; $i -lt $l.Count; $i++) {
+     if ($l[$i] -match '[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]') { "CJK L$($i+1)" }
+     if ($l[$i] -match "\uFFFD")                              { "MOJIBAKE L$($i+1)" }
+   }
+   ```
+
+4. En archivos acumulativos (`bitacora.md`, `deuda-tecnica.md`), verificar
+   que el diff sea **solo adiciones** antes de commitear:
+
+   ```powershell
+   git diff -- <archivo> | Select-String "^-" | Where-Object { $_ -notmatch "^---" }
+   ```
+
+   Debe dar 0 lineas. Si aparecen borrados, se perdio contenido previo.
+
+5. `prettier --write` **debe preservar** el append limpio. Verificado en
+   el item 41: 62 lineas puramente aditivas incluso despues de formatear.
+
+**Nota sobre falsos positivos en los escaneos:**
+
+- El mojibake en consola puede ser artefacto de render de PowerShell 5.1,
+  no del archivo. Confirmar leyendo los char codes antes de "corregir".
+- Algunos U+FFFD son **intencionales**: cited como ejemplo dentro de otro
+  item. Revisar el contexto antes de tocar.
+- Los emojis y em-dashesrenders como mojibake en consola pero son
+  validos en el archivo.
+
+**Origen:** errores repetidos durante los PR #175, #176, #179 y el
+design de Fase 2.
+
+**Severidad:** MEDIA.
+
+**Urgencia:** MEDIA. Es una trampa de proceso, no un defecto de producto,
+pero costo varios ciclos de correccion.
+
+---
+
 ## 41. `seed` rojo en CI: `drizzle-kit migrate` falla sin mensaje
 
 **Estado:** abierto (2026-10-02).
@@ -932,3 +1003,78 @@ BYPASSRLS), que es el de la app runtime.
 
 **Urgencia:** MEDIA. No bloquea el desarrollo, pero **degrada la red de
 seguridad de migraciones** y vuelve lento cada PR.
+
+---
+
+## 42. `drizzle.config.ts` no carga dotenv
+
+**Estado:** abierto (2026-10-02).
+
+**Contexto:** `packages/db/drizzle.config.ts` lee
+`process.env.DATABASE_URL!` **sin cargar dotenv**. No hay ningun
+`import 'dotenv/config'` ni equivalente. El repo tiene `.env.local`
+(no `.env`).
+
+`SETUP.md` (L18-25) indica el setup en este orden:
+
+```bash
+# 3. Generar migraciones
+pnpm db:generate
+# 4. Aplicar migraciones
+pnpm db:migrate
+```
+
+**Sin mencionar que hay que exportar `DATABASE_URL` en el shell.**
+
+## Consecuencia
+
+Un dev nuevo que siga `SETUP.md` al pie de la letra corre `pnpm
+db:migrate` sin la variable en el entorno y recibe:
+
+```
+Error  Please provide required params for Postgres driver:
+    [x] url: undefined
+```
+
+El mensaje no dice **falta la variable** ni menciona `.env.local`. Parece
+un problema de drizzle cuando en realidad es de onboarding.
+
+Es el impacto que anticipo el item 14 ("nuevos devs que siguen
+SETUP.md"), que sigue sin cerrarse.
+
+## Reproducido
+
+```
+> cd packages/db && drizzle-kit migrate
+Error  Please provide required params for Postgres driver:
+    [x] url: undefined
+ ELIFECYCLE  Command failed with exit code 1.
+```
+
+Con `DATABASE_URL` exportada manualmente, el mismo comando corre bien y
+aplica las migraciones.
+
+## Mitigacion
+
+- **Opcion A:** cargar dotenv en `drizzle.config.ts` (por ejemplo
+  `import 'dotenv/config'` o `dotenv.config({ path: '.env.local' })`).
+  Efecto colateral a evaluar: `drizzle.config.ts` se lee desde
+  `packages/db`, asi que la ruta relativa de `.env.local` debe.resolve
+  desde la raiz del repo.
+- **Opcion B:** documentar el export en `SETUP.md` antes del paso 4.
+  Menos invasivo, pero mantiene el pie de trampa.
+- **Opcion C:** ambas. Dotenv en el config mas la nota en `SETUP.md`,
+  porque el error sigue siendo posible si alguien borra `.env.local`.
+
+**Nota:** `ci.yml` crea un `.env.local` propio con URLs dummy, asi que el
+job `build` no esta afectado. El job `seed` de `e2e.yml` exporta
+`DATABASE_URL` como env var del step, tampoco afectado. El problema es
+exclusivamente de desarrollo local.
+
+**Origen:** descubierto durante el diagnostico del item 41.
+
+**Severidad:** MEDIA.
+
+**Urgencia:** MEDIA.
+
+**Reevaluar:** junto con el item 41 (mismo pipeline de migraciones).

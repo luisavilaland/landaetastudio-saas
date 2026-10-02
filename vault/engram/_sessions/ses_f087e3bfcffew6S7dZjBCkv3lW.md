@@ -32,3 +32,5 @@ tags:
 - [[p6-confirmado-put-preapproval-inerte-paused-tambien-last-mod-98]]
 - [[mp-platform-access-token-es-el-token-del-seller-p6-no-es-sco-99]]
 - [[pr-178-mergeado-e97b0c8-deuda-item-41-seed-rojo-en-ci-100]]
+- [[diagnostico-item-41-local-ok-baseline-no-idempotente-trackin-101]]
+- [[items-40-y-42-de-deuda-registrados-ci-true-en-e2e-yml-para-r-102]]
