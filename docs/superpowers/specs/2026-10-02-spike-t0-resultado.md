@@ -2,31 +2,107 @@
 
 **Fecha:** 2026-10-02
 **Issue:** #164 (T0)
-**Estado:** COMPLETO - conclusion negativa para webhooks, positiva para polling
+**Estado:** REFRAMED - P1 sigue PENDIENTE. P2/P3/P5/P6 confirmadas.
 **Entorno:** credenciales de prueba (Tests). Sin produccion.
 
 ---
 
-## Resumen ejecutivo
+## Preguntas resueltas
 
-El spike respondio la pregunta de fondo con una conclusion firme y accionable:
+| P   | Pregunta                                            | Resultado                                            |
+| --- | --------------------------------------------------- | ---------------------------------------------------- |
+| P1  | ¿MP entrega webhooks de suscripciones?              | **PENDIENTE** - no en preview domain. Ver hipoteesis |
+| P2  | ¿`notification_url` en POST `/preapproval`?         | **NO** - 201 sin error, GET vacio                    |
+| P3  | ¿`/authorized_payments` expone el vinculo tenant?   | **SI** - `preapproval_id` + `external_reference`     |
+| P4  | ¿Webhook de alta en BD distinta?                    | n/a - no alcanzado                                   |
+| P5  | ¿`PUT /preapproval/{id}` guarda `notification_url`? | **NO** - 200 sin error, GET vacio                    |
+| P6  | ¿Se puede mutar el preapproval tras el cobro?       | **NO** - todos los PUT son no-op post-cobro          |
 
-> **MercadoPago no entrega webhooks de suscripciones por ninguna via disponible para nosotros.**
-> Un `2xx` de MercadoPago **no es evidencia** de que una operacion se haya aplicado.
+---
 
-Cinco preguntas investigadas, con evidencia observada en dos preapprovals pagados de verdad:
+## Hipotesis principal (NO verificada)
 
-| #   | Pregunta                                            | Veredicto    | Evidencia                            |
-| --- | --------------------------------------------------- | ------------ | ------------------------------------ |
-| P1  | ¿MP entrega webhooks de suscripciones?              | **NEGATIVO** | 2 pagos reales, 0 entregas           |
-| P2  | ¿`notification_url` en POST `/preapproval`?         | **NEGATIVO** | HTTP 201, campo descartado           |
-| P3  | ¿`/authorized_payments` trae `external_reference`?  | **POSITIVO** | Confirmado en 2 pagos                |
-| P4  | ¿Webhook de alta en BD distinta (mas adelante)?     | n/a          | No alcanzado - ver P1                |
-| P5  | ¿`PUT /preapproval/{id}` guarda `notification_url`? | **NEGATIVO** | HTTP 200 + version, campo descartado |
-| P6  | ¿`/preapproval/{id}` permite modificar estado?      | **NEGATIVO** | Solo lectura tras el primer cobro    |
+> **MP no entrega webhooks a dominios preview de Vercel. Requiere un endpoint en el dominio
+> de produccion (`admin.landaetastudio.com`).**
 
-**Impacto:** el handler de webhooks de suscuciones (T5) no es implementable. Fase 2 debe
-redesignarse sobre **polling**, que ya esta especificado en el transversal y no depende de webhooks.
+### Indicios a favor
+
+- El wizard "Configura tu integracion" figura completado, pero el panel sigue en
+  **"ETAPA 1 DE 5"**. MP espera una validacion end-to-end que no ocurre.
+- La URL configurada apuntaba a un preview domain (`saas-admin-git-chore-spike-...vercel.app`).
+- El Flujo B funciona en `tienda1.landaetastudio.com` (dominio real).
+
+### Evidencia de que los webhooks de MP si llegan a produccion
+
+`apps/storefront/app/api/webhooks/mercadopago/route.ts:234` es el **unico** punto donde una orden
+del storefront pasa a `confirmed`. No existe ruta sincronica de confirmacion: `back_urls` solo
+redirigen al navegador. Por lo tanto, que el Flujo B funcione en `tienda1.landaetastudio.com`
+**implica** que MP entrega webhooks a ese dominio.
+
+O sea: la infraestructura de webhooks de MP funciona. Lo no probado es el scope de
+**suscripciones** en un dominio de **produccion del admin**.
+
+---
+
+## Hipotesis alternativa (NO descartada)
+
+> **No hay ningun topic de suscripcion suscrito en el panel de MP.**
+
+El propio "ETAPA 1 DE 5" es evidencia a favor de esta. Si ningun topic esta activo, MP no tiene
+que enviar nada, **independientemente del dominio**. Este spike nunca verifico que la suscripcion
+a topics estuviera activa.
+
+**Esta hipotesis es mas barata de descartar que la principal** y debe comprobarse ANTES de
+implementar T5: es una mirada al panel, no 2.5 dias de codigo.
+
+### Tabla de hipotesis
+
+| #   | Hipotesis                                           | Como se descarta                                | Costo         |
+| --- | --------------------------------------------------- | ----------------------------------------------- | ------------- |
+| H1  | MP no entrega a preview domains                     | Apuntar el webhook a `admin.landaetastudio.com` | Deploy + pago |
+| H2  | No hay topic de suscripcion suscrito                | Verificar la seleccion de topics en el panel    | 5 minutos     |
+| H3  | MP no entrega webhooks de suscripciones en absoluto | H1 descartada + H2 descartada                   | -             |
+
+**El spike anterior concluyo H3 sin haber descartado H1 ni H2.** Esa fue la weakness del
+analisis: se asumio que el topic estaba suscrito, y esa asuncion nunca se verifico.
+
+---
+
+## Decision
+
+Avanzar con T1-T8. T5 se implementa y se deploya a produccion para validar P1.
+
+- Si funciona -> **T9 (polling) queda como fallback documentado**, no se implementa.
+- Si no funciona -> **T9 pasa a ser obligatorio**.
+
+### Correccion al modelo de costo
+
+La hypothesis original era "T5 debe existir antes de validar P1". **Es mas caro de lo necesario.**
+El stub de captura (`apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts`) ya existe y
+ya esta escrito. Para descartar H1 **no hace falta el handler completo**: alcanza con deployar
+el stub a `admin.landaetastudio.com`, apuntar el panel de MP ahi y pagar.
+
+El stub **debe endurecerse antes de tocar produccion** (ver seccion siguiente). Ese endurecimiento
+es una rebanada chica de T5 - firma y limites -, no las 8 transiciones completas.
+
+---
+
+## Requisito para exponer el stub en produccion
+
+El stub actual **no es apto para produccion tal como esta**:
+
+- No verifica firma HMAC. Cualquiera puede POSTear.
+- No limita el tamano del body. Un POST gigante se escribe en disco.
+- Loguea metadata sin restraint y escribe el body crudo a disco.
+
+**Antes de deployarlo a `admin.landaetastudio.com` hay que agregar, como minimo:**
+
+1. Verificacion de firma (reutilizar `verifyMercadoPagoSignature` de `@repo/commerce`).
+2. Limite de tamano del body (rechazar por encima de un tope).
+3. Logueo de metadata **sin PII** y sin persistir el body crudo.
+
+Esa rebanada es reutilizable por T5. El resto del handler (transiciones de estado, idempotencia)
+solo hace falta si el webhook resulta funcionar.
 
 ---
 
@@ -41,9 +117,9 @@ redesignarse sobre **polling**, que ya esta especificado en el transversal y no 
 
 Ambos pagos quedaron `authorized`, con `summarized.semaphore: green` y `charged_quantity: 1`.
 
-### Por que la conclusion es solida
+### Que quedo descartado y que NO
 
-Se descarto la hipotesis mas probable antes de concluir: **Vercel Auth bloqueando el trafico**.
+**Descartado (con control):** Vercel Auth bloqueando el trafico.
 
 1. Auth OFF verificado: un POST anonimo al endpoint devuelve **HTTP 200**.
 2. Ingesta de logs verificada **viva**: un POST de control a las 18:16:48 UTC aparecio en los
@@ -51,15 +127,20 @@ Se descarto la hipotesis mas probable antes de concluir: **Vercel Auth bloqueand
    No hay lag de ingesta.
 3. La ventana de logs cubre la hora del pago #2 (18:11:45 UTC) y **no contiene ninguna entrada**.
 
-Conclusion: **la ausencia de webhook es real, no un artefacto de observabilidad.**
+Por lo tanto **la ausencia de entrega en el preview domain es un hecho verificado**, no un
+artefacto de observabilidad.
+
+**NO descartado:** la causa de esa ausencia. Ver seccion "Hipotesis alternativa". El spike
+verifico que no hubo entrega, pero **no verifico que la suscripcion a topics estuviera activa**,
+ni que el dominio estuviera permitido. Esa es la weakness del analisis original.
 
 ### Nota sobre Auth
 
-Vercel Auth bloqueando el trafico fue un factor real para el pago #1, pero **no es la causa del
-problema de fondo**. El pago #2 ocurrio con Auth desactivado y tampoco produjo entrega.
+Vercel Auth bloqueando el trafico fue un factor real para el pago #1, pero **no explica el pago #2**,
+que ocurrio con Auth desactivado y tampoco produjo entrega.
 
 **Finding operativo:** con Auth desactivado, cualquier preview deploy de Vercel es publicamente
-accesible. Para webhooks es lo correcto, pero es un vector de exposicion que debe documentarse.
+accesible. Para webhooks es lo correcto, pero es un vector de exposicion a documentarse.
 
 ---
 
@@ -208,14 +289,9 @@ como confirmacion del efecto.
 
 ---
 
-## Decision: Opcion C, redefinida
+## T9 - Job de polling: FALLBACK, no mecanismo unico
 
-La Opcion C original (webhooks + polling) **no es implementable tal cual**: la mitad de webhooks
-no existe. Lo que queda es:
-
-### C' - Polling como mecanismo unico
-
-El polling ya esta especificado en el transversal (§6): reintento automatico cada 5 minutos durante
+T9 ya estaba especificado en el transversal (§6): reintento automatico cada 5 minutos durante
 2 horas, consultando `subscriptions` en `pending_first_payment` o `past_due`.
 
 Con los hallazgos de P3, el polling es **mas simple de lo que se preveia**:
@@ -226,21 +302,38 @@ GET /authorized_payments/search?preapproval_id={mpPreapprovalId}
   -> por cada payment: external_reference + status
 ```
 
-Sin webhooks, sin firmatura, sin idempotency por `payment_id` recibido, sin replay.
+Sin firma, sin idempotencia por `payment_id` recibido, sin replay.
 
-**Latencia:** hasta 5 minutos en activacion inicial, en lugar de segundos. Aceptable para
-activacion de tenants.
+**Latencia:** hasta 5 minutos en activacion inicial, en lugar de segundos.
 
-**Ventaja adicional:** `GET /preapproval/{id}` funciona de forma fiable y sirve de segunda fuente
-para el estado de la suscripcion (confirma `authorized`, `paused`, `cancelled`).
+**Estado de T9:** queda en el plan como **fallback documentado**. Se implementa **solo si** el
+webhook en produccion tambien falla (H3). Si el webhook funciona, T9 no se construye.
+
+### Riesgo abierto de T9 que no aplica si hay webhook
+
+El objeto `authorized_payments` expone `payment.status` y `payment.status_detail`, pero **ningun
+campo de chargeback, reversal ni disputa**. Se observaron unicamente `approved` / `accredited`.
+
+| Situacion                           | Webhook | Polling           |
+| ----------------------------------- | ------- | ----------------- |
+| Alta, cobro, pausa, reactivacion    | Si      | Si                |
+| Chargeback / disputa                | Si      | **No verificado** |
+| Distinguir `approved` de `rejected` | Si      | **No verificado** |
+
+Si T9 queda como mecanismo unico, estos dos casos quedan abiertos y deben investigarse antes
+(estado de `/preapproval/{id}`, y endpoint de chargebacks de MP).
 
 ---
 
 ## Tareas afectadas
 
-### T5 - Webhook handler de suscripciones: INVALIDADA
+### T5 - Webhook handler: VUELVE A PLAN, con scope reducido
 
-No implementable. MP no entrega. Sustituir por el job de polling de T9.
+No invalidada, pero **reduced**. Para validar P1 no hace falta el handler completo: alcanza con
+endurecer el stub actual (firma + limite de body + log sin PII), deployarlo a
+`admin.landaetastudio.com` y pagar.
+
+Las 8 transiciones de estado y la idempotencia solo hacen falta si el webhook resulta funcionar.
 
 ### T9 (nueva) - Job de polling de suscripciones
 
