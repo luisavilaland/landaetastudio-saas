@@ -21,3 +21,4 @@ tags:
 - [[issue-173-cerrado-t0-desbloqueado-para-sdd-apply-87]]
 - [[pr-175-mergeado-b7fc01a-item-39-bom-pr-176-88]]
 - [[pr-176-mergeado-repo-limpio-milestone-11-con-9-tareas-abiert-89]]
+- [[spike-t0-stub-deployed-y-verificado-preapproval-rechazado-po-90]]
