@@ -870,3 +870,65 @@ mezclar cambios.
 **Severidad:** INFO.
 
 **Urgencia:** INFO.
+
+---
+
+## 41. `seed` rojo en CI: `drizzle-kit migrate` falla sin mensaje
+
+**Estado:** abierto (2026-10-02).
+
+**Contexto:** job `seed` del workflow `CI` (rama `develop` / PRs).
+Comando: `pnpm db:migrate && pnpm db:seed`.
+
+**Sintoma:** `drizzle-kit migrate` imprime unicamente el spinner
+
+```
+[⣷] applying migrations... ELIFECYCLE  Command failed with exit code 1.
+```
+
+y sale con codigo 1 **sin ningun mensaje de error util**. Ni el nombre de la
+migracion que fallo, ni la causa (conexion, permisos, statement invalido).
+
+**Cadena de fallo:** `seed` rojo -> el job `e2e` se skipea por dependencia ->
+el gate `e2e-success` reporta "Some e2e jobs failed" -> rojo. **Una sola causa
+raiz produce tres checks en rojo.**
+
+**Evidencia de que NO es reciente ni de un PR especifico:**
+
+- El fallo ya estaba presente en el run del `2026-10-02T14:38:28Z` de
+  `chore/spike-t0-fase2`, antes del merge de `develop` y antes del stub v2.
+- El diff del PR #178 (mergeado como `e97b0c8`) **no toca** `packages/db`,
+  migraciones, seed, `package.json` ni `.env`.
+- `develop` solo ejecuta el job `build`. **Nunca corre `seed` ni `e2e`**, asi
+  que su estado verde **no es comparable** con el de un PR. Solo los PRs
+  ejercitan esta parte del pipeline.
+
+**Impacto:** ningun PR puede pasar el gate `e2e-success`. El unico job que
+verifica migraciones y seed esta roto, y como **no imprime diagnostico**,
+cada PR que lo dispare cuesta tiempo de investigacion manual. Ademas
+`seed` es justamente el job que valida que las migraciones apliquen sobre una
+BD limpia: si no corre, **nadie detecta una migracion rota antes de
+produccion**.
+
+**Hipotesis (no confirmadas):**
+
+1. Error de conexion o permisos contra la BD de dev, tragado por el spinner
+   de `drizzle-kit`.
+2. Estado de la BD de dev inconsistente (migracion aplicada a medias).
+3. La variable `DATABASE_URL` del runner apunta a un destino que no acepta
+   escrituras.
+
+**Como diagnosticar:** correr `pnpm db:migrate` localmente contra la BD de
+dev (MUTANTE) para obtener el error real, o agregar salida de debug al step
+de CI. `drizzle-kit` tiene flags de verbose que hoy no se usan.
+
+**Nota de credenciales:** el runner usa `DATABASE_URL` (rol de migracion, con
+`neondb_owner`). No confundir con `DATABASE_APP_URL` (rol `app_user`, sin
+BYPASSRLS), que es el de la app runtime.
+
+**Origen:** detectado durante el merge del PR #178 (spike T0).
+
+**Severidad:** ALTO.
+
+**Urgencia:** MEDIA. No bloquea el desarrollo, pero **degrada la red de
+seguridad de migraciones** y vuelve lento cada PR.

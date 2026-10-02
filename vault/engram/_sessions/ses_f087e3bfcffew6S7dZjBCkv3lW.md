@@ -29,3 +29,6 @@ tags:
 - [[spike-t0-cerrado-mp-no-entrega-webhooks-de-suscripciones-t5-95]]
 - [[t0-reframe-conclusion-original-no-sostenida-t5-reducida-a-so-96]]
 - [[stub-v2-endurecido-conflicto-pr-178-resuelto-secuencia-h2-h1-97]]
+- [[p6-confirmado-put-preapproval-inerte-paused-tambien-last-mod-98]]
+- [[mp-platform-access-token-es-el-token-del-seller-p6-no-es-sco-99]]
+- [[pr-178-mergeado-e97b0c8-deuda-item-41-seed-rojo-en-ci-100]]
