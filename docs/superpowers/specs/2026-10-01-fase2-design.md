@@ -43,7 +43,7 @@ Al verificar la tabla oficial _topic → API_ de MercadoPago para Suscripciones,
 │       │      └─► POST api.mercadopago.com/preapproval  ──────┐  │
 │       │          · external_reference = tenantId               │  │
 │       │          · back_url = <admin base>/suscripcion        │  │
-│       │          · notification_url = <admin>/api/webhooks/...│  │
+│       │          · (notification_url ELIMINADO - ver §2.4)    │  │
 │       │      ◄── init_point                                    │  │
 │       │                                                         │  │
 │       ├─► GET    /api/subscriptions          → estado+permisos  │  │
@@ -206,41 +206,53 @@ crédito = (precioActual × díasRestantes / díasPeríodo)
 
 ---
 
-### 2.4 D4 — `back_url` y `notification_url` ★ BLOQUEADO
-
-**Decisión parcial + bloqueo declarado.**
+### 2.4 D4 — `back_url` y `notification_url` ★ RESUELTO POR T0
 
 **`back_url` — CONFIRMADO.** Aparece en el body de `POST /preapproval` y en `PUT /preapproval/{id}` ("Successful return URL"). Es **singular**. El design lo usa así.
 
-**`notification_url` — NO DETERMINABLE desde la documentación. Evidencia:**
+**`notification_url` — CONFIRMADO QUE NO EXISTE. Eliminar del design.**
 
-| Fuente                                             | Qué dice                                                                                                                                                                                                  |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Body params de `POST /preapproval` (API reference) | `preapproval_plan_id`, `reason`, `external_reference`, `payer_email`, `card_token_id`, `auto_recurring`, `back_url`, `status`. **`notification_url` NO aparece.**                                         |
-| Doc de _Subscriptions → Webhooks_                  | _"This configuration method is not available for QR Code or Subscriptions integrations. To set up notifications for either of these integrations, use the Configuration during payment creation method."_ |
-| Doc de `notification_url` (Preferences / IPN)      | El campo se documenta para `POST /checkout/preferences` y para IPN, **no para preapproval**.                                                                                                              |
+El spike T0 lo probó empíricamente en lugar de dejarlo bloqueado:
 
-**MP se contradice a sí mismo:** dice que para Suscripciones no se puede configurar por panel y hay que hacerlo al crear el pago, pero el endpoint de creación no documenta el campo.
+| Operación                                      | Respuesta | Verificación por `GET` |
+| ---------------------------------------------- | --------- | ---------------------- |
+| `POST /preapproval` con `notification_url`     | HTTP 201  | campo **ausente**      |
+| `PUT /preapproval/{id}` con `notification_url` | HTTP 200  | campo **ausente**      |
 
-**Por qué NO lo resuelvo por inferencia:** si `notification_url` no se acepta, mandarlo es inofensivo; si **sí** se acepta y no lo mandamos, los webhooks no llegan nunca y la suscripción nunca se activa. Son fallos de gravedad distinta. No se adivina un nombre de campo en la ruta crítica de activación.
+MP acepta el campo, devuelve éxito y **lo descarta en silencio**. Confirmado en dos preapprovals.
 
-**Diseño tolerante a ambos resultados:**
+**Consecuencia:** el body de `POST /preapproval` **no debe llevar `notification_url`**. La URL del
+webhook se configura **únicamente en el panel de MP** (_Your integrations → Webhooks_), contra un
+endpoint en el **dominio de producción** (`admin.landaetastudio.com`).
+
+**Regla derivada (aplicar a toda escritura contra MP):** un `2xx` no es evidencia de que la
+operación se aplicó. Toda escritura con efecto de estado debe verificarse con un `GET` posterior.
+
+**Diseño final:**
 
 ```
 POST /preapproval
   body: {
     ...,
-    back_url: <adminBase>/suscripcion,
-    notification_url: <adminBase>/api/webhooks/mercadopago/subscriptions   // si el spike lo confirma
+    back_url: <adminBase>/suscripcion
+    // notification_url: ELIMINADO - T0 demostro que MP lo descarta en silencio
   }
 ```
 
-| Resultado del spike         | Comportamiento                                                                                                                                                                                                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `notification_url` aceptado | Se manda. El webhook llega con `external_reference` = `tenantId`.                                                                                                                                                                                                                          |
-| `notification_url` ignorado | El spike detecta que **no llega ningún webhook**. Plan B: configurar la URL en _Your integrations → Webhooks_ para los topics `subscription_preapproval` + `subscription_authorized_payment`. La doc dice que no se puede, pero **el spike lo prueba empíricamente** en lugar de asumirlo. |
+El webhook se registra **una sola vez**, en el panel de MP, apuntando a
+`https://admin.landaetastudio.com/api/webhooks/mercadopago/subscriptions` con los topics
+`subscription_preapproval` + `subscription_authorized_payment`.
 
-**Restricción operativa que se agrega:** `notification_url` se construye del request (`x-forwarded-proto` + `host`), nunca de una env fija. Si el dominio del panel cambia, hay que redeployar. No hay forma de actualizar la URL de un preapproval ya creado salvo `PUT /preapproval/{id}` (que sí acepta `back_url`; si acepta `notification_url`, se documenta como procedimiento de migración).
+**Pendiente de validar en T5 (producción):** que MP entregue esos topics contra un dominio de
+producción. El spike T0 solo pudo probar contra un preview domain de Vercel y **no** recibió
+entrega. Hipótesis abiertas: dominio preview no permitido (H1) o ningún topic suscrito (H2).
+Ver `2026-10-02-spike-t0-resultado.md`.
+
+**Restricción operativa (actualizada por T0):** la URL del webhook **no se construye del request**
+ni se manda en el body del preapproval. Es un valor fijo del panel de MP apuntando a
+`admin.landaetastudio.com`. Esto **elimina** la restricción de "si el dominio cambia hay que
+redeployar" y también el procedimiento de migración vía `PUT` (P2/P5 demostraron que
+`notification_url` no se persiste por ningún método).
 
 ---
 
@@ -333,20 +345,20 @@ Authorization: Bearer {MP_PLATFORM_ACCESS_TOKEN}
 Content-Type: application/json
 ```
 
-| Campo                               | Valor                                                | Estado                                            |
-| ----------------------------------- | ---------------------------------------------------- | ------------------------------------------------- |
-| `reason`                            | `"Suscripción {planName}"`                           | **Confirmado** — requerido sin plan               |
-| `payer_email`                       | `session.user.email`                                 | **Confirmado** — requerido                        |
-| `external_reference`                | `tenantId`                                           | **Confirmado** — campo free-text de sync          |
-| `back_url`                          | `{adminBase}/suscripcion`                            | **Confirmado** — singular                         |
-| `auto_recurring.frequency`          | `1`                                                  | **Confirmado**                                    |
-| `auto_recurring.frequency_type`     | `"months"`                                           | **Confirmado**                                    |
-| `auto_recurring.transaction_amount` | `plans.priceUyu`                                     | **Confirmado** — centavos, integer                |
-| `auto_recurring.currency_id`        | `"UYU"`                                              | **Confirmado**                                    |
-| `notification_url`                  | `{adminBase}/api/webhooks/mercadopago/subscriptions` | **⏳ BLOQUEADO** (§2.4)                           |
-| `status`                            | `"pending"`                                          | **Confirmado** — sin plan, el tenant paga después |
-| `preapproval_plan_id`               | —                                                    | **No** (D2)                                       |
-| `card_token_id`                     | —                                                    | **No** — el tenant paga en el checkout de MP      |
+| Campo                               | Valor                      | Estado                                             |
+| ----------------------------------- | -------------------------- | -------------------------------------------------- |
+| `reason`                            | `"Suscripción {planName}"` | **Confirmado** — requerido sin plan                |
+| `payer_email`                       | `session.user.email`       | **Confirmado** — requerido                         |
+| `external_reference`                | `tenantId`                 | **Confirmado** — campo free-text de sync           |
+| `back_url`                          | `{adminBase}/suscripcion`  | **Confirmado** — singular                          |
+| `auto_recurring.frequency`          | `1`                        | **Confirmado**                                     |
+| `auto_recurring.frequency_type`     | `"months"`                 | **Confirmado**                                     |
+| `auto_recurring.transaction_amount` | `plans.priceUyu`           | **Confirmado** — centavos, integer                 |
+| `auto_recurring.currency_id`        | `"UYU"`                    | **Confirmado**                                     |
+| ~~`notification_url`~~              | —                          | **NO EXISTE** — T0 lo probó, MP lo descarta (§2.4) |
+| `status`                            | `"pending"`                | **Confirmado** — sin plan, el tenant paga después  |
+| `preapproval_plan_id`               | —                          | **No** (D2)                                        |
+| `card_token_id`                     | —                          | **No** — el tenant paga en el checkout de MP       |
 
 **Response (verificada):**
 
@@ -473,6 +485,9 @@ app/api/subscriptions/
   cancel/route.ts                   POST — cancelar (202, no transiciona)
   reactivate/route.ts               POST — reactivar (202, no transiciona)
   plan/route.ts                     PUT  — cambio de plan + prorrateo
+  # ADVERTENCIA T0-P6: cancel/reactivate/plan no tienen backend en MP.
+  # PUT /preapproval/{id} es de solo lectura tras el primer cobro.
+  # Devuelven 202 como hoy, pero la operacion NO ocurre.
   __tests__/
     route.test.ts
     preapproval.test.ts
@@ -713,32 +728,33 @@ DoD completo (AGENTS.md): `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `p
 
 ## 9. Riesgos del design
 
-| #   | Riesgo                                                                                                                | Sev.        | Mitigación                                                                                                                        |
-| --- | --------------------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| R1  | `/authorized_payments/{id}` no expone ningún vínculo con la suscripción → los cobros recurrentes no se pueden enrutar | **CRÍTICO** | 3 ramas de diseño en §2.1. La peor cuesta +1 día y +1 migración, ya estimada. **El spike lo decide antes de escribir el handler** |
-| R2  | `notification_url` no existe en `POST /preapproval` → no llegan webhooks → ninguna suscripción se activa              | **CRÍTICO** | Spike lo detecta. Plan B documentado (§2.4). Los tests no lo detectan — necesita MP real                                          |
-| R3  | Los literales `type`/`action` difieren de lo esperado → el handler cae en `UNKNOWN` y no procesa nada                 | **ALTO**    | Despacha por **topic** (verificado), no por `action`. `UNKNOWN` loguea. Spike captura un payload real                             |
-| R4  | `paused` de MP no existe en el transversal → divergencia silenciosa si el tenant pausa desde el panel de MP           | **MEDIO**   | `warn` explícito (§6.3). Se reporta a Luis. Fase 3 expone pausar solo vía API si se decide                                        |
-| R5  | Doble click en contratar → dos suscripciones en MP                                                                    | **MEDIO**   | `409` con `initPoint` existente (§6.5)                                                                                            |
-| R6  | `mpPreapprovalId` se desincroniza (MP ok, UPDATE local falla)                                                         | **MEDIO**   | Dos transacciones deliberadas + log con ambos ids (§6.1)                                                                          |
-| R7  | El índice de D7 falla si el seed inserta dos `mpPreapprovalId` iguales                                                | **BAJO**    | El seed actual no crea suscripciones. Si aparece, la migración lo señala — que es el objetivo                                     |
-| R8  | `format:check` falla por los `.md` de Fase 2                                                                          | **BAJO**    | DoD lo incluye explícitamente (§7.4)                                                                                              |
+| #   | Riesgo                                                                                                                | Sev.        | Mitigación                                                                                                                                                                       |
+| --- | --------------------------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | `/authorized_payments/{id}` no expone ningún vínculo con la suscripción → los cobros recurrentes no se pueden enrutar | ~~CRÍTICO~~ | **DESCARTADO por T0.** Expone `preapproval_id` + `external_reference`. Índice parcial alcanza                                                                                    |
+| R2  | `notification_url` no existe en `POST /preapproval` → no llegan webhooks → ninguna suscripción se activa              | **PARCIAL** | **Mitigado por T0:** `notification_url` no existe (P2/P5), la URL va en el panel de MP contra `admin.landaetastudio.com`. **Queda abierto** si MP entrega desde ese dominio (P4) |
+| R3  | Los literales `type`/`action` difieren de lo esperado → el handler cae en `UNKNOWN` y no procesa nada                 | **ALTO**    | Despacha por **topic** (verificado), no por `action`. `UNKNOWN` loguea. Spike captura un payload real                                                                            |
+| R4  | `paused` de MP no existe en el transversal → divergencia silenciosa si el tenant pausa desde el panel de MP           | **MEDIO**   | `warn` explícito (§6.3). Se reporta a Luis. Fase 3 expone pausar solo vía API si se decide                                                                                       |
+| R5  | Doble click en contratar → dos suscripciones en MP                                                                    | **MEDIO**   | `409` con `initPoint` existente (§6.5)                                                                                                                                           |
+| R6  | `mpPreapprovalId` se desincroniza (MP ok, UPDATE local falla)                                                         | **MEDIO**   | Dos transacciones deliberadas + log con ambos ids (§6.1)                                                                                                                         |
+| R7  | El índice de D7 falla si el seed inserta dos `mpPreapprovalId` iguales                                                | **BAJO**    | El seed actual no crea suscripciones. Si aparece, la migración lo señala — que es el objetivo                                                                                    |
+| R8  | `format:check` falla por los `.md` de Fase 2                                                                          | **BAJO**    | DoD lo incluye explícitamente (§7.4)                                                                                                                                             |
 
 ---
 
 ## 10. Preguntas abiertas
 
-| #   | Pregunta                                                                                          | Estado                                                                                  |
-| --- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| P1  | ¿Qué literales exactos de `type`/`action` emite MP por topic?                                     | **Bloqueante.** Spike bloque 0                                                          |
-| P2  | ¿`POST /preapproval` acepta `notification_url`?                                                   | **Bloqueante.** Spike bloque 0. Plan B en §2.4                                          |
-| P3  | ¿`/authorized_payments/{id}` trae `external_reference` o `preapproval_id`?                        | **Bloqueante.** Spike bloque 0. 3 ramas en §2.1                                         |
-| P4  | ¿MP permite configurar la URL por panel para Suscripciones, contra su propia doc?                 | Spike bloque 0. Plan B depende de esto                                                  |
-| P5  | ¿`PUT /preapproval/{id}` acepta `notification_url` (para migrar URLs de preapprovals existentes)? | Spike bloque 0. Determina si cambiar de dominio es viable sin recrear suscripciones     |
-| P6  | `paused`: ¿se agrega al transversal o se documenta como no soportado?                             | **Para Luis.** No se decide acá                                                         |
-| P7  | Prorrateo nativo de MP (`billing_day_proportional`): ¿se evalúa como enhancement?                 | **Para Luis.** Requiere actualizar el transversal §5 (error factual)                    |
-| P8  | ¿`díasPeríodo` es 30 fijo o se configura por plan?                                                | Menos. El transversal §5 asume 30. Se usa 30 como constante hasta que se diga otra cosa |
-| P9  | ¿Quién paga los primeros errores de MP en el spike (tarjeta de prueba, saldo)?                    | Operativo. Bloquea el bloque 0                                                          |
+| #   | Pregunta                                                                                  | Estado                                                                                           |
+| --- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| P1  | ¿Qué literales exactos de `type`/`action` emite MP por topic?                             | **PENDIENTE.** T0 no recibió entregas (solo en preview domain). Se resuelve en T5, en producción |
+| P2  | ¿`POST /preapproval` acepta `notification_url`?                                           | **NO.** T0: HTTP 201, campo descartado. Ver §2.4                                                 |
+| P3  | ¿`/authorized_payments/{id}` trae `external_reference` o `preapproval_id`?                | **SÍ, ambos.** T0 confirmado en 2 pagos. Un índice parcial alcanza (§2.1)                        |
+| P4  | ¿MP entrega webhooks de suscripciones contra un dominio de producción?                    | **PENDIENTE.** H1 (preview no permitido) vs H2 (sin topic suscrito). T5 en producción            |
+| P5  | ¿`PUT /preapproval/{id}` acepta `notification_url` (para migrar URLs existentes)?         | **NO.** T0: HTTP 200, campo descartado. No hay procedimiento de migración de URL                 |
+| P6  | `paused`: ¿se agrega al transversal o se documenta como no soportado?                     | **Para Luis.** No se decide acá                                                                  |
+| P7  | Prorrateo nativo de MP (`billing_day_proportional`): ¿se evalúa como enhancement?         | **Para Luis.** Requiere actualizar el transversal §5 (error factual)                             |
+| P8  | ¿`díasPeríodo` es 30 fijo o se configura por plan?                                        | Menos. El transversal §5 asume 30. Se usa 30 como constante hasta que se diga otra cosa          |
+| P9  | ¿Quién paga los primeros errores de MP en el spike (tarjeta de prueba, saldo)?            | **Resuelto** — test users de MP, tarjeta Visa test. Sin costo real                               |
+| P10 | ¿`PUT /preapproval/{id}` permite mutar estado tras el cobro (`status`, `auto_recurring`)? | **NO.** T0 P6: todos los PUT son no-op post-cobro. Cancelación/pausa fuera de alcance de Fase 2  |
 
 **P1, P2, P3 y P5 bloquean `sdd-apply`.** El design de los handlers es ejecutable sin ellos (despacha por topic, tolera `UNKNOWN`, tiene 3 ramas de resolución), pero **el comportamiento en producción no se puede declarar correcto hasta que el spike los responda.**
 
