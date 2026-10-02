@@ -1,70 +1,138 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
 import { createLogger } from '@repo/logger'
+import { verifyMercadoPagoSignature } from '@repo/commerce'
 
-// TEMPORAL — stub del spike T0. Se reemplaza por el handler real en T5.
-// Captura el payload crudo del webhook de MercadoPago para resolver
-// los literales de type/action (P1) y la presencia de query params.
+// TEMPORAL — stub endurecido del spike T0 (v2). NO es el handler de T5.
 //
-// Deliberadamente NO valida con Zod: el payload crudo es justamente lo
-// que hay que descobrir (P1). Un schema asumido invalidaria el spike.
+// v1 (preview) era aceptable solo en un preview domain: sin firma, sin limite
+// de body, escribiendo el payload crudo a disco. Eso no puede exponerse en
+// `admin.landaetastudio.com`.
+//
+// v2 lo hace apto para produccion:
+//   1. Verifica la firma HMAC con `verifyMercadoPagoSignature` (reutilizado
+//      del webhook del storefront, sin logica duplicada).
+//   2. Limita el body a 100 KB antes de parsear.
+//   3. Loguea SOLO metadata estructural. No persiste el body crudo: el
+//      objetivo de P1 es resolver `type`/`action`, y esos si quedan visibles
+//      en el log sin exponer PII ni datos de tarjeta.
+//
+// Sigue sin validar el shape con Zod a proposito: el payload crudo es
+// justamente lo que hay que descubrir. Un schema asumido invalidaria el
+// spike.
 
-const logger = createLogger('spike-t0-stub')
+const logger = createLogger('spike-t0-stub-v2')
 
-export async function POST(request: NextRequest) {
-  const rawBody = await request.text()
-  const headers = Object.fromEntries(request.headers.entries())
-  const url = new URL(request.url)
+const MAX_BODY_BYTES = 100 * 1024
 
-  const capture = {
-    timestamp: new Date().toISOString(),
-    url: request.url,
-    query: Object.fromEntries(url.searchParams.entries()),
-    headers,
-    rawBody,
-    parsed: (() => {
-      try {
-        return JSON.parse(rawBody)
-      } catch {
-        return null
-      }
-    })(),
-  }
+export const dynamic = 'force-dynamic'
 
-  const dir = await resolveCaptureDir()
-  const filename = `${Date.now()}-${capture.parsed?.type ?? 'unknown'}-${capture.parsed?.action ?? 'noaction'}.json`
-  await writeFile(join(dir, filename), JSON.stringify(capture, null, 2))
-
-  logger.info(
-    { filename, dir, type: capture.parsed?.type, action: capture.parsed?.action },
-    'Webhook captured',
-  )
-  // Only structural metadata in logs: the full payload (and any signature
-  // header) stays in the capture file, never in the log stream.
-  logger.info(
-    { query: capture.query, hasSignature: 'x-signature' in headers },
-    'Webhook envelope',
-  )
-
-  return NextResponse.json({ received: true, captured: filename })
+type StructuralSummary = {
+  type: unknown
+  action: unknown
+  dataId: unknown
+  liveMode: unknown
+  topLevelKeys: string[]
 }
 
-// Vercel: /tmp is the only writable path (ephemeral — read via logs).
-// Local: /tmp may not exist on Windows, so fall back to .t0-captures/ in cwd.
-async function resolveCaptureDir(): Promise<string> {
-  const candidates = [
-    join('/tmp', 'webhook-captures'),
-    join(process.cwd(), '.t0-captures'),
-  ]
-  for (const dir of candidates) {
-    try {
-      await mkdir(dir, { recursive: true })
-      await writeFile(join(dir, '.probe'), 'ok')
-      return dir
-    } catch {
-      // next candidate
+export async function POST(request: NextRequest) {
+  try {
+    const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET
+
+    if (!webhookSecret) {
+      logger.error('MERCADOPAGO_WEBHOOK_SECRET not configured — rejecting')
+      return NextResponse.json(
+        { error: 'Webhook not configured' },
+        { status: 503 },
+      )
+    }
+
+    const rawBody = await request.text()
+
+    if (rawBody.length > MAX_BODY_BYTES) {
+      logger.warn(
+        { bytes: rawBody.length, limit: MAX_BODY_BYTES },
+        'Body too large — rejected',
+      )
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
+    }
+
+    const signature = request.headers.get('x-signature')
+
+    if (!signature) {
+      logger.warn('Missing x-signature header')
+      return NextResponse.json({ error: 'Missing signature' }, { status: 401 })
+    }
+
+    const dataId = extractDataId(rawBody)
+    const verification = verifyMercadoPagoSignature({
+      signatureHeader: signature,
+      xRequestId: request.headers.get('x-request-id') ?? '',
+      dataId: dataId ?? '',
+      secret: webhookSecret,
+    })
+
+    if (!verification.valid) {
+      logger.warn({ reason: verification.reason }, 'Invalid signature')
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+
+    const summary = summarize(rawBody)
+
+    // `type` y `action` son el objetivo de P1. Se loguean para poder
+    // resolver los literales desde Vercel Logs sin persistir el payload.
+    logger.info(summary, 'Webhook received (signature verified)')
+
+    return NextResponse.json({
+      received: true,
+      type: summary.type ?? null,
+      action: summary.action ?? null,
+      dataId: summary.dataId ?? null,
+    })
+  } catch (error) {
+    logger.error(
+      { err: error instanceof Error ? error.message : String(error) },
+      'Failed to process webhook',
+    )
+    return NextResponse.json(
+      { error: 'Internal error' },
+      { status: 500 },
+    )
+  }
+}
+
+function extractDataId(rawBody: string): string | undefined {
+  try {
+    const parsed = JSON.parse(rawBody) as { data?: { id?: string } }
+    return parsed.data?.id
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Reduce el payload a lo que el spike necesita, sin retener PII. El
+ * `topLevelKeys` permite detectar campos que no figuran en la documentacion,
+ * sin volcar valores.
+ */
+function summarize(rawBody: string): StructuralSummary {
+  try {
+    const parsed = JSON.parse(rawBody) as Record<string, unknown>
+    const data = (parsed.data ?? {}) as Record<string, unknown>
+
+    return {
+      type: parsed.type,
+      action: parsed.action,
+      dataId: data.id ?? null,
+      liveMode: parsed.live_mode ?? null,
+      topLevelKeys: Object.keys(parsed).sort(),
+    }
+  } catch {
+    return {
+      type: undefined,
+      action: undefined,
+      dataId: undefined,
+      liveMode: undefined,
+      topLevelKeys: [],
     }
   }
-  return candidates[candidates.length - 1]
 }
