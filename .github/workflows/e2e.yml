@@ -93,6 +93,11 @@ jobs:
       - run: pnpm db:migrate && pnpm db:seed
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          # drizzle-kit usa un spinner interactivo cuyos escapes ANSI
+          # (ESC[2K / ESC[1G) BORRAN el mensaje de error real del log.
+          # Con CI=true no usa el spinner y el error queda legible.
+          # Diagnostico del item 41 de vault/03_Deuda/deuda-tecnica.md
+          CI: true
 
   e2e:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
