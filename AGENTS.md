@@ -540,9 +540,28 @@ Remove-Item Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
 - [ ] ¿DoD verde (`pnpm lint` / `pnpm format:check` / `pnpm typecheck` / `pnpm test` / `pnpm build`)?
 - [ ] ¿GGA no bloqueó (o `--no-verify` documentado)?
 - [ ] ¿Exportaste Engram al vault? (`pnpm vault:export`)
+- [ ] ¿Verificaste que git ve los archivos exportados? (comando aparte)
+- [ ] ¿`vault/engram/` está en el commit?
 - [ ] ¿Docs afectadas actualizadas?
 
 > **Aviso — el Orquestador tiende a olvidarlo.** Verificar el paso de Engram **explícitamente y antes de la bitácora**. Los subagentes lo hacen solos; el Orquestador es el que lo saltea. Si la sesión teve decisiones arquitectónicas, bugs no obvios o convenciones nuevas, la memoria es parte del entregable, no un extra.
+
+### REGLA CRÍTICA — Orden de Engram
+
+Este orden es **obligatorio**. No es una sugerencia.
+
+```
+1. mem_save                                  (grabar memorias)
+2. pnpm vault:export                         (exportar al vault)
+3. git status --short vault/engram/          (verificar — COMANDO APARTE)
+4. git add vault/engram/ + commit
+```
+
+**Por qué el paso 3 va en comando aparte:** encadenar `vault:export` con `git status` en el mismo comando produce un falso negativo por timing de NTFS (aprendizaje del PR #161).
+
+**Por qué el export va ANTES del commit:** si exportás después, los archivos quedan huérfanos fuera del commit. Pasó en el PR #150 y otra vez durante el spike T0.
+
+**Si el export no encuentra nada:** corré `engram stats` y compará el max observation ID contra el max ID de archivo en `vault/engram/`. Si no coinciden, hay drift: exportá de nuevo antes de commitear.
 
 ## Nota sobre worktrees de Paseo
 
