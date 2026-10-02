@@ -116,3 +116,6 @@ vault/engram/.engram-sync-state.json
 
 # gentle-ai skill registry (artefacto local)
 .atl/
+
+# Spike T0 — capturas temporales de webhook (stub temporal)
+.t0-captures/
