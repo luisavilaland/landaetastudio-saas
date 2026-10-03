@@ -36,3 +36,5 @@ tags:
 - [[items-40-y-42-de-deuda-registrados-ci-true-en-e2e-yml-para-r-102]]
 - [[ci-true-no-funciono-causa-raiz-en-hanji-0-0-8-traga-el-error-103]]
 - [[revertido-ci-true-step-de-diagnostico-seguro-sin-fuga-de-cre-104]]
+- [[diagnostico-ci-secret-seteado-y-mismo-host-que-dev-falla-en-105]]
+- [[test-de-conexion-a-neon-con-ssl-en-ci-trampas-de-backtick-y-106]]
