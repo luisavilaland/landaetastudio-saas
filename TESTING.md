@@ -324,7 +324,7 @@ pnpm test
 - Actualización 3 de octubre de 2026 – 486 tests, 58 archivos, T2 de Fase 2: 3 casos de producción de `MP_PLATFORM_*` y 7 casos de `getAdminBaseUrl`. Rama `chore/t2-env-validation`.
 - Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
 - Fase 6 completada: withTenantContext real + FORCE RLS (app_user), E2E Playwright 15 specs con CI self-hosted, incidente RLS de 9 Server Components corregido (08-08).
-- 486 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
+- Estado actual: 486 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Sandbox manual de MercadoPago pendiente (cuenta de prueba de MP).
 - Ver AGENTS.md para detalles de convenciones de código y comandos obligatorios.
 
