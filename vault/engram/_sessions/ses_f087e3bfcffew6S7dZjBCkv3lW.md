@@ -46,3 +46,5 @@ tags:
 - [[seed-ts-trunca-10-de-13-tablas-subscriptions-y-tenant-mp-con-112]]
 - [[patron-los-items-de-deuda-envejecen-releer-antes-de-ejecutar-113]]
 - [[escaneo-de-cjk-sobre-salida-de-git-es-estructuralmente-incap-114]]
+- [[correccion-solo-env-local-tenia-mojibake-los-example-estaban-115]]
+- [[para-deshacer-mojibake-usar-mapeo-explicito-nunca-el-roundtr-116]]

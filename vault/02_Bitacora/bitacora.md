@@ -2158,3 +2158,67 @@ sigue pendiente** y es el unico con implicacion tecnica abierta:
 pregunta a MP sobre el token OAuth para `PUT /preapproval/{id}`, dos
 preapprovals de prueba con cobro agendado el 2026-11-02, y rotar dos
 tokens que quedaron expuestos en el chat de la sesion.
+---
+
+## 2026-10-03 - Correccion del diagnostico de encoding de .env
+
+**Contexto.** Se diagnostico mojibake en los 3 archivos `.env*`. Ese
+diagnostico resulto **parcialmente incorrecto** y se corrige aqui.
+
+**Diagnostico real (verificacion archivo por archivo):**
+
+| Archivo              | BOM | Mojibake       | Trackeado |
+| -------------------- | --- | -------------- | --------- |
+| `.env.local`         | Si  | Si (10 lineas) | No        |
+| `.env.example`       | No  | **No**         | Si        |
+| `.env.local.example` | No  | **No**         | Si        |
+
+**Los 2 `.example` estaban limpios.** Sus lineas no-ASCII son acentos
+espanoles legitimos (n, a, o), guion de caja y el emoji de aviso. No
+habia nada que arreglar. El diagnostico inicial los conto como
+corruptos solo por tener caracteres no-ASCII.
+
+## Fix aplicado
+
+- **`.env.local`**: reemplazo dirigido con mapeo explicito. 60
+  separadores em-dash y 3 acentos (`publicas`, `creacion`,
+  `efimeras`). Valores de las 21 variables **byte-identicos al
+  backup**. BOM removido.
+- **`.example`**: sin cambios. Estaban limpios.
+
+Un detalle: el em-dash estaba manglado en **dos ordenes distintos**
+dentro del mismo archivo. El mapeo inicial cubria solo uno y dejo un
+residuo. Se detecto verificando el resultado, no porque el chequeo de
+mojibake fallara.
+
+## Leccion
+
+1. **Verificar cada archivo individualmente** antes de diagnosticar
+   encoding. "3 archivos con mojibake" y "1 archivo con mojibake"
+   llevan a decisiones distintas.
+2. **El pipeline `iconv -f UTF-8 -t CP1252 | iconv -f CP1252 -t UTF-8`
+   es identidad.** Primero decodifica correctamente el mojibake y
+   despues lo vuelve a codificar: no arregla nada. Ademas applied a un
+   archivo sano **corrompe los acentos legitimos** (`a` -> `a`
+   reinterpretado).
+3. **Para deshacer doble-encoding, usar reemplazo dirigido** con un
+   mapeo explicito y auditable: se sabe exactamente que caracter se
+   cambia por cual, y se puede verificar antes de escribir.
+4. **Verificar el resultado del fix, no solo ejecutarlo.** El chequeo
+   post-escritura es lo que detecto la segunda variante del em-dash.
+
+## Nota pendiente (cosmetico)
+
+El commit `7ac8006` (squash merge del PR #181) toma como mensaje el
+**titulo del PR**, que dice "+ CI=true para item 41". Eso es falso:
+el `CI: true` se revirtio en `22bc8c6` porque resulto inerte
+(`drizzle-kit` nunca lee `process.env.CI`).
+
+No se puede corregir sin reescribir `develop`, asi que queda
+documentado. El **body del PR #181 si tiene el detalle correcto**.
+
+**Origen:** deteccion durante el cierre del PR #181.
+
+**Severidad:** INFO (documental).
+
+**Urgencia:** N/A.
