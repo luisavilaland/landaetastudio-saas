@@ -44,27 +44,35 @@ O sea: la infraestructura de webhooks de MP funciona. Lo no probado es el scope 
 
 ---
 
-## Hipotesis alternativa (NO descartada)
+## Hipotesis alternativa - DESCARTADA (2026-10-02)
 
 > **No hay ningun topic de suscripcion suscrito en el panel de MP.**
 
-El propio "ETAPA 1 DE 5" es evidencia a favor de esta. Si ningun topic esta activo, MP no tiene
-que enviar nada, **independientemente del dominio**. Este spike nunca verifico que la suscripcion
-a topics estuviera activa.
+**Estado: descartada el 2026-10-02.** Luis marco TODOS los topics en el panel de MercadoPago
+(`subscription_preapproval`, `subscription_authorized_payment` y `payment` legacy) y completo el
+wizard "Configura tu integracion". Los webhooks de suscripciones **siguen sin llegar** con los
+topics ya suscritos, lo que descarta esta hipotesis como causa de P1.
 
-**Esta hipotesis es mas barata de descartar que la principal** y debe comprobarse ANTES de
-implementar T5: es una mirada al panel, no 2.5 dias de codigo.
+La app sigue mostrando "ETAPA 1 DE 5". Se interpreta como cosmetico o bug del panel de MP, no
+como senal de topics sin suscribir: **"ETAPA 1 DE 5" no es un indicador fiable del estado de los
+topics** y no debe usarse como signal en spikeos futuros.
+
+> Nota de evidencia: el panel de MP es externo al repo. Este descarte no es reproducible desde el
+> codigo; proviene de la verificacion manual reportada por el humano.
 
 ### Tabla de hipotesis
 
-| #   | Hipotesis                                           | Como se descarta                                | Costo         |
-| --- | --------------------------------------------------- | ----------------------------------------------- | ------------- |
-| H1  | MP no entrega a preview domains                     | Apuntar el webhook a `admin.landaetastudio.com` | Deploy + pago |
-| H2  | No hay topic de suscripcion suscrito                | Verificar la seleccion de topics en el panel    | 5 minutos     |
-| H3  | MP no entrega webhooks de suscripciones en absoluto | H1 descartada + H2 descartada                   | -             |
+| #   | Hipotesis                                           | Estado                          | Como se descarta                                | Costo         |
+| --- | --------------------------------------------------- | ------------------------------- | ----------------------------------------------- | ------------- |
+| H1  | MP no entrega a preview domains                     | **VIVA** - no probada           | Apuntar el webhook a `admin.landaetastudio.com` | Deploy + pago |
+| H2  | No hay topic de suscripcion suscrito                | **DESCARTADA** (2026-10-02)     | Topics marcados en el panel + wizard completo   | 5 minutos     |
+| H3  | MP no entrega webhooks de suscripciones en absoluto | **CONDICIONAL** - depende de H1 | H1 descartada + H2 descartada                   | -             |
 
 **El spike anterior concluyo H3 sin haber descartado H1 ni H2.** Esa fue la weakness del
-analisis: se asumio que el topic estaba suscrito, y esa asuncion nunca se verifico.
+analisis: se asumio que el topic estaba suscrito, y esa asuncion nunca se verifico. H2 ya fue
+descartada; **H1 y H3 solo se distinguen con T5 desplegado en produccion**. Si H1 es la causa,
+T9 (polling) queda como fallback documentado. Si se confirma H3, T9 pasa a ser obligatorio y la
+fase crece de 10 a 12.5 dias.
 
 ---
 
@@ -133,6 +141,11 @@ artefacto de observabilidad.
 **NO descartado:** la causa de esa ausencia. Ver seccion "Hipotesis alternativa". El spike
 verifico que no hubo entrega, pero **no verifico que la suscripcion a topics estuviera activa**,
 ni que el dominio estuviera permitido. Esa es la weakness del analisis original.
+
+> **Actualizado 2026-10-02.** La suscripcion a topics quedo resuelta: todos los topics estan
+> marcados en el panel y el wizard esta completo. Verificar topics **no era** la causa. La causa
+> sigue abierta entre H1 (preview domain) y H3 (MP no entrega), y solo T5 en produccion las
+> separa.
 
 ### Nota sobre Auth
 

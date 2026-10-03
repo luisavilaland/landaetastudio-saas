@@ -2222,3 +2222,44 @@ documentado. El **body del PR #181 si tiene el detalle correcto**.
 **Severidad:** INFO (documental).
 
 **Urgencia:** N/A.
+
+---
+
+## 2026-10-03 - Correccion de H2 (topics del panel MP)
+
+**Contexto.** El plan de Fase 2 y el spike T0 documentaban H2
+(topics suscritos en el panel MP) como bloqueante de T5.
+
+**Estado real (corregido):** H2 fue completado el 2026-10-02.
+
+- Luis marco TODOS los topics en el panel MP
+  (subscription_preapproval, subscription_authorized_payment,
+  payment legacy).
+- El wizard "Configura tu integracion" tambien esta completo.
+- Los webhooks siguen sin llegar, por lo tanto H2 queda descartado.
+- La app sigue mostrando "ETAPA 1 DE 5" (cosmetico o bug de MP).
+
+**Hipotesis remanentes para P1:**
+
+- H1: MP no entrega webhooks a preview domains de Vercel
+  (.vercel.app). Requiere test en admin.landaetastudio.com con
+  T5 implementado.
+- H3: MP no entrega webhooks de suscripciones por ninguna via.
+  En ese caso T9 (polling) pasa a obligatorio.
+
+**H1 vs H3 solo se distinguen con T5 desplegado en produccion.**
+
+**Impacto en la estimacion de la fase:**
+
+- Si H1 es la causa: T5 recibe webhooks, T9 queda como fallback
+  documentado. Total 10 dias.
+- Si H3 se confirma: T5 no recibe, T9 es obligatorio. Total 12.5 dias.
+
+**Origen:** correccion reportada por el humano tras la calibracion
+del 2026-10-03. El panel de MercadoPago es externo al repo, asi que
+la evidencia no es reproducible desde el codigo.
+
+**Severidad:** ALTA (corrige un gate bloqueante obsoleto que
+habria consumido tiempo en T5).
+
+**Urgencia:** N/A.
