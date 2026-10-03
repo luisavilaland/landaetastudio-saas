@@ -807,7 +807,12 @@ El ultimo escenario esta definido y estimado. No se construye la tabla preventiv
 
 ## 38. Estado `paused` de MercadoPago no modelado
 
-**Estado:** abierto (2026-10-01).
+**Estado:** ~~abierto (2026-10-01)~~ → **decisión superada, ver item 49.**
+La decisión de "no soportado en Fase 2" que figura más abajo fue tomada en el
+planning de Fase 2 y **quedó desactualizada** cuando T4 cambió el scope. No la
+borres: el registro original se conserva por trazabilidad, pero **ya no es la
+guía vigente**. Para la semántica y el plan de actualización del transversal,
+ver **item 49**.
 
 **Contexto:** MP tiene un estado `paused` para preapprovals (pausar una suscripcion sin cancelarla). El spec transversal no lo contempla.
 
@@ -1486,3 +1491,159 @@ mientras las vars estén configuradas.
 
 **Reevaluar:** antes de T4 (admin empieza a usar MercadoPago en serio) — a partir
 de ahí, la diferenciación de scopes deja de ser higiene y pasa a ser requisito.
+---
+
+## 48. Conversión centavos ↔ unidad de moneda en el borde de MercadoPago
+
+**Estado:** abierto (2026-10-03). Mitigado en T4, **la causa raíz sigue viva**.
+
+## Hecho
+
+Nuestra persistencia trabaja en **centavos** (integer) por convención de
+`AGENTS.md`. La API de MercadoPago espera el monto **en la unidad de la moneda**
+(`transaction_amount: 49`, no `4900`). Son dos convenciones distintas y el punto
+de contacto entre ambas es una división por 100 que hoy está **escrita a mano en
+cada endpoint**.
+
+Durante T4, `POST /api/subscriptions/preapproval` mandaba
+`transactionAmount: plan.priceUyu` sin dividir: **4900 en vez de 49**. Lo detectó
+el test de contrato `manda el precio en la moneda de MP, no en centavos`. Se
+corrigió con un `/100` explícito en ese endpoint, y el mismo criterio se aplicó
+en `PUT /api/subscriptions/plan`.
+
+## Impacto
+
+1. **Sobrecobro silencioso de 100x.** Es un error de dinero, no un crash: MP
+   acepta el monto happily, cobra 100 veces más, y nada en el sistema falla.
+   Ningún test de integración existente lo habría atrapado.
+2. **La conversión está duplicada y cada endpoint puede olvidarla.** Hoy hay dos
+   `/100` escritos a mano. El próximo endpoint que hable con MP (T5, o un
+   endpoint de cobro de una sola vez) repite la decisión.
+3. **El error inverso es igual de caro.** Si MP devolviera centavos y lo
+   leyéramos como unidades, el crédito de un `downgrade` sería 100x. Hoy solo se
+   verificó en la dirección centavos → unidad.
+4. **Trampa de tipos en `updatePreapproval`.** El wrapper de T3
+   (`packages/commerce/src/mp-subscriptions.ts`) ya envuelve solo el argumento en
+   `auto_recurring.transaction_amount`. Pasar `auto_recurring` explícito desde un
+   endpoint es error de tipos _y_ duplicación; el compilador ata esa mitad del
+   problema pero no la conversión.
+
+## Mitigaciones
+
+1. **Helper único en `packages/commerce`, con el nombre documentando la
+   dirección.** Es la que elimina el error de verdad:
+   ```ts
+   export function centsToMpAmount(cents: number): number
+   export function mpAmountToCents(amount: number): number
+   ```
+   Además, tipar la entrada de `CreatePreapprovalInput` y de `updatePreapproval`
+   **en centavos**, de modo que el sistema de tipos obligue a convertir y no
+   dependa de la disciplina de quien escribe el endpoint.
+2. **Wrapper de alto nivel** `setPreapprovalPlan({ preapprovalId, priceCents })`
+   que ya hace la conversión. Menos invasivo, pero deja la conversión opcional.
+3. **Documentarlo en `AGENTS.md`** junto a la regla de precios. Descartada: no
+   previene nada, solo informa después del error.
+
+**Preferible la 1:** el defecto es un contrato implícito entre dos sistemas con
+convenciones opuestas. Un comentario no lo convierte en invariante; el tipo sí.
+
+## Relacionado
+
+- `AGENTS.md`, sección "Precios siempre en centavos (integer)": la convención que
+  hace necesaria esta conversión.
+- **PR #189 (T4):** donde se detectó y se mitigó a mano.
+- **Memoria 127 (T3):** ya documenta la convención de signos del prorrateo, que
+  depende de la misma conversión.
+
+**Origen:** detectado durante T4 (PR #189) por TDD, al escribir el test de
+contrato del endpoint `preapproval`.
+
+**Severidad:** ALTA. Es dinero: un error de un factor 100 en un cobro.
+
+**Urgencia:** MEDIA. Los dos endpoints de T4 ya están corregidos, así que no hay
+un cobro roto **hoy**. Pero la causa raíz —la conversión manual en cada
+endpoint— sigue presente, y T5 agrega endpoints que hablan con MP.
+
+**Reevaluar:** antes de T5 y antes de exponer cualquier endpoint nuevo a
+MercadoPago. Con la helper en `packages/commerce`, el costo es de un rato.
+
+---
+
+## 49. `paused` implementado pero ausente del transversal
+
+**Estado:** abierto (2026-10-03). **Sucesor del item 38.**
+
+## Hecho
+
+T4 (PR #189) agregó el estado `paused` a `SubscriptionStatus` en
+`packages/commerce/src/subscription-permissions.ts`, con `canPause` y
+`canResume`. El transversal
+`docs/superpowers/specs/2026-09-subscription-lifecycle.md` **sigue listando 6
+estados** en la sección 1 y no lo contempla en la tabla de reglas por estado de
+la sección 2.
+
+La matriz real quedó en **7 estados × 8 permisos**, no 6 × 6: `paused` es el
+único estado con `canResume`, y `canPause` solo aplica desde `active`.
+
+## Decisión de producto (Luis, review de #188, 2026-10-03)
+
+El scope de T4 cambió: **`reactivate` sale** (MP responde 400 a
+`cancelled → authorized`) y **`pause` + `resume` entran**. Esto **reemplaza** la
+decisión del item 38 ("no soportado en Fase 2", "el webhook registra `warn` y no
+transiciona"). La fuente es el review de aprobación de #188, no un documento
+normativo: por eso este item existe.
+
+Semántica que T4 fijó y que el transversal debe recoger:
+
+| Aspecto                    | Decisión de T4                                                                                      |
+| -------------------------- | --------------------------------------------------------------------------------------------------- |
+| Qué hace                   | MP deja de debitar. El tenant conserva storefront y panel.                                          |
+| `canPause`                 | Solo desde `active`.                                                                                |
+| `canResume`                | Solo desde `paused`.                                                                                |
+| `canAccessPanel`           | `'limited'`, no `'readonly'`: el tenant pausado tiene una acción útil (`resume`).                   |
+| `canCancel` desde `paused` | `false`. Se ofrece "reanudar", no "irse".                                                           |
+| Relación con `past_due`    | Son distintos. `past_due` es impago (dunning, gracia de 7 días); `paused` es suspensión voluntaria. |
+| Reversibilidad             | Por diseño: `cancel` es terminal en MP, así que `paused` es el único camino de vuelta.              |
+
+## Impacto
+
+1. **El transversal es la fuente normativa y quedó desalineado del código.**
+   Quien lo lea sin este item implementa 6 estados y no puede representar
+   `paused`. El código ya tiene 7.
+2. **El item 38 dice hoy lo contrario de lo que T4 hace.** El material de T5 que
+   lo lea va a loguear `warn` y **no va a transicionar** `paused`. Con T4 eso
+   está mal: la transición la dispara **nuestra propia API** (`POST /pause`). El
+   resultado sería un tenant al que la UI muestra `active` para siempre mientras
+   MP no le cobra. Falla silenciosa, y es exactamente la divergencia que el item
+   38 quería evitar.
+3. **Riesgo de revertirse.** El próximo PR que "arregle el transversal" puede
+   eliminar `paused` del código para hacerlo coincidir con el doc. De ahí el TODO
+   explícito en `subscription-permissions.ts` y en su test.
+
+## Mitigaciones
+
+1. **PR transversal** (lo pedido): agregar `paused` a la sección 1 (lista de
+   estados) y a la sección 2 (tabla de reglas por estado), con la semántica de
+   la tabla de arriba.
+2. **Basta con documentarlo en el código.** Descartada: el transversal es la
+   fuente normativa. Dos fuentes que divergen son peores que una desactualizada
+   y marcada como conocida.
+
+## Relacionado
+
+- **Item 38:** decisión anterior, ahora superada. Se conserva el registro original
+  con un puntero acá para que no se siga usando como guía vigente.
+- **PR #188:** review donde se decidió el cambio de scope.
+- **PR #189 (T4):** implementación que introduce la divergencia.
+
+**Origen:** detectado durante T4 (PR #189).
+
+**Severidad:** MEDIA. No rompe nada por sí sola; es documentación desalineada con
+el código, pero su consecuencia (el punto 2 de Impacto) sí rompe el flujo.
+
+**Urgencia:** ALTA antes de T5. Es el único item de este PR con fecha impuesta
+por otro trabajo: T5 escribe el webhook que debe transicionar `paused`, y hoy el
+material de referencia le dice que no lo haga.
+
+**Reevaluar:** antes de escribir T5. Después de T5, `paused` deja de ser
+documentación pendiente y pasa a ser comportamiento cubierto por tests.
