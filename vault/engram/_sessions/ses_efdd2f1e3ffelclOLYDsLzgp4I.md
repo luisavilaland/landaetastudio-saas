@@ -20,3 +20,6 @@ tags:
 - [[t3-fase-2-helpers-de-dominio-prorrateo-y-convencion-de-signo-127]]
 - [[bug-el-stub-de-suscripciones-validaba-con-el-secret-del-tena-128]]
 - [[logger-del-stub-debe-nombrar-las-dos-variables-de-secret-129]]
+- [[p6-era-falso-positivo-cancel-y-monto-si-se-aplican-via-put-130]]
+- [[cancel-es-terminal-en-mp-paused-es-el-estado-reversible-131]]
+- [[antes-de-declarar-un-limite-de-api-verificar-que-la-config-s-132]]

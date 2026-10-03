@@ -428,3 +428,127 @@ o intentaran un segundo cobro el 2026-11-02.
 
 El stub debe **eliminarse** si T5 se reemplaza por polling, o mantenerse como receptor de una
 futura re-verificacion de MP.
+
+---
+
+# Resultados finales (2026-10-03)
+
+> Esta seccion **reemplaza** las conclusiones de las secciones anteriores. El spike original
+> corrio con una mezcla de cuentas que produjo tres conclusiones invertidas. Todo lo de arriba
+> queda como registro de lo que se creia; lo de aca es lo que se verifico.
+
+## Causa raiz de los falsos
+
+El spike uso el token de la cuenta de prueba **Test-002** (`3360257364`) para crear los
+preapprovals, mientras que la URL del webhook estaba registrada en la cuenta **plataforma real**
+(`42922495`) y el secret en Vercel era el de esa misma cuenta plataforma.
+
+Esa asimetria — **token de una cuenta, secret de otra** — produce dos sintomas distintos segun
+donde se mire:
+
+- Los eventos los firma la cuenta dueña del preapproval (Test-002) y se validan contra el secret
+  de otra cuenta: **401 silencioso**.
+- Las mutaciones se ejecutan con el token de una cuenta sobre un recurso que pertenece a otra:
+  **2xx que no aplican nada**.
+
+Con la cadena consistente (token y secret de Test-002, URL registrada en Test-002) **todo
+funciona**. La regla que sale de esto:
+
+> **`MP_PLATFORM_ACCESS_TOKEN` y `MP_PLATFORM_WEBHOOK_SECRET` tienen que ser de la MISMA cuenta,
+> y la URL del webhook tiene que estar registrada en esa misma cuenta.**
+
+## H1 — CONFIRMADA
+
+MercadoPago **si entrega** webhooks de suscripciones a un dominio de produccion propio. Tres
+eventos reales por pago, con **1 segundo de latencia**:
+
+```
+21:18:41.052  type=payment                         action=payment.created  dataId=181244133433  liveMode=true
+21:18:41.510  type=subscription_authorized_payment  action=updated           dataId=7032544182     liveMode=null
+21:18:42.524  type=subscription_preapproval        action=updated           dataId=25f8cf82...    liveMode=null
+```
+
+Verificacion cruzada contra la API: los tres `data.id` coinciden exactamente con
+`payment.id`, `invoice` y `preapproval_id` respectivamente.
+
+### Dos formas de payload
+
+| Topic                             | `topLevelKeys`                                                          | `live_mode`           |
+| --------------------------------- | ----------------------------------------------------------------------- | --------------------- |
+| `payment`                         | `action, api_version, data, date_created, id, live_mode, type, user_id` | **presente** (`true`) |
+| `subscription_authorized_payment` | `action, application_id, data, date, entity, id, type, version`         | **ausente**           |
+| `subscription_preapproval`        | `action, application_id, data, date, entity, id, type, version`         | **ausente**           |
+
+**`live_mode` no existe en los topics de suscripcion.** El guard `live_mode === false` del design
+solo aplica al topic `payment`.
+
+### `data.id` significa tres cosas distintas (verificado)
+
+| Topic                             | `data.id` es      | Se resuelve con                 |
+| --------------------------------- | ----------------- | ------------------------------- |
+| `payment`                         | id de pago        | `GET /v1/payments/{id}`         |
+| `subscription_authorized_payment` | **id de invoice** | `GET /authorized_payments/{id}` |
+| `subscription_preapproval`        | id de preapproval | `GET /preapproval/{id}`         |
+
+### Orden de llegada
+
+`payment` → `subscription_authorized_payment` → `subscription_preapproval`, en 1,5 s. **El evento
+que activa la suscripcion es `subscription_authorized_payment`** (es el que trae la invoice) y
+llega segundo. El design mapea el alta desde `subscription_preapproval`, que llega ultimo.
+
+## P6 — REFUTADO
+
+Las tres afirmaciones del spike original eranWrong o estaban incompletas:
+
+| Afirmacion original                                          | Veredicto                                                |
+| ------------------------------------------------------------ | -------------------------------------------------------- |
+| `PUT {status:"cancelled"}` → 200 sin efecto                  | **FALSO. Aplica.** GET posterior devuelve `cancelled`    |
+| `PUT {auto_recurring:{transaction_amount}}` → 200 sin efecto | **FALSO. Aplica.** GET posterior devuelve el monto nuevo |
+| `PUT {status:"cancelled"}` → "read-only post-cobro"          | **FALSO.** No es read-only                               |
+
+## Matriz de transiciones (verificada empiricamente)
+
+| Transicion               | Resultado         | Evidencia                                           |
+| ------------------------ | ----------------- | --------------------------------------------------- |
+| `authorized → cancelled` | **200, aplica**   | GET: `cancelled`, `last_modified` avanza            |
+| `cancelled → authorized` | **400**           | `"Invalid transition from cancelled to authorized"` |
+| `authorized → paused`    | **200, aplica**   | GET: `paused`                                       |
+| `paused → authorized`    | **200, aplica**   | GET: `authorized`                                   |
+| `* → transaction_amount` | **200, aplica**   | GET: monto nuevo                                    |
+| `* → notification_url`   | **200, descarta** | campo ausente en la respuesta y en el GET           |
+
+**`cancelled` es terminal en MP.** No existe volver a `authorized`. **`paused` es el unico estado
+reversible** y es lo que reemplaza al endpoint de reactivacion del plan.
+
+### `next_payment_date` no es indicador
+
+Al pausar y al cancelar, `next_payment_date` **no cambia**: sigue mostrando la proxima fecha.
+Sirve para mostrar el proximo cobro, **no** para saber si la suscripcion va a cobrar.
+
+## Como distinguir un 2xx que aplico de uno que no
+
+El patron de "2xx silencioso" es real, pero `version` y `last_modified` dan la señal:
+
+| Caso                                               | `version`     | `last_modified` |
+| -------------------------------------------------- | ------------- | --------------- |
+| `status: cancelled` (aplica)                       | avanza        | avanza          |
+| `transaction_amount` (aplica)                      | avanza        | avanza          |
+| `status: authorized` sobre un `authorized` (no-op) | **avanza**    | **avanza**      |
+| `notification_url` (descartado)                    | **no avanza** | **no avanza**   |
+
+Regla: **`version` y `last_modified` que no se mueven = MP descarto el campo.** Si se mueven,
+MP proceso el payload — pero un no-op tambien los mueve, asi que no prueban que el _valor_
+haya cambiado. Para eso, `GET`.
+
+## P2 / P5 — CONFIRMADOS
+
+`notification_url` **no persiste**, ni en `POST /preapproval` ni en `PUT /preapproval/{id}`. El
+PUT devuelve 200 y el campo ni siquiera aparece en la respuesta. **La URL del webhook se
+registra unicamente en el panel de MP.**
+
+## Impacto en el plan
+
+- **T9 (polling) queda cancelado.** El mecanismo funciona y entrega en 1 segundo.
+- **T5 vuelve a ser el handler completo** (8 transiciones), no la sonda de 1 dia.
+- **T4 cambia de scope:** sale `reactivate`, entran `pause` y `resume`. `cancel` queda como
+  irreversible y la UI debe avisarlo.

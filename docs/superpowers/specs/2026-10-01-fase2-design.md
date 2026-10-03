@@ -573,6 +573,10 @@ Los 5 endpoints + el webhook llaman a la API de MP con el mismo token y los mism
                                                  [401 si inválido]
 5. subscriptionWebhookSchema.safeParse             [400]
 6. live_mode === false && NODE_ENV=production  → 200 + info, no procesar
+   ⚠️ VERIFICADO 2026-10-03: `live_mode` **solo viene en el topic `payment`**.
+   Los topics de suscripción (`subscription_preapproval`,
+   `subscription_authorized_payment`) **no incluyen el campo**. Tratar
+   "ausente" como distinto de `false`: si no viene, NO asumir producción.
 7. classify(type, action) → topic | UNKNOWN
      UNKNOWN → 200 + warn { type, action }
 8. topic = subscription_preapproval_plan → 200 + info (fuera de alcance)
@@ -596,15 +600,20 @@ estadoObjetivo = deriveFromMp(mpEntity, estadoLocal)
   preapproval.status === 'authorized'  && local ∈ {pending_first_payment, past_due, expired}
       → active, currentPeriodEnd = now()+1mes, lastProcessedPaymentId = invoiceId
   preapproval.status === 'authorized'  && local === 'cancelled'
-      → SIN CAMBIO (reactivar es explícito, spec §2.5)
+      → 400 en MP: no hay transición cancelled → authorized. **No implementable.**
+        (verificado 2026-10-03: "Invalid transition from cancelled to authorized")
   preapproval.status === 'authorized'  && local === 'active'
       → SIN CAMBIO (idempotente)
-  preapproval.status === 'cancelled'  && local ∈ {active, past_due}
+  preapproval.status === 'cancelled'  && local ∈ {active, past_due, paused}
       → cancelled, currentPeriodEnd se mantiene
   preapproval.status === 'cancelled'  && local === 'cancelled'
       → SIN CAMBIO
-  preapproval.status === 'paused'
-      → SIN CAMBIO + warn (MP tiene `paused`; el transversal no lo modela)
+  preapproval.status === 'paused'      && local ∈ {active, past_due}
+      → paused (modelado desde 2026-10-03: la transición MP funciona, 200 + GET)
+  preapproval.status === 'authorized'  && local === 'paused'
+      → active (reanudar; verificado 200 + GET)
+  preapproval.status === 'paused'      && local === 'paused'
+      → SIN CAMBIO (idempotente)
   payment.status === 'approved'        && local ∈ {pending_first_payment, past_due, expired}
       → active, currentPeriodEnd = now()+1mes, lastProcessedPaymentId = paymentId
   payment.status === 'approved'        && local ∈ {active, cancelled}
@@ -624,7 +633,12 @@ lastProcessedPaymentId === paymentId  → 200, sin escrituras
 status local ya es el objetivo        → 200, sin escrituras
 ```
 
-**`paused` es un estado de MP que el transversal no modela.** Se loguea como `warn` y no se transiciona. Si el tenant pausa desde el panel de MP, la DB no lo refleja. Es una divergencia conocida y se reporta en §10.
+**`paused` está MODELADO desde 2026-10-03.** La transición `authorized → paused` funciona en MP
+(verificada 200 + `GET`), y la doc oficial confirma que **detiene el cobro**: _"Pausar suscriptor:
+…Mercado Pago deje de debitar los pagos de ese cliente hasta que decidas reactivarlo"_
+([manage-subscription-plan](https://www.mercadopago.com.ar/developers/es/docs/subscription-plans/manage-subscription-plan)).
+El mapa de §6.3 lo transiciona a un estado local `paused`. Si el tenant pausa desde el panel de
+MP, el webhook lo refleja igual.
 
 **`auto_recurring.transaction_amount` ≠ `plans.priceUyu` en un `subscription_preapproval`:** alguien cambió el monto fuera de la app. Se loguea `warn` con ambos valores y **no** se ajusta el `planId`. El tenant debe usar `PUT /plan`. Queda pendiente de reconciliación para el job de Fase 9.
 
@@ -733,7 +747,7 @@ DoD completo (AGENTS.md): `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `p
 | R1  | `/authorized_payments/{id}` no expone ningún vínculo con la suscripción → los cobros recurrentes no se pueden enrutar | ~~CRÍTICO~~ | **DESCARTADO por T0.** Expone `preapproval_id` + `external_reference`. Índice parcial alcanza                                                                                    |
 | R2  | `notification_url` no existe en `POST /preapproval` → no llegan webhooks → ninguna suscripción se activa              | **PARCIAL** | **Mitigado por T0:** `notification_url` no existe (P2/P5), la URL va en el panel de MP contra `admin.landaetastudio.com`. **Queda abierto** si MP entrega desde ese dominio (P4) |
 | R3  | Los literales `type`/`action` difieren de lo esperado → el handler cae en `UNKNOWN` y no procesa nada                 | **ALTO**    | Despacha por **topic** (verificado), no por `action`. `UNKNOWN` loguea. Spike captura un payload real                                                                            |
-| R4  | `paused` de MP no existe en el transversal → divergencia silenciosa si el tenant pausa desde el panel de MP           | **MEDIO**   | `warn` explícito (§6.3). Se reporta a Luis. Fase 3 expone pausar solo vía API si se decide                                                                                       |
+| R4  | `paused` de MP no existe en el transversal → divergencia silenciosa si el tenant pausa desde el panel de MP           | ~~MEDIO~~   | **RESUELTO 2026-10-03.** `paused` modelado (§6.3) y la transición funciona. La doc de MP confirma que detiene el cobro                                                           |
 | R5  | Doble click en contratar → dos suscripciones en MP                                                                    | **MEDIO**   | `409` con `initPoint` existente (§6.5)                                                                                                                                           |
 | R6  | `mpPreapprovalId` se desincroniza (MP ok, UPDATE local falla)                                                         | **MEDIO**   | Dos transacciones deliberadas + log con ambos ids (§6.1)                                                                                                                         |
 | R7  | El índice de D7 falla si el seed inserta dos `mpPreapprovalId` iguales                                                | **BAJO**    | El seed actual no crea suscripciones. Si aparece, la migración lo señala — que es el objetivo                                                                                    |
@@ -743,18 +757,18 @@ DoD completo (AGENTS.md): `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `p
 
 ## 10. Preguntas abiertas
 
-| #   | Pregunta                                                                                  | Estado                                                                                           |
-| --- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| P1  | ¿Qué literales exactos de `type`/`action` emite MP por topic?                             | **PENDIENTE.** T0 no recibió entregas (solo en preview domain). Se resuelve en T5, en producción |
-| P2  | ¿`POST /preapproval` acepta `notification_url`?                                           | **NO.** T0: HTTP 201, campo descartado. Ver §2.4                                                 |
-| P3  | ¿`/authorized_payments/{id}` trae `external_reference` o `preapproval_id`?                | **SÍ, ambos.** T0 confirmado en 2 pagos. Un índice parcial alcanza (§2.1)                        |
-| P4  | ¿MP entrega webhooks de suscripciones contra un dominio de producción?                    | **PENDIENTE.** H1 (preview no permitido) vs H2 (sin topic suscrito). T5 en producción            |
-| P5  | ¿`PUT /preapproval/{id}` acepta `notification_url` (para migrar URLs existentes)?         | **NO.** T0: HTTP 200, campo descartado. No hay procedimiento de migración de URL                 |
-| P6  | `paused`: ¿se agrega al transversal o se documenta como no soportado?                     | **Para Luis.** No se decide acá                                                                  |
-| P7  | Prorrateo nativo de MP (`billing_day_proportional`): ¿se evalúa como enhancement?         | **Para Luis.** Requiere actualizar el transversal §5 (error factual)                             |
-| P8  | ¿`díasPeríodo` es 30 fijo o se configura por plan?                                        | Menos. El transversal §5 asume 30. Se usa 30 como constante hasta que se diga otra cosa          |
-| P9  | ¿Quién paga los primeros errores de MP en el spike (tarjeta de prueba, saldo)?            | **Resuelto** — test users de MP, tarjeta Visa test. Sin costo real                               |
-| P10 | ¿`PUT /preapproval/{id}` permite mutar estado tras el cobro (`status`, `auto_recurring`)? | **NO.** T0 P6: todos los PUT son no-op post-cobro. Cancelación/pausa fuera de alcance de Fase 2  |
+| #   | Pregunta                                                                                  | Estado                                                                                                                                                                             |
+| --- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1  | ¿Qué literales exactos de `type`/`action` emite MP por topic?                             | **RESPONDIDO 2026-10-03.** `payment`/`payment.created`, `subscription_authorized_payment`/`updated`, `subscription_preapproval`/`updated`. El dispatcher por `type` cubre los tres |
+| P2  | ¿`POST /preapproval` acepta `notification_url`?                                           | **NO.** T0: HTTP 201, campo descartado. Ver §2.4                                                                                                                                   |
+| P3  | ¿`/authorized_payments/{id}` trae `external_reference` o `preapproval_id`?                | **SÍ, ambos.** T0 confirmado en 2 pagos. Un índice parcial alcanza (§2.1)                                                                                                          |
+| P4  | ¿MP entrega webhooks de suscripciones contra un dominio de producción?                    | **SÍ.** H1 refutada: 3 payloads reales, 1 s de latencia, con token y secret de la misma cuenta                                                                                     |
+| P5  | ¿`PUT /preapproval/{id}` acepta `notification_url` (para migrar URLs existentes)?         | **NO.** Re-test 2026-10-03: HTTP 200, campo ausente en la respuesta y en el `GET`. No hay migración de URL                                                                         |
+| P6  | `paused`: ¿se agrega al transversal o se documenta como no soportado?                     | **RESUELTO 2026-10-03.** Se modela. `authorized → paused` funciona; `cancelled → authorized` da 400, así que `pause`/`resume` reemplazan a `reactivate`                            |
+| P7  | Prorrateo nativo de MP (`billing_day_proportional`): ¿se evalúa como enhancement?         | **Para Luis.** Requiere actualizar el transversal §5 (error factual)                                                                                                               |
+| P8  | ¿`díasPeríodo` es 30 fijo o se configura por plan?                                        | Menos. El transversal §5 asume 30. Se usa 30 como constante hasta que se diga otra cosa                                                                                            |
+| P9  | ¿Quién paga los primeros errores de MP en el spike (tarjeta de prueba, saldo)?            | **Resuelto** — test users de MP, tarjeta Visa test. Sin costo real                                                                                                                 |
+| P10 | ¿`PUT /preapproval/{id}` permite mutar estado tras el cobro (`status`, `auto_recurring`)? | **NO.** T0 P6: todos los PUT son no-op post-cobro. Cancelación/pausa fuera de alcance de Fase 2                                                                                    |
 
 **P1, P2, P3 y P5 bloquean `sdd-apply`.** El design de los handlers es ejecutable sin ellos (despacha por topic, tolera `UNKNOWN`, tiene 3 ramas de resolución), pero **el comportamiento en producción no se puede declarar correcto hasta que el spike los responda.**
 
