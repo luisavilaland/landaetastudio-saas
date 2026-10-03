@@ -1177,4 +1177,122 @@ exclusivamente de desarrollo local.
 
 **Urgencia:** MEDIA.
 
+---
+
+## 44. `pnpm db:seed` trunca PRODUCTION en cada run de CI
+
+**Estado:** abierto (2026-10-03).
+
+> **Correccion de severidad.** Este item se levanto inicialmente como
+> "CI/dev comparten la misma base, severidad BAJA". **Esa evaluacion
+> quedo desactualizada** cuando `NEON_DATABASE_URL` volvio a apuntar a
+> production (2026-10-03T03:16:11Z). No es solo compartir base: el
+> pipeline **destruye datos de produccion de forma automatica y
+> silenciosa**.
+
+## Mecanismo
+
+El job `seed` de `.github/workflows/e2e.yml` corre:
+
+```yaml
+- run: pnpm db:migrate && pnpm db:seed
+  env:
+    DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+```
+
+Y `packages/db/seed.ts` ejecuta `TRUNCATE TABLE ... CASCADE` sobre 10
+tablas antes de insertar datos de prueba: `plans`, `order_items`,
+`orders`, `product_variants`, `product_images`, `products`,
+`categories`, `customers`, `admin_users`, `tenants`.
+
+`NEON_DATABASE_URL` y `NEON_DATABASE_APP_URL` apuntan ambos a
+production. **Por lo tanto, cada push a `develop` borra los datos de
+production y los reemplaza con el seed de prueba.**
+
+## Impacto
+
+- **Perdida de datos de produccion en cada run.** No hay confirmacion ni
+  aviso: el job pasa en verde.
+- **Los E2E corren contra produccion**, asi que un test mal escrito
+  puede modificar datos reales.
+- **El desarrollo local comparte la misma base.** Un `pnpm db:seed`
+  manual borra los datos que E2E acaba de preparar, y viceversa.
+- El shop en `tienda1.landaetastudio.com` puede servir datos de prueba
+  entre runs.
+
+## Mitigaciones
+
+1. **Rama de Neon dedicada para CI.** `NEON_DATABASE_URL` y
+   `NEON_DATABASE_APP_URL` apuntando a una rama, con branching por PR.
+   Es la unica solucion que conserva E2E contra datos limpios **y**
+   protege produccion. Es el objetivo declarado del transversal
+   (Fase 2, "T0.3 branching en Neon").
+2. **Guard de seguridad en `seed.ts`:** abortar si el host de
+   `DATABASE_URL` no es el esperado para el entorno actual. Barato y
+   evita el peor escenario.
+3. **Job `seed` con `if:` restringido** a ramas que no sean `develop`.
+
+**Nota:** la opcion 2 es la unica que se puede aplicar sin tocar la
+infraestructura de Neon, y funciona aunque alguien olvide cambiar el
+secret.
+
+**Origen:** detectado al verificar por que E2E paso a verde.
+
+**Severidad:** ALTA.
+
+**Urgencia:** ALTA. Es destructivo y ocurre en cada push.
+
+---
+
+## 45. E2E fallaba por split de base de datos
+
+**Estado:** **Resuelto (2026-10-03)** por cambio de configuracion, no de
+codigo.
+
+## Sintoma
+
+El job `e2e` fallaba con 33 tests pasando y 1 fallando:
+
+```
+Expected: "confirmed"
+Received: "pending_payment"
+e2e/webhook/webhook-signature.spec.ts:92
+```
+
+## Causa
+
+Los dos extremos de la prueba usaban bases distintas:
+
+| Componente                                                    | Variable                                          | Base         |
+| ------------------------------------------------------------- | ------------------------------------------------- | ------------ |
+| `e2e/webhook/webhook-signature.spec.ts` (crea y lee la orden) | `DATABASE_URL`                                    | rama de Neon |
+| Webhook en Vercel (actualiza la orden)                        | `DATABASE_APP_URL` (`packages/db/src/index.ts:6`) | production   |
+
+La orden se creaba en la rama. El webhook la buscaba en production, no
+la encontraba, y no la actualizaba. El test releia la rama y veia
+`pending_payment`.
+
+## Resolucion
+
+`NEON_DATABASE_URL` se restauro a production (`2026-10-03T03:16:11Z`),
+quedando ambos secrets en la misma base. Los 4 jobs del run
+`37088993766` quedaron en `success`.
+
+## Deuda que deja
+
+Esta resolucion **empeoro el item 44**: al unificar en production, el
+`seed` paso a truncar production en cada run. Volver a apuntar CI a una
+rama reintroduce el split del E2E salvo que **los dos secrets** apunten
+a la rama (no solo `NEON_DATABASE_URL`).
+
+**Lecion:** los dos secrets de base deben moverse **juntos**. Mover solo
+uno produce exactamente este fallo, con un sintoma que no parece de
+configuracion.
+
+**Origen:** detectado durante el diagnostico del item 41.
+
+**Severidad:** INFO (resuelto).
+
+**Urgencia:** N/A.
+
 **Reevaluar:** junto con el item 41 (mismo pipeline de migraciones).

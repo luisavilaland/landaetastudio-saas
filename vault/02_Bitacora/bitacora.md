@@ -1966,3 +1966,137 @@ resultaron ser la misma operacion y se fusionaron, y no hay migracion
 de columnas.
 
 **Severidad:** planificado. Sin codigo de producto tocado.
+
+---
+
+## 2026-10-02 y 2026-10-03 - Spike T0, fix del runner y items de deuda
+
+### Spike T0 (issue #164)
+
+Ejecutado con SDD contra la cuenta de pruebas de MercadoPago. Dos
+preapprovals pagados de verdad.
+
+| P   | Pregunta                                             | Resultado |
+| --- | ---------------------------------------------------- | --------- |
+| P1  | ¿MP entrega webhooks de suscripciones?               | PENDIENTE |
+| P2  | ¿`notification_url` en POST `/preapproval`?          | NO        |
+| P3  | ¿`/authorized_payments` expone el vinculo tenant?    | SI        |
+| P5  | ¿`PUT /preapproval/{id}` guarda `notification_url`?  | NO        |
+| P6  | ¿Se puede mutar el preapproval tras el cobro?       | NO        |
+
+**P6 (nuevo).** `PUT /preapproval/{id}` es inerte despues del primer
+cobro. Probado con `status: "cancelled"`, `status: "paused"` y
+`auto_recurring.transaction_amount`: los tres devuelven 200 sin efecto.
+`last_modified` nunca se movio (identico byte a byte en los 6 intentos).
+Con `"canceled"` (una L) la API responde 400. **Ninguna de las dos
+grafias funciona**, y el design (3.3) y el transversal (6) especifican
+`status: "cancelled"`. Cancelar y pausar quedan fuera de alcance de
+Fase 2.
+
+**P3 (positivo).** `/authorized_payments/search` acepta el
+`preapprovalId` como parametro y devuelve `external_reference` +
+`preapproval_id` + `payment.status`. **No se requiere la tabla
+`subscription_payments`**: el cruce tenant se resuelve con el indice
+unico parcial de `subscriptions.mpPreapprovalId`.
+
+**P1 (pendiente).** Cero entregas. Se descarto que fuera un artefacto de
+observabilidad (la ingesta de logs se probo viva con un POST de control
+que aparecio de inmediato) y que fuera Vercel Auth (pago #2 ocurrio con
+Auth desactivado). Quedan dos hipotesis abiertas: **H1** MP no entrega a
+preview domains de Vercel, **H2** no hay ningun topic suscrito en el
+panel. **H2 debe descartarse primero: cuesta 5 minutos y puede ahorrar
+el dia entero de T5.**
+
+### Correccion de un error de analisis
+
+La primera conclusion del spike - "MP no entrega webhooks por ninguna
+via" - **no estaba sostenida**. Se verifico que no hubo entrega, pero
+**nunca se verifico que la suscripcion a topics estuviera activa** en el
+panel. Confundir "no hubo entrega" con "no hay entrega posible" es un
+salto logico invalido. El refame dejo la conclusion en PENDIENTE.
+
+### Hallazgo de observabilidad
+
+**Un `2xx` de Mercado Pago no significa que la operacion se aplico.**
+Cuatro casos lo probaron: `notification_url` en POST (201), en PUT (200
+con `version` incrementado) y `status: "cancelled"` (200) devolvieron
+exito sin aplicar el campo. Toda escritura con efecto de estado debe
+verificarse con un `GET` posterior.
+
+### Items de deuda registrados
+
+| # | Tema | Severidad |
+| - | ---- | --------- |
+| 40 | Reglas de escritura de `.md` en Windows/PowerShell | MEDIA |
+| 41 | `seed` rojo en CI: `drizzle-kit migrate` sin mensaje | ALTO |
+| 42 | `drizzle.config.ts` no carga dotenv | MEDIA |
+| 43 | `drizzle-kit` no imprime errores en modo no-interactivo | ALTA |
+| 44 | `pnpm db:seed` trunca production en cada run de CI | ALTA |
+| 45 | E2E fallaba por split de base de datos | INFO (resuelto) |
+
+**Item 43 (el mas relevante).** `drizzle-kit@0.31.10` embebe
+`hanji@0.0.8`, cuyo `renderWithTask` hace `terminal.reject(err)` y
+despues `process.exit(1)` de forma sincrona: el exit gana la carrera y el
+proceso muere antes del render. Peor: la vista no tiene rama para el
+error, el estado `rejected` dibuja el mismo spinner que `pending`.
+**Cualquier fallo de migracion en CI es indiagnosticable.** Se
+descartaron `CI: true` (drizzle nunca lee esa env var), `--verbose` (no
+existe en 0.31.10), stderr (vacio) y un shim de `process.exit`.
+Reproducible localmente en una linea.
+
+### Diagnostico del item 41 (tres rondas)
+
+1. **`CI: true`** propuesto como fix. Fallo: `process.env.CI` aparece 0
+   veces en `drizzle-kit/bin.cjs`. El output quedo identico.
+2. **Step de diagnostico** sin conectar: revelo que el secret estaba
+   seteado y apuntaba al **mismo host** que la DB de dev. Eso mato la
+   hipotesis de "tracking desalineado".
+3. **Test de conexion con `ssl: 'require'`**:
+   `ERROR CONEXION: ECONNREFUSED connect ECONNREFUSED 54.209.204.248:5432`.
+
+**Causa raiz: el firewall `nftables` del VPS del runner rechazaba el
+puerto 5432.** Se habia creado despues de un `LOGDROPOUT`. Fix manual
+del humano: insertar la regla en posicion 1 de `OUTPUT` y persistir en
+`/etc/sysconfig/nftables.conf`, verificado con simulacro de reboot.
+
+**No era IP Allow de Neon.** La rama de Neon creada durante el
+diagnostico fue devuelta porque no hacia falta.
+
+### Split de DB en E2E (item 45)
+
+El test creaba y releia la orden con `DATABASE_URL` (rama de Neon),
+mientras el webhook corre en Vercel con `DATABASE_APP_URL`
+(production). La orden no existia en production, el webhook no la
+actualizaba y el test veia `pending_payment`.
+
+Resuelto al restaurar `NEON_DATABASE_URL` a production. Los 4 jobs del
+run `37088993766` quedaron en `success`.
+
+**Lecion:** los dos secrets de base deben moverse **juntos**. Mover solo
+uno produce un fallo que no parece de configuracion.
+
+### Deuda introducida por esa resolucion (item 44)
+
+Al unificar ambos secrets en production, **`pnpm db:seed` paso a
+truncar production en cada push a `develop`** (10 tablas con
+`TRUNCATE ... CASCADE`). El job pasa en verde mientras borra datos. Es la
+deuda mas urgente de las seis.
+
+### PRs
+
+| # | Que |
+| - | --- |
+| 178 | Spike T0 + stub temporal (mergeado `e97b0c8`) |
+| 180 | Item 41 (mergeado `4728dc8`) |
+| 181 | Items 40-45, diagnostico de CI, fix del runner (abierto) |
+
+### Pendientes
+
+- **H2 antes de T5**: confirmar topics suscritos en el panel de MP.
+- **Pregunta a MercadoPago**: si el access token de plataforma puede
+  mutar `PUT /preapproval/{id}`. Define si T4 tiene backend de
+  cancelacion o redirige al portal.
+- **Dos preapprovals de prueba con cobro agendado el 2026-11-02**:
+  cancelar desde el panel de MP (la API no funciona, ver P6).
+- **Rotar dos tokens** quedaron expuestos en el chat de la sesion: el de
+  Vercel y el del seller de pruebas.
