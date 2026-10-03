@@ -2518,3 +2518,89 @@ OK · `scripts/check-migrations.sh` OK.
 **Severidad:** INFO (implementacion de task).
 
 **Urgencia:** N/A.
+
+---
+
+## 2026-10-03 - Fix: el stub de suscripciones validaba con el secret del tenant
+
+**Rama:** `chore/fix-webhook-subscriptions-secret` · **Prepara:** T5
+
+**El bug.** El stub de
+`apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts`
+verificaba la firma contra `MERCADOPAGO_WEBHOOK_SECRET`, que es el
+secret del **TENANT** (Flujo B, ordenes de tienda). Los webhooks de
+**suscripciones** llegan de la cuenta de plataforma y vienen
+firmados con `MP_PLATFORM_WEBHOOK_SECRET` (Flujo A).
+
+**Por que se detecto ahora y no en el spike T0.** En el spike el
+stub corria en un preview domain y **nunca llego ningun webhook**,
+asi que la linea nunca se ejecuto contra una firma real. El bug
+llevaba dias en `develop` sin ser observable.
+
+**Por que es bloqueante, no cosmetico.** Con el secret equivocado, si
+el webhook llega, el stub responde **401 "Invalid signature"**. Eso
+es indistinguible de "no llego" mirando solo los access logs. T5
+mide justamente si el webhook llega: sin el fix, el resultado de la
+sonda es ambiguo y se gasta un pago real para no poder concluir nada.
+
+**La asercion que lo prueba.** Con ambos secrets configurados, una
+firma hecha con el secret del **tenant** debe dar **401**. Antes del
+fix daba **200**. Ese test falla en RED y pasa en GREEN; es el que
+protege contra una regresion silenciosa.
+
+**El fix.** `MP_PLATFORM_WEBHOOK_SECRET ?? MERCADOPAGO_WEBHOOK_SECRET`.
+El fallback mantiene el comportamiento legacy en entornos que todavia
+no tengan el secret de plataforma configurado (dev / preview). En
+produccion los tres proyectos de Vercel ya lo tienen (T2).
+
+**Estado del stub en produccion verificado antes del fix** (en
+`admin.landaetastudio.com`, ya desplegado por el PR #178):
+
+| Request | Respuesta |
+|---------|-----------|
+| POST sin `x-signature` | 401 `Missing signature` |
+| POST con firma invalida | 401 `Invalid signature` |
+| POST con body > 100 KB | 413 `Payload too large` |
+| GET | 405 |
+
+O sea: **H1 tiene su precondicion cumplida.** El endpoint existe y
+responde en un dominio de produccion real, no en un `.vercel.app`.
+
+**6 tests nuevos.** Total **523 en 62 archivos**.
+
+**Severidad:** ALTA (invalidaba la medicion de T5).
+
+**Urgencia:** antes de mergear, por el pago pendiente.
+
+---
+
+## 2026-10-03 - Mensaje de logger del stub desactualizado
+
+**Rama:** `chore/fix-webhook-subscriptions-secret` · **PR:** #187
+
+**Que era.** Tras cambiar el secret activo a
+`MP_PLATFORM_WEBHOOK_SECRET ?? MERCADOPAGO_WEBHOOK_SECRET`, el
+mensaje del `logger.error` seguia diciendo
+`'MERCADOPAGO_WEBHOOK_SECRET not configured'`. El log decia una
+variable que ya no era la que se leia.
+
+**Por que importa para T5.** Si T5 llegara a dar 503 (que es lo que
+pasa si ninguno de los dos secrets esta configurado en el entorno),
+el mensaje de diagnostico tiene que senalar las dos variables reales. Un
+mensaje que menciona solo una hace que se investigue el lado
+equivocado: harias pasar tiempo revisando `MERCADOPAGO_WEBHOOK_SECRET`
+en Vercel cuando el problema podria ser `MP_PLATFORM_WEBHOOK_SECRET`.
+
+**El fix.** `'No webhook secret configured
+(MP_PLATFORM_WEBHOOK_SECRET or MERCADOPAGO_WEBHOOK_SECRET)'`.
+
+**Sin cambio en el body del 503** (`"Webhook not configured"`): es
+la respuesta publica y nombra la condicion, no la variable. El test
+existente lo asserta y sigue verde.
+
+**DoD:** `pnpm test` **523/523 en 62 archivos** (sin cambio, es un
+string) · lint, typecheck, build y `format:check` OK.
+
+**Severidad:** BAJA (diagnostico, no comportamiento).
+
+**Urgencia:** N/A.

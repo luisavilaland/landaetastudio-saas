@@ -451,7 +451,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**517 tests pasando, 0 fallos (61 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**523 tests pasando, 0 fallos (62 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
@@ -569,6 +569,8 @@ Actualización 3 de octubre de 2026 – 475 tests, 57 archivos, T1 de Fase 2 (mi
 Actualización 3 de octubre de 2026 – 486 tests, 58 archivos, T2 de Fase 2 (validación de `MP_PLATFORM_*` + `getAdminBaseUrl`). Rama `chore/t2-env-validation`.
 
 Actualización 3 de octubre de 2026 – 517 tests, 61 archivos, T3 de Fase 2 (helpers de dominio + cliente de MercadoPago). Rama `chore/t3-helpers`.
+
+Actualización 3 de octubre de 2026 – 523 tests, 62 archivos, fix del stub del webhook de suscripciones (secret de plataforma). Rama `chore/fix-webhook-subscriptions-secret`.
 
 ## URLs de producción (Vercel)
 

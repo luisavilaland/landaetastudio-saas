@@ -18,3 +18,5 @@ tags:
 - [[prefijo-estado-actual-para-contadores-ambiguos-en-testing-md-125]]
 - [[item-47-la-validacion-de-env-vars-es-global-no-per-app-126]]
 - [[t3-fase-2-helpers-de-dominio-prorrateo-y-convencion-de-signo-127]]
+- [[bug-el-stub-de-suscripciones-validaba-con-el-secret-del-tena-128]]
+- [[logger-del-stub-debe-nombrar-las-dos-variables-de-secret-129]]
