@@ -2263,3 +2263,78 @@ la evidencia no es reproducible desde el codigo.
 habria consumido tiempo en T5).
 
 **Urgencia:** N/A.
+
+---
+
+## 2026-10-03 - T1 Fase 2: indice unico parcial en subscriptions.mpPreapprovalId
+
+**Issue:** #165 · **Rama:** `chore/t1-migration-index`
+
+**Que es.** Un indice. Ni tabla ni columna. Es la base de la
+"estrategia L" del design de Fase 2: resolver el `tenantId` desde el
+`preapproval_id` de MercadoPago sin joins.
+
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS "subscriptions_mp_preapproval_idx"
+  ON "subscriptions" USING btree ("mpPreapprovalId")
+  WHERE "subscriptions"."mpPreapprovalId" IS NOT NULL;
+```
+
+**Estado verificado en Neon** (`ep-dawn-hat-amtrizsw`, us-east-1):
+
+- Indice creado, `UNIQUE`, con su `WHERE`.
+- `ENABLE RLS = true`, `FORCE RLS = true` sobre `subscriptions`: sin
+  cambios.
+- `drizzle.__drizzle_migrations`: de 1 fila a 2.
+- Inventario previo: 2 filas en `subscriptions`, 0 con
+  `mpPreapprovalId`, 0 grupos duplicados (el indice no podia fallar
+  por colision).
+
+**Dos decisiones que conviene no volver a discutir:**
+
+1. **El plan de Fase 2 tenia el nombre de columna mal.** El spike T0
+   documenta `mp_preapproval_id`; el schema real es
+   `mpPreapprovalId` (camelCase, `text('mpPreapprovalId')`).
+   Copiar el SQL del spike tal cual habria fallado por columna
+   inexistente. El SQL del plan §4 ya venia correcto.
+2. **`IF NOT EXISTS` agregado a mano** sobre la salida de
+   `drizzle-kit generate`, que no lo emite. Motivo: este repo ya
+   aplico la migracion 0015 a mano (drizzle-kit no podia) y el item
+   43 de deuda tecnica documenta que drizzle-kit se traga errores de
+   migracion. Con `IF NOT EXISTS` una reaplicacion manual es no-op en
+   vez de "relation already exists".
+
+**Lo que el plan daba por hecho y|resulto real:**
+
+| Suposicion del plan | Resultado |
+| ------------------- | --------- |
+| Drizzle podria no emitir el `WHERE` | **Si lo emite.** Verificado en el `.sql` generado y en `pg_indexes` |
+| El seed no crea suscripciones con preapproval | Correcto: 0 con `mpPreapprovalId` |
+
+**Correccion a una afirmacion comun:** el `WHERE` **no** es necesario
+por los `NULL`. PostgreSQL ya trata los `NULL` como distintos entre si
+en un indice unico, asi que el indice sin `WHERE` tambien los
+permitiria. El `WHERE` hace que el indice sea **parcial**: cubre solo
+las filas que tienen preapproval, que son una fraccion del total. El
+btree es mas chico y el lookup mas barato. La primera version del
+comentario en `schema.ts` afirmaba lo contrario y fue corregida antes
+del commit.
+
+**DoD:** `pnpm lint` 6/6 · `pnpm typecheck` 9/9 · `pnpm test` **475/475
+en 57 archivos** (+1) · `pnpm build` 3/3 · `pnpm format:check` OK ·
+`scripts/check-migrations.sh` OK (Git Bash; el `bash` de WSL en este
+entorno no resuelve `/bin/bash`).
+
+**Pendiente:** `pnpm db:seed` **no** se ejecuto. Trunca tablas y el
+plan no lo pedia para esta task. Queda como decision del humano.
+
+**Archivos:** `packages/db/src/schema.ts`,
+`packages/db/migrations/0001_dapper_revanche.sql`,
+`packages/db/migrations/meta/0001_snapshot.json`,
+`packages/db/migrations/meta/_journal.json`,
+`packages/db/src/__tests__/schema.test.ts`, contadores en README /
+SETUP / TESTING / TESTING-MANUAL.
+
+**Severidad:** INFO (implementacion de task).
+
+**Urgencia:** N/A.

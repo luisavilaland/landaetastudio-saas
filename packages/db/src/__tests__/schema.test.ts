@@ -98,6 +98,22 @@ describe('DB Schema', () => {
       ).toBe(true)
     })
 
+    it('should have a partial unique index on mpPreapprovalId', () => {
+      const mpIdx = getTableConfig(dbSubscriptions).indexes.find(
+        (index) => index.config.name === 'subscriptions_mp_preapproval_idx',
+      )
+      expect(mpIdx).toBeDefined()
+      expect(mpIdx?.config.unique).toBe(true)
+      expect(
+        mpIdx?.config.columns.some(
+          (col) => 'name' in col && col.name === 'mpPreapprovalId',
+        ),
+      ).toBe(true)
+      // El WHERE es lo que hace el indice PARCIAL. Sin el, el btree cubriria
+      // tambien las suscripciones que todavia no tienen alta en MercadoPago.
+      expect(mpIdx?.config.where).toBeDefined()
+    })
+
     it('should default status to pending_first_payment', () => {
       expect(dbSubscriptions.status.hasDefault).toBe(true)
       expect(dbSubscriptions.status.default).toBe('pending_first_payment')

@@ -417,7 +417,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**474 tests pasando, 0 fallos (57 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**475 tests pasando, 0 fallos (57 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
@@ -529,6 +529,8 @@ Release v0.10.0 (2026-09-17) — Modernización stack (TS6, Next 16.3.5, ioredis
 Actualización 20 de septiembre de 2026 – 464 tests, 15 specs E2E (post T6 + migración 0013). Rama `develop`.
 
 Actualización 24 de septiembre de 2026 – 474 tests, 57 archivos, T11/T13 y 0015 preparada. Rama `chore/close-fase1`.
+
+Actualización 3 de octubre de 2026 – 475 tests, 57 archivos, T1 de Fase 2 (migración `0001_dapper_revanche`, índice único parcial en `subscriptions.mpPreapprovalId`). Rama `chore/t1-migration-index`.
 
 ## URLs de producción (Vercel)
 
