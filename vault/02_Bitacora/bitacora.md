@@ -2710,3 +2710,124 @@ string) · lint, typecheck, build y `format:check` OK.
 **Severidad:** BAJA (diagnostico, no comportamiento).
 
 **Urgencia:** N/A.
+
+---
+
+## 2026-10-03 - T4 Fase 2: 6 endpoints de suscripciones
+
+**Rama:** `chore/t4-endpoints` (desde `develop` en `7233859`).
+
+### Que se implemento
+
+Seis handlers en `apps/admin/app/api/subscriptions/`:
+
+| Endpoint | Respuesta | Nota de diseno |
+| --- | --- | --- |
+| `POST /preapproval` | 201 | Rate limit 10/60s por IP, fail-open |
+| `GET /` | 200 | Devuelve `permissions` (matriz de estados) |
+| `POST /cancel` | 202 | **Irreversible** en MP |
+| `POST /pause` | 202 | `authorized -> paused`, reversible |
+| `POST /resume` | 202 | `paused -> authorized` |
+| `PUT /plan` | 402 / 202 | 402 en upgrade, 202 en downgrade |
+
+Los tres de mutacion comparten `apps/admin/lib/subscriptions/mutate.ts`
+para no triplicar el flujo auth -> lectura -> 409 -> PUT -> verificar.
+
+### Estado `paused` anadido a `derivePermissions`
+
+**Por que.** El transversal (`2026-09-subscription-lifecycle.md`, seccion 1)
+lista 6 estados y **no incluye `paused`**. Se agrego al codigo por tres
+motivos verificados:
+
+1. MP expone el estado y la transicion funciona en ambas direcciones
+   (`authorized -> paused` y `paused -> authorized`, ambas 200 + GET
+   coherente, 2026-10-03).
+2. La doc oficial de MP confirma que `paused` **detiene el cobro**
+   ("Mercado Pago deje de debitar los pagos de ese cliente hasta que
+   decidas reactivarlo").
+3. `cancel` es **terminal** en MP: responde 400 a
+   `cancelled -> authorized`. Sin `paused` el tenant no tendria ninguna
+   forma de volver.
+
+`paused` NO es lo mismo que `past_due`: `past_due` es el impago
+(periodo de gracia de 7 dias, seccion 3 del transversal); `paused` es
+la suspension voluntaria del tenant.
+
+Se eligio `canAccessPanel: 'limited'` y no `'readonly'` porque el
+tenant pausado tiene una accion util: `resume`. No pierde acceso al
+storefront: lo que se suspende es el cobro.
+
+**Deuda:** el transversal sigue diciendo 6 estados. Hay que agregar
+`paused` a las secciones 1 y 2 en el PR transversal. Queda como TODO
+en el codigo y en el test.
+
+### Verificacion post-escritura en mutaciones y en plan
+
+El spike T0 demostro que **un 2xx de MP no prueba que la operacion se
+aplico** (P5: `notification_url` se acepta y se descarta en silencio).
+Por eso, tras cada PUT se relee el preapproval con GET y se compara:
+
+- Si el estado/monto **no** quedo aplicado -> **502**, no un falso 202.
+- Si el GET de verificacion **falla** -> se devuelve el exito, porque el
+  PUT ya salio bien y tirar por la borda una operacion valida seria peor
+  que no verificarla.
+
+### Bug encontrado en codigo de T3 (corregido aqui)
+
+El docstring de `ProrationResult.proratedAmountCents` en
+`subscription-proration.ts` estaba **invertido**: decia "(>0, upgrade)"
+cuando la implementacion `(currentPrice - newPrice) * fraction`
+produce **negativo** en un upgrade. Se corrigio el docstring.
+
+Si no se hubiera verificado contra la implementacion, el endpoint de
+cambio de plan habria cobrado al tenant el signo invertido.
+
+### Segundo bug encontrado por TDD: centavos vs unidades
+
+`POST /preapproval` mandaba `transactionAmount: priceUyu` (4900) sin
+dividir por 100. La API de MP espera el monto **en la unidad de la
+moneda**: se estaba por cobrar 100 veces mas. Lo detecto el test
+`manda el precio en la moneda de MP, no en centavos`.
+
+Los centavos son una convencion interna nuestra (AGENTS.md); la
+conversion va en el borde de la API.
+
+### Tercer hallazgo: `payerEmail` no puede venir del cliente
+
+La primera version tomaba el email del pagador de un header
+(`x-tenant-owner-email`). Eso permite que un cliente redirija el cobro
+de su suscripcion a una casilla arbitraria. Corregido: sale del JWT
+(`session.user.email`) via `requireAuthContext()`.
+
+### Prorrateo: el upgrade no se cobra en el endpoint
+
+`PUT /plan` devuelve **402** con el monto a cobrar y deja que la UI arme
+el checkout. Meter un cobro tarjeta a tarjeta ahi seria una operacion
+financiada que el endpoint no tiene permiso de hacer.
+
+El prorrateo es **informativo**: el saldo a favor de un downgrade se
+aplica en la facturacion siguiente, no como un saldo en la DB (no hay
+tabla de creditos y AGENTS.md prohibe inventar una en este PR).
+
+### Aislamiento multi-tenant
+
+Todos los endpoints toman `tenantId` **solo** del JWT. Hay tests
+explicitos de que un `tenantId` en el body o en el query se ignora, y
+de que `withTenantContext` se abre exactamente una vez por request.
+
+### Pruebas dempuestos
+
+- `apps/admin/lib/subscriptions/__tests__/` (rate limit, fail-open)
+- `apps/admin/app/api/subscriptions/__tests__/route.test.ts` (13)
+- `apps/admin/app/api/subscriptions/__tests__/mutations.test.ts` (26)
+- `apps/admin/app/api/subscriptions/preapproval/__tests__/route.test.ts` (25)
+- `apps/admin/app/api/subscriptions/plan/__tests__/route.test.ts` (28)
+- `packages/commerce/src/__tests__/subscription-permissions.test.ts` (13,
+  reescrito con snapshot de matriz completa)
+
+**DoD:** `pnpm test` **619/619 en 66 archivos**, `pnpm lint`,
+`pnpm typecheck`, `pnpm build` (3 apps) y `pnpm format:check` OK.
+
+**Severidad:** N/A (feature).
+
+**Urgencia:** N/A.

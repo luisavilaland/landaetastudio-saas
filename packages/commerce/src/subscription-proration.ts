@@ -36,8 +36,15 @@ export type ProrationDirection = 'upgrade' | 'downgrade' | 'same'
 
 export interface ProrationResult {
   /**
-   * Centavos a cobrar (>0, upgrade) o saldo a favor (<0, downgrade).
-   * Negativo = el tenant debe; positivo = el tenant tiene credito.
+   * Diferencia entre lo pagado y lo que corresponde, en centavos.
+   *
+   * Signo (derivado de `(currentPrice - newPrice) * diasRestantes / diasPeriodo`):
+   * - **Negativo = el tenant DEBE**: es un upgrade. Hay que cobrar la diferencia.
+   * - **Positivo = el tenant TIENE credito**: es un downgrade.
+   * - `same` siempre da 0.
+   *
+   * El signo es contraintuitivo (un upgrade da negativo) pero es coherente con
+   * la formula: lo que se calcula es "lo que ya pago menos lo que le corresponde".
    */
   proratedAmountCents: number
   direction: ProrationDirection
