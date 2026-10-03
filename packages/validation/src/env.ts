@@ -27,8 +27,6 @@ const coreSchema = z.object({
   MP_TOKEN_ENCRYPTION_KEY: z
     .string()
     .min(32, 'MP_TOKEN_ENCRYPTION_KEY must be at least 32 characters'),
-  MP_PLATFORM_ACCESS_TOKEN: z.string().min(1).optional(),
-  MP_PLATFORM_WEBHOOK_SECRET: z.string().min(1).optional(),
 })
 
 const productionSchema = coreSchema.extend({
@@ -52,6 +50,12 @@ const productionSchema = coreSchema.extend({
   MERCADOPAGO_WEBHOOK_SECRET: z
     .string()
     .min(1, 'MERCADOPAGO_WEBHOOK_SECRET is required in production'),
+  MP_PLATFORM_ACCESS_TOKEN: z
+    .string()
+    .min(1, 'MP_PLATFORM_ACCESS_TOKEN is required in production'),
+  MP_PLATFORM_WEBHOOK_SECRET: z
+    .string()
+    .min(1, 'MP_PLATFORM_WEBHOOK_SECRET is required in production'),
   STOREFRONT_URL: z
     .string()
     .url('STOREFRONT_URL must be a valid URL in production'),
@@ -67,6 +71,10 @@ const developmentSchema = coreSchema.extend({
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET_NAME: z.string().optional(),
   MERCADOPAGO_WEBHOOK_SECRET: z.string().optional(),
+  // Fase 2: sin esto los handlers de suscripciones devuelven 500
+  // ("MercadoPago no configurado") en vez de romper el arranque.
+  MP_PLATFORM_ACCESS_TOKEN: z.string().optional(),
+  MP_PLATFORM_WEBHOOK_SECRET: z.string().optional(),
   STOREFRONT_URL: z.string().url().optional(),
   SENTRY_DSN: z.string().url().optional(),
 })

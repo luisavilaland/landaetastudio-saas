@@ -2338,3 +2338,111 @@ SETUP / TESTING / TESTING-MANUAL.
 **Severidad:** INFO (implementacion de task).
 
 **Urgencia:** N/A.
+
+---
+
+## 2026-10-03 - T2 Fase 2: MP_PLATFORM_* obligatorias en produccion + getAdminBaseUrl
+
+**Issue:** #166 · **Rama:** `chore/t2-env-validation`
+
+**Que es.** Dos cosas, sin logica de negocio:
+
+1. `MP_PLATFORM_ACCESS_TOKEN` y `MP_PLATFORM_WEBHOOK_SECRET` dejan de
+   ser opcionales en `coreSchema` y pasan a **obligatorias** en
+   `productionSchema`. Mismo patron que `MERCADOPAGO_WEBHOOK_SECRET`.
+   En desarrollo quedan opcionales a proposito: los handlers de
+   suscripciones devuelven `500 { error: "MercadoPago no
+   configurado" }` en vez de romper el arranque.
+2. `apps/admin/lib/get-admin-base-url.ts`: `getAdminBaseUrl(request)`,
+   espejo de `getStorefrontBaseUrl`. Deriva el dominio de
+   `x-forwarded-proto` + `host`, sin fallback a variable fija.
+
+**Riesgo operativo de esta task (leer antes de mergear).** Al volver
+obligatorias las dos variables, **una app de Vercel sin
+`MP_PLATFORM_*` deja de arrancar**. Hay que configurar las dos en los
+tres proyectos de Vercel **antes** de mergear, o el deploy deja las
+tres apps caidas. En `develop` no hay riesgo: `isProduction` exige
+`NODE_ENV=production` mas al menos una cloud var.
+
+**Dos diferencias deliberadas contra el espejo del storefront:**
+
+- `getAdminBaseUrl` **lanza** si el request no trae `host`. El espejo
+  devuelve `https://`, que es una URL valida en apariencia pero
+  invalida en la practica: el webhook quedaria registrado en un
+  destino que nunca recibe nada. Fallar en el request es mejor.
+- Parsea `x-forwarded-proto` como lista separada por comas
+  (`"https,http"`) y toma el primer valor. Vercel hace esto.
+
+**Un test que primero pasa por el motivo equivocado.** La primera
+version de los asserts de produccion matcheaba solo el nombre de la
+variable, y pasaban. Al endurecerlos para exigir el mensaje propio de
+`.min(1, '... is required in production')`, **fallaron**: cuando la
+variable falta, Zod emite el error de tipo (`expected string, received
+undefined`) y el mensaje custom solo aparece cuando la variable existe
+pero esta vacia. O sea, los tests originales no probaban lo que
+creian. Los asserts finales exigen el encabezado `PRODUCTION` mas el
+nombre de la variable, que es lo unico que distingue ese fallo de uno
+del schema de desarrollo.
+
+**Verificado en Neon tras `pnpm db:seed`:** plans 3, tenants 2,
+subscriptions 2, products 6, orders 4, customers 2. El indice de T1
+sigue presente y 0 filas con `mpPreapprovalId`.
+
+**DoD:** `pnpm lint` 6/6 · `pnpm typecheck` 9/9 · `pnpm test`
+**485/485 en 58 archivos** (+11) · `pnpm build` 3/3 ·
+`pnpm format:check` OK · `scripts/check-migrations.sh` OK.
+
+**Pendiente para T7.** Los contadores de tests de este PR (485) y los
+del PR de T1 (475) tocan las mismas lineas de README, SETUP, TESTING,
+TESTING-MANUAL y bitacora. Al mergear ambos, el total real es **486**:
+los contadores habran que corregir ahi.
+
+**Archivos:** `packages/validation/src/env.ts`,
+`packages/validation/src/__tests__/env.test.ts`,
+`apps/admin/lib/get-admin-base-url.ts`,
+`apps/admin/lib/__tests__/get-admin-base-url.test.ts`, `SETUP.md`,
+`README.md`, `TESTING.md`, `TESTING-MANUAL.md`.
+
+**Severidad:** ALTA (el riesgo de deploy que introduce hay que
+gestionarlo antes del merge).
+
+**Urgencia:** antes de mergear.
+
+---
+
+## 2026-10-03 - Item 47: la validacion de env vars es global, no per-app
+
+**Contexto.** El PR #185 (T2) hizo `MP_PLATFORM_*` obligatorias en
+produccion. `packages/validation/src/env.ts` define **un solo schema
+de produccion para las tres apps**, pero solo `apps/admin` usa esas
+credenciales.
+
+**Hecho.** Storefront y superadmin no las necesitan para nada y sin
+embargo `validateEnv()` tira si faltan: no arrancan.
+
+**Lo que se vio en el T2.** Los preview deploys de storefront y
+superadmin fallaron con las vars sin configurar. Se configuraron en
+los tres proyectos de Vercel y las tres quedaron en verde.
+
+**Salvedad, porque importa para no mentir en el futuro.**
+`saas-admin` paso *antes* de la correccion. Si la causa fuera
+`validateEnv()`, las tres deberian haber fallado. La correlacion
+"configurar -> verde" es fuerte, pero la causalidad **no esta
+probada**: puede haber un factor propio de storefront y superadmin.
+El defecto de diseno del item 47 es real e independiente del
+incidente; lo que no se afirma es que el incidente fuera
+exclusivamente por esto.
+
+**Fix temporal.** `MP_PLATFORM_ACCESS_TOKEN` y
+`MP_PLATFORM_WEBHOOK_SECRET` configuradas en los tres proyectos de
+Vercel.
+
+**Fix definitivo.** `validateEnv({ app, requires })` con scope por
+app, solo admin valida las de plataforma. Registrado como **item 47**
+en `vault/03_Deuda/deuda-tecnica.md`, severidad MEDIA, a reevaluar
+antes de T4.
+
+**Severidad:** MEDIA (bloquea merges de PRs que agregan vars; no
+rompe produccion mientras esten configuradas).
+
+**Urgencia:** MEDIA.

@@ -1400,3 +1400,89 @@ diagnostico del item 44.
 **Urgencia:** MEDIA - no bloquea Fase 2, pero puede causar tests flaky en T4.
 
 **Reevaluar:** antes de T4 (endpoints de suscripciones).
+
+---
+
+## 47. La validación de env vars es global, no per-app
+
+**Estado:** abierto (2026-10-03).
+
+## Hecho
+
+`packages/validation/src/env.ts` define **un solo schema de producción** para las
+tres apps. Con el PR #185, `MP_PLATFORM_ACCESS_TOKEN` y `MP_PLATFORM_WEBHOOK_SECRET`
+pasaron a ser obligatorias en `productionSchema`. Pero **solo `apps/admin` las usa**:
+son las credenciales de la cuenta de plataforma para cobrar suscripciones
+(`POST /preapproval`, firma del webhook de suscripciones).
+
+Storefront y superadmin no las necesitan para nada, y sin embargo `validateEnv()`
+tira y **no arrancan** si faltan.
+
+## Impacto
+
+1. **Fuerza a configurar variables innecesarias en 2 de los 3 proyectos de Vercel.**
+   Es superficie de exposición gratuita: el token de la plataforma vive en el
+   entorno de dos procesos que jamás lo leen.
+2. **Bloquea merges.** Cualquier PR que agregue una var de un solo scope frena
+   los tres deploys hasta que se configuren las tres.
+3. **Falla de forma opaca.** El mensaje dice "Invalid environment variables for
+   PRODUCTION: MP_PLATFORM_ACCESS_TOKEN is required in production" en el log de
+   una app que no la usa. Nada indica que el problema es de diseño del schema.
+
+## Evidencia (PR #185, 2026-10-03)
+
+| Momento                                            | Resultado      |
+| -------------------------------------------------- | -------------- |
+| Preview deploy de `storefront`                     | **FAILURE**    |
+| Preview deploy de `superadmin`                     | **FAILURE**    |
+| Preview deploy de `saas-admin`                     | SUCCESS        |
+| Tras configurar `MP_PLATFORM_*` en los 3 proyectos | Las 3 en verde |
+
+**Salvedad honesta:** `admin` pasó _antes_ de la corrección. Si la causa fuera
+`validateEnv()`, las tres deberían haber fallen. No hay evidencia de que el fallo
+fuera exclusivamente la validación: podría haber un factor propio de storefront y
+superadmin (dos de los tres son las que corren `next build` con el store de
+`NODE_ENV=production` completo). La correlación "configurar → verde" es fuerte,
+pero **la causalidad no está probada**. Por eso este item registra el defecto de
+diseño —que es real e independiente del incidente— y no afirma que el incidente
+fuera exclusivamente por esto.
+
+## Mitigaciones
+
+1. **Scope por app en `validateEnv(scope)`.** Cada app declara qué vars exige:
+   ```ts
+   validateEnv({
+     app: 'admin',
+     requires: ['MP_PLATFORM_ACCESS_TOKEN', 'MP_PLATFORM_WEBHOOK_SECRET'],
+   })
+   ```
+   Es la opción que resuelve la raíz y la que Reduce el acoplamiento: cada app
+   declara lo que realmente necesita (superadmin y storefront nunca cobran
+   suscripciones).
+2. **Schema base + extend por app.** `productionBaseSchema` + `adminProductionSchema`
+   que agrega las de plataforma. Menos invasivo que cambiar la firma, pero
+   duplica el punto de entrada.
+3. **Aceptarlo y documentarlo.** Deja el problema como está: la app que no usa la
+   var igual la exige. Descartada.
+
+**Preferible la 1:** el scope ya existe conceptualmente (las tres apps importan el
+mismo paquete pero cada una lo consume distinto); falta pasarlo de comentario a
+parámetro.
+
+## Relacionado
+
+- **Item 42:** `drizzle.config.ts` no carga dotenv — mismo eje: configuración que
+  se toma del entorno global en vez de por consumidor.
+- **PR #185 (T2):** donde se materializó.
+
+**Origen:** detectado al mergear el PR #185. Los preview deploys de storefront y
+superadmin fallaron con las vars sin configurar; configurar las tres los dejó en
+verde.
+
+**Severidad:** MEDIA. Bloquea merges de PRs que agregan vars; no rompe producción
+mientras las vars estén configuradas.
+
+**Urgencia:** MEDIA.
+
+**Reevaluar:** antes de T4 (admin empieza a usar MercadoPago en serio) — a partir
+de ahí, la diferenciación de scopes deja de ser higiene y pasa a ser requisito.

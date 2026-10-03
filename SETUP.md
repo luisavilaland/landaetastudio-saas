@@ -128,10 +128,10 @@ La aplicación valida automáticamente las variables de entorno al arrancar (`pa
 
 ### Comportamiento por entorno
 
-| Entorno                                 | Validación                                                                                                                                                                                                                                                                                                                      |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Desarrollo** (`NODE_ENV=development`) | Valida las variables core (`DATABASE_URL`, `DATABASE_APP_URL`, `AUTH_SECRET`, `MERCADOPAGO_ACCESS_TOKEN`, `MP_TOKEN_ENCRYPTION_KEY`). `MP_TOKEN_ENCRYPTION_KEY` requiere al menos 32 caracteres. `NEXTAUTH_URL` es opcional (NextAuth v5 la infiere del Host header). Las variables cloud son opcionales.                       |
-| **Producción** (`NODE_ENV=production`)  | Valida las variables core y cloud (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `MERCADOPAGO_WEBHOOK_SECRET`, `STOREFRONT_URL`). `MP_PLATFORM_ACCESS_TOKEN` y `MP_PLATFORM_WEBHOOK_SECRET` son opcionales hasta Fase 2. |
+| Entorno                                 | Validación                                                                                                                                                                                                                                                                                                                                           |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Desarrollo** (`NODE_ENV=development`) | Valida las variables core (`DATABASE_URL`, `DATABASE_APP_URL`, `AUTH_SECRET`, `MERCADOPAGO_ACCESS_TOKEN`, `MP_TOKEN_ENCRYPTION_KEY`). `MP_TOKEN_ENCRYPTION_KEY` requiere al menos 32 caracteres. `NEXTAUTH_URL` es opcional (NextAuth v5 la infiere del Host header). Las variables cloud son opcionales.                                            |
+| **Producción** (`NODE_ENV=production`)  | Valida las variables core y cloud (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `MERCADOPAGO_WEBHOOK_SECRET`, `STOREFRONT_URL`, `MP_PLATFORM_ACCESS_TOKEN`, `MP_PLATFORM_WEBHOOK_SECRET`). Las dos últimas son obligatorias desde la Fase 2. |
 
 ### Si falta una variable
 
@@ -147,7 +147,41 @@ La app **no arrancará** y mostrará un error claro indicando qué variable falt
 
 `MP_TOKEN_ENCRYPTION_KEY` es obligatoria en todos los entornos y debe tener al menos 32 caracteres. Generala localmente con `openssl rand -base64 32` y guardala únicamente en `.env.local` o en Vercel. La misma clave debe estar configurada en storefront, admin y superadmin; no se versiona ni se imprime.
 
-`MP_PLATFORM_ACCESS_TOKEN` y `MP_PLATFORM_WEBHOOK_SECRET` quedan opcionales hasta Fase 2.
+`MP_PLATFORM_ACCESS_TOKEN` y `MP_PLATFORM_WEBHOOK_SECRET` son **obligatorias en producción desde la Fase 2** (ver "MercadoPago plataforma (Fase 2)" más abajo). En desarrollo son opcionales: los handlers de suscripciones devuelven `500 { error: "MercadoPago no configurado" }` en vez de romper el arranque.
+
+### MercadoPago plataforma (Fase 2)
+
+Las credenciales de **cobrar suscripciones a los tenants** son distintas de las credenciales de **cobrar al cliente final de cada tienda**. Esta sección es para las primeras.
+
+| Variable                     | Qué es                                                                                                  | Entorno                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `MP_PLATFORM_ACCESS_TOKEN`   | Token de la **cuenta de plataforma**, no el del tenant. El del tenant va cifrado en `tenant_mp_config`. | Obligatoria en producción |
+| `MP_PLATFORM_WEBHOOK_SECRET` | Firma secreta con la que MP firma las notificaciones de suscripción.                                    | Obligatoria en producción |
+
+**Cómo obtenerlas.** En el panel de MercadoPago de la cuenta **de plataforma** (la que cobra las suscripciones del SaaS, no la de ninguna tienda):
+
+1. `MP_PLATFORM_ACCESS_TOKEN`: Developer tools → _Tus integraciones_ → copiar el token de acceso de producción de la aplicación de plataforma. En la API es el `Authorization: Bearer` de `POST /preapproval`.
+2. `MP_PLATFORM_WEBHOOK_SECRET`: _Tus integraciones_ → **Webhooks** → copiar el **Signing secret**. Es un valor distinto del token.
+
+Ambas van en `.env.local` (desarrollo) y en las tres apps de Vercel (producción). Los placeholders ya existen en `.env.local.example` y ambas están declaradas en `turbo.json > tasks.build.env`.
+
+**Registrar la URL del webhook.** En la misma pantalla de _Webhooks_ de la cuenta de plataforma, la URL se registra **literal**: MP no hace templating de path, así que **no** admite `/api/webhooks/mercadopago/subscriptions/:tenantId`. La URL de Fase 2 es:
+
+```
+https://admin.landaetastudio.com/api/webhooks/mercadopago/subscriptions
+```
+
+- Debe ser **HTTPS pública**. No sirve `localhost` ni un preview domain de Vercel (`.vercel.app`) — ver más abajo.
+- Suscribí los topics: `subscription_preapproval`, `subscription_authorized_payment` y `payment` (legacy).
+- El tenant se resuelve **por el `preapproval_id`**, no por el host ni por el path.
+
+**Tres trampas verificadas por el spike T0** (`docs/superpowers/specs/2026-10-02-spike-t0-resultado.md`), para no perder tiempo después:
+
+1. **`notification_url` no se persiste.** `POST /preapproval` la acepta y devuelve `201`, pero un `GET /preapproval/{id}` posterior no la muestra. `PUT /preapproval/{id}` devuelve `200` y tampoco la guarda. La única vía es el panel de MP.
+2. **`PUT /preapproval/{id}` es de solo lectura después del primer cobro.** Devuelve `200` sin efecto (`status: "cancelled"`), o `400` si usás `"canceled"`. Cancelar o pausar una suscripción desde nuestra API no es posible con este endpoint.
+3. **Un `2xx` de MP no es evidencia de que la operación se haya aplicado.** Verificá con un `GET` posterior.
+
+**El panel puede mostrar "ETAPA 1 DE 5" con los topics ya suscritos.** No lo tomes como señal: se verificó que el estado del wizard no refleja la suscripción real a los topics.
 
 ### Agregar nuevas variables
 
@@ -417,7 +451,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**475 tests pasando, 0 fallos (57 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**486 tests pasando, 0 fallos (58 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
@@ -532,6 +566,8 @@ Actualización 24 de septiembre de 2026 – 474 tests, 57 archivos, T11/T13 y 00
 
 Actualización 3 de octubre de 2026 – 475 tests, 57 archivos, T1 de Fase 2 (migración `0001_dapper_revanche`, índice único parcial en `subscriptions.mpPreapprovalId`). Rama `chore/t1-migration-index`.
 
+Actualización 3 de octubre de 2026 – 486 tests, 58 archivos, T2 de Fase 2 (validación de `MP_PLATFORM_*` + `getAdminBaseUrl`). Rama `chore/t2-env-validation`.
+
 ## URLs de producción (Vercel)
 
 | App        | URL                                               |
@@ -587,7 +623,7 @@ Todas las variables cloud deben estar configuradas en cada proyecto:
 - `DATABASE_URL`, `DATABASE_APP_URL`, `AUTH_SECRET` (core, obligatorias en todos)
 - `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET`
 - `MP_TOKEN_ENCRYPTION_KEY` (misma clave en las 3 apps, obligatoria en todos los entornos)
-- `MP_PLATFORM_ACCESS_TOKEN`, `MP_PLATFORM_WEBHOOK_SECRET` (opcionales hasta Fase 2)
+- `MP_PLATFORM_ACCESS_TOKEN`, `MP_PLATFORM_WEBHOOK_SECRET` (**obligatorias en producción** desde Fase 2)
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `REDIS_URL` (ioredis — storefront)
 - `RESEND_API_KEY`
 - `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
