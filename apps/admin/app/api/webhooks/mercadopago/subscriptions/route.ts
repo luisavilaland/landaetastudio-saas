@@ -36,7 +36,15 @@ type StructuralSummary = {
 
 export async function POST(request: NextRequest) {
   try {
-    const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET
+    // Los webhooks de suscripciones llegan firmados con el secret de la cuenta
+    // de PLATAFORMA (Flujo A), no con el del tenant (Flujo B). Validar con el
+    // equivocado produce 401 "Invalid signature" sobre un webhook que si llego,
+    // lo que vuelve ambigua la medicion de H1 vs H3.
+    // Fallback al del tenant para entornos que todavia no tengan el de
+    // plataforma configurado (dev / preview).
+    const webhookSecret =
+      process.env.MP_PLATFORM_WEBHOOK_SECRET ??
+      process.env.MERCADOPAGO_WEBHOOK_SECRET
 
     if (!webhookSecret) {
       logger.error('MERCADOPAGO_WEBHOOK_SECRET not configured — rejecting')
