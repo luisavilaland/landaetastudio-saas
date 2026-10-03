@@ -2407,3 +2407,42 @@ los contadores habran que corregir ahi.
 gestionarlo antes del merge).
 
 **Urgencia:** antes de mergear.
+
+---
+
+## 2026-10-03 - Item 47: la validacion de env vars es global, no per-app
+
+**Contexto.** El PR #185 (T2) hizo `MP_PLATFORM_*` obligatorias en
+produccion. `packages/validation/src/env.ts` define **un solo schema
+de produccion para las tres apps**, pero solo `apps/admin` usa esas
+credenciales.
+
+**Hecho.** Storefront y superadmin no las necesitan para nada y sin
+embargo `validateEnv()` tira si faltan: no arrancan.
+
+**Lo que se vio en el T2.** Los preview deploys de storefront y
+superadmin fallaron con las vars sin configurar. Se configuraron en
+los tres proyectos de Vercel y las tres quedaron en verde.
+
+**Salvedad, porque importa para no mentir en el futuro.**
+`saas-admin` paso *antes* de la correccion. Si la causa fuera
+`validateEnv()`, las tres deberian haber fallado. La correlacion
+"configurar -> verde" es fuerte, pero la causalidad **no esta
+probada**: puede haber un factor propio de storefront y superadmin.
+El defecto de diseno del item 47 es real e independiente del
+incidente; lo que no se afirma es que el incidente fuera
+exclusivamente por esto.
+
+**Fix temporal.** `MP_PLATFORM_ACCESS_TOKEN` y
+`MP_PLATFORM_WEBHOOK_SECRET` configuradas en los tres proyectos de
+Vercel.
+
+**Fix definitivo.** `validateEnv({ app, requires })` con scope por
+app, solo admin valida las de plataforma. Registrado como **item 47**
+en `vault/03_Deuda/deuda-tecnica.md`, severidad MEDIA, a reevaluar
+antes de T4.
+
+**Severidad:** MEDIA (bloquea merges de PRs que agregan vars; no
+rompe produccion mientras esten configuradas).
+
+**Urgencia:** MEDIA.

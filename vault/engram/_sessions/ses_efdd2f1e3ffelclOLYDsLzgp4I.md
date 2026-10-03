@@ -15,3 +15,5 @@ tags:
 - [[drizzle-e-indices-parciales-si-emite-where-no-emite-if-not-e-122]]
 - [[t2-fase-2-mp-platform-obligatorias-en-produccion-getadminbas-123]]
 - [[zod-con-vi-stubenv-el-mensaje-de-min-1-no-aparece-si-la-vari-124]]
+- [[prefijo-estado-actual-para-contadores-ambiguos-en-testing-md-125]]
+- [[item-47-la-validacion-de-env-vars-es-global-no-per-app-126]]
