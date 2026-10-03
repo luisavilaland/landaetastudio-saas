@@ -2110,7 +2110,7 @@ tenia una regla en `OUTPUT` que rechazaba el puerto 5432, creada despues
 de un `LOGDROPOUT`. Se corrigio insertando la regla en posicion 1 y
 persistiendo en `/etc/sysconfig/nftables.conf`.
 
-**Diagnostico en tres rondas.** Merece留下来 porque el camino fue largo:
+**Diagnostico en tres rondas.** Merece quedarse porque el camino fue largo:
 
 1. `CI: true` propuesto como fix. **No funciono**: `process.env.CI` aparece
    0 veces en `drizzle-kit/bin.cjs`. Output identico.

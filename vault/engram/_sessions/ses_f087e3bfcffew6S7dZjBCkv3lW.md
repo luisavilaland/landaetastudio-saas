@@ -45,3 +45,4 @@ tags:
 - [[item-44-reclasificado-a-baja-y-checklist-de-go-live-con-trig-111]]
 - [[seed-ts-trunca-10-de-13-tablas-subscriptions-y-tenant-mp-con-112]]
 - [[patron-los-items-de-deuda-envejecen-releer-antes-de-ejecutar-113]]
+- [[escaneo-de-cjk-sobre-salida-de-git-es-estructuralmente-incap-114]]

@@ -913,6 +913,24 @@ este repo se detectaron dos variantes:
    }
    ```
 
+   **Escanear el ARCHIVO, nunca la salida de `git`.** Esto no es
+   teorico: un CJK se colo en la bitacora (PR #181, 2026-10-03) porque
+   el escaneo se hizo sobre `git diff | Where-Object { $_ -match '^+' }`.
+   La salida de un comando nativo en PowerShell se decodifica con la
+   codificacion de consola, asi que los caracteres CJK llegan a
+   PowerShell como signos de pregunta `?` **antes de tocar el regex**.
+   El regex es correcto; la entrada ya estaba destruida, y el chequeo
+   reportaba "0 CJK" con el CJK presente en el archivo.
+
+   Nota: no citar CJK literal al explicar este problema. Escribirlo aqui
+   reintroduce el defecto que el escaneo debe detectar. Describirlo con
+   palabras ("tres ideogramas de chino") es suficiente.
+
+   Sintoma caracteristico: el `git show` del mismo commit imprime `?` en
+   lugar del CJK, y el `Get-Content` del archivo si lo muestra. Si el
+   conteo por `git` da 0 pero el archivo tiene CJK, **el escaneo esta
+   mal, no el archivo**.
+
 4. En archivos acumulativos (`bitacora.md`, `deuda-tecnica.md`), verificar
    que el diff sea **solo adiciones** antes de commitear:
 
