@@ -362,6 +362,13 @@ Los componentes (`ProductCard`, `CartDrawer`, `ProductGallery`) se escriben una 
 5. Actualizar documentación: `README.md`, `SETUP.md`, `AGENTS.md`, `TESTING.md`
 6. Crear `docs/runbook.md` para el equipo comercial y soporte
 7. Primer cliente real onboardeado con el flujo de autoservicio
+8. **[ANTES del punto 7]** Item 44: CI no debe tocar la base de producción.
+   Hoy `NEON_DATABASE_URL` y `NEON_DATABASE_APP_URL` apuntan a la misma base
+   y `pnpm db:seed` trunca 10 tablas en cada push a `develop`. Sin clientes
+   reales es aceptable; con el primero deja de serlo. Resolver con un guard
+   en `seed.ts` (por host, no por `NODE_ENV`: CI no lo setea) o con una
+   rama de Neon dedicada para CI. Ver `vault/03_Deuda/deuda-tecnica.md`
+   item 44.
 
 ---
 

@@ -1181,14 +1181,12 @@ exclusivamente de desarrollo local.
 
 ## 44. `pnpm db:seed` trunca PRODUCTION en cada run de CI
 
-**Estado:** abierto (2026-10-03).
+**Estado:** abierto (2026-10-03). **Severidad BAJA durante desarrollo.**
 
-> **Correccion de severidad.** Este item se levanto inicialmente como
-> "CI/dev comparten la misma base, severidad BAJA". **Esa evaluacion
-> quedo desactualizada** cuando `NEON_DATABASE_URL` volvio a apuntar a
-> production (2026-10-03T03:16:11Z). No es solo compartir base: el
-> pipeline **destruye datos de produccion de forma automatica y
-> silenciosa**.
+**Decision del humano:** en la etapa actual **no hay clientes reales** y
+los datos son **regenerables con `pnpm db:seed`**. El riesgo es
+aceptable. El guard propuesto queda como **defensa a futuro**, no como
+necesidad actual.
 
 ## Mecanismo
 
@@ -1200,47 +1198,66 @@ El job `seed` de `.github/workflows/e2e.yml` corre:
     DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
 ```
 
-Y `packages/db/seed.ts` ejecuta `TRUNCATE TABLE ... CASCADE` sobre 10
-tablas antes de insertar datos de prueba: `plans`, `order_items`,
-`orders`, `product_variants`, `product_images`, `products`,
-`categories`, `customers`, `admin_users`, `tenants`.
+Y `packages/db/seed.ts` ejecuta `TRUNCATE TABLE ... CASCADE` sobre
+**10 de las 13 tablas** del baseline antes de insertar datos de prueba:
+`plans`, `order_items`, `orders`, `product_variants`, `product_images`,
+`products`, `categories`, `customers`, `admin_users`, `tenants`.
 
 `NEON_DATABASE_URL` y `NEON_DATABASE_APP_URL` apuntan ambos a
 production. **Por lo tanto, cada push a `develop` borra los datos de
-production y los reemplaza con el seed de prueba.**
+development y los reemplaza con el seed de prueba.**
 
-## Impacto
+## Nota: 3 tablas no se truncan
 
-- **Perdida de datos de produccion en cada run.** No hay confirmacion ni
-  aviso: el job pasa en verde.
-- **Los E2E corren contra produccion**, asi que un test mal escrito
-  puede modificar datos reales.
-- **El desarrollo local comparte la misma base.** Un `pnpm db:seed`
-  manual borra los datos que E2E acaba de preparar, y viceversa.
-- El shop en `tienda1.landaetastudio.com` puede servir datos de prueba
-  entre runs.
+`subscriptions`, `shipping_methods` y `tenant_mp_config` quedan fuera
+del TRUNCATE. **`subscriptions` es la relevante para Fase 2**: las
+suscripciones creadas por los tests no se limpian entre runs, asi que
+pueden quedar filas huerfanas que confundan el debug de E2E de
+suscripciones (exactamente lo que vendra en T4/T5). No es un bug hoy
+porque no hay suscripciones reales, pero es un factor a tener en cuenta
+cuando esas tareas creen filas.
 
-## Mitigaciones
+## Impacto durante desarrollo
 
-1. **Rama de Neon dedicada para CI.** `NEON_DATABASE_URL` y
-   `NEON_DATABASE_APP_URL` apuntando a una rama, con branching por PR.
-   Es la unica solucion que conserva E2E contra datos limpios **y**
-   protege produccion. Es el objetivo declarado del transversal
-   (Fase 2, "T0.3 branching en Neon").
-2. **Guard de seguridad en `seed.ts`:** abortar si el host de
-   `DATABASE_URL` no es el esperado para el entorno actual. Barato y
-   evita el peor escenario.
-3. **Job `seed` con `if:` restringido** a ramas que no sean `develop`.
+- **Los datos de development se regeneran** con un `pnpm db:seed`.
+- **Los E2E corren contra la misma base**, asi que un test mal escrito
+  puede modificar datos compartidos.
+- El job pasa en verde: **no hay aviso** de que se trunco nada.
+- Un `pnpm db:seed` manual borra los datos que E2E acaba de preparar, y
+  viceversa.
 
-**Nota:** la opcion 2 es la unica que se puede aplicar sin tocar la
-infraestructura de Neon, y funciona aunque alguien olvide cambiar el
-secret.
+## REEVALUAR OBLIGATORIAMENTE antes de
+
+1. **Primer tenant con datos reales.**
+2. **Cualquier deploy a produccion que reciba trafico.**
+
+En cualquiera de esos dos momentos esto pasa de BAJA a ALTA y el
+impacto deja de ser reversible con un `db:seed`.
+
+## Fix preparado (NO aplicado)
+
+Guard en `seed.ts` que refuses si el host de `DATABASE_URL` es el de
+production y `CI=true`, salvo que se setee `ALLOW_PROD_SEED_IN_CI=true`.
+
+**Por que un guard por host y no por `NODE_ENV`:** el guard actual solo
+chequea `NODE_ENV`, y **CI no setea `NODE_ENV`**, asi que pasaria sin
+darse cuenta en el runner. El host de Neon identifica la base con
+certeza; `NODE_ENV` no.
+
+Alternativa de infraestructura: rama de Neon dedicada para CI (es el
+objetivo del transversal, "T0.3 branching en Neon").
+
+**Recordatorio de go-live:** el punto esta agregado a la seccion
+**"Fase 10 - Go-live y checklist final"** de
+`docs/superpowers/specs/2026-09-blueprint-v2.6.md`, como requisito previo
+al primer cliente real.
 
 **Origen:** detectado al verificar por que E2E paso a verde.
 
-**Severidad:** ALTA.
+**Severidad:** BAJA (desarrollo).
 
-**Urgencia:** ALTA. Es destructivo y ocurre en cada push.
+**Urgencia:** BAJA, con reevaluacion obligatoria en los dos hitos de
+arriba.
 
 ---
 
@@ -1288,6 +1305,16 @@ a la rama (no solo `NEON_DATABASE_URL`).
 **Lecion:** los dos secrets de base deben moverse **juntos**. Mover solo
 uno produce exactamente este fallo, con un sintoma que no parece de
 configuracion.
+
+**Decision consciente, no un bug corregido.** La resolucion fue mover
+un secret, no cambiar codigo. **Si en el futuro se vuelve a mover uno
+solo de los dos secrets, el split reaparece** con un sintoma que no
+parece de configuracion: una orden existe en una base y el webhook
+busca en otra. El fallo se manifiesta como un assert de Playwright
+(`Expected: "confirmed"`), que no sugiere en absoluto un problema de
+bases.
+
+Al tocar cualquiera de los dos secrets de base, verificar **los dos**.
 
 **Origen:** detectado durante el diagnostico del item 41.
 
