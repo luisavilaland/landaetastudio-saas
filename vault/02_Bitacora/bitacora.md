@@ -2571,3 +2571,36 @@ responde en un dominio de produccion real, no en un `.vercel.app`.
 **Severidad:** ALTA (invalidaba la medicion de T5).
 
 **Urgencia:** antes de mergear, por el pago pendiente.
+
+---
+
+## 2026-10-03 - Mensaje de logger del stub desactualizado
+
+**Rama:** `chore/fix-webhook-subscriptions-secret` · **PR:** #187
+
+**Que era.** Tras cambiar el secret activo a
+`MP_PLATFORM_WEBHOOK_SECRET ?? MERCADOPAGO_WEBHOOK_SECRET`, el
+mensaje del `logger.error` seguia diciendo
+`'MERCADOPAGO_WEBHOOK_SECRET not configured'`. El log decia una
+variable que ya no era la que se leia.
+
+**Por que importa para T5.** Si T5 llegara a dar 503 (que es lo que
+pasa si ninguno de los dos secrets esta configurado en el entorno),
+el mensaje de diagnostico tiene que senalar las dos variables reales. Un
+mensaje que menciona solo una hace que se investigue el lado
+equivocado: harias pasar tiempo revisando `MERCADOPAGO_WEBHOOK_SECRET`
+en Vercel cuando el problema podria ser `MP_PLATFORM_WEBHOOK_SECRET`.
+
+**El fix.** `'No webhook secret configured
+(MP_PLATFORM_WEBHOOK_SECRET or MERCADOPAGO_WEBHOOK_SECRET)'`.
+
+**Sin cambio en el body del 503** (`"Webhook not configured"`): es
+la respuesta publica y nombra la condicion, no la variable. El test
+existente lo asserta y sigue verde.
+
+**DoD:** `pnpm test` **523/523 en 62 archivos** (sin cambio, es un
+string) · lint, typecheck, build y `format:check` OK.
+
+**Severidad:** BAJA (diagnostico, no comportamiento).
+
+**Urgencia:** N/A.

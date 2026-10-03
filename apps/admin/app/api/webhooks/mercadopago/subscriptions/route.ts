@@ -47,7 +47,9 @@ export async function POST(request: NextRequest) {
       process.env.MERCADOPAGO_WEBHOOK_SECRET
 
     if (!webhookSecret) {
-      logger.error('MERCADOPAGO_WEBHOOK_SECRET not configured — rejecting')
+      logger.error(
+        'No webhook secret configured (MP_PLATFORM_WEBHOOK_SECRET or MERCADOPAGO_WEBHOOK_SECRET)',
+      )
       return NextResponse.json(
         { error: 'Webhook not configured' },
         { status: 503 },
