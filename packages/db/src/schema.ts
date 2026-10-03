@@ -11,7 +11,7 @@ import {
   boolean,
   customType,
 } from 'drizzle-orm/pg-core'
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType() {
@@ -91,6 +91,17 @@ export const dbSubscriptions = pgTable(
       tenantIdx: uniqueIndex('subscriptions_tenant_idx').on(table.tenantId),
       statusIdx: index('subscriptions_status_idx').on(table.status),
       planIdx: index('subscriptions_plan_idx').on(table.planId),
+      // Indice unico PARCIAL sobre el preapproval de MercadoPago. Es la base de
+      // la estrategia L del design de Fase 2: resolver tenantId desde el
+      // preapproval_id recibido sin joins.
+      //
+      // El WHERE no es por los NULL: en PostgreSQL un indice unico ya trata los
+      // NULL como distintos entre si. El WHERE es para que el indice cubra
+      // solo las filas que efectivamente tienen preapproval, que son una
+      // fraccion del total. Asi el btree es mas chico y el lookup mas barato.
+      mpPreapprovalUnique: uniqueIndex('subscriptions_mp_preapproval_idx')
+        .on(table.mpPreapprovalId)
+        .where(sql`${table.mpPreapprovalId} IS NOT NULL`),
     }
   },
 )

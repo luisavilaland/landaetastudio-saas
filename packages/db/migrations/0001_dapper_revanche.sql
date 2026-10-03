@@ -1,0 +1,15 @@
+-- T1 (Fase 2): indice unico PARCIAL sobre subscriptions.mpPreapprovalId.
+-- Base de la "estrategia L" del design: resolver tenantId desde el
+-- preapproval_id de MercadoPago sin joins.
+--
+-- El WHERE hace que el indice sea PARCIAL: cubre solo las filas que tienen
+-- preapproval de MercadoPago, que son una fraccion del total. Un indice sin
+-- WHERE tambien permitiria multiples NULL (PostgreSQL los trata como
+-- distintos), pero seria mas grande y el lookup mas caro.
+--
+-- IF NOT EXISTS agregado a mano sobre la salida de drizzle-kit: este repo
+-- ya aplico la migracion 0015 manualmente (drizzle-kit no podia), y el
+-- item 43 de deuda tecnica documenta que drizzle-kit se traga errores de
+-- migracion en CI. Con IF NOT EXISTS, una reaplicacion manual es no-op en
+-- vez de "relation already exists".
+CREATE UNIQUE INDEX IF NOT EXISTS "subscriptions_mp_preapproval_idx" ON "subscriptions" USING btree ("mpPreapprovalId") WHERE "subscriptions"."mpPreapprovalId" IS NOT NULL;

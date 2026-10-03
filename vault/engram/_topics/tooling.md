@@ -18,3 +18,4 @@ tags:
 - [[verificar-worktrees-huerfanos-por-blob-contra-el-historial-55]] (discovery)
 - [[worktrees-de-paseo-no-son-checkouts-completos-56]] (discovery)
 - [[checks-de-formato-excluir-tool-managed-y-append-only-antes-d-57]] (pattern)
+- [[gotcha-powershell-5-1-con-gh-y-git-stderr-nullo-y-rompe-el-c-120]] (discovery)
