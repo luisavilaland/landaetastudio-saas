@@ -2574,6 +2574,112 @@ responde en un dominio de produccion real, no en un `.vercel.app`.
 
 ---
 
+## 2026-10-03 - Spike T0: resultados finales (H1 confirmada, P6 refutado)
+
+**Rama:** `chore/spike-t0-resultados-finales`
+
+## La causa raiz de todos los falsos
+
+El spike original creo los preapprovals con el token de **Test-002**
+(`3360257364`), mientras la URL del webhook estaba registrada en la cuenta
+**plataforma real** (`42922495`) y el secret en Vercel era el de esa cuenta.
+**Token de una cuenta, secret de otra.**
+
+Esa asimetria produce dos sintomas segun donde se mire: los eventos los firma
+la cuenta que creo el preapproval y se validan contra el secret equivocado
+(**401 silencioso**), y las mutaciones se ejecutan con un token que no es del
+recurso (**2xx que no aplican nada**).
+
+Con la cadena consistente —token y secret de Test-002, URL registrada en
+Test-002— todo funciona.
+
+> **Regla:** `MP_PLATFORM_ACCESS_TOKEN` y `MP_PLATFORM_WEBHOOK_SECRET` tienen
+> que ser de la MISMA cuenta, y la URL del webhook tiene que estar registrada
+> en esa misma cuenta.
+
+## H1 CONFIRMADA
+
+Tres eventos reales por pago, con **1 segundo** de latencia (pago 21:18:40,
+eventos 21:18:41.05 / 41.51 / 42.52):
+
+```
+type=payment                         action=payment.created  dataId=181244133433  liveMode=true
+type=subscription_authorized_payment  action=updated           dataId=7032544182     liveMode=null
+type=subscription_preapproval        action=updated           dataId=25f8cf82...    liveMode=null
+```
+
+Los tres `data.id` verificados contra la API: coinciden con `payment.id`,
+`invoice` y `preapproval_id`. **T9 (polling) queda cancelado.**
+
+**`live_mode` solo viene en el topic `payment`.** En los dos topics de
+suscripcion el campo **no existe**. El guard `live_mode === false` del design
+solo aplica a `payment`; hay que tratar "ausente" como distinto de `false`.
+
+## P6 REFUTADO
+
+| Afirmacion del spike | Veredicto |
+|----------------------|-----------|
+| `cancelled` → 200 sin efecto | **FALSO. Aplica.** |
+| `transaction_amount` → 200 sin efecto | **FALSO. Aplica.** |
+| "`PUT /preapproval/{id}` es read-only post-cobro" | **FALSO.** |
+
+## Matriz de transiciones (verificada)
+
+| Transicion | Resultado |
+|------------|-----------|
+| `authorized → cancelled` | **200, aplica** |
+| `cancelled → authorized` | **400** "Invalid transition from cancelled to authorized" |
+| `authorized → paused` | **200, aplica** |
+| `paused → authorized` | **200, aplica** |
+| `* → transaction_amount` | **200, aplica** |
+| `* → notification_url` | **200, descarta** (P5 confirmado por re-test) |
+
+**`cancelled` es terminal en MP.** `paused` es el unico reversible.
+
+## Cambio de scope en T4
+
+`reactivate` **sale** (inviable), entran **`pause`** y **`resume`**. T4 pasa de
+5 a 6 endpoints. `cancel` queda irreversible y la UI tiene que avisarlo.
+
+La doc oficial de MP confirma que `paused` **detiene el cobro** ("Mercado Pago
+deje de debitar los pagos de ese cliente hasta que decidas reactivarlo"), asi
+que `pause`/`resume` se exponen **sin feature flag**.
+
+## Como distinguir un 2xx que aplico de uno que no
+
+| Caso | `version` | `last_modified` |
+|------|-----------|-----------------|
+| `cancelled` (aplica) | avanza | avanza |
+| `transaction_amount` (aplica) | avanza | avanza |
+| `authorized` sobre `authorized` (no-op) | **avanza** | **avanza** |
+| `notification_url` (descartado) | **no avanza** | **no avanza** |
+
+Regla: **que no se muevan = MP descarto el campo.** Si se mueven, MP proceso
+el payload, pero un no-op tambien los mueve: no prueban que el valor haya
+cambiado. Para eso, `GET`.
+
+## Test empirico pendiente (no bloquea)
+
+Preapproval `24b2a8687a7a4331b475820c50334601` **pausado** el 2026-10-03.
+Su `next_payment_date` es 2026-11-03. **Verificar ese dia si MP intenta
+cobrar.** La doc dice que no deberia; es la validacion empirica que decide si
+`pause` se expone sin feature flag.
+
+Nota: `next_payment_date` **no cambia** ni al pausar ni al cancelar. No sirve
+como indicador de si la suscripcion va a cobrar.
+
+## Impacto en la estimacion
+
+Fase 2 = **10 dias**. T5 vuelve a ser el handler completo (8 transiciones) en
+vez de la sonda de 1 dia. T4 sube a 3.5 dias por el endpoint adicional.
+
+**Severidad:** ALTA (corrige tres conclusiones del spike que el resto de la
+fase daba por ciertas).
+
+**Urgencia:** antes de T4.
+
+---
+
 ## 2026-10-03 - Mensaje de logger del stub desactualizado
 
 **Rama:** `chore/fix-webhook-subscriptions-secret` · **PR:** #187
