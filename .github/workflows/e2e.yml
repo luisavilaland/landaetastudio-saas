@@ -90,6 +90,21 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verificar conexion a Neon (con SSL)
+        run: |
+          node -e "
+            const p = require('postgres');
+            const s = p(process.env.DATABASE_URL, { connect_timeout: 10000, ssl: 'require' });
+            s\`SELECT 1 AS ok\`.then(([r]) => {
+              console.log('CONEXION OK:', r.ok);
+              return s.end();
+            }).catch(e => {
+              console.log('ERROR CONEXION:', e.code || 'NO_CODE', e.message);
+              process.exit(1);
+            });
+          "
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - run: pnpm db:migrate && pnpm db:seed
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}

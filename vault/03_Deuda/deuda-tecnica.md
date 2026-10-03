@@ -873,6 +873,95 @@ mezclar cambios.
 
 ---
 
+## 40. Reglas de escritura de `.md` en Windows/PowerShell
+
+**Estado:** abierto (2026-10-02). Registra una serie de errores
+recurrentes al editar `.md` desde PowerShell.
+
+**1. `format:check` no se corre despues de editar.**
+
+`pnpm format:check` corre en el job `build` de CI. Editar un `.md` sin
+correrlo produce un PR rojo por formato, aunque el contenido este bien.
+
+**2. `Add-Content` con here-strings rompe el encoding.**
+
+`Add-Content` / `Set-Content` con `-Encoding UTF8` en PowerShell 5.1
+introducen caracteres corruptos en texto con acentos o no-ASCII. En
+este repo se detectaron dos variantes:
+
+- **U+FFFD** (caracter de reemplazo Unicode) donde deberia ir un acento.
+- Caracteres CJK colados en comentarios, que swept como basura invisible.
+
+## Reglas
+
+1. Despues de **CUALQUIER** escritura sobre un `.md` fuera de
+   `.prettierignore`, correr `pnpm format:check`. No al final del
+   trabajo: despues de cada escritura.
+
+2. Para texto con acentos o no-ASCII, usar la herramienta `write`, **no**
+   `Add-Content` con here-strings. `Add-Content` solo para texto plano
+   ASCII.
+
+3. Despues de escribir con `Add-Content`, escanear en busca de CJK y de
+   U+FFFD. Si hay matches: **PARAR y corregir antes de commitear.**
+
+   ```powershell
+   $l = Get-Content <archivo> -Encoding UTF8
+   for ($i=0; $i -lt $l.Count; $i++) {
+     if ($l[$i] -match '[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]') { "CJK L$($i+1)" }
+     if ($l[$i] -match "\uFFFD")                              { "MOJIBAKE L$($i+1)" }
+   }
+   ```
+
+   **Escanear el ARCHIVO, nunca la salida de `git`.** Esto no es
+   teorico: un CJK se colo en la bitacora (PR #181, 2026-10-03) porque
+   el escaneo se hizo sobre `git diff | Where-Object { $_ -match '^+' }`.
+   La salida de un comando nativo en PowerShell se decodifica con la
+   codificacion de consola, asi que los caracteres CJK llegan a
+   PowerShell como signos de pregunta `?` **antes de tocar el regex**.
+   El regex es correcto; la entrada ya estaba destruida, y el chequeo
+   reportaba "0 CJK" con el CJK presente en el archivo.
+
+   Nota: no citar CJK literal al explicar este problema. Escribirlo aqui
+   reintroduce el defecto que el escaneo debe detectar. Describirlo con
+   palabras ("tres ideogramas de chino") es suficiente.
+
+   Sintoma caracteristico: el `git show` del mismo commit imprime `?` en
+   lugar del CJK, y el `Get-Content` del archivo si lo muestra. Si el
+   conteo por `git` da 0 pero el archivo tiene CJK, **el escaneo esta
+   mal, no el archivo**.
+
+4. En archivos acumulativos (`bitacora.md`, `deuda-tecnica.md`), verificar
+   que el diff sea **solo adiciones** antes de commitear:
+
+   ```powershell
+   git diff -- <archivo> | Select-String "^-" | Where-Object { $_ -notmatch "^---" }
+   ```
+
+   Debe dar 0 lineas. Si aparecen borrados, se perdio contenido previo.
+
+5. `prettier --write` **debe preservar** el append limpio. Verificado en
+   el item 41: 62 lineas puramente aditivas incluso despues de formatear.
+
+**Nota sobre falsos positivos en los escaneos:**
+
+- El mojibake en consola puede ser artefacto de render de PowerShell 5.1,
+  no del archivo. Confirmar leyendo los char codes antes de "corregir".
+- Algunos U+FFFD son **intencionales**: cited como ejemplo dentro de otro
+  item. Revisar el contexto antes de tocar.
+- Los emojis y em-dashesrenders como mojibake en consola pero son
+  validos en el archivo.
+
+**Origen:** errores repetidos durante los PR #175, #176, #179 y el
+design de Fase 2.
+
+**Severidad:** MEDIA.
+
+**Urgencia:** MEDIA. Es una trampa de proceso, no un defecto de producto,
+pero costo varios ciclos de correccion.
+
+---
+
 ## 41. `seed` rojo en CI: `drizzle-kit migrate` falla sin mensaje
 
 **Estado:** abierto (2026-10-02).
@@ -932,3 +1021,382 @@ BYPASSRLS), que es el de la app runtime.
 
 **Urgencia:** MEDIA. No bloquea el desarrollo, pero **degrada la red de
 seguridad de migraciones** y vuelve lento cada PR.
+
+---
+
+## 42. `drizzle.config.ts` no carga dotenv
+
+**Estado:** abierto (2026-10-02).
+
+**Contexto:** `packages/db/drizzle.config.ts` lee
+`process.env.DATABASE_URL!` **sin cargar dotenv**. No hay ningun
+`import 'dotenv/config'` ni equivalente. El repo tiene `.env.local`
+(no `.env`).
+
+`SETUP.md` (L18-25) indica el setup en este orden:
+
+```bash
+# 3. Generar migraciones
+pnpm db:generate
+# 4. Aplicar migraciones
+pnpm db:migrate
+```
+
+**Sin mencionar que hay que exportar `DATABASE_URL` en el shell.**
+
+## Consecuencia
+
+Un dev nuevo que siga `SETUP.md` al pie de la letra corre `pnpm
+db:migrate` sin la variable en el entorno y recibe:
+
+```
+Error  Please provide required params for Postgres driver:
+    [x] url: undefined
+```
+
+El mensaje no dice **falta la variable** ni menciona `.env.local`. Parece
+un problema de drizzle cuando en realidad es de onboarding.
+
+Es el impacto que anticipo el item 14 ("nuevos devs que siguen
+SETUP.md"), que sigue sin cerrarse.
+
+## Reproducido
+
+```
+> cd packages/db && drizzle-kit migrate
+Error  Please provide required params for Postgres driver:
+    [x] url: undefined
+ ELIFECYCLE  Command failed with exit code 1.
+```
+
+Con `DATABASE_URL` exportada manualmente, el mismo comando corre bien y
+aplica las migraciones.
+
+## Mitigacion
+
+- **Opcion A:** cargar dotenv en `drizzle.config.ts` (por ejemplo
+  `import 'dotenv/config'` o `dotenv.config({ path: '.env.local' })`).
+  Efecto colateral a evaluar: `drizzle.config.ts` se lee desde
+  `packages/db`, asi que la ruta relativa de `.env.local` debe.resolve
+  desde la raiz del repo.
+- **Opcion B:** documentar el export en `SETUP.md` antes del paso 4.
+  Menos invasivo, pero mantiene el pie de trampa.
+- **Opcion C:** ambas. Dotenv en el config mas la nota en `SETUP.md`,
+  porque el error sigue siendo posible si alguien borra `.env.local`.
+
+---
+
+## 43. `drizzle-kit` no imprime errores en modo no-interactivo
+
+**Estado:** abierto (2026-10-02).
+
+**Versiones:** `drizzle-kit@0.31.10`, que embebe `hanji@0.0.8`.
+
+### Mecanismo
+
+`drizzle-kit migrate` delega la ejecucion en `hanji.renderWithTask()`:
+
+```js
+function renderWithTask(view, task) {
+  const terminal = new TaskTerminal(view, process.stdout);
+  terminal.requestLayout();
+  try {
+    const result = yield task;
+    terminal.clear();
+    return result;
+  } catch (err) {
+    terminal.reject(err);
+    process.exit(1);        // <- sincrono, gana la carrera
+  }
+}
+```
+
+`process.exit()` es sincrono: mata el proceso antes de que el terminal
+renderice la excepcion.
+
+Peor aun, la vista **no tiene rama para el error**:
+
+```js
+render(status) {
+  if (status === "pending" || status === "rejected") {
+    return `[${spin}] applying migrations...`;
+  }
+  return `[✓] migrations applied successfully!`;
+}
+```
+
+El estado `rejected` dibuja **el mismo spinner** que `pending`. El texto
+del error no se imprime por ningun camino.
+
+### Consecuencias
+
+- **Cualquier fallo de migracion en CI es indetectable.** Solo se ve
+  `exit code 1` sin mensaje. Ese es el motivo de que el item 41 fuera
+  indiagnosticable.
+- `stderr` queda **vacio**: todo sale por stdout, y a stdout no llega.
+- No existe flag `--verbose` en `migrate` en esta version:
+  `Unrecognized options for command 'migrate': --verbose`.
+- **`CI: true` NO sirve.** `process.env.CI` aparece **0 veces** en
+  `drizzle-kit/bin.cjs`. Se probo en el job `seed` y el output quedo
+  identico. Se revirtio.
+- Un shim que difiera `process.exit` **tampoco sirve**: como la vista no
+  renderiza el error, no hay nada que esperar.
+
+### Reproduccion local (sin CI)
+
+```powershell
+$env:DATABASE_URL = "postgresql://u:p@host.invalid.tld:5432/db"
+cd packages/db
+pnpm exec drizzle-kit migrate 2>&1
+# -> spinner + exit 1 + CERO mensaje. Identico a CI.
+```
+
+Esto permite iterar el diagnostico sin gastar un ciclo de CI de ~20 min.
+
+### Mitigaciones
+
+1. **Step de diagnostico previo en CI** que imprima el estado del entorno
+   (si `DATABASE_URL` esta seteada y su host). Implementado en `e2e.yml`.
+   Es lo que permite diagnosticar hoy.
+2. **Wrapper propio** que llame a la migracion sin pasar por
+   `renderWithTask`, para que la excepcion se propague y Node la
+   imprima. Requiere alcanzar internos de drizzle-kit, que no son
+   parte del API publico (`api.d.ts` solo exporta `generate*`, `push*` y
+   `studio*`).
+3. **Upgrade de `drizzle-kit`** cuando corrijan el bug. La ultima version
+   al 2026-10-02 es `0.31.11`, pero **hanji sigue en `0.0.8`**: el bug
+   vive en hanji, asi que actualizar drizzle podria no bastar. Probar el
+   upgrade es barato, pero no esta garantizado.
+
+**Nota sobre el estado de hanji:** es una libreria muy chica
+(versiones `0.0.3` a `0.0.8`) y tightly coupled al flujo de
+renderizado de drizzle. El riesgo de que el fix upstream llegue rapido
+es bajo.
+
+**Origen:** descubierto durante el diagnostico del item 41.
+
+**Severidad:** ALTA.
+
+**Urgencia:** MEDIA-ALTA. No bloquea el desarrollo local (ahi el error
+si se ve porque hay TTY), pero hace **indiagnosticable cualquier fallo
+de migraciones en CI**, que es donde las migraciones se ejecutan de
+verdad.
+
+**Referencias:** `drizzle-kit@0.31.10`, `hanji@0.0.8`, item 41.
+
+**Nota:** `ci.yml` crea un `.env.local` propio con URLs dummy, asi que el
+job `build` no esta afectado. El job `seed` de `e2e.yml` exporta
+`DATABASE_URL` como env var del step, tampoco afectado. El problema es
+exclusivamente de desarrollo local.
+
+**Origen:** descubierto durante el diagnostico del item 41.
+
+**Severidad:** MEDIA.
+
+**Urgencia:** MEDIA.
+
+---
+
+## 44. `pnpm db:seed` trunca PRODUCTION en cada run de CI
+
+**Estado:** abierto (2026-10-03). **Severidad BAJA durante desarrollo.**
+
+**Decision del humano:** en la etapa actual **no hay clientes reales** y
+los datos son **regenerables con `pnpm db:seed`**. El riesgo es
+aceptable. El guard propuesto queda como **defensa a futuro**, no como
+necesidad actual.
+
+## Mecanismo
+
+El job `seed` de `.github/workflows/e2e.yml` corre:
+
+```yaml
+- run: pnpm db:migrate && pnpm db:seed
+  env:
+    DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+```
+
+Y `packages/db/seed.ts` ejecuta `TRUNCATE TABLE ... CASCADE` sobre
+**10 de las 13 tablas** del baseline antes de insertar datos de prueba:
+`plans`, `order_items`, `orders`, `product_variants`, `product_images`,
+`products`, `categories`, `customers`, `admin_users`, `tenants`.
+
+`NEON_DATABASE_URL` y `NEON_DATABASE_APP_URL` apuntan ambos a
+production. **Por lo tanto, cada push a `develop` borra los datos de
+development y los reemplaza con el seed de prueba.**
+
+## Nota: 3 tablas no se truncan
+
+`subscriptions`, `shipping_methods` y `tenant_mp_config` quedan fuera
+del TRUNCATE. **`subscriptions` es la relevante para Fase 2**: las
+suscripciones creadas por los tests no se limpian entre runs, asi que
+pueden quedar filas huerfanas que confundan el debug de E2E de
+suscripciones (exactamente lo que vendra en T4/T5). No es un bug hoy
+porque no hay suscripciones reales, pero es un factor a tener en cuenta
+cuando esas tareas creen filas.
+
+## Impacto durante desarrollo
+
+- **Los datos de development se regeneran** con un `pnpm db:seed`.
+- **Los E2E corren contra la misma base**, asi que un test mal escrito
+  puede modificar datos compartidos.
+- El job pasa en verde: **no hay aviso** de que se trunco nada.
+- Un `pnpm db:seed` manual borra los datos que E2E acaba de preparar, y
+  viceversa.
+
+## REEVALUAR OBLIGATORIAMENTE antes de
+
+1. **Primer tenant con datos reales.**
+2. **Cualquier deploy a produccion que reciba trafico.**
+
+En cualquiera de esos dos momentos esto pasa de BAJA a ALTA y el
+impacto deja de ser reversible con un `db:seed`.
+
+## Fix preparado (NO aplicado)
+
+Guard en `seed.ts` que refuses si el host de `DATABASE_URL` es el de
+production y `CI=true`, salvo que se setee `ALLOW_PROD_SEED_IN_CI=true`.
+
+**Por que un guard por host y no por `NODE_ENV`:** el guard actual solo
+chequea `NODE_ENV`, y **CI no setea `NODE_ENV`**, asi que pasaria sin
+darse cuenta en el runner. El host de Neon identifica la base con
+certeza; `NODE_ENV` no.
+
+Alternativa de infraestructura: rama de Neon dedicada para CI (es el
+objetivo del transversal, "T0.3 branching en Neon").
+
+**Recordatorio de go-live:** el punto esta agregado a la seccion
+**"Fase 10 - Go-live y checklist final"** de
+`docs/superpowers/specs/2026-09-blueprint-v2.6.md`, como requisito previo
+al primer cliente real.
+
+**Origen:** detectado al verificar por que E2E paso a verde.
+
+**Severidad:** BAJA (desarrollo).
+
+**Urgencia:** BAJA, con reevaluacion obligatoria en los dos hitos de
+arriba.
+
+---
+
+## 45. E2E fallaba por split de base de datos
+
+**Estado:** **Resuelto (2026-10-03)** por cambio de configuracion, no de
+codigo.
+
+## Sintoma
+
+El job `e2e` fallaba con 33 tests pasando y 1 fallando:
+
+```
+Expected: "confirmed"
+Received: "pending_payment"
+e2e/webhook/webhook-signature.spec.ts:92
+```
+
+## Causa
+
+Los dos extremos de la prueba usaban bases distintas:
+
+| Componente                                                    | Variable                                          | Base         |
+| ------------------------------------------------------------- | ------------------------------------------------- | ------------ |
+| `e2e/webhook/webhook-signature.spec.ts` (crea y lee la orden) | `DATABASE_URL`                                    | rama de Neon |
+| Webhook en Vercel (actualiza la orden)                        | `DATABASE_APP_URL` (`packages/db/src/index.ts:6`) | production   |
+
+La orden se creaba en la rama. El webhook la buscaba en production, no
+la encontraba, y no la actualizaba. El test releia la rama y veia
+`pending_payment`.
+
+## Resolucion
+
+`NEON_DATABASE_URL` se restauro a production (`2026-10-03T03:16:11Z`),
+quedando ambos secrets en la misma base. Los 4 jobs del run
+`37088993766` quedaron en `success`.
+
+## Deuda que deja
+
+Esta resolucion **empeoro el item 44**: al unificar en production, el
+`seed` paso a truncar production en cada run. Volver a apuntar CI a una
+rama reintroduce el split del E2E salvo que **los dos secrets** apunten
+a la rama (no solo `NEON_DATABASE_URL`).
+
+**Lecion:** los dos secrets de base deben moverse **juntos**. Mover solo
+uno produce exactamente este fallo, con un sintoma que no parece de
+configuracion.
+
+**Decision consciente, no un bug corregido.** La resolucion fue mover
+un secret, no cambiar codigo. **Si en el futuro se vuelve a mover uno
+solo de los dos secrets, el split reaparece** con un sintoma que no
+parece de configuracion: una orden existe en una base y el webhook
+busca en otra. El fallo se manifiesta como un assert de Playwright
+(`Expected: "confirmed"`), que no sugiere en absoluto un problema de
+bases.
+
+Al tocar cualquiera de los dos secrets de base, verificar **los dos**.
+
+**Origen:** detectado durante el diagnostico del item 41.
+
+**Severidad:** INFO (resuelto).
+
+**Urgencia:** N/A.
+
+**Reevaluar:** junto con el item 41 (mismo pipeline de migraciones).
+
+---
+
+## 46. `seed.ts` no trunca `subscriptions` ni `tenant_mp_config`
+
+**Estado:** abierto (2026-10-03).
+
+## Hecho
+
+`packages/db/seed.ts` ejecuta `TRUNCATE TABLE ... CASCADE` sobre **10 de
+las 13 tablas** del baseline. Quedan fuera **tres**:
+
+| Tabla              | Se trunca | Por que importa               |
+| ------------------ | --------- | ----------------------------- |
+| `subscriptions`    | NO        | **La tabla de Fase 2**        |
+| `tenant_mp_config` | NO        | Config por tenant             |
+| `shipping_methods` | NO        | Catalogo, lo repuebla el seed |
+
+## Impacto en Fase 2
+
+Las suscripciones creadas por los tests **no se limpian entre runs**. Cuando
+T4 (endpoints) y T5 (webhook) creen filas en `subscriptions`, un test puede
+leer filas residuales de un run anterior y obtener:
+
+- **Falsos positivos:** el test pasa porque encontro una suscripcion vieja en
+  lugar de la que acaba de crear.
+- **Falsos negativos:** el test falla por conflicto de datos de una corrida
+  previa, y se reintenta sin causa real.
+
+El riesgo es **tests flaky**, que es peor que un fallo claro porque
+entrena al equipo a reintentar sin investigar.
+
+Hoy no es un bug: no hay suscripciones reales. Se vuelve relevante en T4.
+
+## Mitigaciones
+
+1. **Agregar `subscriptions` y `tenant_mp_config` al TRUNCATE de
+   `seed.ts`.** Es el fix directo y mantiene la garantia "dejar la base como
+   estaba". Evaluar si `shipping_methods` tambien debe entrar.
+2. **Documentar que T4/T5 deben limpiar explicitamente** las filas que crean,
+   en un `beforeAll` propio del spec. Menos invasivo, pero cada spec nueva
+   tiene que acordarse.
+
+**Preferible la 1:** centralizar el estado limpio en un solo lugar es mas
+robusto que confiar en que cada test recuerde limpiar.
+
+## Relacionado
+
+- **Item 44:** el TRUNCATE es el mecanismo destructivo de este item.
+- **Item 45:** los secrets de base deben moverse juntos.
+
+**Origen:** detectado al inventariar las tablas del TRUNCATE durante el
+diagnostico del item 44.
+
+**Severidad:** MEDIA.
+
+**Urgencia:** MEDIA - no bloquea Fase 2, pero puede causar tests flaky en T4.
+
+**Reevaluar:** antes de T4 (endpoints de suscripciones).
