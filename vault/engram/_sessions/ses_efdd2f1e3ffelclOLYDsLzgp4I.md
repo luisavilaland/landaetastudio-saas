@@ -17,3 +17,4 @@ tags:
 - [[zod-con-vi-stubenv-el-mensaje-de-min-1-no-aparece-si-la-vari-124]]
 - [[prefijo-estado-actual-para-contadores-ambiguos-en-testing-md-125]]
 - [[item-47-la-validacion-de-env-vars-es-global-no-per-app-126]]
+- [[t3-fase-2-helpers-de-dominio-prorrateo-y-convencion-de-signo-127]]

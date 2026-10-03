@@ -292,10 +292,10 @@ pnpm test
 
 | Métrica      | Valor     |
 | ------------ | --------- |
-| **Total**    | 486 tests |
-| **Pasando**  | 486 ✅    |
+| **Total**    | 517 tests |
+| **Pasando**  | 517 ✅    |
 | **Fallas**   | 0 ✅      |
-| **Archivos** | 58        |
+| **Archivos** | 61        |
 
 > Los tests de endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, Redis, storage). Helpers centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`). Además: 15 specs E2E en `e2e/` (Playwright, CI self-hosted).
 
@@ -322,9 +322,10 @@ pnpm test
 - Actualización 24 de septiembre de 2026 – 474 tests, 57 archivos, T11 real y T13; 0015 queda pendiente de aplicación. Rama `chore/close-fase1`.
 - Actualización 3 de octubre de 2026 – 475 tests, 57 archivos, T1 de Fase 2: test del índice único parcial `subscriptions_mp_preapproval_idx` en `packages/db/src/__tests__/schema.test.ts`. Rama `chore/t1-migration-index`.
 - Actualización 3 de octubre de 2026 – 486 tests, 58 archivos, T2 de Fase 2: 3 casos de producción de `MP_PLATFORM_*` y 7 casos de `getAdminBaseUrl`. Rama `chore/t2-env-validation`.
+- Actualización 3 de octubre de 2026 – 517 tests, 61 archivos, T3 de Fase 2: 8 casos de `derivePermissions`, 10 de `calculateProration` y 13 de `classifyMpEvent`. Rama `chore/t3-helpers`.
 - Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
 - Fase 6 completada: withTenantContext real + FORCE RLS (app_user), E2E Playwright 15 specs con CI self-hosted, incidente RLS de 9 Server Components corregido (08-08).
-- Estado actual: 486 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
+- Estado actual: 517 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Sandbox manual de MercadoPago pendiente (cuenta de prueba de MP).
 - Ver AGENTS.md para detalles de convenciones de código y comandos obligatorios.
 

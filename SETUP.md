@@ -451,7 +451,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**486 tests pasando, 0 fallos (58 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**517 tests pasando, 0 fallos (61 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
@@ -567,6 +567,8 @@ Actualización 24 de septiembre de 2026 – 474 tests, 57 archivos, T11/T13 y 00
 Actualización 3 de octubre de 2026 – 475 tests, 57 archivos, T1 de Fase 2 (migración `0001_dapper_revanche`, índice único parcial en `subscriptions.mpPreapprovalId`). Rama `chore/t1-migration-index`.
 
 Actualización 3 de octubre de 2026 – 486 tests, 58 archivos, T2 de Fase 2 (validación de `MP_PLATFORM_*` + `getAdminBaseUrl`). Rama `chore/t2-env-validation`.
+
+Actualización 3 de octubre de 2026 – 517 tests, 61 archivos, T3 de Fase 2 (helpers de dominio + cliente de MercadoPago). Rama `chore/t3-helpers`.
 
 ## URLs de producción (Vercel)
 

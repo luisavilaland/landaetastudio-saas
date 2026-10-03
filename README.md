@@ -512,7 +512,7 @@ pnpm test        # Unit + integración (vitest)
 pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 ```
 
-- **Total:** 486 tests pasando, 0 fallos (58 archivos).
+- **Total:** 517 tests pasando, 0 fallos (61 archivos).
 - Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 - Los endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, redis).
 - 15 specs E2E en `e2e/` (storefront, checkout, admin, superadmin, security, webhook) — CI con runner self-hosted.
@@ -526,3 +526,5 @@ pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 **Última actualización:** 3 de octubre de 2026 – T1 de Fase 2 (índice único parcial en `subscriptions.mpPreapprovalId`, migración `0001_dapper_revanche`). 475 tests pasando, 0 fallos (57 archivos). Rama `chore/t1-migration-index`.
 
 **Última actualización:** 3 de octubre de 2026 – T2 de Fase 2 (`MP_PLATFORM_*` obligatorias en producción + `getAdminBaseUrl`). 486 tests pasando, 0 fallos (58 archivos). Rama `chore/t2-env-validation`.
+
+**Última actualización:** 3 de octubre de 2026 – T3 de Fase 2 (helpers de dominio: `derivePermissions`, `calculateProration`, `classifyMpEvent`, cliente MP). 517 tests pasando, 0 fallos (61 archivos). Rama `chore/t3-helpers`.

@@ -2446,3 +2446,75 @@ antes de T4.
 rompe produccion mientras esten configuradas).
 
 **Urgencia:** MEDIA.
+
+---
+
+## 2026-10-03 - T3 Fase 2: helpers de dominio
+
+**Issue:** #167 · **Rama:** `chore/t3-helpers`
+
+**Que es.** Tres funciones puras y un cliente HTTP. Sin DB, sin red
+(en las puras), sin logica de negocio. Es la base de T4 (endpoints) y
+T5 (webhook).
+
+| Archivo | Exporta |
+|---------|---------|
+| `subscription-permissions.ts` | `derivePermissions`, `SubscriptionStatus` |
+| `subscription-proration.ts` | `calculateProration` |
+| `mp-webhook-events.ts` | `classifyMpEvent`, `MpTopic` |
+| `mp-subscriptions.ts` | cliente HTTP de MP (create/update/get preapproval, getAuthorizedPayment) |
+
+**31 tests nuevos** (8 permisos · 10 prorrateo · 13 clasificacion),
+todos contra el transversal. Total **517 en 61 archivos**.
+
+**Tres contradicciones entre el plan, el prompt y el transversal.**
+Se implemento a favor del transversal, que es la fuente de verdad:
+
+1. **Convencion de signos del prorrateo.** El prompt de T3 decia
+   "proratedAmountCents negativo = saldo a favor (downgrade)", pero
+   su propia formula `(actual - nuevo) x diasRestantes/diasPeriodo`
+   da **negativo en el upgrade**, y la tabla de pruebas del plan
+   tambien (-4000 y -2000 para upgrades). El transversal §5 dice
+   "credito > 0 -> saldo a favor; credito < 0 -> debe diferencia".
+   **Implementado: negativo = el tenant debe (upgrade).** La frase del
+   prompt era la que estaba mal.
+2. **Periodo completo.** El plan §6.2 decia "30 dias restantes ->
+   prorrateo = 0". Con la formula del §5 y 30/30, el resultado es el
+   precio completo, no cero: cambiar de plan con el periodo entero
+   por delante tiene un costo real. Solo da 0 cuando el precio no
+   cambia. **Implementado segun la formula.**
+3. **Periodo vencido.** El prompt pedia `max(0, ...)` (clamp a 0) y
+   el plan pedia "error de dominio". **Implementado: throw.** Un 0
+   silencioso se interpretaria como "no hay nada que cobrar", que es
+   un falso exito: el endpoint confirmaria un cambio de plan no cobrado.
+
+**`canCancel` y `canReactivate` NO son transcripcion.** La tabla del
+§2 no tiene fila para "cancelar" ni "reactivar"; se derivaron del
+detalle por estado de la misma seccion y queda dicho en el codigo:
+cancelar solo desde `active`; reactivar desde `cancelled` y
+`expired`. `abandoned` no reactiva porque su boton es "Completar
+pago", que es el flujo de alta.
+
+**`classifyMpEvent` es el unico punto donde se fijan los literales
+de topic.** A proposito: cuando T5 capture un payload real, se
+actualiza ese archivo y sus tests en un commit dedicado. El
+clasificador devuelve `UNKNOWN` en vez de lanzar: una notificacion
+que no entendemos no puede romper el endpoint.
+
+**Accidente de encoding, resuelto.** Un intento de actualizar los
+contadores con `[System.IO.File]::WriteAllText` +
+`Get-Content -Raw` aplico **doble encoding a los 4 .md de docs**
+(`Metrica` -> `MÃƒÆ'Ã‚Â©trica`). Es el bug documentado el 25 de
+septiembre, reencarnado. Se revirtio con `git checkout --` y se
+rehicieron los reemplazos con la herramienta de edicion, que
+maneja UTF-8. Verificado con decodificacion estricta en los 4
+archivos. **En este repo: nunca escribir .md con cmdlets de
+PowerShell.**
+
+**DoD:** `pnpm lint` 6/6 · `pnpm typecheck` 9/9 · `pnpm test`
+**517/517 en 61 archivos** · `pnpm build` 3/3 · `pnpm format:check`
+OK · `scripts/check-migrations.sh` OK.
+
+**Severidad:** INFO (implementacion de task).
+
+**Urgencia:** N/A.
