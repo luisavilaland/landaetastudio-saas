@@ -2100,3 +2100,61 @@ deuda mas urgente de las seis.
   cancelar desde el panel de MP (la API no funciona, ver P6).
 - **Rotar dos tokens** quedaron expuestos en el chat de la sesion: el de
   Vercel y el del seller de pruebas.
+---
+
+## 2026-10-03 - Cierre del diagnostico de seed + items 44-46
+
+**Contexto.** Cierre de la saga del item 41 (`seed` rojo en CI). El fix
+del runner ya estaba aplicado por Edgar: el firewall `nftables` del VPS
+tenia una regla en `OUTPUT` que rechazaba el puerto 5432, creada despues
+de un `LOGDROPOUT`. Se corrigio insertando la regla en posicion 1 y
+persistiendo en `/etc/sysconfig/nftables.conf`.
+
+**Diagnostico en tres rondas.** Merece留下来 porque el camino fue largo:
+
+1. `CI: true` propuesto como fix. **No funciono**: `process.env.CI` aparece
+   0 veces en `drizzle-kit/bin.cjs`. Output identico.
+2. Step de diagnostico sin conectar: revelo que el secret estaba seteado y
+   apuntaba al **mismo host** que la DB de dev. Eso mato la hipotesis de
+   "tracking desalineado".
+3. Test de conexion con `ssl: 'require'`:
+   `ECONNREFUSED connect ECONNREFUSED 54.209.204.248:5432`.
+
+**Correccion de un error propio.** Mi primera conclusion del spike - "MP no
+entrega webhooks por ninguna via" - **no estaba sostenida**. Se verifico
+que no hubo entrega, pero nunca se verifico que la suscripcion a topics
+estuviera activa en el panel de MP. Confundir "no hubo entrega" con "no hay
+entrega posible" es un salto logico invalido.
+
+**Cambios de deuda:**
+
+- **Item 44** reclasificado a **BAJA** durante desarrollo, con dos gatillos
+  de reevaluacion obligatoria: primer tenant con datos reales, y primer
+  deploy a produccion que reciba trafico. En cualquiera de los dos deja de
+  ser reversible con un `db:seed`.
+- **Item 45** **RESUELTO** por configuracion, no por codigo. Documentado
+  que mover **uno solo** de los dos secrets de base reintroduce el split,
+  con un sintoma (assert de Playwright) que no parece de configuracion.
+- **Item 46** registrado: `seed.ts` trunca 10 de 13 tablas.
+- **Blueprint Fase 10**: punto 8 agregado, con el gatillo del item 44
+  anclado a "Primer cliente real onboardeado".
+
+**Hallazgo del dia.** `seed.ts` trunca **10 de las 13 tablas** del
+baseline. Las que quedan fuera son `subscriptions`, `tenant_mp_config` y
+`shipping_methods`. **`subscriptions` es la de Fase 2**: los tests de T4/T5
+pueden leer filas residuales de un run anterior y producir tests flaky. No
+es bug hoy porque no hay suscripciones reales; se vuelve relevante antes de
+T4.
+
+**El dato importa mas de lo que parece.** Un TRUNCATE parcial no falla: no
+avisa y deja la base en un estado que nadie declaro. Es la misma clase de
+problema que el item 44, pero silencioso.
+
+**Estado del PR #181.** Items 40-46 registrados. 41 y 45 resueltos. **43
+sigue pendiente** y es el unico con implicacion tecnica abierta:
+`drizzle-kit` traga los errores de migracion en CI.
+
+**Pendientes de Fase 2.** H2 (topics en el panel, 5 min, desbloquea T5),
+pregunta a MP sobre el token OAuth para `PUT /preapproval/{id}`, dos
+preapprovals de prueba con cobro agendado el 2026-11-02, y rotar dos
+tokens que quedaron expuestos en el chat de la sesion.

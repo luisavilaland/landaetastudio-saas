@@ -1323,3 +1323,62 @@ Al tocar cualquiera de los dos secrets de base, verificar **los dos**.
 **Urgencia:** N/A.
 
 **Reevaluar:** junto con el item 41 (mismo pipeline de migraciones).
+
+---
+
+## 46. `seed.ts` no trunca `subscriptions` ni `tenant_mp_config`
+
+**Estado:** abierto (2026-10-03).
+
+## Hecho
+
+`packages/db/seed.ts` ejecuta `TRUNCATE TABLE ... CASCADE` sobre **10 de
+las 13 tablas** del baseline. Quedan fuera **tres**:
+
+| Tabla              | Se trunca | Por que importa               |
+| ------------------ | --------- | ----------------------------- |
+| `subscriptions`    | NO        | **La tabla de Fase 2**        |
+| `tenant_mp_config` | NO        | Config por tenant             |
+| `shipping_methods` | NO        | Catalogo, lo repuebla el seed |
+
+## Impacto en Fase 2
+
+Las suscripciones creadas por los tests **no se limpian entre runs**. Cuando
+T4 (endpoints) y T5 (webhook) creen filas en `subscriptions`, un test puede
+leer filas residuales de un run anterior y obtener:
+
+- **Falsos positivos:** el test pasa porque encontro una suscripcion vieja en
+  lugar de la que acaba de crear.
+- **Falsos negativos:** el test falla por conflicto de datos de una corrida
+  previa, y se reintenta sin causa real.
+
+El riesgo es **tests flaky**, que es peor que un fallo claro porque
+entrena al equipo a reintentar sin investigar.
+
+Hoy no es un bug: no hay suscripciones reales. Se vuelve relevante en T4.
+
+## Mitigaciones
+
+1. **Agregar `subscriptions` y `tenant_mp_config` al TRUNCATE de
+   `seed.ts`.** Es el fix directo y mantiene la garantia "dejar la base como
+   estaba". Evaluar si `shipping_methods` tambien debe entrar.
+2. **Documentar que T4/T5 deben limpiar explicitamente** las filas que crean,
+   en un `beforeAll` propio del spec. Menos invasivo, pero cada spec nueva
+   tiene que acordarse.
+
+**Preferible la 1:** centralizar el estado limpio en un solo lugar es mas
+robusto que confiar en que cada test recuerde limpiar.
+
+## Relacionado
+
+- **Item 44:** el TRUNCATE es el mecanismo destructivo de este item.
+- **Item 45:** los secrets de base deben moverse juntos.
+
+**Origen:** detectado al inventariar las tablas del TRUNCATE durante el
+diagnostico del item 44.
+
+**Severidad:** MEDIA.
+
+**Urgencia:** MEDIA - no bloquea Fase 2, pero puede causar tests flaky en T4.
+
+**Reevaluar:** antes de T4 (endpoints de suscripciones).
