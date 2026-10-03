@@ -48,3 +48,4 @@ tags:
 - [[escaneo-de-cjk-sobre-salida-de-git-es-estructuralmente-incap-114]]
 - [[correccion-solo-env-local-tenia-mojibake-los-example-estaban-115]]
 - [[para-deshacer-mojibake-usar-mapeo-explicito-nunca-el-roundtr-116]]
+- [[session-summary-landaetastudio-saas-117]]
