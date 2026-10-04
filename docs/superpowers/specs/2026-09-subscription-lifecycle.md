@@ -76,11 +76,16 @@ camino: la pausa es el único mecanismo reversible.
 | `canAccessPanel`        | `'limited'`. No `'readonly'` porque el tenant pausado tiene una acción útil: `resume`.                          |
 | Relación con `past_due` | Son distintos. `past_due` es **impago** (dunning, gracia de 7 días, §3). `paused` es **suspensión voluntaria**. |
 
-**Discrepancia conocida con la API (a resolver):** la transición
-`paused → cancelled` existe en MercadoPago y figura en el diagrama, pero
-`derivePermissions` de T4 devuelve `canCancel: false` para `paused`. MP la
-acepta; nuestra API todavía no la expone. Mientras tanto, la UI ofrece
-"reanudar", no "irse". Ver item 49.
+**`paused` permite cancelar (decisión 2026-10-04):** la transición
+`paused → cancelled` está **expuesta**. `derivePermissions` devuelve
+`canCancel: true` para `paused` y `POST /api/subscriptions/cancel` acepta
+`paused` en su lista de estados de origen.
+
+Razón: `paused` significa "suspender el cobro", no "bloquear acciones".
+MercadoPago acepta la transición, así que obligar al tenant a "reanudar para
+cancelar" es burocracia sin beneficio. Antes de esta decisión la matriz decía
+`canCancel: false` mientras el endpoint la rechazaba con 409: la UI podía
+mostrar un botón que siempre fallaba. Ver item 51.
 
 > **Validación empírica pendiente.** El preapproval `24b2a868` quedó pausado el
 > 2026-10-03. El 2026-11-03 se verifica si MercadoPago intentó cobrar durante la
@@ -141,6 +146,7 @@ spike, así que no se afirma ni se niega acá. Si T5 la usa, verificarla primero
 | **Cambiar de plan**              | ❌                      | ✅          | ❌         | ❌         | ❌                     | ❌        | ❌          |
 | **Pausar el cobro**              | ❌                      | ✅          | ❌         | ❌         | ❌                     | ❌        | ❌          |
 | **Reanudar el cobro**            | ❌                      | ❌          | ❌         | ✅         | ❌                     | ❌        | ❌          |
+| **Cancelar la suscripción**      | ❌                      | ✅          | ❌         | ✅         | ❌                     | ❌        | ❌          |
 | **Tienda pública accesible**     | ❌                      | ✅          | ✅         | ✅         | ✅ (hasta fin período) | ❌        | ❌          |
 
 ### Detalle por estado

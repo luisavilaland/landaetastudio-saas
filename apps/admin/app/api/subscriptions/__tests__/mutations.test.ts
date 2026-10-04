@@ -109,17 +109,24 @@ describe('cancel', () => {
     )
   })
 
-  it('409 desde `paused`: hay que reanudar antes de cancelar', async () => {
+  it('202 desde `paused`: puede cancelar sin reanudar antes', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
     mockSubContext(sub({ status: 'paused' }))
+    vi.mocked(getPreapproval).mockResolvedValue({ status: 'cancelled' })
 
     const res = await cancel()
     const body = await res.json()
 
-    expect(res.status).toBe(409)
-    expect(body.field).toBe('status')
-    expect(body.status).toBe('paused')
-    expect(updatePreapproval).not.toHaveBeenCalled()
+    // Decision de producto (Luis, 2026-10-04): `paused` es "suspender el
+    // cobro", no "bloquear acciones". Antes esto devolvia 409 y obligaba a
+    // `resume` -> `cancel`, que era burocracia sin beneficio.
+    expect(res.status).toBe(202)
+    expect(body.status).toBe('cancelled')
+    expect(updatePreapproval).toHaveBeenCalledWith(
+      'preapproval-abc',
+      { status: 'cancelled' },
+      TOKEN,
+    )
   })
 
   it('409 desde `past_due`: con factura impaga MP no procesa la baja', async () => {

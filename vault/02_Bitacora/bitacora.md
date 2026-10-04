@@ -2934,3 +2934,50 @@ flecha: **cero** CJK reales.
 **Severidad:** N/A (resolucion de deuda).
 
 **Urgencia:** N/A.
+
+---
+
+## 2026-10-04 - Item 51: `paused` puede cancelar (decision de producto)
+
+**Rama:** `chore/paused-can-cancel` (desde `develop` en `67a06d6`).
+
+**Decision (Luis): opcion A — `canCancel: true` para `paused`.** `paused`
+significa "suspender el cobro", no "bloquear acciones". MP acepta
+`paused -> cancelled`, asi que obligar al tenant a "reanudar para cancelar"
+seria burocracia sin beneficio.
+
+### No era solo cambiar una bandera
+
+El PR #191 habia dejado anotada una discrepancia: la matriz de permisos decia
+`canCancel: false` para `paused`, y `POST /cancel` tenia `allowedFrom:
+['active']` con un test que afirmaba el 409 desde `paused`.
+
+Si se hubiera tocado **solo** la matriz, la UI habria mostrado un boton
+"Cancelar" que siempre devolvia 409. La decision quedo implementada en las dos
+capas:
+
+1. `derivePermissions`: `canCancel: true`.
+2. `POST /cancel`: `allowedFrom: ['active', 'paused']`.
+
+### El modo de fallo que esto evita
+
+Es el item 38 invertido: ahi la documentacion contradecía al codigo; aca la
+inconsistencia era **interna del codigo**, entre la matriz de permisos y la
+lista de estados que acepta cada endpoint.
+
+Los endpoints de mutacion son la frontera real: la matriz decide que boton se
+muestra, el endpoint decide si funciona. Si divergen, el sintoma es un 409
+inexplicable. Para T5, un gate que verifique solo la matriz no alcanza.
+
+### Transversal §2
+
+La tabla de permisos **no tenia ninguna fila de cancelar**. Se agrego con OK en
+`active` y `paused`, y se reemplazo la nota de "discrepancia abierta" por la
+decision.
+
+### Tests
+
+- Snapshot de la matriz actualizado (fila `paused`).
+- 2 tests nuevos: "solo active y paused pueden cancelar" y "paused puede las 3
+  salidas plausibles".
+- `mutations.test.ts`: el test que afirmaba 409 desde `paused` ahora afirma 202.

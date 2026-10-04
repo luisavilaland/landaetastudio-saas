@@ -32,3 +32,5 @@ tags:
 - [[t4-y-deuda-48-49-mergeados-a-develop-cleanup-completo-139]]
 - [[tompamount-frommpamount-centraliza-la-conversion-math-round-140]]
 - [[los-items-de-deuda-que-bloquean-la-fase-se-resuelven-con-pr-141]]
+- [[hook-gga-detecta-mojibake-que-631-tests-no-ven-y-el-barrel-n-142]]
+- [[cancancel-true-para-paused-la-decision-debia-implementarse-e-143]]
