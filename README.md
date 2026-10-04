@@ -512,7 +512,7 @@ pnpm test        # Unit + integración (vitest)
 pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 ```
 
-- **Total:** 523 tests pasando, 0 fallos (62 archivos).
+- **Total:** 619 tests pasando, 0 fallos (66 archivos).
 - Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 - Los endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, redis).
 - 15 specs E2E en `e2e/` (storefront, checkout, admin, superadmin, security, webhook) — CI con runner self-hosted.
@@ -530,3 +530,5 @@ pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 **Última actualización:** 3 de octubre de 2026 – T3 de Fase 2 (helpers de dominio: `derivePermissions`, `calculateProration`, `classifyMpEvent`, cliente MP). 517 tests pasando, 0 fallos (61 archivos). Rama `chore/t3-helpers`.
 
 **Última actualización:** 3 de octubre de 2026 – Fix del stub del webhook de suscripciones: valida contra `MP_PLATFORM_WEBHOOK_SECRET` (preparación de T5). 523 tests pasando, 0 fallos (62 archivos). Rama `chore/fix-webhook-subscriptions-secret`.
+
+**Última actualización:** 3 de octubre de 2026 – T4 de Fase 2 (6 endpoints de suscripciones en `apps/admin/app/api/subscriptions`: `preapproval`, `GET`, `cancel`, `pause`, `resume`, `plan`). Nuevo estado `paused` en `derivePermissions` con `canPause`/`canResume`. 619 tests pasando, 0 fallos (66 archivos). Rama `chore/t4-endpoints`.

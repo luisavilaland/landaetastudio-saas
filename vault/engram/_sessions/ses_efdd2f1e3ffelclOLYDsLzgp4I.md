@@ -23,3 +23,7 @@ tags:
 - [[p6-era-falso-positivo-cancel-y-monto-si-se-aplican-via-put-130]]
 - [[cancel-es-terminal-en-mp-paused-es-el-estado-reversible-131]]
 - [[antes-de-declarar-un-limite-de-api-verificar-que-la-config-s-132]]
+- [[t4-fase-2-6-endpoints-de-suscripciones-133]]
+- [[estado-paused-anadido-a-derivepermissions-134]]
+- [[corregidos-3-bugs-signo-de-prorrateo-centavos-vs-unidades-pa-135]]
+- [[session-summary-landaetastudio-saas-136]]

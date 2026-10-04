@@ -292,10 +292,10 @@ pnpm test
 
 | Métrica      | Valor     |
 | ------------ | --------- |
-| **Total**    | 523 tests |
-| **Pasando**  | 523 ✅    |
+| **Total**    | 619 tests |
+| **Pasando**  | 619 ✅    |
 | **Fallas**   | 0 ✅      |
-| **Archivos** | 62        |
+| **Archivos** | 66        |
 
 > Los tests de endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, Redis, storage). Helpers centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`). Además: 15 specs E2E en `e2e/` (Playwright, CI self-hosted).
 
@@ -324,9 +324,10 @@ pnpm test
 - Actualización 3 de octubre de 2026 – 486 tests, 58 archivos, T2 de Fase 2: 3 casos de producción de `MP_PLATFORM_*` y 7 casos de `getAdminBaseUrl`. Rama `chore/t2-env-validation`.
 - Actualización 3 de octubre de 2026 – 517 tests, 61 archivos, T3 de Fase 2: 8 casos de `derivePermissions`, 10 de `calculateProration` y 13 de `classifyMpEvent`. Rama `chore/t3-helpers`.
 - Actualización 3 de octubre de 2026 – 523 tests, 62 archivos, fix del stub de suscripciones: 6 casos de selección de secret y validación de firma en `apps/admin/app/api/webhooks/mercadopago/subscriptions/__tests__/route.test.ts`. Rama `chore/fix-webhook-subscriptions-secret`.
+- Actualización 3 de octubre de 2026 – 619 tests, 66 archivos, T4 de Fase 2: 96 casos nuevos para los 6 endpoints de suscripciones (`preapproval` con rate limit 10/60s y `payerEmail` tomado del JWT, `GET` con permisos, `cancel`/`pause`/`resume` con verificación post-escritura, `plan` con prorrateo 402/202) más el estado `paused` en la matriz de permisos. Rama `chore/t4-endpoints`.
 - Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
 - Fase 6 completada: withTenantContext real + FORCE RLS (app_user), E2E Playwright 15 specs con CI self-hosted, incidente RLS de 9 Server Components corregido (08-08).
-- Estado actual: 523 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
+- Estado actual: 619 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Sandbox manual de MercadoPago pendiente (cuenta de prueba de MP).
 - Ver AGENTS.md para detalles de convenciones de código y comandos obligatorios.
 
