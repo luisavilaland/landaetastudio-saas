@@ -5,6 +5,7 @@ import { eq, and } from 'drizzle-orm'
 import {
   calculateProration,
   getPreapproval,
+  toMpAmount,
   updatePreapproval,
 } from '@repo/commerce'
 import { createLogger } from '@/lib/logger'
@@ -230,7 +231,7 @@ export async function PUT(request: NextRequest) {
       await updatePreapproval(
         data.subscription.mpPreapprovalId,
         {
-          transactionAmount: data.newPlan.priceUyu / 100,
+          transactionAmount: toMpAmount(data.newPlan.priceUyu),
         },
         token,
       )
@@ -265,7 +266,7 @@ export async function PUT(request: NextRequest) {
       logger.warn({ err }, '[subscriptions/plan] no pude verificar el monto')
     }
 
-    const expectedAmount = data.newPlan.priceUyu / 100
+    const expectedAmount = toMpAmount(data.newPlan.priceUyu)
     if (verifiedAmount !== null && verifiedAmount !== expectedAmount) {
       logger.error(
         { expectedAmount, verifiedAmount },

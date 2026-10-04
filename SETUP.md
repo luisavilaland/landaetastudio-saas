@@ -347,7 +347,7 @@ ls .opencode/commands/
 ls ~/.config/opencode/commands/
 ```
 
-SDD NO está inicializado en este repo (no existen `openspec/`, `.sdd/` ni `changes/`). El primer uso requiere `sdd-init`.
+SDD **está inicializado** en modo `hybrid` (Engram + `openspec`): existe `openspec/config.yaml`, creado por el PR #163 (`9af860e`, 2026-10-01). No hay `openspec/specs/`, `openspec/changes/` ni `.sdd/` — el store de archivos está configurado pero sin artefactos de ningún change todavía.
 
 ## Worktrees de Paseo
 

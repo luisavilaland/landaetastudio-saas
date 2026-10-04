@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, dbSubscriptions, dbPlans, withTenantContext } from '@repo/db'
 import { eq, and } from 'drizzle-orm'
-import { createPreapproval } from '@repo/commerce'
+import { createPreapproval, toMpAmount } from '@repo/commerce'
 import { getAdminBaseUrl } from '@/lib/get-admin-base-url'
 import { createLogger } from '@/lib/logger'
 import {
@@ -36,7 +36,7 @@ const RATE_LIMIT = 10
  * - **El `UPDATE` de `mpPreapprovalId` es una segunda transaccion.** Si
  *   fallara, MP ya tiene el preapproval creado y la DB no lo sabria; dos
  *   transacciones lo hacen explicito y se puede reconciliar por logs.
- * - **Doble click â†’ 409 con el `initPoint` existente**, no un 500. Volver a
+ * - **Doble click → 409 con el `initPoint` existente**, no un 500. Volver a
  *   crear un preapproval cada vez que el usuario toca el boton genera
  *   suscripciones huerfanas en MP que hay que cancelar a mano.
  */
@@ -149,15 +149,15 @@ export async function POST(request: NextRequest) {
       {
         reason: `Suscripcion ${subscription.plan.displayName}`,
         payerEmail: email ?? '',
-        // El cruce con MP es por `external_reference` (ver design Â§6.5).
+        // El cruce con MP es por `external_reference` (ver design §6.5).
         externalReference: tenantId,
         backUrl: `${adminBase}/suscripcion`,
         // Sin notification_url: ver la nota del encabezado.
         autoRecurring: { frequency: 1, frequencyType: 'months' },
-        // La API de MP espera el monto en la UNIDAD de la moneda, no en centavos.
-// `priceUyu` viene de la DB en centavos (contrato interno nuestro), asi que
-// hay que convertir: mandar 4900 en vez de 49 seria cobrar 100 veces mas.
-        transactionAmount: subscription.plan.priceUyu / 100,
+// La API de MP espera el monto en la UNIDAD de la moneda, no en
+        // centavos. `toMpAmount` centraliza la conversion (item 48): antes era
+        // un `/100` a mano y produjo un cobro 100x mayor.
+        transactionAmount: toMpAmount(subscription.plan.priceUyu),
         currencyId: 'UYU',
       },
       token,

@@ -2830,4 +2830,107 @@ de que `withTenantContext` se abre exactamente una vez por request.
 
 **Severidad:** N/A (feature).
 
+**Urgencia:** N/A.---
+
+## 2026-10-03 - Resolucion de los items 48, 49 y 50
+
+**Rama:** `chore/fix-48-49-50` (desde `develop` en `19b3dcd`).
+
+Este PR **resuelve** los items, no los registra. Los tres quedaban registrados en
+el PR #190 y bloqueaban el arranque de T5.
+
+### Item 48 - Conversion centavos / unidad de moneda
+
+`packages/commerce/src/mp-amounts.ts`:
+
+```
+toMpAmount(cents)      // centavos -> unidad de MP
+fromMpAmount(mpAmount)  // unidad de MP -> centavos
+```
+
+Las **3** conversiones inline que quedaban de T4 se reemplazaron por el helper
+(`preapproval` L160, `plan` L233 y L268). `grep` confirma **0** restantes.
+
+**`Math.round` en `fromMpAmount` es load-bearing, no decorativo.** Verificado en
+node antes de escribir el test: `(29 / 100) * 100` da `28.999999999999996`. Sin
+el round, `fromMpAmount(toMpAmount(29))` devuelve `28.999...` y cualquier
+comparacion contra un entero de la DB falla. Hay un test dedicado a este
+caso.
+
+**Lo que NO se hizo:** tipar `CreatePreapprovalInput` y `updatePreapproval` en
+centavos (mitigacion 2 del item). Cambia el contrato del wrapper de T3 y excedia
+el PR. La proteccion actual es de disciplina, no de tipos.
+
+**`email.ts` NO se toco:** sus dos `/ 100` son `(total / 100).toFixed(2)` para
+**mostrar** un precio en un email. Usar un helper llamado `toMpAmount` ahi seria
+mentir sobre el dominio.
+
+### Item 49 - `paused` en el transversal
+
+`2026-09-subscription-lifecycle.md` actualizado de 6 a **7 estados**: §1
+(titulo, tabla de estados, diagrama, tabla de disparadores), §2 (columna
+`paused`, filas `canPause`/`canResume`, bloque de detalle) y §6 (mapeo).
+
+**Correcciones de exactitud queophoran en el mismo PR.** El doc afirmaba cosas
+que el spike refuto:
+
+- **`cancelled -> active` ELIMINADA** del diagrama, de la tabla de disparadores
+  y del detalle de `cancelled`. MP devuelve **400**. El doc lo daba por valido e
+  inducía a construir un flujo roto. Ahora dice explicitamente que la
+  cancelacion es **irreversible**.
+- Reemplazado el bloque "Estado `paused` de MP - no modelado" y la fila
+  `subscription_preapproval (paused) -> (sin cambio)` de §6, que contradician el
+  codigo ya mergeado en T4.
+- Documentado que **`live_mode` solo viene en `payment`**: los topics de
+  suscripcion no lo incluyen, asi que "ausente" debe tratarse distinto de
+  `false`.
+
+**Decision de producto registrada: opcion B.** El alta se activa desde
+`subscription_preapproval` con `status: authorized`, no desde
+`subscription_authorized_payment`. Quedo escrito en §6 con su consecuencia
+operativa: hay una ventana en la que MP ya cobro y la DB todavia dice
+`pending_first_payment`, y la UI debe tolerarla.
+
+**Discrepancia que queda ABIERTA (no es deuda de este item):** el doc incluye
+`paused -> cancelled` porque MP la acepta, pero `derivePermissions` devuelve
+`canCancel: false` para `paused`. Anotado en §1. Falta decidir si la UI ofrece
+"Cancelar" sobre una suscripcion pausada.
+
+**Validacion empirica pendiente:** el preapproval `24b2a868` quedo pausado el
+2026-10-03. El **2026-11-03** se verifica si MP intento cobrar durante la pausa.
+Si intento, la definicion de "paused" es incorrecta y hay que cambiarla antes de
+defenderla en el codigo.
+
+### Item 50 - AGENTS.md y SETUP.md
+
+Ambos afirmaban que `openspec/` no existia. Es falso: existe
+`openspec/config.yaml`, agregado por `9af860e` (**PR #163**, 2026-10-01),
+rastreado por git.
+
+El error tiene una causa concreta: **la afirmacion se volvo falsa el mismo dia
+que se creo el directorio.** El PR #163 agrego `openspec/config.yaml` y, en el
+mismo commit, 14 lineas a `AGENTS.md` con una seccion SDD escrita asumiendo que
+SDD no se iba a inicializar en este repo. Tres dias despues el repo la
+contradixo y el texto no se actualizo.
+
+Se corrigieron **los dos** archivos, no solo `AGENTS.md`: dejar `SETUP.md` con
+la misma falsehood lo perpetuaria en el documento de onboarding, que es
+justamente donde alguien lo lee antes de arrancar.
+
+### Nota de tooling: scan de corrupcion por codepoint
+
+El escaneo habitual con regex de rangos Unicode en PowerShell dio un falso
+positivo sobre la flecha `->` (U+2192) de una tabla del spec: la consola la
+renderiza como basura CJK. El metodo fiable es enumerar codepoints y comparar
+contra el rango CJK como numero entero, no contra el caracter renderizado. Los
+349 caracteres no-ASCII del spec son todos acentos espanioles, `x`, `§` y la
+flecha: **cero** CJK reales.
+
+### DoD
+
+`pnpm test` **631/631 en 67 archivos** (base develop 619/66), `pnpm lint`,
+`pnpm typecheck`, `pnpm build` (3 apps) y `pnpm format:check` en verde.
+
+**Severidad:** N/A (resolucion de deuda).
+
 **Urgencia:** N/A.

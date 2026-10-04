@@ -649,7 +649,7 @@ Flujo típico (7 fases):
 - **Meta-commands** (orquestan varios pasos, no tienen skill propia): `/sdd-new` (arranca un cambio: explore + propose), `/sdd-continue` (retoma el cambio activo en la siguiente fase de la cadena), `/sdd-ff` (fast-forward del planning: propose → spec → design → tasks), `/sdd-status` (estado del cambio activo, read-only).
 - **Fases sin command propio** (propose, spec, design, tasks): las lanza el orquestador; `/sdd-ff` las encadena.
 - **También con command**: `/sdd-init` (inicializar), `/sdd-research` (evidencia externa), `/sdd-onboard` (walkthrough guiado).
-- **Estado en este repo**: SDD NO está inicializado — no existen `openspec/`, `.sdd/` ni `changes/`. El primer uso requiere `/sdd-init`.
+- **Estado en este repo**: SDD **está inicializado** en modo `hybrid` (Engram + `openspec`). Existe `openspec/config.yaml`, creado por el PR #163 (`9af860e`, 2026-10-01). **No** existen `openspec/specs/`, `openspec/changes/` ni `.sdd/`: el store de archivos está configurado pero todavía no tiene artefactos de ningún change. Es decir, la infraestructura está, el contenido no.
 
 ## Judgment Day (revisión adversarial)
 
