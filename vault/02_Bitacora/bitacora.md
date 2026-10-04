@@ -2981,3 +2981,98 @@ decision.
 - 2 tests nuevos: "solo active y paused pueden cancelar" y "paused puede las 3
   salidas plausibles".
 - `mutations.test.ts`: el test que afirmaba 409 desde `paused` ahora afirma 202.
+
+---
+
+## 2026-10-04 - T5: handler completo del webhook de suscripciones
+
+**Rama:** `chore/t5-webhook-handler` (desde `develop` en `0619584`).
+**Issue:** #169. Reemplaza el stub de captura (spike T0 v2) por el handler real.
+
+### Pre-requisito verificado
+
+El PR #188 (spike T0 re-ejecutado) confirmo **H1**: MP SI entrega webhooks de
+suscripciones a produccion (3 eventos en 1 s). La memoria de Engram del
+2026-10-02 que decia "T5 INVALIDADA" quedo superada y esta marcada como tal.
+
+**T9 (polling) cancelado. NO se implemento polling.**
+
+### Event order B (Luis)
+
+El alta se activa desde `subscription_preapproval`, NO desde
+`subscription_authorized_payment`. Es el tercer evento y llega ~2.5 s despues; a
+cambio, la fuente de verdad es el estado del preapproval y no el del cobro.
+
+El spike (spec L496) recomienda lo contrario. Se sigue la decision de producto
+y la discrepancia quedo documentada en el transversal.
+
+### `data.id` significa tres cosas distintas
+
+| Topic | `data.id` es | Se resuelve con |
+| --- | --- | --- |
+| `payment` | id de pago | `GET /v1/payments/{id}` |
+| `subscription_authorized_payment` | id de **invoice** | `GET /authorized_payments/{id}` |
+| `subscription_preapproval` | id de preapproval | `GET /preapproval/{id}` |
+
+Se agrego `getPayment` a `@repo/commerce`: faltaba y hacia falta.
+
+### `live_mode` ausente en topics de suscripcion
+
+Solo viene en `payment`. "Ausente" se trata como no-live. Un guard
+`live_mode === false` Strict no pondria ningun topic de suscripcion en el camino
+de escritura, que es justo donde hay que escribir.
+
+### Idempotencia por convergencia
+
+MercadoPago reintenta los webhooks. Las guardas son: si el estado local ya es el
+objetivo, no se escribe (convergencia); y si `lastProcessedPaymentId` ya es el
+del evento, no se escribe (duplicado de pago).
+
+### Tolerante a lo desconocido
+
+- `type` desconocido -> 200 + `warn`, sin escrituras. MP reintenta los 5xx y un
+  evento que no entendemos no se arregla reintentando.
+- GET a MP que falla -> se acepta sin escribir, no se devuelve 5xx.
+- Body no-JSON -> 200.
+
+### Divergencia con el design que queda ABIERTA
+
+§6.3 pide, para la transicion 1, `lastProcessedPaymentId = invoiceId`. **No es
+implementable en ese evento**: el `data.id` de `subscription_preapproval` es el
+id del PREAPPROVAL, no el de la invoice. El id de invoice viaja en otro topic.
+
+Guardar el id del preapproval en una columna llamada `lastProcessedPaymentId`
+seria mentir sobre el dato. La idempotencia de esa transicion la da la
+convergencia. Si Luis quiere el invoiceId guardado, hace falta el lookup extra
+`GET /authorized_payments/search?preapproval_id={id}`.
+
+### Tres bugs de test que aparecieron y valen la pena
+
+1. **`spyTx` envolvia cada fila como `data`.** `limit()` resolvia al objeto fila
+   en vez de al array, asi que `rows[0]` era `undefined` y toda transicion que
+   escribe fallaba con `no_subscription`. Derivado de asumir que `makeTxMock`
+   tomaba una fila; toma un ARRAY de filas.
+2. **El helper de firma no omitia la parte `id:` cuando `dataId` era vacio.** El
+   verificador la omite, asi que firmar `id:;ts:;` nunca matchea. Impide testear
+   el body no-JSON.
+3. **El mock de idempotencia no persistia escrituras.** "Mismo payment dos veces"
+   no era testeable: las dos llamadas leian la misma fila pristina. Se agrego un
+   tx que muta al escribir.
+
+Ademas: los tests del stub viejo (`route.test.ts`) **no mockeaban `@repo/db`** y
+terminaban consultando una DB real. El resultado dependia de si habia fila.
+
+### Aviso obsoleto corregido
+
+`mp-webhook-events.ts` advertia que los literales de topic NO estaban
+verificados. El spike ya los verifico. Reemplazado por la tabla de las dos
+formas de payload y la nota de los tres significados de `data.id`.
+
+### DoD
+
+`pnpm test` **670/670 en 68 archivos** (base develop 633/67), `pnpm lint`,
+`pnpm typecheck`, `pnpm build` (3 apps) y `pnpm format:check` en verde.
+
+**Severidad:** N/A (feature).
+
+**Urgencia:** N/A.
