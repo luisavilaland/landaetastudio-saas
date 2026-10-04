@@ -24,11 +24,30 @@ const USER_AGENT = 'SaaS-eCommerce/1.0'
 const DEFAULT_TIMEOUT_MS = 30_000
 
 /** Error normalizado de MercadoPago, para que los handlers puedan mapearlo a un status HTTP. */
-export interface MercadoPagoApiError extends Error {
+/**
+ * Error de la API de MercadoPago.
+ *
+ * Clase real y no un `interface` + type assertion sobre `Error`: la asercion
+ * deja al objeto sin la cadena de prototipos de `MercadoPagoApiError`, asi que
+ * `instanceof MercadoPagoApiError` no funciona y un `catch` solo puede
+ * distinguirlo por el string de `name`.
+ *
+ * Como extiende `Error`, `instanceof Error` sigue siendo `true` y todas las
+ * guardas existentes (`err instanceof Error && err.name === '...'`) siguen
+ * valiendo.
+ */
+export class MercadoPagoApiError extends Error {
   /** Status HTTP de la respuesta de MP, o 0 si el fallo fue de red / timeout. */
-  status: number
+  readonly status: number
   /** `true` si el error fue timeout o fallo de red (no respuesta de MP). */
-  isNetworkError: boolean
+  readonly isNetworkError: boolean
+
+  constructor(message: string, status: number, isNetworkError: boolean) {
+    super(message)
+    this.name = 'MercadoPagoApiError'
+    this.status = status
+    this.isNetworkError = isNetworkError
+  }
 }
 
 function toApiError(
@@ -36,11 +55,7 @@ function toApiError(
   status: number,
   isNetworkError: boolean,
 ): MercadoPagoApiError {
-  const error = new Error(message) as MercadoPagoApiError
-  error.name = 'MercadoPagoApiError'
-  error.status = status
-  error.isNetworkError = isNetworkError
-  return error
+  return new MercadoPagoApiError(message, status, isNetworkError)
 }
 
 /** Extrae el mensaje de error de MP sin asumir la forma del body. */
@@ -200,6 +215,25 @@ export function getPreapproval(
   timeoutMs?: number,
 ): Promise<Record<string, unknown>> {
   return mpRequest(`/preapproval/${id}`, token, { method: 'GET' }, timeoutMs)
+}
+
+/**
+ * Lectura del estado real de un pago (`GET /v1/payments/{id}`).
+ *
+ * NO confundir con `/authorized_payments/{id}`: son **recursos distintos** y
+ * el spike T0 lo verifico. El topic `payment` trae un id de pago aqui; el
+ * topic `subscription_authorized_payment` trae un id de invoice que va a
+ * `getAuthorizedPayment`.
+ *
+ * Existe para T5: el topic `payment` es el unico que trae `live_mode`, pero
+ * su `action` no basta para decidir `past_due` — hace falta el estado real.
+ */
+export function getPayment(
+  id: string,
+  token: string,
+  timeoutMs?: number,
+): Promise<Record<string, unknown>> {
+  return mpRequest(`/v1/payments/${id}`, token, { method: 'GET' }, timeoutMs)
 }
 
 /**

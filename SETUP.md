@@ -451,7 +451,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**619 tests pasando, 0 fallos (66 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**679 tests pasando, 0 fallos (69 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
@@ -573,6 +573,8 @@ Actualización 3 de octubre de 2026 – 517 tests, 61 archivos, T3 de Fase 2 (he
 Actualización 3 de octubre de 2026 – 523 tests, 62 archivos, fix del stub del webhook de suscripciones (secret de plataforma). Rama `chore/fix-webhook-subscriptions-secret`.
 
 Actualización 3 de octubre de 2026 – 619 tests, 66 archivos, T4 de Fase 2 (6 endpoints de suscripciones). Rama `chore/t4-endpoints`.
+
+Actualización 4 de octubre de 2026 – 679 tests, 69 archivos, T5 de Fase 2 (handler del webhook de suscripciones). Rama `chore/t5-webhook-handler`.
 
 ## URLs de producción (Vercel)
 

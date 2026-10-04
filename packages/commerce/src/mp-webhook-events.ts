@@ -2,19 +2,34 @@
  * Clasificacion de topics del webhook de MercadoPago.
  *
  * Fuente de verdad: `docs/superpowers/specs/2026-09-subscription-lifecycle.md`
- * seccion 6 ("Topics reales de MercadoPago").
+ * seccion 6 ("Topics reales de MercadoPago"), con los literales confirmados por
+ * el spike T0 re-ejecutado (`docs/superpowers/specs/2026-10-02-spike-t0-resultado.md`,
+ * seccion "Resultados finales 2026-10-03").
  *
  * ESTE ES EL UNICO PUNTO DEL CODIGO DONDE SE FIJAN LOS LITERALES DE TOPIC.
- * Cuando T5 capture un payload real en produccion, se actualiza ESTE archivo y
- * sus tests en un commit dedicado. No dispersar el mapeo por los handlers: el
- * punto de tener un clasificador propio es que haya un solo lugar que corregir.
+ * No dispersar el mapeo por los handlers: el punto de tener un clasificador
+ * propio es que haya un solo lugar que corregir.
  *
- * ADVERTENCIA: los literales exactos de `type` y `action` NO estan verificados
- * con evidencia. El spike T0 (2026-10-02) no recibio un solo webhook de
- * suscripciones, asi que la tabla sale de la documentacion de MP. Por eso el
- * clasificador es tolerante: una combinacion desconocida produce `UNKNOWN`, que
- * es una RESPUESTA VALIDA, no un error. El handler deberia responder 200 con un
- * log `warn` y no escribir nada.
+ * **VERIFICADO CONTRA PAYLOAD REAL (2026-10-03).** El spike capturo tres
+ * eventos en produccion y los `type` coinciden con los literales de abajo.
+ * Antes de esa fecha el mapeo venia de la documentacion de MP y esta nota
+ * advertia que no estaba verificado.
+ *
+ * Dos formas de payload, relevantes para el que despacha:
+ *
+ * | Topic                             | `topLevelKeys`                                                          | `live_mode` |
+ * | --------------------------------- | ----------------------------------------------------------------------- | ----------- |
+ * | `payment`                         | `action, api_version, data, date_created, id, live_mode, type, user_id`  | **presente**|
+ * | `subscription_authorized_payment` | `action, application_id, data, date, entity, id, type, version`          | **ausente**  |
+ * | `subscription_preapproval`        | `action, application_id, data, date, entity, id, type, version`          | **ausente**  |
+ *
+ * **`data.id` significa tres cosas distintas segun el topic:** en `payment` es
+ * un id de pago (`GET /v1/payments/{id}`), en `subscription_authorized_payment`
+ * es un id de **invoice** (`GET /authorized_payments/{id}`) y en
+ * `subscription_preapproval` es el id del preapproval (`GET /preapproval/{id}`).
+ *
+ * El clasificador sigue siendo tolerante: una combinacion desconocida produce
+ * `UNKNOWN`, que es una RESPUESTA VALIDA, no un error.
  */
 
 export type MpTopic =

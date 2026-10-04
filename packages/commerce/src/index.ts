@@ -55,6 +55,8 @@ export {
   createPreapproval,
   updatePreapproval,
   getPreapproval,
+  getAuthorizedPayment,
+  getPayment,
   MP_API,
 } from './mp-subscriptions'
 

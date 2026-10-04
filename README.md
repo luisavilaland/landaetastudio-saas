@@ -512,7 +512,7 @@ pnpm test        # Unit + integración (vitest)
 pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 ```
 
-- **Total:** 619 tests pasando, 0 fallos (66 archivos).
+- **Total:** 679 tests pasando, 0 fallos (69 archivos).
 - Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 - Los endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, redis).
 - 15 specs E2E en `e2e/` (storefront, checkout, admin, superadmin, security, webhook) — CI con runner self-hosted.
@@ -532,3 +532,5 @@ pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 **Última actualización:** 3 de octubre de 2026 – Fix del stub del webhook de suscripciones: valida contra `MP_PLATFORM_WEBHOOK_SECRET` (preparación de T5). 523 tests pasando, 0 fallos (62 archivos). Rama `chore/fix-webhook-subscriptions-secret`.
 
 **Última actualización:** 3 de octubre de 2026 – T4 de Fase 2 (6 endpoints de suscripciones en `apps/admin/app/api/subscriptions`: `preapproval`, `GET`, `cancel`, `pause`, `resume`, `plan`). Nuevo estado `paused` en `derivePermissions` con `canPause`/`canResume`. 619 tests pasando, 0 fallos (66 archivos). Rama `chore/t4-endpoints`.
+
+**Última actualización:** 4 de octubre de 2026 – T5 de Fase 2 (handler completo del webhook de suscripciones, issue #169): 8 transiciones de §6.3, event order B, `data.id` con 3 significados según topic, idempotencia por convergencia. Incluye `getPayment` y sus primeros tests directos del cliente de MP. 679 tests pasando, 0 fallos (69 archivos). Rama `chore/t5-webhook-handler`.

@@ -292,10 +292,10 @@ pnpm test
 
 | Métrica      | Valor     |
 | ------------ | --------- |
-| **Total**    | 619 tests |
-| **Pasando**  | 619 ✅    |
+| **Total**    | 679 tests |
+| **Pasando**  | 679 ✅    |
 | **Fallas**   | 0 ✅      |
-| **Archivos** | 66        |
+| **Archivos** | 69        |
 
 > Los tests de endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, Redis, storage). Helpers centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`). Además: 15 specs E2E en `e2e/` (Playwright, CI self-hosted).
 
@@ -325,9 +325,10 @@ pnpm test
 - Actualización 3 de octubre de 2026 – 517 tests, 61 archivos, T3 de Fase 2: 8 casos de `derivePermissions`, 10 de `calculateProration` y 13 de `classifyMpEvent`. Rama `chore/t3-helpers`.
 - Actualización 3 de octubre de 2026 – 523 tests, 62 archivos, fix del stub de suscripciones: 6 casos de selección de secret y validación de firma en `apps/admin/app/api/webhooks/mercadopago/subscriptions/__tests__/route.test.ts`. Rama `chore/fix-webhook-subscriptions-secret`.
 - Actualización 3 de octubre de 2026 – 619 tests, 66 archivos, T4 de Fase 2: 96 casos nuevos para los 6 endpoints de suscripciones (`preapproval` con rate limit 10/60s y `payerEmail` tomado del JWT, `GET` con permisos, `cancel`/`pause`/`resume` con verificación post-escritura, `plan` con prorrateo 402/202) más el estado `paused` en la matriz de permisos. Rama `chore/t4-endpoints`.
+- Actualización 4 de octubre de 2026 – 679 tests, 69 archivos, T5 de Fase 2: 37 casos del handler del webhook (`__tests__/handler.test.ts`: 8 transiciones de §6.3, firma, clasificación, idempotencia por convergencia, resolución de tenant L+R, aislamiento cross-tenant, tolerancia a UNKNOWN) más 9 casos de `packages/commerce/src/__tests__/mp-subscriptions.test.ts`, los primeros tests directos del cliente de MP. Rama `chore/t5-webhook-handler`.
 - Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
 - Fase 6 completada: withTenantContext real + FORCE RLS (app_user), E2E Playwright 15 specs con CI self-hosted, incidente RLS de 9 Server Components corregido (08-08).
-- Estado actual: 619 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
+- Estado actual: 679 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Sandbox manual de MercadoPago pendiente (cuenta de prueba de MP).
 - Ver AGENTS.md para detalles de convenciones de código y comandos obligatorios.
 
