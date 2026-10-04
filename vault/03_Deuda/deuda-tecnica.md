@@ -1760,3 +1760,75 @@ items 48 y 49.
 **Reevaluar:** en la próxima auditoría documental, aplicar la misma lupa a los
 otros "estado actual" de `AGENTS.md` y `SETUP.md`. Un doc de estado escrito en el
 mismo commit que crea el hecho que lo contradice tiene una vida útil corta.
+---
+
+## 51. `paused` no podía cancelar: decisión de producto, implementar
+
+**Estado:** ✅ **RESUELTO (2026-10-04)** — PR `chore/paused-can-cancel`.
+Registrado y resuelto en el mismo PR, porque la decisión ya estaba tomada: solo
+faltaba implementarla.
+
+## Hecho
+
+El PR #191 (items 48/49/50) documentó en el transversal que `paused → cancelled`
+existe en MercadoPago, pero marcó una **discrepancia abierta**: la matriz de
+permisos decía `canCancel: false` para `paused`, así que nuestra API no la
+exponía y la UI solo ofrecía "reanudar".
+
+**Decisión de producto (Luis, 2026-10-04): opción A — `canCancel: true` para
+`paused`.** `paused` significa "suspender el cobro", no "bloquear acciones".
+
+## Por qué no era solo un cambio de bandera
+
+El bug no estaba solo en la matriz. `POST /api/subscriptions/cancel` tiene
+`allowedFrom: ['active']` y rechazaba `paused` con 409, con un test que
+afirmaba ese comportamiento ("hay que reanudar antes de cancelar").
+
+Si se hubiera cambiado **solo** `canCancel` a `true`, la UI habría mostrado un
+botón "Cancelar" que siempre devolvía 409. La decisión queda implementada en las
+**dos** capas o no queda implementada:
+
+1. `derivePermissions`: `canCancel: true` para `paused`.
+2. `POST /cancel`: `allowedFrom: ['active', 'paused']`.
+
+Los dos archivos tienen ahora el mismo comportamiento y hay tests que lo fijan
+en cada capa.
+
+## Impacto de haberlo hecho en dos capas
+
+Es el mismo modo de fallo que el item 38 (documentación que contradice al
+código), invertido: acá la documentación decía una cosa y el código otra
+—inconsistencia interna del código, no entre doc y código—. Un gate que solo
+verifica la matriz de permisos no alcanza: hay que verificar también la lista
+de estados que acepta cada endpoint de mutación.
+
+**Para T5:** los endpoints de mutación son la frontera real. La matriz de
+permisos decide qué botón se muestra; el endpoint decide si funciona. Si
+divergen, el síntoma es un 409 inexplicable para el usuario.
+
+## Resolución
+
+- `packages/commerce/src/subscription-permissions.ts`: `canCancel: true` para
+  `paused`, con el razonamiento en el comentario.
+- `apps/admin/app/api/subscriptions/cancel/route.ts`: `allowedFrom` acepta
+  `paused`; `conflictMessage` actualizado para no decir "solo activa".
+- Tests: snapshot de la matriz actualizado, 2 tests nuevos en permisos, y el test
+  de `mutations.test.ts` que afirmaba el 409 desde `paused` convertido en 202.
+- Transversal §2: agregada la fila "Cancelar la suscripción" con ✅ en `active`
+  y `paused` (la tabla no tenía ninguna fila de cancelar). Reemplazada la nota
+  de "discrepancia abierta" por la decisión.
+
+## Relacionado
+
+- **Item 49:** donde se documentó `paused` y se dejó la discrepancia anotada.
+- **Item 38:** el mismo eje de documentación que contradice al código.
+
+**Origen:** detectado al implementar el item 49 (PR #191) y resuelto por
+decisión de producto en el mismo día.
+
+**Severidad:** MEDIA. Sin este fix, la UI podía ofrecer una acción que siempre
+devolvía 409.
+
+**Urgencia:** BAJA. Resuelto en este PR.
+
+**Reevaluar:** no. Quedó alineado en las dos capas y con tests en cada una.

@@ -63,7 +63,7 @@ describe('derivePermissions', () => {
     expect(p.canResume).toBe(false)
   })
 
-  it('paused: conserva storefront, puede reanudar, no puede cancelar ni pausar', () => {
+  it('paused: conserva storefront, puede reanudar y puede cancelar', () => {
     const p = derivePermissions('paused')
 
     // Conserva el acceso: `paused` suspende el COBRO, no el servicio. La doc de
@@ -75,9 +75,10 @@ describe('derivePermissions', () => {
     expect(p.canAccessPanel).toBe('limited')
     expect(p.canWrite).toBe(false)
     expect(p.canChangePlan).toBe(false)
-    // Cancelar desde paused ES posible en MP, pero desde la UI tiene sentido
-    // ofrecer solo "reanudar": el tenant que pauso quiere volver, no irse.
-    expect(p.canCancel).toBe(false)
+    // Decision de producto (Luis, 2026-10-04): `paused` es "suspender el
+    // cobro", no "bloquear acciones". MP acepta `paused -> cancelled`, asi que
+    // se expone. Forzar "reanudar para cancelar" seria burocracia.
+    expect(p.canCancel).toBe(true)
     expect(p.canReactivate).toBe(false)
     expect(p.canPause).toBe(false)
     expect(p.canResume).toBe(true)
@@ -162,7 +163,7 @@ describe('derivePermissions — matriz completa (proteccion contra regresiones)'
       'pending_first_payment|none|false|false|false|false|false|false|false',
       'active|full|true|true|true|true|false|true|false',
       'past_due|limited|true|false|false|false|false|false|false',
-      'paused|limited|true|false|false|false|false|false|true',
+      'paused|limited|true|false|false|true|false|false|true',
       'cancelled|readonly|true|false|false|false|true|false|false',
       'expired|none|false|false|false|false|true|false|false',
       'abandoned|none|false|false|false|false|false|false|false',
@@ -184,6 +185,28 @@ describe('derivePermissions — matriz completa (proteccion contra regresiones)'
     expect(canResume).toEqual(['paused'])
     // Ningun estado puede offerser ambas cosas.
     expect(canPause.filter((s) => canResume.includes(s))).toEqual([])
+  })
+
+  it('solo active y paused pueden cancelar', () => {
+    // Decision de producto (Luis, 2026-10-04): `paused` es "suspender el
+    // cobro", no "bloquear acciones". MP acepta `paused -> cancelled`.
+    // `cancelled` no puede cancelar de nuevo y los estados "muertos"
+    // (`expired`, `abandoned`) ya no admiten esa transicion.
+    expect(ALL.filter((s) => derivePermissions(s).canCancel)).toEqual([
+      'active',
+      'paused',
+    ])
+  })
+
+  it('paused puede las 3 salidas plausibles: reanudar, cancelar o nada', () => {
+    // `paused` es el unico estado con dos acciones disponibles a la vez.
+    // Si se le agrega una tercera transicion en el futuro, este test obliga a
+    // decidir explicitamente si `paused` sigue siendo bidireccional.
+    const p = derivePermissions('paused')
+
+    expect(p.canResume).toBe(true)
+    expect(p.canCancel).toBe(true)
+    expect(p.canPause).toBe(false)
   })
 
   it('el storefront queda abierto en active, past_due, paused y cancelled', () => {

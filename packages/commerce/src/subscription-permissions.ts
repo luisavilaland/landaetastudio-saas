@@ -125,12 +125,14 @@ const PERMISSIONS_BY_STATUS: Record<SubscriptionStatus, SubscriptionPermissions>
       canAccessStorefront: true,
       canWrite: false,
       canChangePlan: false,
-      // Cancelar desde `paused` es posible en MP, pero no se ofrece: el tenant
-      // que pauso quiere volver, no irse. Se expone solo `resume`.
-      canCancel: false,
-      canReactivate: false,
-      canPause: false,
-      canResume: true,
+// `paused` es "suspender el cobro", no "bloquear acciones". La API expone
+    // `canCancel: true` porque MercadoPago acepta `paused -> cancelled`
+    // (verificado 2026-10-03) y obligar al tenant a "reanudar para cancelar"
+    // seria burocracia sin beneficio. Decision de producto de Luis.
+    canCancel: true,
+    canReactivate: false,
+    canPause: false,
+    canResume: true,
     },
     cancelled: {
       canAccessPanel: 'readonly',

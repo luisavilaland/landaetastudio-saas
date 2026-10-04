@@ -12,8 +12,14 @@ const logger = createLogger('admin-subscriptions-cancel')
  * `cancelled` a `authorized` (verificado 2026-10-03). No hay reacion: un tenant
  * que cancela tiene que crear una suscripcion nueva.
  *
- * Solo desde `active`. Cancelar desde `past_due` se rechaza: con la factura
- * impaga, MP no procesa la baja. El tenant tiene que resolver el impago.
+ * Desde `active` y desde `paused`. Decision de producto (Luis, 2026-10-04):
+ * `paused` es "suspender el cobro", no "bloquear acciones"; MP acepta
+ * `paused -> cancelled`, asi que obligar al tenant a reanudar para cancelar
+ * seria burocracia sin beneficio. Coherente con `canCancel: true` en
+ * `derivePermissions`.
+ *
+ * Cancelar desde `past_due` se rechaza: con la factura impaga, MP no procesa la
+ * baja. El tenant tiene que resolver el impago primero.
  *
  * Devuelve **202, no 200**: la mutacion es asincrona. El estado local lo
  * escribe el webhook cuando MP confirma.
@@ -26,9 +32,9 @@ export async function POST() {
     return await mutateSubscriptionStatus({
       tenantId,
       target: 'cancelled',
-      allowedFrom: ['active'],
+      allowedFrom: ['active', 'paused'],
       conflictMessage:
-        'Solo se puede cancelar una suscripcion activa. Resolvi primero el impago si corresponde.',
+        'Solo se puede cancelar una suscripcion activa o pausada. Resolvi primero el impago si corresponde.',
       conflictField: 'status',
       successBody: {
         message: 'Cancelacion solicitada. El acceso sigue hasta el fin del periodo pagado.',
