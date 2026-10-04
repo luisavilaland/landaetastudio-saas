@@ -27,3 +27,8 @@ tags:
 - [[estado-paused-anadido-a-derivepermissions-134]]
 - [[corregidos-3-bugs-signo-de-prorrateo-centavos-vs-unidades-pa-135]]
 - [[session-summary-landaetastudio-saas-136]]
+- [[pr-188-mergeado-y-t4-rebaseado-sobre-develop-137]]
+- [[items-48-y-49-de-deuda-item-38-marcado-como-superado-138]]
+- [[t4-y-deuda-48-49-mergeados-a-develop-cleanup-completo-139]]
+- [[tompamount-frommpamount-centraliza-la-conversion-math-round-140]]
+- [[los-items-de-deuda-que-bloquean-la-fase-se-resuelven-con-pr-141]]

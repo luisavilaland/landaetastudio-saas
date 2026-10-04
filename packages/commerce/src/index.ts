@@ -26,10 +26,10 @@ export { makeSignature, verifyMercadoPagoSignature } from './webhook-signature'
 // Encryption
 export { encryptToken, decryptToken, EncryptionError } from './encryption'
 
-// Redis (export for testing or direct access if needed)
-export { redisClient } from './redis'
-
-// Rate limit (fail-open wrappers, AGENTS.md: nunca 500 si Redis cae)
+// Rate limit y demas: solo los wrappers fail-open de abajo.
+// El cliente crudo NO se reexporta: AGENTS.md prohibe usar `redisClient.*`
+// directamente (el primer comando de un cold-start serverless se rechaza
+// mientras el socket conecta). Exportarlo desde el barrel invita a violarlo.
 export { safeGet, redisSetEx, redisDel, redisIncr, redisPexpire } from './redis'
 
 // Suscripciones — Fase 2
@@ -55,6 +55,8 @@ export {
   createPreapproval,
   updatePreapproval,
   getPreapproval,
-  getAuthorizedPayment,
   MP_API,
 } from './mp-subscriptions'
+
+// Conversion centavos <-> unidad de moneda (item 48)
+export { toMpAmount, fromMpAmount } from './mp-amounts'

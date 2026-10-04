@@ -8,7 +8,7 @@
 
 ---
 
-## 1. Máquina de estados (6 estados)
+## 1. Máquina de estados (7 estados)
 
 ### Estados
 
@@ -17,6 +17,7 @@
 | `pending_first_payment` | Registrado, pago inicial pendiente                           | ❌ Bloqueado   | ❌ No publicada         |
 | `active`                | Al día, suscripción vigente                                  | ✅ Completo    | ✅ Funcionando          |
 | `past_due`              | Pago falló (dentro de gracia 7 días)                         | ⚠ Limitado     | ✅ Funcionando          |
+| `paused`                | Cobro suspendido por el tenant (MP no debita)                | ⚠ Limitado     | ✅ Funcionando          |
 | `cancelled`             | Canceló voluntariamente (vence al fin de período)            | ⚠ Solo lectura | ✅ Hasta fin de período |
 | `expired`               | Pasó gracia sin pagar                                        | ❌ Bloqueado   | ❌ Despublicada         |
 | `abandoned`             | Nunca completó primer pago (7 días desde registro sin pagar) | ❌ Bloqueado   | ❌ No publicada         |
@@ -40,25 +41,64 @@ stateDiagram-v2
     past_due --> active : pago aprobado (Webhook MP Plataforma) - recuperación automática
     past_due --> expired : Día 7 desde primer fallo sin resolver
     active --> cancelled : preapproval cancelado (Webhook MP Plataforma) - cancelación voluntaria
+    active --> paused : POST /api/subscriptions/pause (tenant pausa el cobro)
+    paused --> active : POST /api/subscriptions/resume (tenant reanuda el cobro)
+    paused --> cancelled : POST /api/subscriptions/cancel (no expuesto aún por la API)
     cancelled --> expired : Fin de período pagado
-    cancelled --> active : Tenant se arrepiente (PUT /preapproval {status:"authorized"})
     expired --> active : pago aprobado (Webhook MP Plataforma) - reactivación manual
     expired --> [*] : Día 90 - Borrado definitivo (cron)
     abandoned --> [*] : Día 90 - Borrado definitivo (cron)
 ```
 
-### Estado `paused` de MP — no modelado (nota 2026-10-01)
+### Estado `paused` — modelado (decisión 2026-10-03)
 
-MercadoPago tiene un estado `paused` para preapprovals que este transversal
-**no modela**. Decisión tomada en el planning de Fase 2:
+MercadoPago tiene un estado `paused` para preapprovals. Este transversal
+**ahora lo modela como estado de primera clase** (antes figuraba como "no
+modelado", decisión del planning de Fase 2 que quedó superada).
 
-- **Fase 2**: el webhook registra `warn` y **no transiciona** si recibe `paused`.
-  Si el tenant pausa desde el panel de MP, la DB no lo refleja.
-- **Al transversal**: se agrega cuando **Fase 3** defina la semántica de pausa
-  (¿es `past_due`? ¿un estado nuevo? ¿bloquea el panel?).
+**Definición:** suscripción con **cobro temporalmente interrumpido**. MercadoPago
+deja de debitar los pagos hasta que se reactive. Fuente: [doc oficial de
+MercadoPago — Manage subscription plan](https://www.mercadopago.com.ar/developers/es/docs/subscription-plans/manage-subscription-plan).
 
-Esto no es un descuido: la semántica de pausa requiere decisión de producto que
-todavía no está tomada.
+**Por qué existe en la máquina de estados (no es un descuido):** `cancel` es
+**terminal** en MercadoPago. El spike del 2026-10-03 verificó que
+`cancelled → authorized` devuelve **400** (`Invalid transition from cancelled to
+authorized`). Sin `paused`, un tenant que quisiera volver se quedaría sin
+camino: la pausa es el único mecanismo reversible.
+
+**Semántica decidida:**
+
+| Aspecto                 | Decisión                                                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Qué suspende            | El **cobro**, no el servicio. El tenant conserva storefront y panel.                                            |
+| `canPause`              | Solo desde `active`.                                                                                            |
+| `canResume`             | Solo desde `paused`.                                                                                            |
+| `canAccessPanel`        | `'limited'`. No `'readonly'` porque el tenant pausado tiene una acción útil: `resume`.                          |
+| Relación con `past_due` | Son distintos. `past_due` es **impago** (dunning, gracia de 7 días, §3). `paused` es **suspensión voluntaria**. |
+
+**Discrepancia conocida con la API (a resolver):** la transición
+`paused → cancelled` existe en MercadoPago y figura en el diagrama, pero
+`derivePermissions` de T4 devuelve `canCancel: false` para `paused`. MP la
+acepta; nuestra API todavía no la expone. Mientras tanto, la UI ofrece
+"reanudar", no "irse". Ver item 49.
+
+> **Validación empírica pendiente.** El preapproval `24b2a868` quedó pausado el
+> 2026-10-03. El 2026-11-03 se verifica si MercadoPago intentó cobrar durante la
+> pausa. Si intentó, la definición de arriba es incorrecta y hay que cambiarla
+> antes deffeundarla por buena en el código.
+
+### Transición `cancelled → active`: **eliminada** (verificada imposible)
+
+Este transversal antes documentaba `cancelled → active` vía
+`PUT /preapproval/{id} {status:"authorized"}`. **Se eliminó porque el spike la
+refutó**: MercadoPago responde **400** a esa transición.
+
+Consecuencia de producto: **la cancelación es irreversible.** Un tenant que
+cancela y se arrepiente tiene que crear una suscripción nueva. La UI debe
+advertirlo antes de confirmar y **no** ofrecer "reactivar" después de cancelar.
+
+`expired → active` sigue en el diagrama: **no** fue verificada contra MP en el
+spike, así que no se afirma ni se niega acá. Si T5 la usa, verificarla primero.
 
 ### Qué dispara cada transición
 
@@ -67,19 +107,21 @@ todavía no está tomada.
 > (`type`/`action` por topic) están en §6 y se confirman en el spike T0
 > (issue #164).
 
-| Transición                            | Disparador                                                          | Origen                                   |
-| ------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------- |
-| `pending_first_payment` → `active`    | Preapproval dado de alta + pago aprobado                            | Webhook MP Plataforma (`MP_PLATFORM_*`)  |
-| `pending_first_payment` → `abandoned` | Cron: `created_at + 7d` sin pago aprobado                           | Job interno (cron nocturno, UTC)         |
-| `active` → `past_due`                 | Cobro rechazado / fallido                                           | Webhook MP Plataforma                    |
-| `past_due` → `active`                 | Cobro aprobado (reintento exitoso de MP)                            | Webhook MP Plataforma                    |
-| `past_due` → `expired`                | Cron: día 7 desde primer fallo sin resolver                         | Job interno (cron nocturno, UTC)         |
-| `active` → `cancelled`                | Preapproval cancelado (tenant cancela)                              | Webhook MP Plataforma                    |
-| `cancelled` → `expired`               | Fin de `current_period_end`                                         | Job interno (cron nocturno, UTC)         |
-| `cancelled` → `active`                | Tenant se arrepiente: `PUT /preapproval/{id} {status:"authorized"}` | Backend (MP_PLATFORM_ACCESS_TOKEN)       |
-| `expired` → `active`                  | Cobro aprobado (pago manual)                                        | Webhook MP Plataforma / Botón "Ya pagué" |
-| `expired` → `[borrado]`               | Cron: 90 días desde `expired_at`                                    | Job interno (cron nocturno, UTC)         |
-| `abandoned` → `[borrado]`             | Cron: 90 días desde `abandoned_at`                                  | Job interno (cron nocturno, UTC)         |
+| Transición                            | Disparador                                                      | Origen                                   |
+| ------------------------------------- | --------------------------------------------------------------- | ---------------------------------------- |
+| `pending_first_payment` → `active`    | Preapproval dado de alta + pago aprobado                        | Webhook MP Plataforma (`MP_PLATFORM_*`)  |
+| `pending_first_payment` → `abandoned` | Cron: `created_at + 7d` sin pago aprobado                       | Job interno (cron nocturno, UTC)         |
+| `active` → `past_due`                 | Cobro rechazado / fallido                                       | Webhook MP Plataforma                    |
+| `past_due` → `active`                 | Cobro aprobado (reintento exitoso de MP)                        | Webhook MP Plataforma                    |
+| `past_due` → `expired`                | Cron: día 7 desde primer fallo sin resolver                     | Job interno (cron nocturno, UTC)         |
+| `active` → `cancelled`                | Preapproval cancelado (tenant cancela)                          | Webhook MP Plataforma                    |
+| `active` → `paused`                   | Tenant pausa el cobro                                           | Backend (`POST /pause`)                  |
+| `paused` → `active`                   | Tenant reanuda el cobro                                         | Backend (`POST /resume`)                 |
+| `paused` → `cancelled`                | Tenant cancela desde pausa (MP lo acepta; API no lo expone aún) | Backend (`POST /cancel`, pendiente)      |
+| `cancelled` → `expired`               | Fin de `current_period_end`                                     | Job interno (cron nocturno, UTC)         |
+| `expired` → `active`                  | Cobro aprobado (pago manual)                                    | Webhook MP Plataforma / Botón "Ya pagué" |
+| `expired` → `[borrado]`               | Cron: 90 días desde `expired_at`                                | Job interno (cron nocturno, UTC)         |
+| `abandoned` → `[borrado]`             | Cron: 90 días desde `abandoned_at`                              | Job interno (cron nocturno, UTC)         |
 
 ---
 
@@ -87,17 +129,19 @@ todavía no está tomada.
 
 ### Tabla resumen: Estado × Permisos
 
-| Acción                           | `pending_first_payment` | `active`    | `past_due` | `cancelled`            | `expired` | `abandoned` |
-| -------------------------------- | ----------------------- | ----------- | ---------- | ---------------------- | --------- | ----------- |
-| **Acceder panel admin**          | ❌                      | ✅ Completo | ⚠ Limitado | ⚠ Solo lectura         | ❌        | ❌          |
-| **Ver productos/órdenes/config** | ❌                      | ✅          | ✅         | ✅                     | ❌        | ❌          |
-| **Crear/editar productos**       | ❌                      | ✅          | ❌         | ❌                     | ❌        | ❌          |
-| **Crear/editar categorías**      | ❌                      | ✅          | ❌         | ❌                     | ❌        | ❌          |
-| **Gestionar órdenes**            | ❌                      | ✅          | ✅         | ✅                     | ❌        | ❌          |
-| **Recibir órdenes (storefront)** | ❌                      | ✅          | ✅         | ✅                     | ❌        | ❌          |
-| **Configurar MP, envíos, etc.**  | ❌                      | ✅          | ❌         | ❌                     | ❌        | ❌          |
-| **Cambiar de plan**              | ❌                      | ✅          | ❌         | ❌                     | ❌        | ❌          |
-| **Tienda pública accesible**     | ❌                      | ✅          | ✅         | ✅ (hasta fin período) | ❌        | ❌          |
+| Acción                           | `pending_first_payment` | `active`    | `past_due` | `paused`   | `cancelled`            | `expired` | `abandoned` |
+| -------------------------------- | ----------------------- | ----------- | ---------- | ---------- | ---------------------- | --------- | ----------- |
+| **Acceder panel admin**          | ❌                      | ✅ Completo | ⚠ Limitado | ⚠ Limitado | ⚠ Solo lectura         | ❌        | ❌          |
+| **Ver productos/órdenes/config** | ❌                      | ✅          | ✅         | ✅         | ✅                     | ❌        | ❌          |
+| **Crear/editar productos**       | ❌                      | ✅          | ❌         | ❌         | ❌                     | ❌        | ❌          |
+| **Crear/editar categorías**      | ❌                      | ✅          | ❌         | ❌         | ❌                     | ❌        | ❌          |
+| **Gestionar órdenes**            | ❌                      | ✅          | ✅         | ✅         | ✅                     | ❌        | ❌          |
+| **Recibir órdenes (storefront)** | ❌                      | ✅          | ✅         | ✅         | ✅                     | ❌        | ❌          |
+| **Configurar MP, envíos, etc.**  | ❌                      | ✅          | ❌         | ❌         | ❌                     | ❌        | ❌          |
+| **Cambiar de plan**              | ❌                      | ✅          | ❌         | ❌         | ❌                     | ❌        | ❌          |
+| **Pausar el cobro**              | ❌                      | ✅          | ❌         | ❌         | ❌                     | ❌        | ❌          |
+| **Reanudar el cobro**            | ❌                      | ❌          | ❌         | ✅         | ❌                     | ❌        | ❌          |
+| **Tienda pública accesible**     | ❌                      | ✅          | ✅         | ✅         | ✅ (hasta fin período) | ❌        | ❌          |
 
 ### Detalle por estado
 
@@ -123,6 +167,19 @@ todavía no está tomada.
 - Emails automáticos día 0, 3, 5, 7
 - Webhook MP Plataforma: si llega un cobro aprobado → back to `active`
 
+**`paused`** (suspensión voluntaria del tenant)
+
+- Cobro **suspendido**: MercadoPago no debita. El servicio sigue dado.
+- Panel: banner "Tu cobro está pausado. Reanudá cuando quieras" + acción `resume`
+- Storefront: funciona normal (lo suspension es el cobro, no el acceso)
+- Escritura bloqueada (productos, categorías, config): coherente con `past_due`
+- **Reanudar:** botón "Reanudar" → `POST /api/subscriptions/resume` → MP procesa
+  → webhook confirma → `paused` → `active`. Vuelve el cobro automático.
+- **Cancelar:** la transición existe en MP pero la API todavía no la expone
+  (ver §1). Hoy el camino desde `paused` es volver a `active` y cancelar desde ahí.
+- **No es impago.** Si el tenant no puede pagar y el cobro falla, eso es
+  `past_due` (§3), no `paused`. La pausa es siempre una decisión del tenant.
+
 **`cancelled`**
 
 - El tenant pidió cancelar → sigue activo hasta `current_period_end`
@@ -131,7 +188,9 @@ todavía no está tomada.
 - No puede cambiar de plan ni configurar nada nuevo
 - Al llegar `current_period_end` → `expired`
 - **Política:** No se reintegra tiempo no usado (estándar SaaS).
-- **Reactivación:** Si el tenant se arrepiente antes de `current_period_end`, puede hacer clic en "Reactivar" en el panel → backend llama `PUT /preapproval/{id} {status:"authorized"}` → MP procesa → webhook (o polling) confirma → transición `cancelled` → `active`. El período se renueva desde la reactivación.
+- **Irreversible (verificado 2026-10-03):** `cancelled → active` devuelve **400**
+  en MercadoPago. No hay "reactivar". Un tenant que cancela y se arrepiente
+  debe crear una suscripción nueva. Ver §1.
 
 **`expired`**
 
@@ -336,19 +395,38 @@ El payload del webhook trae `type` + `action` **separados**, más `data.id`,
 > **despacha por `type`** (que sí está verificado) y trata cualquier
 > combinación desconocida como no-op con log `warn`. No se adivinan literales.
 
+> **Literal de `status` por topic: verificado en el spike T0 (2026-10-03).**
+> `subscription_preapproval` trae `status: authorized` cuando el alta queda
+> confirmada. `payment` trae `data.id` pero **no** trae `status` de suscripción.
+> Ojo con el campo `live_mode`: **solo viene en `payment`**. Los topics de
+> suscripción **no** lo incluyen, así que "ausente" debe tratarse distinto de
+> `false`.
+
 ### Mapeo topic → estado interno
+
+> **Decisión de producto (Luis, 2026-10-03): opción B.** El alta se activa desde
+> `subscription_preapproval` con `status: authorized`, **no** desde
+> `subscription_authorized_payment`. Razón: `subscription_preapproval` es el
+> evento que confirma el estado del preapproval, mientras que
+> `subscription_authorized_payment` confirma el cobro. Se elige la fuente de
+> verdad del preapproval y se acepta el costo de latencia de esperar el tercer
+> evento del flujo (`payment` → `subscription_authorized_payment` →
+> `subscription_preapproval`).
+>
+> Consecuencia operativa: hay una ventana en la que MP ya cobró y nuestra DB
+> todavía dice `pending_first_payment`. La UI debe tolerar ese estado.
 
 | Topic + `action` (semántico)             | Estado previo           | Estado nuevo | Acciones                                                                                                       |
 | ---------------------------------------- | ----------------------- | ------------ | -------------------------------------------------------------------------------------------------------------- |
-| `subscription_preapproval` (alta)        | `pending_first_payment` | (sin cambio) | Guardar `mp_preapproval_id` en `subscriptions`                                                                 |
-| Cobro aprobado                           | `pending_first_payment` | `active`     | Set `current_period_end = now() + 1 month`, activar panel                                                      |
+| `subscription_preapproval` (alta)        | `pending_first_payment` | `active`     | **Alta (opción B).** Set `current_period_end = now() + 1 month`, activar panel                                 |
 | Cobro aprobado                           | `past_due`              | `active`     | Reset gracia, set nuevo `current_period_end`                                                                   |
 | Cobro aprobado                           | `expired`               | `active`     | Reactivación manual, set nuevo `current_period_end`                                                            |
 | Cobro rechazado / fallido                | `active`                | `past_due`   | Iniciar gracia 7d, email #3, set `current_period_end` sin cambios                                              |
 | Cobro rechazado / fallido                | `past_due`              | (sin cambio) | Reiniciar contador gracia? No, mantener día 0 original                                                         |
 | `subscription_preapproval` (cancelado)   | `active` / `past_due`   | `cancelled`  | Set `current_period_end` = fin de período actual                                                               |
+| `subscription_preapproval` (paused)      | `active`                | `paused`     | **Modelado desde 2026-10-03.** Transición disparada por `POST /pause` (§1). No alterar el período.             |
+| `subscription_preapproval` (authorized)  | `paused`                | `active`     | Reanudación. Disparada por `POST /resume` (§1). Set nuevo `current_period_end`                                 |
 | `subscription_preapproval` (actualizado) | Cualquiera              | (eval)       | **Solo si el monto nuevo != monto guardado** → upgrade/downgrade con prorrateo. Si no → ignorar + log warning. |
-| `subscription_preapproval` (paused)      | Cualquiera              | (sin cambio) | **No modelado.** Log `warn`, no transicionar. Ver §1                                                           |
 
 ### El tenant se resuelve desde MP, no desde el payload
 

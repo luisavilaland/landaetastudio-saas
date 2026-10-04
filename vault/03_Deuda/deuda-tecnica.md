@@ -1495,7 +1495,23 @@ de ahí, la diferenciación de scopes deja de ser higiene y pasa a ser requisito
 
 ## 48. Conversión centavos ↔ unidad de moneda en el borde de MercadoPago
 
-**Estado:** abierto (2026-10-03). Mitigado en T4, **la causa raíz sigue viva**.
+**Estado:** ✅ **RESUELTO (2026-10-04)** — PR `chore/fix-48-49-50`.
+
+**Resolución:** `packages/commerce/src/mp-amounts.ts` con `toMpAmount` y
+`fromMpAmount`, exportados por `@repo/commerce`. Las **3** conversiones inline
+`/ 100` que quedaban en T4 se reemplazaron por el helper (`preapproval` L160,
+`plan` L233 y L268). `grep` confirma **0** conversiones inline restantes hacia
+MercadoPago. 12 tests nuevos, incluido el que falla si se saca el `Math.round`
+de `fromMpAmount` (sin él, `29` roundtrip a `28.999999999999996`).
+
+**Lo que NO se hizo (deliberado):** la parte 2 de la mitigación 1 —tipar
+`CreatePreapprovalInput` y `updatePreapproval` en centavos para que el tipo
+obligue a convertir. Eso cambiaría el contrato del wrapper de T3 y excede este
+PR. La protección actual es de disciplina (helper nombrado), no de tipos.
+
+**No se tocó `email.ts`:** sus dos `/ 100` son `(total / 100).toFixed(2)` para
+**mostrar** un precio en un email, no una conversión hacia MP. Usar un helper
+llamado `toMpAmount` ahí sería mentir sobre el dominio.
 
 ## Hecho
 
@@ -1571,7 +1587,34 @@ MercadoPago. Con la helper en `packages/commerce`, el costo es de un rato.
 
 ## 49. `paused` implementado pero ausente del transversal
 
-**Estado:** abierto (2026-10-03). **Sucesor del item 38.**
+**Estado:** ✅ **RESUELTO (2026-10-04)** — PR `chore/fix-48-49-50`. Actualizado el
+transversal a **7 estados**. **Sucesor del item 38.**
+
+**Resolución:** `docs/superpowers/specs/2026-09-subscription-lifecycle.md`
+actualizado — §1 (título, tabla de estados, diagrama, tabla de disparadores),
+§2 (columna `paused` + filas `canPause`/`canResume`, bloque de detalle) y §6
+(mapeo de topics). Se registró además la **decisión de producto de opción B**
+para la activación, y la eliminación de la transición `cancelled → active`.
+
+**Correcciones de exactitud queulgieron en el mismo PR** (estaban documentadas
+como válidas y el spike las refutó):
+
+- Se **eliminó `cancelled → active`** del diagrama, de la tabla de disparadores
+  y del detalle de `cancelled`. MP devuelve **400**. La cancelación es
+  irreversible; el doc decía lo contrario e inducía a construir un flujo roto.
+- Se reemplazó el bloque "Estado `paused` de MP — no modelado" y la fila
+  `subscription_preapproval (paused) → (sin cambio)` de §6, que contradecían el
+  código ya mergeado.
+- Se documentó que `live_mode` **solo viene en `payment`**; los topics de
+  suscripción no lo incluyen, así que "ausente" ≠ `false`.
+
+**Discrepancia que queda ABIERTA (no es deuda de este item):** el doc incluye
+`paused → cancelled` porque MP la acepta, pero `derivePermissions` devuelve
+`canCancel: false` para `paused`. Está anotado en §1 del transversal. Decidir si
+se expone el botón "Cancelar" en una suscripción pausada.
+
+**Validación empírica pendiente:** el preapproval `24b2a868` quedó pausado el
+2026-10-03. El **2026-11-03** se verifica si MP intentó cobrar durante la pausa.
 
 ## Hecho
 
@@ -1647,3 +1690,73 @@ material de referencia le dice que no lo haga.
 
 **Reevaluar:** antes de escribir T5. Después de T5, `paused` deja de ser
 documentación pendiente y pasa a ser comportamiento cubierto por tests.
+---
+
+## 50. `AGENTS.md` afirmaba que `openspec/` no existía cuando sí existe
+
+**Estado:** ✅ **RESUELTO (2026-10-04)** — PR `chore/fix-48-49-50`. Registrado y
+resuelto en el mismo PR.
+
+## Hecho
+
+`AGENTS.md` decía, en la sección "SDD Workflow":
+
+> **Estado en este repo**: SDD NO está inicializado — no existen `openspec/`,
+> `.sdd/` ni `changes/`. El primer uso requiere `/sdd-init`.
+
+Eso es **falso**. Existe `openspec/config.yaml`, agregado por el commit
+`9af860e` (**PR #163**, 2026-10-01, "docs(fase2): planificacion SDD de webhook
+suscripciones + checkout"). `openspec/` está **rastreado por git**, no ignorado.
+
+`SETUP.md` repetía la misma afirmación falsa en su sección de SDD.
+
+## Impacto
+
+1. **Un agente que leyera AGENTS.md concluiría que tiene que correr `/sdd-init`
+   sobre un repo ya inicializado**, que sobreescribiría `openspec/config.yaml`.
+2. **El modo real se ocultaba.** SDD está en `hybrid` (Engram + `openspec`), que
+   es lo que determina dónde persisten los artefactos. Decir "no inicializado"
+   hace que un agente elija el store equivocado sin saberlo.
+3. **Era la segunda fuente de contradicción** después del item 38: el doc
+   decía una cosa y el disco otra. Con el item 49 corregido, esta era la última
+   afirmación de estado que mentía sobre el repo.
+
+## Nota sobre el origen del error
+
+La afirmación se volvió falsa **el mismo día que se creó el directorio**: el
+PR #163 agregó `openspec/config.yaml` y, en el mismo commit, 14 líneas a
+`AGENTS.md`. La sección SDD se escribió asumiendo que SDD no se iba a inicializar
+en este repo. Tres días después el repo la contradijo y el texto no se actualizó.
+
+El patrón: un doc de estado escrito en el mismo commit que crea el hecho que lo
+contradice. Vale la pena revisar los demás "estado actual" de `AGENTS.md` y
+`SETUP.md` con la misma lupa.
+
+## Resolución
+
+- `AGENTS.md`: la línea ahora dice que SDD **está** inicializado en modo `hybrid`,
+  cita el commit `9af860e` y el PR #163, aclara que **no** existen
+  `openspec/specs/`, `openspec/changes/` ni `.sdd/`, y cierra con "la
+  infraestructura está, el contenido no".
+- `SETUP.md`: misma corrección en su sección de SDD.
+
+Se corrigieron **los dos** archivos, no solo `AGENTS.md`: dejar `SETUP.md` con la
+misma falsehood perpetuaría el error en el documento de onboarding, que es
+justamente donde alguien lo lee antes de arrancar.
+
+## Relacionado
+
+- **Item 38 / 49:** mismo eje — documentación que contradice el código.
+- **PR #163:** donde se creó `openspec/config.yaml`.
+
+**Origen:** detectado durante T4 (PR #189), al limpiar el worktree y ver un
+`openspec/` que AGENTS.md declaraba inexistente. Registrado al resolver los
+items 48 y 49.
+
+**Severidad:** BAJA. No rompe nada por sí sola; misleadea a quien lee.
+
+**Urgencia:** BAJA. Resuelto en este PR.
+
+**Reevaluar:** en la próxima auditoría documental, aplicar la misma lupa a los
+otros "estado actual" de `AGENTS.md` y `SETUP.md`. Un doc de estado escrito en el
+mismo commit que crea el hecho que lo contradice tiene una vida útil corta.
