@@ -243,8 +243,31 @@ describe('firma', () => {
 
   it('503 si no hay ningun secret configurado', async () => {
     delete process.env.MP_PLATFORM_WEBHOOK_SECRET
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET
     const res = await POST(request(body('payment', PAYMENT_ID), null))
     expect(res.status).toBe(503)
+  })
+
+  it('cae al secret del tenant si el de plataforma NO esta configurado', async () => {
+    // Mitad de la regresion que arreglo el PR #187. Sin este caso, cambiar el
+    // `??` por `||` o borrar el fallback pasaria los tests y dejaria el webhook
+    // con 401 en dev y preview, donde solo esta el secret del tenant.
+    delete process.env.MP_PLATFORM_WEBHOOK_SECRET
+    process.env.MERCADOPAGO_WEBHOOK_SECRET = TENANT_SECRET
+
+    const res = await POST(request(body('payment', PAYMENT_ID), TENANT_SECRET))
+
+    expect(res.status).toBe(200)
+  })
+
+  it('con el de plataforma configurado, una firma del secret del tenant da 401', async () => {
+    // La otra mitad de la misma regresion: el secret de plataforma tiene que
+    // GANAR, no Bastar con que uno de los dos validara.
+    process.env.MERCADOPAGO_WEBHOOK_SECRET = TENANT_SECRET
+
+    const res = await POST(request(body('payment', PAYMENT_ID), TENANT_SECRET))
+
+    expect(res.status).toBe(401)
   })
 })
 
