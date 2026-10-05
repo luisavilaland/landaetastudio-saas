@@ -15,3 +15,5 @@ tags:
 - [[session-summary-landaetastudio-saas-154]]
 - [[reconciliacion-de-issues-168-y-112-cerrados-repo-queda-con-3-155]]
 - [[pr-195-mergeado-exports-vault-e-issues-168-y-112-reconciliad-156]]
+- [[items-54-y-55-de-deuda-registrados-pr-196-y-me-inyecte-cjk-a-157]]
+- [[auditoria-mid-phase-fase-2-3-defectos-funcionales-confirmado-160]]
