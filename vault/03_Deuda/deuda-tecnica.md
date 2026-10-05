@@ -1832,3 +1832,168 @@ devolvía 409.
 **Urgencia:** BAJA. Resuelto en este PR.
 
 **Reevaluar:** no. Quedó alineado en las dos capas y con tests en cada una.
+---
+
+## 52. El escaneo del item 40 no cubre caracteres de control
+
+**Estado:** abierto (2026-10-04). Descubierto en T5.
+
+## Hecho
+
+El metodo de escaneo que prescribe el item 40 cubre solo dos clases de
+caracteres:
+
+```
+if ($l[$i] -match '[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]') { "CJK L$($i+1)" }
+if ($l[$i] -match "\uFFFD")                              { "MOJIBAKE L$($i+1)" }
+```
+
+Los **caracteres de control** (U+0000-U+0008, U+000B-U+001F) no estan
+cubiertos. Durante T5, dos reemplazos bulk con PowerShell los introdujeron y
+**no fueron detectados por ningun control del proyecto**:
+
+| Control      | Donde                           | Como se leyo        | Codigo real          |
+| ------------ | ------------------------------- | ------------------- | -------------------- |
+| U+0007 (BEL) | comentario de `FAILURE_ACTIONS` | `pproved`           | `approved`           |
+| U+0007 (BEL) | comentario de `HandleInput`     | `ction del payload` | `action del payload` |
+| U+000B (VT)  | comentario de acceso a env      | `alidateEnv()`      | `validateEnv()`      |
+
+Los tres **reemplazaron una letra**, no se insertaron: el archivo sigue siendo
+UTF-8 valido, asi que `pnpm lint`, `tsc`, `vitest` y `prettier` los pasaron
+sin quejarse. El texto era correcto salvo por un caracter invisible.
+
+**Los encontro el hook GGA**, no el DoD. Con 682 tests en verde, el unico
+control del proyecto que los ve es el pre-commit.
+
+## Impacto
+
+1. **Fallo silencioso en comentarios**, que es donde menos se nota: un
+   identificador mal escrito en un comentario no rompe nada hasta que alguien
+   copia el fragmento "arreglado".
+2. **El mecanismo de scan esta incompleto**, asi que cualquier agente que siga
+   el item 40 al pie de la letra hereda el mismo punto ciego.
+3. **Los reemplazos bulk de PowerShell son la causa raiz**, no los archivos
+   viejos. Un archivo sano que pasa por un `[System.IO.File]::WriteAllText`
+   con un `.Replace()` puede quedar asi. Por eso el item 25/26 (reparar
+   doble encoding) reaparece: la causa nunca estuvo en los archivos.
+
+## Mitigacion
+
+Ampliar el escaneo del item 40 para incluir control chars. Por codepoint, no
+por regex, porque un caracter de control en un rango se confunde con el
+renderizado de la consola:
+
+```powershell
+$l = [System.IO.File]::ReadAllLines(<archivo>, [System.Text.Encoding]::UTF8)
+$bad = 0
+for ($i = 0; $i -lt $l.Count; $i++) {
+  foreach ($c in $l[$i].ToCharArray()) {
+    $n = [int]$c
+    if (($n -ge 0x4e00 -and $n -le 0x9fff)) { "CJK L$($i+1)"; $bad++ }
+    if ($n -eq 0xFFFD)                          { "FFFD L$($i+1)"; $bad++ }
+    if (($n -lt 9) -or ($n -ge 11 -and $n -le 31)) {
+      "CTRL U+$('{0:X4}' -f $n) L$($i+1)"; $bad++
+    }
+  }
+}
+```
+
+**Por que enumerar codepoints y no regex:** durante T5 un escaneo por regex
+reporto como CJK la flecha `->` (U+2192), porque la consola la renderiza como
+basura. El codigo estaba limpio y el scan mentia. Con `[int]$c` no hay
+interpretacion de por medio.
+
+**Excluir el archivo entero:** el `text` declarado en el ejemplo de arriba esta
+como referencia; el resto de las ramas del item 40 se mantienen.
+
+## Relacionado
+
+- **Item 40:** el metodo de escaneo que hay que ampliar.
+- **Items 25 y 26:** el doble encoding preexistente en `bitacora.md` y
+  `deuda-tecnica.md`.-alli la causa fueron los archivos; aca fue la
+  herramienta.
+- **Memoria 114:** ya documenta que escanear la salida de `git` es
+  estructuralmente incapaz de detectar CJK. Este item es el complemento: el
+  archivo correcto escaneado con el patron incorrecto tampoco alcanza.
+
+**Origen:** descubierto en T5 (PR #193) por el hook GGA, con el DoD completo en
+verde.
+
+**Severidad:** MEDIA. No rompe codigo ejecutable; rompe la confianza en los
+comentarios y deja el scan con un punto ciego conocido.
+
+**Urgencia:** BAJA. Sin datos ni cashflow comprometidos.
+
+**Reevaluar:** en el proximo PR de docs. Es un cambio de una linea en el item 40.
+
+---
+
+## 53. La activacion por preapproval no guarda el invoiceId
+
+**Estado:** abierto (2026-10-04). **Decision tomada; documentada para que no se
+reabra sola.**
+
+> **Titulo preciso, porque la formulacion corta era falsa.** `lastProcessedPaymentId`
+> **NO esta sin uso**: el handler lo escribe para los eventos de topic `payment`
+> y lo lee como guarda de pago ya procesado. Lo que no ocurre es que la
+> activacion disparada por `subscription_preapproval` guarde el invoiceId.
+
+## Hecho
+
+El design §6.3 pide, para la transicion 1
+(`preapproval.authorized` → `active`), setear
+`lastProcessedPaymentId = invoiceId`.
+
+**No es implementable en ese evento.** Verificado en el spike #188:
+`subscription_preapproval.data.id` es el **id del preapproval**. El id de la
+invoice viaja en `subscription_authorized_payment`, que es un topic distinto y
+llega antes.
+
+La estructura del codigo quedo asi:
+
+| Evento                     | `lastProcessedPaymentId` | Por que                                            |
+| -------------------------- | ------------------------ | -------------------------------------------------- |
+| `payment`                  | **se escribe** (L522)    | Su `data.id` ES un id de pago                      |
+| `payment`                  | **se lee** (L501)        | Guarda de pago ya procesado, evita doble escritura |
+| `subscription_preapproval` | no se toca               | Su `data.id` no es un id de pago                   |
+
+Guardar el id del preapproval en una columna llamada
+`lastProcessedPaymentId` seria **mentir sobre el dato**: la guarda dejaria de
+distinguir un pago de un preapproval, y un id de preapproval comparado contra
+un id de pago nunca coincide, o sea la guarda dejaria de servir sin que nadie lo
+note.
+
+## Decision (Luis, 2026-10-04)
+
+Dejar solo **convergencia de estado**. La idempotencia es por construccion: si
+el estado local ya es el objetivo, no se escribe. Es stateless y aguanta
+cualquier cantidad de reintentos de MercadoPago, que es el caso real.
+
+El invoiceId no aporta en esta fase: no hay auditoria de pagos que lo necesite.
+
+**Alternativa descartada:** guardar el invoiceId con el lookup extra
+`GET /authorized_payments/search?preapproval_id={id}` en cada evento de
+preapproval. Cuesta una llamada a MP por evento para guardar un dato que
+nadie lee.
+
+## Fase 3
+
+Si hace falta auditoria de pagos, un **cron de reconciliacion** con acceso a
+todos los eventos historicos resuelve mejor que guardar el invoiceId en el
+handler: el handler ve un evento a la vez y no puede reconstruir historia; el
+cron si.
+
+## Relacionado
+
+- **PR #193 (T5):** donde se implemento la decision.
+- **Design Fase 2 §6.3:** la linea original que pide el invoiceId.
+
+**Origen:** detectado al implementar T5.
+
+**Severidad:** INFO. No es un defecto: es una divergencia consciente entre el
+design y la implementacion, documentada para que no se "arregle" sola.
+
+**Urgencia:** N/A.
+
+**Reevaluar:** al planificar Fase 3, si aparece un requisito de auditoria de
+pagos.

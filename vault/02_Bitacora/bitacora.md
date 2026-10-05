@@ -3076,3 +3076,57 @@ formas de payload y la nota de los tres significados de `data.id`.
 **Severidad:** N/A (feature).
 
 **Urgencia:** N/A.
+
+---
+
+## 2026-10-04 - Items 52 y 53 registrados (hallazgos de T5)
+
+**Rama:** `chore/deuda-items-52-53` (desde `develop` en `fdea784`).
+
+### Item 52 - el scan del item 40 no cubre control chars
+
+El metodo del item 40 solo chequea CJK y U+FFFD. Los caracteres de control
+(U+0000-U+0008, U+000B-U+001F) no estan cubiertos, y en T5 dos reemplazos bulk
+con PowerShell introdujeron **U+0007 (BEL)** y **U+000B (VT)** que
+**reemplazaron letras**:
+
+- `approved` -> `<BEL>pproved`
+- `action del payload` -> `<BEL>ction del payload`
+- `validateEnv()` -> `<VT>alidateEnv()`
+
+Los tres dejaron el archivo como UTF-8 valido, asi que lint, tsc, vitest y
+prettier los pasaron con **682 tests en verde**. Los encontro el hook GGA.
+
+Mitigacion: ampliar el escaneo a control chars, enumerando codepoints y no con
+regex — un regex reporto como CJK la flecha U+2192 porque la consola la
+renderiza como basura.
+
+### Item 53 - la activacion por preapproval no guarda el invoiceId
+
+**El titulo corto "lastProcessedPaymentId sin uso" era falso** y no se
+registro asi. La columna **si** se usa: el handler la escribe para los eventos
+de topic `payment` (L522) y la lee como guarda de pago ya procesado (L501), con
+test que lo cubre. Lo que no ocurre es que la activacion disparada por
+`subscription_preapproval` guarde el invoiceId, porque su `data.id` es el id
+del **preapproval**.
+
+Registrarlo con el titulo corto habria invited a borrar el campo o la guarda:
+es el mismo modo de fallo del item 38, inverted (esta vez el codigo contradice
+al doc).
+
+**Decision (Luis, 2026-10-04):** dejar solo convergencia de estado. La
+idempotencia es por construccion. Alternativa descartada: guardar el invoiceId
+con `GET /authorized_payments/search?preapproval_id={id}` en cada evento, que
+cuesta una llamada a MP para guardar un dato que nadie lee.
+
+**Fase 3:** si hace falta auditoria de pagos, un cron de reconciliacion con
+acceso a los eventos historicos resuelve mejor que guardar el invoiceId en el
+handler.
+
+### Ironia del item 52
+
+Al escribir el item 52 meti un ideograma CJK en una frase
+(o sea la guarda deja de servir sin que nadie lo note). Lo detecto el scan que
+describiendo en ese mismo item. Es la tercera vez que caigo en la misma trampa
+(la memoria 114 ya lo advertia). El mismo scan que el item propone lo
+detecto al escribir el item.
