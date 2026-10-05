@@ -1997,3 +1997,134 @@ design y la implementacion, documentada para que no se "arregle" sola.
 
 **Reevaluar:** al planificar Fase 3, si aparece un requisito de auditoria de
 pagos.
+
+---
+
+## 54. El ciclo `mem_save` -> `vault:export` -> commit se realimenta solo
+
+## Hecho
+
+Exportar a `vault/engram/` **ensucia el working tree cada vez que se graba una
+memoria nueva**. No es un fallo de un commit concreto: es una propiedad del
+flujo.
+
+Secuencia observada el 2026-10-05, con dos ciclos:
+
+| Ciclo | Accion | Resultado en el arbol |
+| ----- | ------ | --------------------- |
+| 1 | `mem_save` x5 + `vault:export` | 7 untracked (5 obs + session summary + indice de sesion) |
+| 2 | commit + PR + merge | limpio |
+| 3 | `mem_save` x1 + `vault:export` | 1 modificado + 1 untracked |
+
+El archivo `_sessions/<id>.md` es un indice: cada observacion nueva agrega una
+linea `- [[<slug>]]` al final. O sea, **un export posterior reescribe un archivo
+que ya estaba commiteado**, y el diff no es de una linea cualquiera: es el
+resultado de haber gravado memoria.
+
+## Impacto
+
+El checklist de "working tree limpio" como **prerequisito** de una tarea deja de
+ser una senal. En el PR #195 (exports) Hubo que frenar y pedir decision
+humana por 7 archivos que ninguno era codigo. La rama de la auditoria
+mid-phase se creo desde `develop` y no estaba bloqueada: un worktree es un
+checkout limpio, no una copia del working tree principal. Ese es el unico
+motivo por el que el ciclo no bloquea trabajo real.
+
+Mientras tanto, cada `mem_save` vuelve a ensuciar el arbol y el proximo agente
+que corra el checklist va a reportar un falso positivo.
+
+## Mitigaciones
+
+1. **Excluir `vault/engram/` del checklist de working tree limpio.** Es
+   tool-managed, igual que `.env.local` y `node_modules/`. Es lo mas simple y
+   lo que menos reglas agrega.
+2. Un `.gitignore` parcial seria **incorrecto**: el proyecto quiere versionar
+   `vault/engram/` (PR #195, #193, #191 lo hacen). Ignorarlo seria perder el
+   registro.
+3. Commitear los exports en el mismo PR del trabajo que los origino, en vez de
+   en un PR propio. Reduce el ciclo a uno.
+
+## Relacionado
+
+- **PR #195:** primer PR donde se manifesto esto, con el export en PR separado.
+- **Item 52:** el otro problema de la misma carpeta, con la diferencia de que
+  ese si corrompe contenido.
+- **AGENTS.md, "REGLA CRITICA - Orden de Engram":** el orden que produce el
+  ciclo.
+
+**Origen:** detenido durante la preparacion de la auditoria mid-phase de
+Fase 2, al bloquear el checklist de working tree limpio con 7 untracked.
+
+**Severidad:** BAJA. No rompe nada: agrega ruido y una decision humana
+improvisada por sesion.
+
+**Urgencia:** N/A. Resolver antes de que el patron se normalice en el
+checklist de otras tareas.
+
+---
+
+## 55. GGA no audita archivos `.md`
+
+## Hecho
+
+`Gentleman Guardian Angel` v2.10.1, al commitear, reporta:
+
+```
+File patterns:    *.ts,*.tsx,*.js,*.jsx,*.sql
+Exclude patterns: *test.ts,*spec.ts,*d.ts,dist/*,build/*,node_modules/*,vault/*
+```
+
+Un commit que solo toca markdown pasa por el hook **sin revisar nada**:
+`No matching files staged for commit`, y el commit sale.
+
+Esto es coherente con que `vault/` este excluido a proposito (los exports son
+tool-managed). El problema es el alcance: **tampoco cubre specs, planes,
+transversales ni README**, que si son autorales y si importan.
+
+## Impacto
+
+La unica defensa contra corrupcion de texto en `.md` es hoy un **scan manual**,
+y ese scan vive en un item de deuda (el 40), no en ninguna automatizacion.
+Consecuencia
+directa: los caracteres de control que rompen texto pueden entrar en bitacora,
+deuda tecnica o un spec, y **nada en el pipeline los va a marcar**.
+
+El precedente ya ocurrio. El item 52 registro `U+0007` (BEL) y `U+000B` (VT)
+inyectados en un `.ts` por reemplazo bulk con PowerShell:
+
+| Caracter | Efecto | Deteccion |
+| -------- | ------ | -------- |
+| `U+0007` (BEL) | `approved` -> `<BEL>pproved` | GGA (por azar: era un `.ts`) |
+| `U+000B` (VT) | `validateEnv()` -> `<VT>alidateEnv()` | GGA (por azar: era un `.ts`) |
+
+Si esos mismos reemplazos hubieran caído en `bitacora.md`, GGA no habria dicho
+nada. Los archivos quedaron como UTF-8 valido y pasaron lint, `tsc`, vitest y
+prettier con 682 tests en verde.
+
+## Mitigaciones
+
+1. **Extender GGA a `*.md`**, sacando `vault/engram/` de la exclusion pero
+   manteniendo `vault/` fuera. Es el arreglo de raiz: la defensa tiene que estar
+   en el hook, no en la memoria de un agente.
+2. **Step de CI** que corra el scan del item 40 sobre los `.md` de autor
+   (`docs/`, `README.md`, `SETUP.md`, `TESTING*.md`, `vault/02_Bitacora/`,
+   `vault/03_Deuda/`). Complementario de (1) si GGA no se puede tocar.
+3. **El scan debe enumerar codepoints**, nunca usar regex de rangos Unicode: un
+   regex reporto como CJK la flecha `U+2192` porque la consola la renderiza
+   como basura. Ese falso positivo ya costo una vez (nota del item 48).
+
+## Relacionado
+
+- **Item 40:** el scan manual que hoy es la unica defensa.
+- **Item 52:** los dos casos reales, detectados de rebote.
+- **`.gga`:** donde vive la lista de patrones.
+- **Nota del item 48:** por que el scan no puede ser un regex.
+
+**Origen:** detectado el 2026-10-05 al commitear el PR #195, que solo contenia
+markdown y fue revisado por GGA con `No matching files staged`.
+
+**Severidad:** MEDIA. No hay corrupcion activa hoy; lo que hay es **ausencia de
+la defensa** en el unico lugar del pipeline donde deberia estar.
+
+**Urgencia:** antes de la Fase 3, que es la fase de mayor volumen
+documental. Antes de T7 (docs de Fase 2) alcanza con el scan manual.

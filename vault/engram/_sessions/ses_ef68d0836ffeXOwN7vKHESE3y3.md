@@ -14,3 +14,4 @@ tags:
 - [[blueprint-v2-6-desactualizado-en-5-puntos-frente-al-codigo-d-153]]
 - [[session-summary-landaetastudio-saas-154]]
 - [[reconciliacion-de-issues-168-y-112-cerrados-repo-queda-con-3-155]]
+- [[pr-195-mergeado-exports-vault-e-issues-168-y-112-reconciliad-156]]
