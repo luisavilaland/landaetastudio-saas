@@ -2010,11 +2010,11 @@ flujo.
 
 Secuencia observada el 2026-10-05, con dos ciclos:
 
-| Ciclo | Accion | Resultado en el arbol |
-| ----- | ------ | --------------------- |
-| 1 | `mem_save` x5 + `vault:export` | 7 untracked (5 obs + session summary + indice de sesion) |
-| 2 | commit + PR + merge | limpio |
-| 3 | `mem_save` x1 + `vault:export` | 1 modificado + 1 untracked |
+| Ciclo | Accion                         | Resultado en el arbol                                    |
+| ----- | ------------------------------ | -------------------------------------------------------- |
+| 1     | `mem_save` x5 + `vault:export` | 7 untracked (5 obs + session summary + indice de sesion) |
+| 2     | commit + PR + merge            | limpio                                                   |
+| 3     | `mem_save` x1 + `vault:export` | 1 modificado + 1 untracked                               |
 
 El archivo `_sessions/<id>.md` es un indice: cada observacion nueva agrega una
 linea `- [[<slug>]]` al final. O sea, **un export posterior reescribe un archivo
@@ -2092,10 +2092,10 @@ deuda tecnica o un spec, y **nada en el pipeline los va a marcar**.
 El precedente ya ocurrio. El item 52 registro `U+0007` (BEL) y `U+000B` (VT)
 inyectados en un `.ts` por reemplazo bulk con PowerShell:
 
-| Caracter | Efecto | Deteccion |
-| -------- | ------ | -------- |
-| `U+0007` (BEL) | `approved` -> `<BEL>pproved` | GGA (por azar: era un `.ts`) |
-| `U+000B` (VT) | `validateEnv()` -> `<VT>alidateEnv()` | GGA (por azar: era un `.ts`) |
+| Caracter       | Efecto                                | Deteccion                    |
+| -------------- | ------------------------------------- | ---------------------------- |
+| `U+0007` (BEL) | `approved` -> `<BEL>pproved`          | GGA (por azar: era un `.ts`) |
+| `U+000B` (VT)  | `validateEnv()` -> `<VT>alidateEnv()` | GGA (por azar: era un `.ts`) |
 
 Si esos mismos reemplazos hubieran caído en `bitacora.md`, GGA no habria dicho
 nada. Los archivos quedaron como UTF-8 valido y pasaron lint, `tsc`, vitest y
