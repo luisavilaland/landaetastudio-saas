@@ -43,6 +43,16 @@ function isUsableUrl(url: string | undefined): url is string {
 const appUrl = process.env.DATABASE_APP_URL
 const hasAppUrl = isUsableUrl(appUrl)
 
+/**
+ * `describe.skipIf` no le da a TypeScript el narrowing de `appUrl`, asi que el
+ * narrowing se hace aca. Con `skipIf` los tests se saltean cuando la URL no es
+ * usable: nunca se conectan a una base dummy.
+ */
+function dbUrl(): string {
+  if (!appUrl) throw new Error('DATABASE_APP_URL no configurada')
+  return appUrl
+}
+
 // PREAPPROVAL_ID es unico por corrida: `subscriptions_mp_preapproval_idx` es unico.
 const PREAPPROVAL_ID = `h1-test-${randomUUID()}`
 
@@ -87,11 +97,10 @@ async function deleteTenant(tenantId: string): Promise<void> {
   }
 }
 
-describe('H1 - resolve_tenant_by_preapproval (SECURITY DEFINER)', () => {
+describe.skipIf(!hasAppUrl)('H1 - resolve_tenant_by_preapproval (SECURITY DEFINER)', () => {
   beforeAll(async () => {
-    if (!hasAppUrl) return
 
-    client = postgres(appUrl)
+    client = postgres(dbUrl())
 
     // El mecanismo depende de que la app NO pueda bypasear RLS por su cuenta.
     const roleRows = await conn()<{ bypass: boolean }[]>`
@@ -132,14 +141,12 @@ describe('H1 - resolve_tenant_by_preapproval (SECURITY DEFINER)', () => {
   }, 60_000)
 
   afterAll(async () => {
-    if (!hasAppUrl) return
     await deleteTenant(tenantA?.id ?? '')
     await deleteTenant(tenantB?.id ?? '')
     await client?.end()
   })
 
   it('1. resuelve el tenantId de un preapprovalId sin contexto de tenant', async () => {
-    if (!hasAppUrl) return
 
     const rows = await conn()<ResolveRow[]>`
       SELECT resolve_tenant_by_preapproval(${PREAPPROVAL_ID}) AS "tenantId"
@@ -149,7 +156,6 @@ describe('H1 - resolve_tenant_by_preapproval (SECURITY DEFINER)', () => {
   })
 
   it('2. devuelve NULL si el preapprovalId no existe', async () => {
-    if (!hasAppUrl) return
 
     const rows = await conn()<ResolveRow[]>`
       SELECT resolve_tenant_by_preapproval('no-existe-este-preapproval') AS "tenantId"
@@ -159,7 +165,6 @@ describe('H1 - resolve_tenant_by_preapproval (SECURITY DEFINER)', () => {
   })
 
   it('3. desde el contexto de otro tenant devuelve el tenant correcto, y RLS sigue intacto', async () => {
-    if (!hasAppUrl) return
 
     // La funcion devuelve el tenant Dueño del preapproval, no el del contexto:
     // es lo que el webhook necesita para enrutar el evento.
@@ -183,7 +188,6 @@ describe('H1 - resolve_tenant_by_preapproval (SECURITY DEFINER)', () => {
   })
 
   it('4. expone solo el tenantId: retorna un escalar uuid, no un record', async () => {
-    if (!hasAppUrl) return
 
     const fnRows = await conn()<FunctionRow[]>`
       SELECT pg_get_userbyid(p.proowner)        AS "owner",
@@ -211,7 +215,6 @@ describe('H1 - resolve_tenant_by_preapproval (SECURITY DEFINER)', () => {
   })
 
   it('5. PUBLIC no puede ejecutarla: el escape hatch es solo para app_user', async () => {
-    if (!hasAppUrl) return
 
     const privRows = await conn()<{ grantee: string }[]>`
       SELECT grantee
@@ -225,12 +228,11 @@ describe('H1 - resolve_tenant_by_preapproval (SECURITY DEFINER)', () => {
   })
 
   it('6. aguanta una sesion tibia: la query directa falla, la funcion no', async () => {
-    if (!hasAppUrl) return
 
     // `max: 1` fuerza una sola conexion fisica, para que el calentamiento y las
     // consultas posteriores Happens en la MISMA sesion. Sin esto, `withTenantContext`
     // calienta su propio pool y el estado `''` no se reproduce aqui.
-    const warm = postgres(appUrl, { max: 1 })
+    const warm = postgres(dbUrl(), { max: 1 })
 
     try {
       // Sesion virgen: `app.tenant_id` no existe todavia.
