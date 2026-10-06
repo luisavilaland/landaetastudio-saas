@@ -20,3 +20,7 @@ tags:
 - [[el-swap-de-perfil-de-auditoria-no-es-validable-n-1-sin-contr-161]]
 - [[ling-3-0-fue-removido-de-opencode-zen-agents-md-documenta-un-162]]
 - [[contrafactual-ling-3-1-invalido-por-confound-encontro-4-erro-163]]
+- [[auditoria-mergeada-41f5a3c-luis-decidio-opcion-b-para-h2-y-f-164]]
+- [[h2-cerrado-decidetarget-soporta-paused-item-38-superseded-op-165]]
+- [[regla-6-del-item-40-nunca-here-strings-de-powershell-para-ma-166]]
+- [[worktree-de-paseo-pnpm-install-env-local-son-bloqueantes-ant-167]]

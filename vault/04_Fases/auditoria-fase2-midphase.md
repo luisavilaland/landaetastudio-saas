@@ -238,18 +238,22 @@ Verificación de conteo: 83 archivos de test en disco = 68 de vitest + 15 de `e2
 
 Verificado por enumeración de codepoints, no por regex.
 
-| Archivo                           | `U+FFFD` | CJK |
-| --------------------------------- | -------- | --- |
-| `vault/02_Bitacora/bitacora.md`   | 36       | 8   |
-| `vault/03_Deuda/deuda-tecnica.md` | 1        | 0   |
+| Archivo                           | `U+FFFD` | CJK | Ctrl |
+| --------------------------------- | -------- | --- | ---- |
+| `vault/02_Bitacora/bitacora.md`   | 34       | 10  | 4    |
+| `vault/03_Deuda/deuda-tecnica.md` | 1        | 0   | 0    |
 
-**Los `U+FFFD` están concentrados.** 30 de los 36 están en una sola entrada del 2026-08-11 (`bitacora.md:936-945`), donde un reemplazo bulk destruyó acentos: `est? vac?o`, `Migraci?n`, `diagn?stico`, `pod?a`, `realine?`. Los 6 restantes son aislados (`:855`, `:861`, `:864`, `:1560`). Esto los hace **acotados y reparables**: un rango, una fecha.
+> **Corrección (2026-10-05).** Una primera versión de esta tabla decía 36 `U+FFFD` y 8 CJK. Los números verificados son **34 y 10**: 4 de los CJK y 2 de los `U+FFFD` estaban mal contados. Una segunda pasada lo detectó y esta versión lo corrige. La tabla es la que se debe citar.
+
+**Los `U+FFFD` están concentrados.** 29 de los 34 están en una sola entrada del 2026-08-11 (`bitacora.md:936-945`), donde un reemplazo bulk destruyó acentos: `est? vac?o`, `Migraci?n`, `diagn?stico`, `pod?a`, `realine?`. Los 5 restantes son aislados (`:855`, `:861`, `:864`, `:1560`). Esto los hace **acotados y reparables**: un rango, una fecha.
 
 El `U+FFFD` de `deuda-tecnica.md:501` es el residuo que el propio item 26 documenta. No es un defecto vivo, es evidencia: no corregirlo sin decidir antes.
 
-**Los 8 CJK son falsos positivos.** Están en `bitacora.md:976-977` y son una entrada del 2026-08-15 que documenta haber **corregido** un texto chino en `SECURITY.md`, citando el original como evidencia. Se verificó que `SECURITY.md` sigue limpio. Un scan que solo busque CJK sobre este archivo produciría un falso positivo; por eso el item 40 insiste en enumerar codepoints.
+**Los 10 CJK son falsos positivos.** Están en `bitacora.md:976-977` y son una entrada del 2026-08-15 que documenta haber **corregido** un texto chino en `SECURITY.md`, citando el original como evidencia. Se verificó que `SECURITY.md` sigue limpio. Un scan que solo busque CJK sobre este archivo produciría un falso positivo; por eso el item 40 insiste en enumerar codepoints.
 
-**Item 52: los caracteres de control originales ya no están.** El escaneo por codepoint sobre los 8 archivos de T4/T5 da **0** control chars. El defecto se corrigió. Lo que queda es que la mitigación del item 52 **nunca se aplicó al item 40**: el scan del item 40 (`deuda-tecnica.md:913-919`) sigue cubriendo solo CJK y `U+FFFD`, y la rama de control chars existe únicamente como texto dentro del item 52.
+**Los 4 caracteres de control no estaban inventariados.** `bitacora.md` tiene `U+000C` y `U+0008` en `:936`, `U+0007` (BEL) en `:942` y `U+000D` en `:942`. **El item 40 debería extender su alcance a `vault/`**: hasta ahora solo se escaneaban los `.md` de autor y `vault/` quedaba fuera, que es justo donde hay control chars.
+
+**Item 52: los caracteres de control de T5 ya no están.** El escaneo por codepoint sobre los 8 archivos de T4/T5 da **0** control chars. El defecto se corrigió. Lo que queda es que la mitigación del item 52 **nunca se aplicó al item 40**: el scan del item 40 (`deuda-tecnica.md:913-919`) sigue cubriendo solo CJK y `U+FFFD`, y la rama de control chars existía únicamente como texto dentro del item 52. **Resuelto en el PR que cierra H2** (2026-10-05): el item 40 suma la regla 6 sobre backticks de PowerShell y la extensión del escaneo a `vault/`.
 
 ## 5. Drift de proceso
 

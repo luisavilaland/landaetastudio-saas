@@ -35,7 +35,7 @@ concurrency:
 jobs:
   wait-for-deployments:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Wait for storefront to be ready
@@ -80,7 +80,7 @@ jobs:
 
   seed:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
@@ -111,7 +111,7 @@ jobs:
 
   e2e:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: [wait-for-deployments, seed]
     timeout-minutes: 30
     steps:
@@ -127,10 +127,12 @@ jobs:
         env:
           DATABASE_APP_URL: ${{ secrets.NEON_DATABASE_APP_URL }}
       - name: Install Playwright Chromium
-        # Sin --with-deps: en AlmaLinux Playwright cae al fallback Ubuntu y usa apt-get (inexistente).
-        # Las libs del sistema se instalan una vez en el runner vía dnf; Playwright 1.62 ya tiene
-        # el build chromium-1234 cacheado en el runner y `install chromium` valida sin descargar.
-        run: pnpm exec playwright install chromium
+        # Con `--with-deps`: en el runner self-hosted (AlmaLinux) no se usaba
+        # porque Playwright cae al fallback Ubuntu e invoca `apt-get`, que no
+        # existe ahi; las libs se instalaban una vez por `dnf`. En
+        # `ubuntu-latest` `apt-get` si existe, asi que las deps de sistema se
+        # resuelven en el paso en lugar de depender del estado del host.
+        run: pnpm exec playwright install --with-deps chromium
       - name: Run E2E tests
         run: pnpm test:e2e
         env:

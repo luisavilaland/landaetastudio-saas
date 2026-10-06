@@ -59,6 +59,14 @@ const REVIVABLE = ['pending_first_payment', 'past_due', 'expired'] as const
 const CANCELLABLE = ['active', 'past_due', 'paused'] as const
 
 /**
+ * Estados desde los que MP puede reportar `paused`.
+ *
+ * No incluye `expired` ni `abandoned`: una suscripcion vencida no se pausa, se
+ * cancela o expira. Coincide con el diseno §6.3.
+ */
+const PAUSABLE = ['active', 'past_due'] as const
+
+/**
  * Shape minimo del payload, validado con Zod.
  *
  * El stub del spike lo parseaba a mano a proposito ("el payload crudo es lo que
@@ -334,8 +342,10 @@ async function handlePreapproval(
     })
   }
 
-  // `authorized` es el unico estado que activa. `paused` no: pausar no revive
-  // una suscripcion, es una suspension deliberada.
+  // `authorized` es el unico estado que ACTIVA el alta. `paused` no activa, pero
+  // tampoco es "nada": es un estado destino que hay que reflejar (H2). Antes
+  // se colapsaba a `approved: false` y se perdia, con lo que `decideTarget` no
+  // podia distinguirlo de cualquier otro estado no autorizante.
   const activating = mpStatus === 'authorized'
 
   return applyTransition({
@@ -343,6 +353,7 @@ async function handlePreapproval(
     eventKind: 'preapproval',
     paymentId: null,
     approved: activating,
+    mpStatus,
   })
 }
 
@@ -417,6 +428,14 @@ interface TransitionInput {
   eventKind: 'preapproval' | 'preapproval_cancelled' | 'payment'
   paymentId?: string | null
   approved: boolean
+  /**
+   * Estado crudo que reporta MP en el preapproval.
+   *
+   * Antes solo pasaba `approved`, que aplasta a un binario y vuelve
+   * indistinguible `paused` de cualquier otro estado no autorizante. Esa
+   * perdida de informacion es la causa de H2.
+   */
+  mpStatus?: string | null
   liveMode?: boolean
 }
 
@@ -473,7 +492,7 @@ async function applyTransition(
     }
 
     const current = row.status as SubscriptionStatus
-    const target = decideTarget(eventKind, input.approved, current)
+    const target = decideTarget(eventKind, input.approved, current, input.mpStatus)
 
     if (!target) {
       // Transiciones 2, 3, 5 y 7: sin cambio. No se escribe.
@@ -512,9 +531,12 @@ async function applyTransition(
       updatedAt: new Date(),
     }
 
-    if (target === 'active') {
-      // El periodo se renueva al activar. En la baja NO se toca: el acceso
-      // sigue hasta `current_period_end`.
+    // El periodo se renueva SOLO al activar desde un estado que lo habia
+    // perdido. Reanudar desde `paused` NO lo renueva: el tenant nunca perdio el
+    // periodo, solo dejo de facturarse. Sin este guard, `POST /resume` regalaba
+    // un mes gratis cada vez que se pausaba y reanudaba.
+    const resuming = current === 'paused' && target === 'active'
+    if (target === 'active' && !resuming) {
       patch.currentPeriodEnd = oneMonthFromNow()
     }
 
@@ -549,6 +571,7 @@ function decideTarget(
   eventKind: TransitionInput['eventKind'],
   approved: boolean,
   current: string,
+  mpStatus?: string | null,
 ): SubscriptionStatus | null {
   if (eventKind === 'preapproval_cancelled') {
     // Transicion 4 y 5.
@@ -557,8 +580,30 @@ function decideTarget(
   }
 
   if (eventKind === 'preapproval') {
-    // Transiciones 1, 2 y 3. `approved === false` aqui significa que MP no esta
-    // en `authorized` (por ejemplo `paused`), y en ese caso no hay transicion.
+    // Decision item 38 superseded. Ver spike T0 (H1 confirmada, `paused`
+    // reversible) y el PR que cierra H2.
+    //
+    // El item 38 decia "el webhook registra warn y no transiciona" porque se
+    // tomo antes del spike, con informacion incompleta. El spike probo que
+    // `paused` es reversible en ambas direcciones y que detiene el cobro.
+
+    // Transicion 6: MP reporta `paused`. Es destino valido desde `active` y
+    // desde `past_due` (diseno §6.3). No se toca `currentPeriodEnd`: pausar
+    // suspende el cobro, no cancela el periodo.
+    if (mpStatus === 'paused') {
+      if ((PAUSABLE as readonly string[]).includes(current)) return 'paused'
+      return null
+    }
+
+    // Transicion 7: `paused` -> `active`. El reanudar NO renueva el periodo:
+    // el tenant nunca lo perdio, solo dejo de facturarse. Por eso se resuelve
+    // aqui y no por `REVIVABLE`, que ademas no incluye `paused`.
+    if (current === 'paused') {
+      return approved ? 'active' : null
+    }
+
+    // Transiciones 1, 2 y 3. `approved === false` con un status que no es
+    // `paused` significa que MP no esta en `authorized` y no hay transicion.
     if (!approved) return null
     if ((REVIVABLE as readonly string[]).includes(current)) return 'active'
     return null
