@@ -807,18 +807,33 @@ El ultimo escenario esta definido y estimado. No se construye la tabla preventiv
 
 ## 38. Estado `paused` de MercadoPago no modelado
 
-**Estado:** ~~abierto (2026-10-01)~~ → **decisión superada, ver item 49.**
-La decisión de "no soportado en Fase 2" que figura más abajo fue tomada en el
-planning de Fase 2 y **quedó desactualizada** cuando T4 cambió el scope. No la
-borres: el registro original se conserva por trazabilidad, pero **ya no es la
-guía vigente**. Para la semántica y el plan de actualización del transversal,
-ver **item 49**.
+**Estado:** ~~abierto (2026-10-01)~~ **SUPERSEDED por decision del 2026-10-05.
+Ver item 38-bis, que es la guia vigente.**
 
+**Razon:** la decision de "no soportado en Fase 2" que figura mas abajo se tomo
+en el planning de Fase 2, **antes del spike T0**, con informacion incompleta.
+El spikeinio con payloads reales y cambio las dos premisas en las que se
+fundaba: (1) `authorized -> paused` devuelve 200 y aplica, (2)
+`paused -> authorized` devuelve 200 y aplica. `cancelled` es el unico terminal.
+La doc oficial de MP confirma que `paused` **detiene el cobro** ("Mercado Pago
+deje de debitar los pagos de ese cliente hasta que decidas reactivarlo").
+
+**Reemplazo:** item 38-bis. Este registro no se borra por trazabilidad: deja
+constancia de que la decision se tomo con informacion incompleta y de por que se
+reviso. Ese es el riesgo real de un item de deuda usado como documento
+normativo: sobrevive al spike que lo refuta.
+
+La razon del root cause de H2 (auditoria mid-phase, PR #197): el handler hizo
+exactamente lo que este item decidia, y T4 construyo `pause`/`resume` tres dias
+despues **sin revisar este item**. El `202` de `pause` moria porque el webhook
+seguia una decision vieja.
+
+**Decision vigente:** item 38-bis, opcion B.
 **Contexto:** MP tiene un estado `paused` para preapprovals (pausar una suscripcion sin cancelarla). El spec transversal no lo contempla.
 
 **Impacto:** si el tenant pausa desde el panel de MP, la DB no lo refleja. El estado sigue en `active` y el tenant conserva acceso completo, cuando la intencion de MP es suspenderse. Divergencia silenciosa entre MP y nuestra DB.
 
-**Decision (Luis, planning Fase 2):** documentar como **no soportado** en Fase 2. El webhook registra `warn` y **no transiciona** cuando recibe `paused`. No se inventa un estado nuevo ni se mapea a `past_due` (que tiene semantica de dunning, que es otra cosa).
+**Decision (Luis, planning Fase 2) — SUPERADA:** documentar como **no soportado** en Fase 2. El webhook registra `warn` y **no transiciona** cuando recibe `paused`. No se inventa un estado nuevo ni se mapea a `past_due` (que tiene semantica de dunning, que es otra cosa).
 
 **Se agrega al transversal cuando Fase 3 defina la semantica de pausa:** ¿es `past_due`? ¿un estado nuevo? ¿bloquea el panel admin? ¿el storefront sigue accesible? Requiere decision de producto.
 
@@ -827,6 +842,57 @@ ver **item 49**.
 **Severidad:** MEDIA.
 
 **Urgencia:** BAJA.
+
+---
+
+## 38-bis. `paused` es estado soportado en Fase 2 (decision vigente)
+
+**Estado:** vigente (2026-10-05). Reemplaza al item 38.
+
+**Decision (Luis, aprobacion de la auditoria mid-phase PR #197):** **opcion B.**
+El item 38 se revierte y `pause`/`resume` construidos en T4 siguen en pie.
+
+**Por que B y no A.** El item 38 asumia que `paused` no podia mapearse a ningun
+estado nuestro sin inventar semantica. El spike demostro lo contrario: MP ya
+lo expone, ya es reversible en ambas direcciones y ya tiene semantica propia
+(suspende el cobro sin cancelar el acceso). La opcion A —quitar `pause`/
+`resume`— dejaria al tenant sin ninguna forma de volver de una suspension que
+el mismo MercadoPago permite.
+
+**Transiciones:**
+
+| Origen     | Destino  | Disparador                       | Confirma                                                             |
+| ---------- | -------- | -------------------------------- | -------------------------------------------------------------------- |
+| `active`   | `paused` | `POST /api/subscriptions/pause`  | webhook, topic `subscription_preapproval` con `status: 'paused'`     |
+| `past_due` | `paused` | `POST /api/subscriptions/pause`  | webhook,idem                                                         |
+| `paused`   | `active` | `POST /api/subscriptions/resume` | webhook, topic `subscription_preapproval` con `status: 'authorized'` |
+
+El webhook confirma via `decideTarget`. `POST /pause` y `POST /resume` devuelven
+`202` y **no escriben** el estado local: lo confirma el evento.
+
+**Guard de periodo (critico).** `paused -> active` NO renueva
+`currentPeriodEnd`. El tenant nunca perdio el periodo: solo dejo de facturarse.
+Sin ese guard, cada ciclo pause/resume regalaba un mes. Solo la activacion desde
+un estado que habia perdido el periodo (`pending_first_payment`, `past_due`,
+`expired`) lo renueva.
+
+**Estados que NO pueden pausar:** `expired`, `abandoned`, `cancelled`. Una
+suscripcion vencida no se pausa, caduca. `PAUSABLE = ['active', 'past_due']`.
+
+**Cancelacion desde `paused`:** sigue permitida (item 51). `cancelled` es
+terminal en MP: no hay vuelta atras.
+
+**Severidad:** INFO. No es un defecto: es la decision vigente que reemplaza al item 38.
+
+**Urgencia:** N/A.
+
+**Origen:** auditoria mid-phase de Fase 2 (PR #197), hallazgo H2, con la
+aprobacion de Luis del 2026-10-05.
+
+**Evidencia:** spike T0 (`docs/superpowers/specs/2026-10-02-spike-t0-resultado.md`,
+matriz de transiciones), doc oficial de MP
+(manage-subscription-plan: _"Pausar suscriptor ... Mercado Pago deje de debitar
+los pagos de ese cliente hasta que decidas reactivarlo"_).
 
 ---
 
@@ -947,6 +1013,48 @@ este repo se detectaron dos variantes:
 
 5. `prettier --write` **debe preservar** el append limpio. Verificado en
    el item 41: 62 lineas puramente aditivas incluso despues de formatear.
+
+6. **Nunca here-strings de PowerShell para markdown con backticks.** En
+   strings dobles y here-strings de PowerShell, el **backtick es el caracter de
+   escape**, y entre sus escapes validos esta el tabulador vertical (U+000B).
+   Una lineaintended para escribir un path entre comillas invertidas produce
+   **U+000B + el resto del texto con la primera letra perdida**.
+
+   Sintoma: el archivo resultante muestra `ault/engram/` en lugar de
+   `vault/engram/`, e `itacora.md` en lugar de `bitacora.md`. Pasa
+   `format:check`, pasa UTF-8 estricto, y **solo se detecta enumerando
+   codepoints**.
+
+   Aplica a todo markdown con inline code, code fences o paths entre backticks.
+   Aplica igual a los here-strings `@"..."@` y a `$var = "..."`.
+
+   Mitigacion: usar la herramienta de edicion para escribir el markdown y
+   usar PowerShell solo para leer, escanear o escribir **texto plano ASCII sin
+   backticks**. Si unavoidable, escapar el backtick como ` ` `` (doble
+   backtick) o construir el texto con `[char]96`.
+
+   **Escaneo post-escritura obligatorio**, por codepoint, porque el sintoma es
+   un control char y un regex de CJK no lo cubre:
+
+   ```powershell
+   $t = [System.IO.File]::ReadAllText(<archivo>)
+   $c = 0
+   for ($i=0; $i -lt $t.Length; $i++) {
+     $x = [int]$t[$i]
+     if ((($x -le 0x08) -or ($x -ge 0x0B -and $x -le 0x1F)) -and $x -ne 0x09 -and $x -ne 0x0A) {
+       "CTRL pos ${i}: U+$('{0:X4}' -f $x)"; $c++
+     }
+   }
+   "Total control chars: $c"
+   ```
+
+   **Tercera aparicion del mismo patron.** La primera fue este item; la segunda,
+   el item 52 (dos reemplazos bulk con PowerShell introdujeron U+0007 y
+   U+000B que **reemplazaron letras**); la tercera, el body del PR #197, donde
+   un addendum escrito con here-string metio 5 caracteres de control
+   (2x U+000B, U+0008, 2x U+000D). Documentarla cierra el ciclo: la causa es
+   **herramiental**, no de disciplina, y por eso la regla tiene que ser
+   "no uses esa herramienta", no "tene mas cuidado".
 
 **Nota sobre falsos positivos en los escaneos:**
 

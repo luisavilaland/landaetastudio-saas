@@ -3130,3 +3130,79 @@ Al escribir el item 52 meti un ideograma CJK en una frase
 describiendo en ese mismo item. Es la tercera vez que caigo en la misma trampa
 (la memoria 114 ya lo advertia). El mismo scan que el item propone lo
 detecto al escribir el item.
+
+---
+
+## 2026-10-05 - H2: decideTarget soporta `paused` (item 38 superseded)
+
+**Rama:** `chore/fix-h2-decide-target-paused` · Cierra H2 de la auditoria
+mid-phase (PR #197). Decision de Luis: **opcion B**.
+
+### Que era el bug, exactamente
+
+No era un `if` faltante. En `handlePreapproval` el status crudo de MP se
+colapsaba a un booleano:
+
+```ts
+const activating = mpStatus === 'authorized'
+// mpStatus === 'paused' terminaba en approved: false
+```
+
+`decideTarget` recibia `approved: false` y no podia distinguir `paused` de
+cualquier otro estado no autorizante, asi que retornaba `null`. **La
+informacion se perdia antes de llegar a la matriz de transiciones.**
+
+### El fix
+
+`TransitionInput` suma `mpStatus`, y `decideTarget` recibe el status crudo:
+
+| Transicion | Origen | Destino |
+|---|---|---|
+| 9 | `active` / `past_due` | `paused` |
+| 10 | `paused` | `active` (resume) |
+
+`PAUSABLE = ['active', 'past_due']`. `expired`, `abandoned` y `cancelled` no
+pausan: una suscripcion vencida no se pausa, caduca.
+
+### El guard que faltaba y es el mas importante
+
+`paused -> active` **no renueva `currentPeriodEnd`**. Sin ese guard, cada ciclo
+pause/resume regalaba un mes: el tenant nunca perdio el periodo, solo dejo de
+facturarse. Solo la activacion desde un estado que lo habia perdido
+(`pending_first_payment`, `past_due`, `expired`) lo renueva. Hay un test
+dedicado que lo verifica.
+
+### Tests
+
+**7 nuevos** (los 3 obligatorios + 4 de borde): `active -> paused`,
+`past_due -> paused`, `expired` no pausa, replay de `paused` converge,
+`paused -> active` sin renovar periodo, `paused` con MP no autorizado no
+transiciona, y la regresion del 409 eterno de `POST /resume`.
+
+**Total: 685 en 68 archivos** (base `develop` 678/68).
+
+### Dos reglas de proceso que se documenetan en este PR
+
+1. **Item 40 regla 6:** nunca here-strings de PowerShell para markdown con
+   backticks. En strings dobles el backtick es el caracter de escape y entre
+   sus escapes validos esta U+000B, asi que una linea para escribir un path
+   entre comillas invertidas produce U+000B + el texto con la primera letra
+   perdida (`ault/engram/`, `itacora.md`). **Tercera aparicion:** este item, el
+   item 52, y el body del PR #197.
+
+2. **AGENTS.md:** el setup del worktree de Paseo (`pnpm install` + `.env.local`)
+   es **bloqueante** antes de cualquier DoD. Una junction no lo reemplaza: pnpm
+   anida un `node_modules` por paquete y la junction solo resuelve el raiz.
+   Evidencia: `typecheck` dio **0/9 con junction** y **9/9 con install real**
+   (PR #196). Ademas sin install real, `prettier` no resuelve
+   `prettier-plugin-tailwindcss` y falla sin formatear nada.
+
+### DoD
+
+`pnpm lint` 6/6 · `pnpm typecheck` 9/9 · `pnpm test` 685/685 en 68 archivos ·
+`pnpm build` 3/3 · `pnpm format:check` OK · `scripts/check-migrations.sh` OK
+(Git Bash). Migraciones: 0 archivos modificados.
+
+**Severidad:** ALTO (cierra un bloqueante de auditoria).
+
+**Urgencia:** antes de T6.

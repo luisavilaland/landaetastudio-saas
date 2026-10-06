@@ -569,6 +569,44 @@ Este orden es **obligatorio**. No es una sugerencia.
 - No traen `.env.local` → copiar del main worktree.
 - Pueden tener permisos de edición restringidos: si bloquea escritura en `vault/`, reportar al humano (edición manual), NO sortear el bloqueo.
 
+### Setup completo es BLOQUEANTE antes de cualquier DoD
+
+No es una recomendación de comodidad: es una precondición. El DoD corrido sin
+ella no es evidencia, y un resultado obtenido sin ella **no se puede reportar**.
+
+```bash
+# 1. .env.local desde el main worktree
+cp <main-worktree>/.env.local .env.local
+
+# 2. Install real (NO junction)
+pnpm install
+
+# 3. Verificar AMBOS antes de seguir
+ls -d node_modules && ls -l .env.local
+
+# 4. Recién entonces: lint / typecheck / test / build / format:check
+```
+
+**Evidencia de por qué es bloqueante y no opcional:**
+
+| Worktree | Método                     | `pnpm typecheck`  |
+| -------- | -------------------------- | ----------------- |
+| PR #196  | junction de `node_modules` | **0 / 9 — falso** |
+| PR #196  | `pnpm install` real        | 9 / 9             |
+| PR #197  | `pnpm install` real        | 9 / 9             |
+
+Una **junction** a `node_modules` del worktree principal **no sirve**: pnpm
+anida un `node_modules` por paquete, y esos no existen en el worktree. La
+junction solo resuelve el raíz. Los imports de paquete siguen sin resolverse y
+`tsc` falla con `Cannot find module`, que parece un error de código y no de
+entorno.
+
+Además: con junction, `prettier` no resuelve `prettier-plugin-tailwindcss`
+(necesario para `.prettierrc`) y **falla con exit 1 sin formatear nada**.
+
+**NO correr el DoD en el worktree principal.** El objetivo del DoD es verificar
+el _candidato_ (la rama), y el worktree principal está en otra rama.
+
 ## Workflow de skill-improver
 
 - **Cuándo correr**: al cierre de cada fase del SaaS, antes de releases.

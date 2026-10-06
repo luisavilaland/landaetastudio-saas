@@ -362,6 +362,127 @@ describe('transicion 4 — preapproval.cancelled desde active/past_due/paused ->
   }
 })
 
+describe('transicion 9 — preapproval.paused desde active/past_due -> paused', () => {
+  // Cierra H2 (PR #197). El item 38 decia que `paused` no se soportaba; el
+  // spike T0 probo que es reversible y que detiene el cobro.
+  for (const from of ['active', 'past_due']) {
+    it(`desde ${from}`, async () => {
+      const periodEnd = new Date('2026-11-03T00:00:00Z')
+      const { tx, updates } = spyTx([
+        sub({ status: from, currentPeriodEnd: periodEnd }),
+      ])
+      vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+      vi.mocked(getPreapproval).mockResolvedValue({
+        id: PREAPPROVAL_ID,
+        status: 'paused',
+      })
+
+      const res = await POST(
+        request(body('subscription_preapproval', PREAPPROVAL_ID)),
+      )
+
+      expect(res.status).toBe(200)
+      expect(updates).toHaveLength(1)
+      expect(updates[0]).toMatchObject({ status: 'paused' })
+      // Pausar suspende el cobro, no cancela el periodo: `currentPeriodEnd`
+      // NO se toca. Tampoco `planId`.
+      expect(updates[0]).not.toHaveProperty('currentPeriodEnd')
+      expect(updates[0]).not.toHaveProperty('planId')
+      // Es un preapproval, no un pago: la guarda de pago no aplica.
+      expect(updates[0]).not.toHaveProperty('lastProcessedPaymentId')
+    })
+  }
+
+  it('desde expired NO pausa: no aplica', async () => {
+    const { tx, updates } = spyTx([sub({ status: 'expired' })])
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'paused',
+    })
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    expect(updates).toHaveLength(0)
+  })
+
+  it('replay de paused -> paused no escribe (convergencia)', async () => {
+    const { tx, updates } = spyTx([sub({ status: 'paused' })])
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'paused',
+    })
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    expect(updates).toHaveLength(0)
+  })
+})
+
+describe('transicion 10 — preapproval.authorized desde paused -> active (resume)', () => {
+  it('reactiva SIN renovar currentPeriodEnd', async () => {
+    const periodEnd = new Date('2026-11-03T00:00:00Z')
+    const { tx, updates } = spyTx([
+      sub({ status: 'paused', currentPeriodEnd: periodEnd }),
+    ])
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'authorized',
+    })
+
+    const res = await POST(
+      request(body('subscription_preapproval', PREAPPROVAL_ID)),
+    )
+
+    expect(res.status).toBe(200)
+    expect(updates).toHaveLength(1)
+    expect(updates[0]).toMatchObject({ status: 'active' })
+    // ESTE es el guard del fix: sin el, cada pause/resume regalaba un mes.
+    // Reanudar no renueva el periodo porque el tenant nunca lo perdio.
+    expect(updates[0]).not.toHaveProperty('currentPeriodEnd')
+  })
+
+  it('desde paused con MP no autorizado no transiciona', async () => {
+    const { tx, updates } = spyTx([sub({ status: 'paused' })])
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'pending',
+    })
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    expect(updates).toHaveLength(0)
+  })
+})
+
+describe('regresion H2 — resume desde paused no responde 409', () => {
+  // El sintoma que la auditoria reporto: `POST /resume` exige
+  // `allowedFrom: ['paused']`, y como el webhook nunca transicionaba a
+  // `paused`, el estado real era `active` y el endpoint contestaba 409 para
+  // siempre. Con H2 cerrado, el estado `paused` existe y el 409 se va.
+  it('el estado paused es alcanzable, asi que resume deja de dar 409', async () => {
+    const { tx, updates } = spyTx([
+      sub({ status: 'active', currentPeriodEnd: new Date('2026-11-03') }),
+    ])
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'paused',
+    })
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    // La fila quedo en `paused`, que es exactamente el `from` que
+    // `POST /resume` acepta (`allowedFrom: ['paused']`). Antes quedaba en
+    // `active`, y por eso el endpoint contestaba 409 para siempre.
+    expect(updates).toHaveLength(1)
+    expect(updates[0]).toMatchObject({ status: 'paused' })
+  })
+})
+
 describe('transicion 5 — preapproval.cancelled desde cancelled -> SIN CAMBIO', () => {
   it('no escribe nada', async () => {
     const { tx, updates } = spyTx([sub({ status: 'cancelled' })])
