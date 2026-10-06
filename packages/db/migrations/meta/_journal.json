@@ -15,6 +15,13 @@
       "when": 1791040598732,
       "tag": "0001_dapper_revanche",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1799110400000,
+      "tag": "0002_resolve_tenant_by_preapproval",
+      "breakpoints": true
     }
   ]
 }

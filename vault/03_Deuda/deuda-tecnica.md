@@ -2236,3 +2236,70 @@ la defensa** en el unico lugar del pipeline donde deberia estar.
 
 **Urgencia:** antes de la Fase 3, que es la fase de mayor volumen
 documental. Antes de T7 (docs de Fase 2) alcanza con el scan manual.
+
+## 56. `resolve_tenant_by_preapproval` es superficie de seguridad permanente
+
+## Hecho
+
+El fix de H1 (PR #197 → rama `chore/fix-h1-preapproval-tenant-resolution`) dejo una
+funcion `SECURITY DEFINER` en `public` que bypasea RLS:
+
+```sql
+CREATE OR REPLACE FUNCTION resolve_tenant_by_preapproval(preapproval_id TEXT)
+RETURNS UUID
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $fn$
+  SELECT "tenantId" FROM subscriptions
+  WHERE "mpPreapprovalId" = preapproval_id LIMIT 1;
+$fn$;
+```
+
+No es una func de negocio comun: es un bypass de RLS deliberado y permanente,
+porque el tenant es justamente lo que hay que resolver para poder abrir el
+contexto. Vive mientras viva el flujo de suscripciones.
+
+## Por que importa
+
+Hoy expone exactamente una cosa: el `tenantId` de un `mpPreapprovalId`. Eso es
+todo lo que el webhook necesita, y nada mas. Pero nada impide que alguien le
+agregue una salida mas:
+
+- Cambiar `RETURNS UUID` por `RETURNS TABLE` y exponer toda la fila.
+- Agregar un segundo `SELECT` que devuelva `email`, `status` u otros datos de
+  `subscriptions`.
+- Sacar el `REVOKE ALL ... FROM PUBLIC`, y de golpe cualquier rol conectado
+  resuelve el tenant de cualquier preapproval.
+- Quitar `SET search_path`, abriendo la inyeccion via `search_path`.
+
+Cada una de esas es una fuga cross-tenant silenciosa, y ninguna la detectaria el
+codigo de aplicacion.
+
+## Defensas actuales
+
+`packages/db/src/__tests__/preapproval-tenant-resolution.test.ts` fija el
+contrato contra Neon real:
+
+- `prosecdef = true`, `prorettype = uuid`, `pronargs = 1`,
+  `config = ['search_path=public, pg_temp']`.
+- `SELECT *` devuelve **una** columna.
+- `PUBLIC` **no** tiene `EXECUTE`; `app_user` si.
+
+Un cambio en la funcion los rompe y el test se pone rojo. Eso es lo que evita que
+la deuda sea silenciosa.
+
+## Relacionado
+
+- **ADR-026:** la decision y las alternativas descartadas.
+- **H1 (auditoria mid-phase #197):** el defecto original.
+- **`set_tenant_id`:** el otro escape hatch acotado del schema; mismo patron.
+
+**Origen:** 2026-10-06, al resolver H1.
+
+**Severidad:** MEDIA de riesgo, ALTA de consecuencia. Hoy no hay fuga; lo que
+queda es que el contrato depende de que nadie edite la funcion.
+
+**Urgencia:** antes de Fase 3, cuando el numero de migraciones que tocan RLS
+crezca y aparezca mas superficie por agregar.

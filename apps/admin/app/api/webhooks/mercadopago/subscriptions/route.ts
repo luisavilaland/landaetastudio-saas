@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, dbSubscriptions, withTenantContext } from '@repo/db'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   classifyMpEvent,
@@ -375,8 +375,8 @@ async function resolveTenant(
   preapprovalId: string,
   token: string,
 ): Promise<Resolved | null> {
-  const fromLocal = await withTenantContextByPreapproval(preapprovalId)
-  if (fromLocal) return fromLocal
+  const localTenantId = await resolveTenantIdByPreapproval(preapprovalId)
+  if (localTenantId) return { tenantId: localTenantId, preapprovalId }
 
   logger.info(
     { preapprovalId },
@@ -398,25 +398,36 @@ async function resolveTenant(
 }
 
 /**
- * Busca la suscripcion por `mpPreapprovalId`.
+ * Resuelve el tenant de un `mpPreapprovalId` SIN abrir contexto de tenant.
  *
- * `withTenantContext` exige un tenantId, y aqui todavia no lo tenemos: es
- * justamente lo que estamos resolviendo. Por eso se consulta con la conexion
- * directa. Es seguro: solo se LEE y el filtro es el indice unico parcial, que
- * es por definicion de un solo tenant. La escritura posterior si va siempre
- * dentro de `withTenantContext`.
+ * El chicken-and-egg: `withTenantContext` exige un tenantId, y aca todavia no lo
+ * tenemos: es justamente lo que estamos resolviendo.
+ *
+ * Consultar `subscriptions` con la conexion directa tampoco sirve. La tabla tiene
+ * FORCE ROW LEVEL SECURITY y su policy compara contra
+ * `current_setting('app.tenant_id', true)::UUID`, asi que sin contexto el lookup
+ * falla siempre, de dos formas segun el estado de la sesion:
+ *
+ *   - sesion virgen        -> `current_setting` devuelve NULL -> predicado NULL ->
+ *                             cero filas, en silencio.
+ *   - sesion ya usada por `withTenantContext` (que hace SET LOCAL) -> el GUC vuelve
+ *                             a `''` -> `''::UUID` -> error 22P02.
+ *
+ * Ese era el H1 de la auditoria mid-phase (#197): la estrategia L era codigo
+ * muerto, el indice de T1 no se usaba, y todo caia en la estrategia R.
+ *
+ * `resolve_tenant_by_preapproval` es el escape hatch acotado: corre como
+ * `neondb_owner` (que tiene BYPASSRLS) y devuelve UNICAMENTE el tenantId de un
+ * preapprovalId. No expone filas ni otras columnas, y el resto de la tabla sigue
+ * con RLS. El filtro por `mpPreapprovalId` usa el indice de T1. Ver ADR-026.
  */
-async function withTenantContextByPreapproval(
+async function resolveTenantIdByPreapproval(
   preapprovalId: string,
-): Promise<Resolved | null> {
-  const rows = await db
-    .select({ tenantId: dbSubscriptions.tenantId })
-    .from(dbSubscriptions)
-    .where(eq(dbSubscriptions.mpPreapprovalId, preapprovalId))
-    .limit(1)
-
-  const row = rows[0]
-  return row ? { tenantId: row.tenantId, preapprovalId } : null
+): Promise<string | null> {
+  const rows = await db.execute<{ tenantId: string | null }>(
+    sql`SELECT resolve_tenant_by_preapproval(${preapprovalId}) AS "tenantId"`,
+  )
+  return rows[0]?.tenantId ?? null
 }
 
 // ---------------------------------------------------------------------------
