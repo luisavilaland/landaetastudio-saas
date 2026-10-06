@@ -3766,3 +3766,51 @@ diseño: cuando el código se movió, el doc queda congelado como historia y la 
 verdad pasa a los ADR. Un blueprint que dice "Referencia vigente" y apunta a una fase
 ya cerrada es peor que uno ausente, porque induce a construir sobre RLS y eventos que
 ya no existen.
+
+### Cierre formal de Fase 2 (T8)
+
+**Fecha:** 2026-10-06
+
+Fase 2 cerrada formalmente: T0-T8, los tres fixes H1/H2/H3, la mini auditoría de T6
+(#202) y los dos mini-PRs documentales (#204, #205). T9 (polling) cancelado por H1
+confirmada. Base del cierre: `develop` en `c2b477e`.
+
+**DoD verificado sobre el worktree de T8, sin cache:** lint 6/6, typecheck 9/9,
+**705/705 tests en 69 archivos**, build 3/3 `Compiled successfully`, `format:check`
+limpio, `check-migrations.sh` OK con 3 migraciones.
+
+**Housekeeping de issues.** #164-#169 (T0-T5) ya estaban cerrados. #170 (T6) y #171
+(T7) seguían abiertos porque los PRs #201 y #203 no llevaron la directiva `Closes`,
+aunque su trabajo estaba mergeado y verificado. Cerrados con referencia al PR que los
+implementó. Queda abierto solo #172, que este PR cierra.
+
+**Cifras de coverage, medidas y no estimadas.** Leídas de
+`coverage/coverage-final.json` sobre `c2b477e`: **78.12% stmts · 74.45% fns**. El
+documento de cierre registra el coverage por archivo y **no** afirma el rango de
+92-100% que se daba por supuesto: el webhook de suscripciones de plataforma queda en
+**81.3%** y `mp-subscriptions.ts` en **81.4%**. El archivo más bajo (68.9%) es el
+webhook de órdenes del tenant en storefront, que es Fase 1. Se documentó la
+discrepancia en vez de alisarla, porque un cierre es el registro que se lee después
+y una cifra inflada se hereda como cierta.
+
+**Lo que no se puede cerrar desde el código.** El panel de MercadoPago tiene 3 de
+los 4 topics; falta `subscription_preapproval_plan`. El PR #204 corrigió el
+documento que reproducía el error, pero la suscripción real sigue incompleta. Es la
+única acción de Fase 2 que queda fuera del repo.
+
+**Corrección histórica registrada.** En obs 119 se descartó H2 ("faltan topics en el
+panel") porque "se suscribieron todos". Con el cuarto topic nunca suscrito, ese
+descarte era parcial. No cambia la conclusión material — H1 sigue siendo la causa raíz
+de P1 — pero la auditoría de Fase 2 debe leer esta corrección en vez de dar H2 por
+cerrada.
+
+**What:** cierre formal de Fase 2 en `vault/04_Fases/cierre-fase2.md`; #170 y #171
+cerrados.
+**Why:** T8 del plan de Fase 2; la auditoría #197 exigía 4 precondiciones antes de
+firmar el cierre (las 4 cumplidas: #199/#200, #205, y este documento).
+**Where:** `vault/04_Fases/cierre-fase2.md`, `vault/02_Bitacora/bitacora.md`.
+**Learned:** un plan estima 10 días hábiles y la fase se ejecutó en 4 días
+calendario, pero el trabajo que no se contabiliza es el que vuelve: 3 defectos
+funcionales de una auditoría, 2 mini-PRs documentales y un drift de topics en el
+panel que ningún test detecta porque vive fuera del repo. El DoD verde mide el
+código, no la configuración de un tercero.
