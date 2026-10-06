@@ -1,6 +1,6 @@
 # Decisiones de arquitectura – saas-ecommerce
 
-**Última revisión: 2026-09-17**
+**Última revisión: 2026-10-06**
 
 Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada ADR está documentada individualmente en `vault/01_ADRs/`.
 
@@ -33,10 +33,32 @@ Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada AD
 | [ADR-023](../01_ADRs/ADR-023-dos-flujos-mp.md)                 | Dos flujos MP independientes (plataforma vs tenant)   | Aceptada                    |
 | [ADR-024](../01_ADRs/ADR-024-pgcrypto-tokens.md)               | Cifrado de tokens con pgcrypto + clave en env var     | Aceptada                    |
 | [ADR-025](../01_ADRs/ADR-025-plantillas-composiciones.md)      | Sistema de plantillas intercambiables (composiciones) | Aceptada                    |
+| [ADR-026](../01_ADRs/ADR-026-resolucion-tenant-preapproval.md) | Resolución de tenant por preapprovalId sin contexto   | Aceptada — Fase 2           |
+| [ADR-027](../01_ADRs/ADR-027-planid-endpoint-write.md)         | `planId` se escribe en el endpoint, no en el webhook  | Aceptada — Fase 2           |
+
+## Fase 2 — Webhook de suscripciones + checkout dinámico
+
+Cerrada el 2026-10-06 (T0–T8). Decisiones de Fase 2 registradas en ADR-026 y ADR-027.
+
+| Documento              | Ruta                                                          |
+| ---------------------- | ------------------------------------------------------------- |
+| Plan                   | `docs/superpowers/plans/2026-10-01-fase2.md`                  |
+| Spec                   | `docs/superpowers/specs/2026-10-01-fase2-webhook-checkout.md` |
+| Design                 | `docs/superpowers/specs/2026-10-01-fase2-design.md`           |
+| Spike T0 (contrato MP) | `docs/superpowers/specs/2026-10-02-spike-t0-resultado.md`     |
+| Auditoría mid-phase    | `vault/04_Fases/auditoria-fase2-midphase.md`                  |
+| Auditoría T6 (tests)   | `vault/04_Fases/auditoria-t6-test-quality.md`                 |
+| Cierre                 | `vault/04_Fases/cierre-fase2.md`                              |
+
+**Operativo:** el panel de MercadoPago tiene suscritos 3 de los 4 topics; falta
+`subscription_preapproval_plan`. Ver `SETUP.md`.
 
 ## Blueprint vigente
 
-- **Blueprint v2.6:** `docs/superpowers/specs/2026-09-blueprint-v2.6.md` — plan completo 10 fases (pre-lanzamiento)
+- **Blueprint v2.6:** `docs/superpowers/specs/2026-09-blueprint-v2.6.md` — **NO NORMATIVO**
+  desde 2026-10-06, conservado como referencia histórica. El contenido de Fase 2 quedó
+  desactualizado al cerrarse la fase (URL del webhook y nombres de evento). Para
+  construir, usar los ADR y las specs de fase.
 
 ## Convenciones clave
 

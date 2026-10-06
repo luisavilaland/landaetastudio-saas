@@ -37,3 +37,4 @@ tags:
 - [[auditoria-t6-los-tests-con-mock-no-pueden-verificar-el-where-178]]
 - [[cierre-de-fase-2-decisiones-d1-d7-y-resultados-del-spike-t0-179]]
 - [[corregido-drift-de-topics-de-mp-en-setup-md-3-4-180]]
+- [[precondiciones-t8-cumplidas-blueprint-no-normativo-arquitect-181]]

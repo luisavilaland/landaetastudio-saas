@@ -3722,3 +3722,47 @@ por la regla de alcance de #203.
 **Learned:** un doc que resume un enum queda desactualizado en silencio. La lista
 correcta sale de `MpTopic`, no de memoria — y el comentario del código ya decía
 que ese topic no escribe estado, dato que faltaba en el doc.
+
+### Precondiciones de T8 cumplidas (auditoría mid-phase #197 §7)
+
+**Fecha:** 2026-10-06
+
+La auditoría mid-phase de Fase 2 (`vault/04_Fases/auditoria-fase2-midphase.md`, PR #197,
+2026-10-05) definió cuatro precondiciones **"Antes de T8"**. Verificadas una por una
+antes de escribir el documento de cierre:
+
+| #   | Precondición                                            | Estado previo | Estado ahora |
+| --- | ------------------------------------------------------ | ------------- | ------------ |
+| 1   | Crear ADR-026 y ADR-027                                 | ❌ faltaba    | ✅ #199, #200 |
+| 2   | Blueprint v2.6 no normativo o actualizado               | ❌            | ✅ este PR   |
+| 3   | Indexar spec/design/plan de Fase 2 en `arquitectura.md` | ❌            | ✅ este PR   |
+| 4   | Decidir qué deuda se acepta en el cierre                | ⏳            | ⏳ T8        |
+
+**Precondición 2 — blueprint marcado no normativo.** `docs/superpowers/specs/2026-09-blueprint-v2.6.md`
+sigue-ba affirman­do ser "Referencia vigente" y su pie decía "Próximo paso: Fase 1",
+que ya estaba completada. Ahora declara no normativo desde el 2026-10-06, la fila 2 de la
+hoja de ruta pasó de Pendiente a Completada, y el pie apunta a Fase 3.
+
+**Precondición 3 — `arquitectura.md` indexa Fase 2.** El documento terminaba en ADR-025
+y no conocía ni Fase 2 ni los ADR-026/027. Se agregaron las dos filas de ADR al índice
+existente, una sección de Fase 2 con plan/spec/design/spike/auditorías/cierre, y la
+sección "Blueprint vigente" ahora declara la no normatividad. Su fecha de revisión
+pasó de 2026-09-17 a 2026-10-06.
+
+**Alcance deliberadamente acotado.** El contenido de diseño de la sección Fase 2 del
+blueprint **no se reescribió** (URL del webhook con `:tenantId`, nombres de evento old).
+Marcarlo no normativo es preferible a reescribirlo: esas secciones describen el
+problema original y las soluciones ya están en ADR-026 y ADR-027. Reescribirlas
+volvería a decidir en un documento histórico lo que los ADR ya decidieron.
+
+**What:** blueprint v2.6 marcado no normativo; `arquitectura.md` indexa Fase 2 +
+ADR-026/027.
+**Why:** precondiciones #2 y #3 de la auditoría mid-phase #197, requeridas antes de
+firmar el cierre de fase.
+**Where:** `docs/superpowers/specs/2026-09-blueprint-v2.6.md`,
+`vault/05_Specs/arquitectura.md`, `vault/02_Bitacora/bitacora.md`.
+**Learned:** la nota de no normatividad es más honesta que "actualizar" un documento de
+diseño: cuando el código se movió, el doc queda congelado como historia y la fuente de
+verdad pasa a los ADR. Un blueprint que dice "Referencia vigente" y apunta a una fase
+ya cerrada es peor que uno ausente, porque induce a construir sobre RLS y eventos que
+ya no existen.
