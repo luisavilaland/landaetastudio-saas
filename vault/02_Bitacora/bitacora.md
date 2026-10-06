@@ -3517,3 +3517,102 @@ tampoco afecta al CI porque ahi ambas se saltean.
 **Severidad:** cierra T6.
 
 **Urgencia:** siguiente T7 (documentacion y memoria).
+
+## 2026-10-06 - Auditoria de calidad de tests de T6
+
+Mini auditoria que verifica que los tests **prueban lo que dicen probar**.
+Rama `audit/t6-test-quality`. Veredicto: **T6 pasa.**
+
+Es la converscion explicita de una caza accidental. El mock de H3
+(`@/lib/logger` cuando el codigo importaba `@repo/logger`) hizo que 9 tests
+pasaran sin testear, y se encontro porque los tests nuevos de H3 daban 0 warns.
+Ese "de paso" es exactamente el tipo de defecto que no se encuentra solo.
+
+### Lo que se verifico
+
+- **83 / 88** targets de `vi.mock` correctos.
+- **454 / 455** `it()` con al menos un `expect()`.
+- **7 / 7** mutation-lite detectadas sobre funciones de H1, H2, H3 y T6, todas
+  revertidas limpias.
+- **1 / 3** mutaciones de aislamiento cross-tenant detectadas.
+- Flake de Neon: **0 / 3** en esta corrida (historico ~1 cada 4-5).
+
+### Los 3 tests de T6 son efectivos
+
+Cada uno detecta exactamente la perdida de comportamiento que cubre:
+
+| Mutacion | Tests que rompieron |
+| --- | --- |
+| `decideTarget` (H2) | 1 |
+| `verifyPlanAmountConvergence` (H3) | 2 |
+| `resolveTenantIdByPreapproval` (H1) | 11 |
+| `resolveTenant` fallback R (H1) | 2 |
+| `cancel` / `pause` / `resume` catch (T6) | 1 / 1 / 1 |
+
+Ese era el riesgo real de T6 y queda despejado.
+
+### H-T6-1 [ALTO] — los tests con mock no pueden verificar el WHERE de una query
+
+Quitar `eq(dbSubscriptions.tenantId, ...)` del `SELECT` y del `UPDATE` de
+`applyTransition` dejo los **705 tests verdes**. Con el filtro del `SELECT` en
+tautologia, `row` es una fila arbitraria y el `UPDATE` escribe la que sea: fuga
+cross-tenant completa, invisible.
+
+Los tests cross-tenant existentes verifican que se **pase** el tenant correcto a
+`withTenantContext`. No verifican que la query **filtre** por tenant. Son
+distintas, y la segunda es la que evita la fuga.
+
+Con mocks la semantica del `WHERE` es **invisible por construccion**: no hay test
+que distinga `WHERE tenantId = X` de `WHERE true`. No es que falte un test: es que
+con este harness no se puede escribir. Item de deuda 61.
+
+### H-T6-2 [BAJO] — 5 archivos mockean un logger que el codigo no importa
+
+`config/settings`, `config/tenant`, `config/tenant/domain`,
+`products/[id]/variants` y `shipping` mockean `@/lib/logger`, pero sus rutas
+importan `@repo/logger`. Como `lib/logger.ts` es un shim de re-export, son dos
+modulos distintos y **el mock no tiene efecto**.
+
+Es la clase de bug de H3 replicada 5 veces. Aca no hay falsos verdes (ningun test
+afirma sobre logs), asi que queda LOW: codigo muerto y ruido, no cobertura falsa.
+Fuera del alcance estricto (T1-T5), reportado porque el metodo lo encontró de
+paso.
+
+### H-T6-3 [BAJO] — un `it()` sin `expect()` y un `skipIf` sin razon
+
+`encryption.test.ts:105` no afirma nada (pasa mientras no lance, forma valida pero
+no documentada). `rls-cross-tenant.test.ts:161` tiene un `skipIf` correcto pero
+sin comentario que explique que saltarse es legitimo. Contraste: el archivo de H1
+si lo documenta.
+
+### Un falso positivo propio
+
+La primera version del check de branches reporto `0%` en `mp-amounts.ts`. Era un
+bug del script: 0/0 mostrado como 0% en vez de "sin ramas". Ese archivo tiene 0
+ramas. Se corrigio **antes** de reportar, porque un hallazgo de cobertura
+inventado es peor que ninguno.
+
+### Coverage de Fase 2 (del JSON, no de la tabla)
+
+| Archivo | Stmts | Branches |
+| --- | --- | --- |
+| `webhooks/.../subscriptions/route.ts` | 81.28% | 92.31% |
+| `commerce/mp-subscriptions.ts` | 81.40% | 75.00% |
+| `lib/subscriptions/handlers.ts` | 96.88% | 84.62% |
+
+Las 20 ramas sin cubrir del webhook son fallbacks de `safeGet` y guards de
+`mp_unavailable` / `tenant_unresolved`: **ninguna es codigo de H1/H2/H3**, y el
+mutation-lite lo confirma. El `mp-subscriptions.ts` con 75% de branches es el
+peor ratio de Fase 2: sus 8 ramas sin cubrir son guards de respuesta de MP.
+
+### Veredicto
+
+**T6 pasa. Arrancar T7.** H-T6-1 se atiende antes de Phase 3; H-T6-2 y H-T6-3
+son de minutos.
+
+Es la primera pasada. No se hizo segunda pasada templada, que segun el precedente
+de #197 es donde aparecen los errores que la primera no ve. Queda como PR aparte.
+
+**Severidad:** cierra la verificacion de T6.
+
+**Urgencia:** T7 puede arrancar ya.
