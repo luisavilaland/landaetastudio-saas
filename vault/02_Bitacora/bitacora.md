@@ -3412,3 +3412,108 @@ Journal corregido: las 3 entradas quedan en 2026 y en orden creciente.
 **Severidad:** ALTO (cierra el tercer bloqueante de la auditoria).
 
 **Urgencia:** con esto, T6 queda desbloqueada: H1, H2 y H3 cerrados.
+
+## 2026-10-06 - T6: tests de integracion (gap real: el catch de las 3 rutas de mutacion)
+
+Cierra T6 del plan de Fase 2. Rama `test/fase2-integration-tests`.
+
+### El gap no era el que se suponia
+
+La lista de suites de §9.1 esta **completa** salvo una, y §9.2 ya estaba
+cubierto entero:
+
+| Suite §9.1 | Existe | Tests |
+| --- | --- | --- |
+| `preapproval.test.ts` | si | 25 |
+| `route.test.ts` (GET) | si | 10 |
+| `cancel.test.ts` | si (`mutations.test.ts`) | ~6 |
+| `reactivate.test.ts` | **no existe el endpoint** | - |
+| `plan.test.ts` | si | 32 |
+| `proration.test.ts` | si | 10 |
+| `subscription-permissions.test.ts` | si | 15 |
+| `mp-webhook-events.test.ts` | si | 12 |
+| webhook `route.test.ts` | si | 43 |
+
+§9.2 (los 3 cross-tenant) ya estaba cubierto y **no se duplico**:
+
+1. Ruta de escritura: `mutations.test.ts:319-346` itera cancel/pause/resume y
+   verifica `withTenantContext` con el tenant de la sesion.
+2. Aislamiento de DB: `rls-cross-tenant.test.ts` (8 casos contra Neon) mas el
+   caso 3 de `preapproval-tenant-resolution.test.ts`. Nota: la asercion literal
+   "la query incluye `eq(tenantId)`" es **estructural, no de comportamiento**, y
+   no corresponde a un test unitario.
+3. No-confianza en el body: `handler.test.ts:853-867` ya monta
+   `external_reference: 'tenant-OTRO'` y asegura que se procesa el tenant local.
+
+**`reactivate.test.ts` no se escribe**: T0 reemplazo `reactivate` por
+`pause` + `resume`, asi que la suite del plan apunta a un endpoint que no se
+construyo. Divergencia plan↔implementacion, no deuda.
+
+### El gap real: 3 rutas de mutacion al 71.42%
+
+`cancel`, `pause` y `resume` rendian 71.42% de lineas, las tres con **el mismo
+unico hueco**: el `catch` que llama a `serverError`. Un 500 en esas tres rutas no
+lo ejercitaba nadie. Tres tests lo cierran: DB caida -> 500 y, sobre todo,
+**nada escrito en MP** (un 500 con un PUT a MP ya hecho deja al tenant en un
+estado que la DB no registra).
+
+### La cobertura nunca fue medible en este repo
+
+`vitest.config.ts` declara `coverage.provider: 'v8'` desde siempre, pero
+**`@vitest/coverage-v8` no estaba declarado en ningun `package.json`**. Es decir:
+la configuracion existia, la dependencia no. Ningun criterio de aceptacion de los
+ultimos PRs (que pedian ">= 80%") pudo verificarse nunca.
+
+Y el comando que todo el mundo prueba primero tampoco funciona:
+`pnpm test --coverage` falla porque **pnpm se come el flag** (`Unknown option`).
+Hay que usar `pnpm exec vitest run --coverage`. Items 58, 59 y 60.
+
+### Trampa del reporter de texto
+
+Con `cancel`, `pause` y `resume` al 100%, **sus filas desaparecen de la tabla de
+texto** de coverage: los directorios largos se truncan y el agrupamiento los
+colapsa. Los archivos si estan (verificado en `coverage-final.json`), y
+`--coverage.include` tampoco arregla la tabla.
+
+Consecuencia: si uno se lee la tabla, concluye "no se cubren" cuando es al
+contrario. Los numeros de este PR salen del JSON.
+
+### Coverage final de Fase 2 (leido del JSON)
+
+| Archivo | Antes | Despues |
+| --- | --- | --- |
+| `subscriptions/cancel/route.ts` | 71.42% | **100%** |
+| `subscriptions/pause/route.ts` | 71.42% | **100%** |
+| `subscriptions/resume/route.ts` | 71.42% | **100%** |
+| `subscriptions/plan/route.ts` | 94.66% | 94.67% |
+| `subscriptions/preapproval/route.ts` | 92.15% | 92.16% |
+| `subscriptions/route.ts` (GET) | 90.90% | 90.91% |
+| `lib/subscriptions/mutate.ts` | 100% | 100% |
+| `lib/subscriptions/handlers.ts` | 96.87% | 96.88% |
+| `webhooks/.../subscriptions/route.ts` | 81.28% | 81.28% |
+| `commerce/mp-subscriptions.ts` | 81.39% | 81.40% |
+| `commerce/subscription-proration.ts` | 92.85% | 92.86% |
+| `commerce/mp-amounts.ts` | - | 100% |
+| `commerce/subscription-permissions.ts` | - | 100% |
+| `commerce/mp-webhook-events.ts` | - | 100% |
+| `commerce/webhook-signature.ts` | 95.91% | 95.92% |
+
+Global: **77.90% -> 78.11%** en statements, 78.43% -> 78.66% en lineas.
+
+### DoD
+
+`pnpm lint` 6/6 (0 cached) - `pnpm typecheck` 9/9 (0 cached) - `pnpm test`
+**705/705** en 69 archivos - `pnpm build` 3/3 (0 cached) - `pnpm format:check`
+OK. Tests de ordenes sin tocar (verificado con `git diff` sobre
+`apps/admin/app/api/orders`).
+
+**Sobre el flakiness:** una de las corridas del suite completo fallo en
+`preapproval-tenant-resolution.test.ts` con `Failed Suites 1` y `705 passed`, o
+sea un fallo de `beforeAll` contra Neon, no de asercion. Las dos corridas
+siguientes dieron 69/69 y 705/705. Es el mismo flakiness de contencion de Neon
+documentado en el PR de H1 (dos suites de Neon en paralelo con 69 workers), que
+tampoco afecta al CI porque ahi ambas se saltean.
+
+**Severidad:** cierra T6.
+
+**Urgencia:** siguiente T7 (documentacion y memoria).

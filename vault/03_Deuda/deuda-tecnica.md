@@ -2355,3 +2355,111 @@ convergencia manual.
 
 **Urgencia:** cuando se exponga el estado del plan al tenant (panel de
 suscripciones). Antes de eso es ruido de log.
+
+## 58. `pnpm test --coverage` no mide nada: pnpm se come el flag
+
+## Hecho
+
+`pnpm test --coverage` falla:
+
+```
+ERROR  Unknown option: 'coverage'
+Did you mean 'reverse'? Use "--config.unknown=value" to force an unknown option.
+```
+
+El error no es de vitest: es de **pnpm**. El script raiz es `vitest run`, y el
+flag `--coverage` lo interpreta pnpm como una opcion suya, no como argumento del
+script. Hay que invocarlo como `pnpm exec vitest run --coverage`.
+
+## Por que importa
+
+T6 tiene como criterio de aceptacion medir la cobertura (§9.3). Con el comando
+que todo el mundo prueba primero, el coverage no se mide y parece que "no hay
+forma de medirlo". Ya paso: hasta T6 nadie habia reportado un porcentaje, y la
+razon de fondo era esta mas que la falta de la dependencia (ver item 59).
+
+## Relacionado
+
+- **Item 59:** `@vitest/coverage-v8` no estaba declarado, que es la causa raiz.
+- **`package.json`:** el script `test` no declara `--coverage`.
+
+**Origen:** 2026-10-06, en T6.
+
+**Severidad:** BAJA. Workaround de una linea.
+
+**Urgencia:** junto con 59, o directamente al mismo tiempo.
+
+## 59. `@vitest/coverage-v8` no estaba declarado en ningun `package.json`
+
+## Hecho
+
+`vitest.config.ts` declara `coverage.provider: 'v8'` desde siempre:
+
+```ts
+coverage: {
+  provider: 'v8',
+  reporter: ['text', 'json', 'html'],
+},
+```
+
+Pero **`@vitest/coverage-v8` no estaba declarado en ningun `package.json`** ni
+estaba en el store de pnpm. Configurar un provider que no esta instalado es una
+configuracion que no puede funcionar: correr coverage daba
+
+```
+MISSING DEPENDENCY  Cannot find dependency '@vitest/coverage-v8'
+```
+
+O sea que **la cobertura nunca fue medible en este repo**. Por eso ningun
+criterio de aceptacion de los ultimos PRs (que pediran ">= 80%") pudo
+verificarse.
+
+## Relacionado
+
+- **Item 58:** el comando que se usa primero tampoco funciona.
+
+**Origen:** 2026-10-06, en T6. Resuelto en el PR de T6 (`@vitest/coverage-v8@^5.0.2`).
+
+**Severidad:** MEDIA. No era un bug de ejecucion sino una capacidad de
+verificacion ausente, que es peor: un criterio de aceptacion que nadie puede
+medir no es un criterio.
+
+**Urgencia:** resuelta en T6.
+
+## 60. El reporter de texto de coverage oculta archivos
+
+## Hecho
+
+Con las rutas de mutacion al 100% (`cancel/route.ts`, `pause/route.ts`,
+`resume/route.ts`), **esas tres filas desaparecen de la tabla de texto** del
+reporte de coverage, aunque los archivos estan y estan cubiertos. Lo mismo con
+`mutate.ts`, que aparece, y `handlers.ts`, que aparece.
+
+Los directorios largos se truncan a un ancho fijo (`...iptions/cancel`,
+`...criptions/resume`) y el agrupamiento por directorio los colapsa.
+
+El reporte `text` es el que se lee a ojo. Si un archivo bien cubierto no aparece,
+la lectura razonable es "no se cubre", que es la conclusion opuesta a la
+verdad.
+
+## Como verificar los numeros reales
+
+Leer el reporte JSON, que trae rutas absolutas y no trunca:
+
+```bash
+pnpm exec vitest run --coverage
+# despues, sobre coverage/coverage-final.json
+```
+
+Con `--coverage.include` tampoco alcanza: los archivos faltan igual en la tabla.
+
+## Relacionado
+
+- **Item 58** y **59:** sin ellos no hay ningun reporte que truncar.
+
+**Origen:** 2026-10-06, en T6.
+
+**Severidad:** BAJA, pero con trampa: invita a reportar un numero equivocado.
+
+**Urgencia:** cuando se empiece a usar coverage como criterio en CI, porque ahi
+el numero se lee de una tabla y no de un JSON.

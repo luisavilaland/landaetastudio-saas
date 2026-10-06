@@ -32,3 +32,5 @@ tags:
 - [[deuda-journal-json-idx-2-con-when-fechados-90-dias-en-el-fut-173]]
 - [[h3-resuelto-planid-se-escribe-en-el-endpoint-no-en-el-webhoo-174]]
 - [[patron-antes-de-mapear-valor-entidad-inyectividad-sobre-la-h-175]]
+- [[session-summary-landaetastudio-saas-176]]
+- [[t6-completo-gap-real-era-el-catch-de-las-3-rutas-de-mutacion-177]]

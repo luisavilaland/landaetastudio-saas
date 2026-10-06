@@ -345,3 +345,32 @@ describe('mutaciones — aislamiento multi-tenant', () => {
     })
   }
 })
+
+describe('mutaciones - fallo de infraestructura (T6)', () => {
+  // Los tres `catch` de cancel/pause/resume estaban sin cubrir: las tres rutas
+  // rendian 71.42% de lineas y el unico hueco era el `serverError`. Un 500 en
+  // estas tres rutas no lo ejercitaba nadie.
+  for (const [nombre, handler, mensaje] of [
+    ['cancel', cancel, 'Error al cancelar la suscripcion'],
+    ['pause', pause, 'Error al pausar la suscripcion'],
+    ['resume', resume, 'Error al reanudar la suscripcion'],
+  ] as const) {
+    it(`${nombre}: si la DB cae, 500 sin tocar MP`, async () => {
+      vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+      // Falla el contexto de tenant, que es la causa real de un 500 aca.
+      vi.mocked(withTenantContext).mockRejectedValue(
+        new Error('db no disponible'),
+      )
+
+      const res = await handler()
+
+      expect(res.status).toBe(500)
+      // El mensaje es el de la ruta, no el del error interno: no se filtra el
+      // detalle de la infraestructura.
+      expect(await res.json()).toEqual({ error: mensaje })
+      // Y lo importante: nada se escribio en MP. Un 500 con un PUT a MP ya
+      // hecho dejaria al tenant en un estado que la DB no registra.
+      expect(updatePreapproval).not.toHaveBeenCalled()
+    })
+  }
+})
