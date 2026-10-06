@@ -172,7 +172,9 @@ https://admin.landaetastudio.com/api/webhooks/mercadopago/subscriptions
 ```
 
 - Debe ser **HTTPS pública**. No sirve `localhost` ni un preview domain de Vercel (`.vercel.app`) — ver más abajo.
-- Suscribí los topics: `subscription_preapproval`, `subscription_authorized_payment` y `payment` (legacy).
+- Suscribí **4 topics** en el panel de MP: `subscription_preapproval`, `subscription_authorized_payment`, `payment` y `subscription_preapproval_plan`.
+  - `subscription_preapproval_plan` **no escribe estado**: avisa que el _plan_ cambió, no la suscripción. El handler responde `{ ignored: true }` y loguea un `warn`.
+- `UNKNOWN` es el fallback tolerante de `classifyMpEvent` ante un topic no reconocido: registra `warn` y responde `200` sin escribir. **No es un topic que se suscriba.**
 - El tenant se resuelve **por el `preapproval_id`**, no por el host ni por el path.
 
 **Cómo se resuelve el tenant (y por qué la URL no lleva tenant).** La resolución es un

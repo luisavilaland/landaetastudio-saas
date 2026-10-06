@@ -3690,3 +3690,35 @@ Antes de Phase 3: item 61. Antes de T8: cerrar el drift de topics en SETUP.md
 **Severidad:** cierre de fase.
 
 **Urgencia:** Phase 3 puede arrancar ya.
+
+### Corrección de drift en SETUP.md — topics de MercadoPago
+
+**Fecha:** 2026-10-06
+
+La sección `### MercadoPago plataforma (Fase 2)` de `SETUP.md` decía suscribir **3 topics**
+en el panel de MP. El código clasifica **4** (`MpTopic` y `TOPIC_BY_TYPE` /
+`TOPIC_BY_ACTION` en `packages/commerce/src/mp-webhook-events.ts`), así que quien
+configurara siguiendo el documento se suscribía a 3 de 4 y se perdía
+`subscription_preapproval_plan`.
+
+El drift tenía **dos** errores, no uno:
+
+1. `subscription_preapproval_plan` faltaba en la lista.
+2. `payment` estaba etiquetado como `(legacy)`, y no lo es: tiene handler propio
+   (`handlePayment`) y es el único topic que necesita `live_mode` y `action`.
+   La etiqueta se eliminó.
+
+También se documentó que `UNKNOWN` es el fallback tolerante de `classifyMpEvent`
+(respuesta válida, loguea `warn` y devuelve `200` sin escribir) y **no** un topic
+que se suscriba, y que `subscription_preapproval_plan` se acepta pero no escribe
+estado porque avisa un cambio de _plan_, no de suscripción.
+
+**Origen:** mini auditoría de T7, que encontró el drift pero lo dejó sin corregir
+por la regla de alcance de #203.
+
+**What:** corregida la lista de topics de MP en `SETUP.md` (3 → 4, sin `(legacy)`).
+**Why:** el documento inducía a una configuración incompleta del webhook de plataforma.
+**Where:** `SETUP.md` L175, `vault/02_Bitacora/bitacora.md`.
+**Learned:** un doc que resume un enum queda desactualizado en silencio. La lista
+correcta sale de `MpTopic`, no de memoria — y el comentario del código ya decía
+que ese topic no escribe estado, dato que faltaba en el doc.
