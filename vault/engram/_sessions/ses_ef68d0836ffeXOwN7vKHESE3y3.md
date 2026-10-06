@@ -39,3 +39,4 @@ tags:
 - [[corregido-drift-de-topics-de-mp-en-setup-md-3-4-180]]
 - [[precondiciones-t8-cumplidas-blueprint-no-normativo-arquitect-181]]
 - [[cierre-formal-de-fase-2-t8-con-dod-verificado-182]]
+- [[auditor-a-de-cierre-de-fase-2-fase-2-pasa-item-62-nuevo-183]]

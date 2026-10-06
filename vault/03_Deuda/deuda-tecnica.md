@@ -2532,3 +2532,55 @@ silencio.
 
 **Urgencia:** antes de Phase 3, cuando el numero de rutas con RLS crezca y este
 patron (mockear `withTenantContext` y afirmar sobre las llamadas) se replique.
+
+## 62. Un nombre de funcion o un comentario pueden hacer el trabajo de la review
+
+**Estado:** abierto (2026-10-06). Detectado en la auditoria de cierre de Fase 2
+(`vault/04_Fases/auditoria-fase2.md`, hallazgo H-F2-1, severidad ALTO).
+
+### Hecho
+
+H1 de la auditoria mid-phase (`estrategia L nunca resolvia`) no fallo por falta de
+tests. Fallo porque dos artefactos falsehood su trabajo:
+
+1. **Un argumento de seguridad falso escrito en el codigo.** El comentario de
+   `withTenantContextByPreapproval` decia _"Es seguro: solo se LEE y el filtro es
+   el indice unico parcial, que es por definicion de un solo tenant"_. La premisa
+   es falsa: RLS se aplica **antes** del `WHERE`, asi que la funcion devolvia
+   cero filas siempre. Confundia **selectividad del indice** con **permiso de
+   acceso**.
+
+2. **El nombre afirmaba la garantia que el codigo no cumplia.** La funcion se
+   llamaba `withTenantContextByPreapproval`. Una revision que greppeara
+   `withTenantContext` veia el nombre, marcaba el casillero y seguia.
+
+3. **La prueba que lo refutaba ya estaba en el repo.** El test
+   `"sin set_tenant_id una conexion nueva devuelve cero filas RLS"`
+   (`packages/db/src/__tests__/rls-cross-tenant.test.ts:333`) se creo el
+   2026-09-24 en `670a7b3`, el commit de cierre de Fase 1: **doce dias antes de
+   que empezara Fase 2**.
+
+### Impacto
+
+Tres defectos funcionales de la fase (H1, H2, H3) llegaron a produccion porque el
+proceso de revision aceptaba nombre y comentario como evidencia. Ninguno lo
+detecto ningun test. La mini auditoria de T6 (#202) encontro el limite de los
+mocks (item 61) pero no esta dimension: **el codigo puede mentir en su propia
+documentacion sin que nada falle.**
+
+### Mitigacion
+
+Dos reglas de revision, sin codigo nuevo:
+
+1. Un comentario que **justifica saltarse una frontera de seguridad es un
+   hallazgo**, no documentacion. Exige verificar la premisa contra el motor.
+2. Una funcion cuyo **nombre promete una propiedad de seguridad** debe abrirse y
+   verificarse como si no la cumpliera.
+
+### Learned
+
+Un nombre puede actuar como el unico punto de falla de una revision. Cuando el
+nombre y el cuerpo discrepan, el nombre es el que gana porque es lo que se lee
+primero. `withTenantContextByPreapproval` no fallaba por estar mal nombrada:
+fallaba porque el nombre prometia un invariante que no existia, y nadie lo
+verifico porque el nombre ya lo decia.

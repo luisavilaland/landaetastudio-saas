@@ -3814,3 +3814,58 @@ calendario, pero el trabajo que no se contabiliza es el que vuelve: 3 defectos
 funcionales de una auditoría, 2 mini-PRs documentales y un drift de topics en el
 panel que ningún test detecta porque vive fuera del repo. El DoD verde mide el
 código, no la configuración de un tercero.
+
+### Auditoría de cierre de Fase 2
+
+**Fecha:** 2026-10-06
+
+Auditoría read-only de la fase completa (equivalente a #140 de Fase 1) sobre
+`develop` en `8e2c4f9`. Dos perfiles con scopes disjuntos: QA (mecánica +
+defectos) y Orquestador (inventario + procesos + propuestas). Read-only
+verificado: el worktree terminó con un solo archivo modificado, el fix de
+`AGENTS.md` de esta misma auditoría.
+
+**Veredicto: Fase 2 pasa.** Sin CRITICAL ni HIGH de código. 11 hallazgos: 6
+MEDIUM, 5 LOW, más 1 de proceso (ALTO). El único bloqueante de Fase 3 sigue
+siendo el item 61, ya declarado antes de esta auditoría.
+
+**El hallazgo importante no es de código.** H1 no falló por falta de tests.
+Falló porque el **nombre** de la función (`withTenantContextByPreapproval`
+prometía un contexto de tenant que no establecía) y un **comentario** que
+justificaba la seguridad con una premisa falsa ("el índice único parcial es por
+definición de un solo tenant") hicieron el trabajo de la review. Y la prueba que
+lo refutaba — `"sin set_tenant_id una conexión nueva devuelve cero filas RLS"` —
+ya estaba en el repo desde el **2026-09-24**, en el commit de cierre de Fase 1:
+doce días antes de que empezara la fase. Registrado como item 62.
+
+**Dos severidades se corrigieron contra el subagente que las reportó.** El
+`dataId` de la firma se leyó como ALTO con el escenario "401 en cada entrega",
+pero el spike T0 registró tres entregas reales de MP con `data.id` **en el body**:
+se rebajó a MEDIUM, con el riesgo residual acotado al topic no observado por el
+spike. Verificar la afirmación de un subagente contra la evidencia es parte del
+método, no una excepción.
+
+**Sobre branches en 67.38%:** es la cifra que más conviene mirar y la que el
+documento de cierre no reportaba. Una función puede figurar cubierta si se la
+llamó una vez; una rama sin cubrir es una decisión que el código tomó y nadie
+ejercitó.
+
+**Discrepancia entre subagentes, registrada a propósito.** Sobre el cleanup de
+worktree, uno concluded "ruido aceptable, no cambiar la regla". La auditoría
+verificó que la secuencia documentada no cubre tres modos de falla observados en
+#204/#205/#206: `gh` con exit 0 y 433 MB huérfanos, `git worktree remove` que
+responde "is not a working tree" porque git ya desvinculó, y
+`paseo_archive_workspace` que responde "Workspace not found" **y archiva
+igual**. `AGENTS.md` actualizado.
+
+**What:** auditoría de cierre de Fase 2 (`vault/04_Fases/auditoria-fase2.md`),
+item 62 de deuda, fix de cleanup en `AGENTS.md`.
+**Why:** equivalente a #140 de Fase 1; buscar lo que la auditoría mid-phase
+(#197) y la mini auditoría T6 (#202) no vieron, y evaluar el proceso de la fase.
+**Where:** `vault/04_Fases/auditoria-fase2.md`, `vault/03_Deuda/deuda-tecnica.md`,
+`AGENTS.md`, `vault/02_Bitacora/bitacora.md`.
+**Learned:** el DoD mide el código, y el código puede mentir en su propia
+documentación sin que nada falle. Tres defectos de una fase llegaron a producción
+no porque faltaran tests, sino porque un nombre y un comentario afirmaban
+garantías que nadie verificó. El proceso de revisión necesita tratar el
+argumento de seguridad como hallazgo y el nombre como promesa por comprobar.
