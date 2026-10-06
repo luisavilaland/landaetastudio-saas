@@ -3321,3 +3321,94 @@ comparacion y no como llamada generica. Se resuelve con un helper `conn()`.
 **Severidad:** CRITICO (cierra el segundo bloqueante de la auditoria).
 
 **Urgencia:** antes de T6, junto con H3.
+
+## 2026-10-06 - H3: `planId` se escribe en el endpoint, no en el webhook
+
+Cierra H3 de la auditoria mid-phase (#197). Rama
+`chore/fix-h3-plan-id-endpoint-write`.
+
+### El defecto
+
+`PUT /api/subscriptions/plan` devolvia 202 con el comentario *"El plan no se
+escribe en la DB. Lo hace el webhook"*. El webhook nunca tuvo esa logica:
+`applyTransition` escribia `status`, `currentPeriodEnd` y
+`lastProcessedPaymentId`, y cero campos de plan. `subscriptions.planId` quedaba
+congelado en el plan de creacion, y el `409 "Ya tenes ese plan"` respondia
+contra un estado que no existia.
+
+### El rediseno, y por que la auditoria estaba equivocado
+
+La auditoria propuso que el webhook escribiera `planId` mapeando
+`transaction_amount` a un plan local. Se descarto por tres razones:
+
+1. **El mapeo no es inyectivo en el tiempo.** Con un A -> B -> A, un evento
+   tardio del ciclo de B vuelve a matchear B y **revierte** `planId`.
+2. **Se dispara en todo evento con monto**, no solo en los de cambio: los
+   cobros recurrentes tambien traen `transaction_amount`, asi que `planId` se
+   reescribiria en cada pago.
+3. **El orden no esta garantizado**: MP reintenta webhooks.
+
+Y el dato que lo cierra: el tenant **no puede cambiar el monto desde el panel de
+MP**. Todo cambio pasa por `PUT /plan`. El webhook no tiene nada que descubrir.
+
+Queda asi: el endpoint escribe `planId` tras confirmar con MP (el `GET`
+post-escritura ya existia), y el webhook solo verifica que el monto coincida con
+el precio del plan local.
+
+### Tres desviaciones del plan, y por que
+
+**1. No se devuelve 502 cuando falla el GET de verificacion.** El plan pedia
+eso. Pero el endpoint ya tiene **dos tests deliberados** que dicen 202:
+`202 si el GET de verificacion falla: el PUT ya salio bien` y `202 si MP no
+devuelve transaction_amount`, con el comentario *"Campo ausente != monto
+incorrecto: no se puede afirmar que fallo"*. Son decisiones ya razonadas, no
+descuidos. Lo que H3 cambia es que **sin confirmacion no se escribe `planId`**,
+que es el punto real. El `202` sigue siendo honesto porque el `PUT` a MP si
+salio.
+
+**2. La verificacion no se gatea por `target === 'active'`.** Con esa
+condicion es **inalcanzable** en el caso que mas importa: un evento atrasado
+sobre una suscripcion ya activa cae en `no_transition` (`active` no esta en
+`REVIVABLE`), o sea que el aviso nunca saldria justo cuando hay algo que avisar.
+Es un invariante del **evento**, no de la transicion: corre en todo evento
+`subscription_preapproval` con monto, antes de `decideTarget`.
+
+**3. En el topic `payment` no se compara el monto.** Alli
+`transaction_amount` es lo cobrado ese ciclo, que legitimamente difiere del
+precio del plan (prorrateo, cupones, primer ciclo con descuento). Comparar daria
+falsos positivos.
+
+### Un bug de tests que hacia invisible todo esto
+
+El `handler.test.ts` mockeaba `@/lib/logger`, pero el handler importa el logger
+desde **`@repo/logger`**. El mock no tenia efecto: **todos esos tests
+corrian contra el logger real de pino**, y por eso ninguno podia afirmar sobre
+un `warn`. Sin los spies estables de `vi.hoisted`, los cuatro tests de H3 no
+tenian forma de observar el comportamiento que verifican.
+
+### 8 tests nuevos, 702 en 69 archivos (base 694/69)
+
+Cuatro en el webhook (convergencia OK, monto divergente, evento atrasado que no
+revierte, sin `planId` local) y cuatro en `PUT /plan` (escribe tras confirmar, no
+escribe si el monto no aplico, no escribe si no se pudo verificar, y el 409
+reflejando la DB real).
+
+### Corregido de paso: el `when` del journal
+
+El `idx 2` de `_journal.json` tenia `when: 1799110400000`, que da **2027-01-05**
+(90 dias adelantado; lo habia puesto a ojo en el PR de H1). No rompe nada porque
+drizzle ordena por `idx`, pero `db:generate` usa el `when` de la ultima entrada
+para timestampar la nueva, asi que **toda migracion futura naceria en 2027**.
+Corregido a `1791301469000` (2026-10-06T15:44:29Z, el commit de la migracion).
+Las tres entradas quedan en 2026 y en orden creciente.
+
+### DoD
+
+`pnpm lint` 6/6 (0 cached) - `pnpm typecheck` 9/9 (0 cached) - `pnpm test`
+702/702 en 69 archivos - `pnpm build` 3/3 (0 cached) - `pnpm format:check` OK -
+`scripts/check-migrations.sh` OK (Git Bash). Baseline y archive sin tocar.
+Journal corregido: las 3 entradas quedan en 2026 y en orden creciente.
+
+**Severidad:** ALTO (cierra el tercer bloqueante de la auditoria).
+
+**Urgencia:** con esto, T6 queda desbloqueada: H1, H2 y H3 cerrados.

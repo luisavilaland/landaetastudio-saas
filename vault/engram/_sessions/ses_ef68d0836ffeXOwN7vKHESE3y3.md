@@ -28,3 +28,7 @@ tags:
 - [[patron-lookup-de-bootstrap-bajo-rls-via-security-definer-aco-169]]
 - [[reglas-de-proceso-cleanup-de-worktree-en-3-registros-turbo-f-170]]
 - [[tests-que-dependen-de-la-db-skipif-y-registro-en-e2e-yml-o-n-171]]
+- [[session-summary-landaetastudio-saas-172]]
+- [[deuda-journal-json-idx-2-con-when-fechados-90-dias-en-el-fut-173]]
+- [[h3-resuelto-planid-se-escribe-en-el-endpoint-no-en-el-webhoo-174]]
+- [[patron-antes-de-mapear-valor-entidad-inyectividad-sobre-la-h-175]]

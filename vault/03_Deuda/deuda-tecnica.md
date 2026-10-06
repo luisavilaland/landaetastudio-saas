@@ -2303,3 +2303,55 @@ queda es que el contrato depende de que nadie edite la funcion.
 
 **Urgencia:** antes de Fase 3, cuando el numero de migraciones que tocan RLS
 crezca y aparezca mas superficie por agregar.
+
+## 57. `planId` puede quedar desalineado si falla el GET de verificacion
+
+## Hecho
+
+Con H3 (PR #200), `PUT /api/subscriptions/plan` escribe `subscriptions.planId`
+**solo** cuando su `GET` de verificacion posterior confirma que el monto quedo
+aplicado en MP:
+
+| Situacion                      | Status | Escribe `planId` |
+| ------------------------------ | ------ | ---------------- |
+| Monto verificado y coincide    | `202`  | si               |
+| Monto verificado y NO coincide | `502`  | no               |
+| `GET` de verificacion fallo    | `202`  | no               |
+| `transaction_amount` ausente   | `202`  | no               |
+
+Los dos ultimos casos son deliberados: un `GET` que fallo o un campo ausente no
+permiten afirmar que la operacion fallo, asi que el `202` sigue siendo honesto
+(el `PUT` a MP si salio). Ver el test `202 si el GET de verificacion falla` y el
+`202 si MP no devuelve transaction_amount`.
+
+## El residuo
+
+Si el `GET` falla **despues** de que MP aplico el cambio, la DB y MP quedan
+desalineadas: MP tiene el monto nuevo, la DB tiene el plan viejo. El tenant ve
+el plan viejo en el panel y el `409 "Ya tenes ese plan"` puede responder contra
+un estado que ya no es el de MP.
+
+Es un trade consciente y no un descuido: se prefiere no afirmar nada antes que
+afirmar un estado que nadie verifico. Y **converge solo**: el siguiente
+`PUT /plan` del tenant vuelve a intentar el cambio, y si MP ya tiene ese monto
+la escritura se confirma.
+
+## Por que queda como deuda y no como bug
+
+La ventana existe, pero nadie la cierra automaticamente. Lo que falta es
+deteccion: si el `GET` fallo, el endpoint solo emite un `warn` y sigue. No hay
+ninguna señal que le diga a alguien "hay un cambio sin registrar".
+
+## Relacionado
+
+- **ADR-027:** la decision y por que la escritura es del endpoint.
+- **Item 56:** `resolve_tenant_by_preapproval`, otro escape hatch acotado de H1.
+- **Auditoria #197 (H3):** el defecto original (`planId` nunca se escribia).
+
+**Origen:** 2026-10-06, al resolver H3.
+
+**Severidad:** BAJA. Ventana acotada a una falla puntual del `GET`, con
+convergencia manual.
+
+**Urgencia:** cuando se exponga el estado del plan al tenant (panel de
+suscripciones). Antes de eso es ruido de log.

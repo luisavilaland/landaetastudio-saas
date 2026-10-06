@@ -4,12 +4,32 @@ import { NextRequest } from 'next/server'
 import { withTenantContext } from '@repo/db'
 import { makeTxMock } from '@repo/test-utils'
 
-vi.mock('@/lib/logger', () => ({
+/**
+ * Spies estables del logger.
+ *
+ * `vi.mock` se hoistea, asi que los spies tienen que salir de `vi.hoisted`: con
+ * `createLogger: () => ({ warn: vi.fn() })` cada llamada devuelve spies nuevos y
+ * el test no puede afirmar nada. H3 necesita poder afirmar sobre el warn de monto
+ * divergente.
+ *
+ * **El target es `@repo/logger`, no `@/lib/logger`.** El handler importa el
+ * logger desde `@repo/logger`; mockeando `@/lib/logger` (que este archivo hacia
+ * antes) se mockeaba un modulo que la ruta nunca importa, asi que el mock no
+ * tenia efecto y los tests corrian contra el logger real de pino.
+ */
+const { loggerInfo, loggerWarn, loggerError, loggerDebug } = vi.hoisted(() => ({
+  loggerInfo: vi.fn(),
+  loggerWarn: vi.fn(),
+  loggerError: vi.fn(),
+  loggerDebug: vi.fn(),
+}))
+
+vi.mock('@repo/logger', () => ({
   createLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
+    info: loggerInfo,
+    warn: loggerWarn,
+    error: loggerError,
+    debug: loggerDebug,
   }),
 }))
 
@@ -52,6 +72,12 @@ const TOKEN = 'APP_USR-platform-token'
 const PREAPPROVAL_ID = 'preapproval-1'
 const INVOICE_ID = '7032544182'
 const PAYMENT_ID = '181244133433'
+
+/** Planes locales, en centavos. H3 compara `priceUyu` contra el monto del evento. */
+const PLAN_A = 'aaaaaaaa-1111-4111-8111-111111111111'
+const PLAN_B = 'bbbbbbbb-2222-4222-8222-222222222222'
+const PLAN_A_ROW = { id: PLAN_A, priceUyu: 1000 }
+const PLAN_B_ROW = { id: PLAN_B, priceUyu: 2000 }
 
 /**
  * Builds a webhook body with the exact shape verified in spike #188.
@@ -123,9 +149,22 @@ interface TxSpy {
   updates: Array<Record<string, unknown>>
 }
 
-function spyTx(rows: unknown[]): TxSpy {
+/**
+ * `rows` es el ARRAY de filas que recibira el handler, no una sola fila.
+ *
+ * `planRows` es lo que devuelve la consulta a `plans` de la verificacion de
+ * convergencia de H3. Va en un segundo slot de la cola de selects: los tests que
+ * no pasan `amountCents` nunca lo consumen, asi que el default vacio no los
+ * afecta.
+ */
+function spyTx(rows: unknown[], planRows: unknown[] = []): TxSpy {
   const updates: Array<Record<string, unknown>> = []
-  const base = makeTxMock({ select: [{ data: rows, terminal: 'limit' }] })
+  const base = makeTxMock({
+    select: [
+      { data: rows, terminal: 'limit' },
+      { data: planRows, terminal: 'limit' },
+    ],
+  })
   const tx = base as unknown as {
     update: ReturnType<typeof vi.fn>
     select: ReturnType<typeof makeTxMock>['select']
@@ -143,6 +182,7 @@ interface SubOverrides {
   status?: string
   lastProcessedPaymentId?: string | null
   mpPreapprovalId?: string | null
+  planId?: string
 }
 
 function sub(overrides: SubOverrides = {}) {
@@ -153,6 +193,7 @@ function sub(overrides: SubOverrides = {}) {
     currentPeriodEnd: null,
     mpPreapprovalId: PREAPPROVAL_ID,
     lastProcessedPaymentId: null,
+    planId: PLAN_A,
     ...overrides,
   }
 }
@@ -598,11 +639,11 @@ function localHitsTenantOne() {
  * `localStrategy` plus access to the write spy, for tests that need both the
  * resolved tenant AND the recorded updates.
  */
-function localStrategyWithUpdates(rows: unknown[]) {
+function localStrategyWithUpdates(rows: unknown[], planRows: unknown[] = []) {
   localStrategy(rows)
   // Re-wired: `localStrategy` built its own spyTx internally; rebuild one we
   // can hold onto.
-  const spy = spyTx(rows)
+  const spy = spyTx(rows, planRows)
   vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
     cb(spy.tx),
   )
@@ -678,11 +719,96 @@ describe('idempotencia', () => {
 
 describe('resolucion de tenant', () => {
   // -------------------------------------------------------------------------
-  // H1 (auditoria mid-phase #197): la estrategia L era codigo muerto. La
-  // resolucion iba por `db.select` sobre `subscriptions`, que tiene FORCE RLS:
-  // sin `app.tenant_id` el predicado de la policy nunca es TRUE, asi que el
-  // lookup no resolvia nunca y todo caia en R.
+  // H3 (auditoria mid-phase #197): el webhook NO escribe `planId`. Solo verifica
+  // que el monto que reporta MP coincida con el precio del plan local, y avisa
+  // si no. La escritura la hace `PUT /api/subscriptions/plan` despues de
+  // confirmar con MP. Ver ADR-027.
   // -------------------------------------------------------------------------
+  it('H3: monto que coincide con el plan local -> convergencia, sin warn', async () => {
+    // El preapproval reporta 10 (1000 centavos), que es el precio de PLAN_A.
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'authorized',
+      external_reference: 'tenant-1',
+      transaction_amount: 10,
+    })
+    const { updates } = localStrategyWithUpdates([sub({ planId: PLAN_A })], [PLAN_A_ROW])
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    const diverged = loggerWarn.mock.calls.filter((c) =>
+      String(c[1] ?? '').includes('monto divergente'),
+    )
+    expect(diverged).toEqual([])
+  })
+
+  it('H3: monto divergente -> warn con los dos montos, y planId NO se escribe', async () => {
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'authorized',
+      external_reference: 'tenant-1',
+      transaction_amount: 20,
+    })
+    const { updates } = localStrategyWithUpdates([sub({ planId: PLAN_A })], [PLAN_A_ROW])
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    const diverged = loggerWarn.mock.calls.filter((c) =>
+      String(c[1] ?? '').includes('monto divergente'),
+    )
+    expect(diverged).toHaveLength(1)
+    expect(diverged[0]?.[0]).toMatchObject({
+      planPriceCents: 1000,
+      eventAmountCents: 2000,
+    })
+    // El webhook nunca escribe planId: ese es el punto de H3.
+    expect(updates.some((u) => 'planId' in u)).toBe(false)
+  })
+
+  it('H3: un evento atrasado NO revierte planId (el bug del mapeo monto -> plan)', async () => {
+    // La suscripcion ya esta en PLAN_B (2000), cambio confirmado por el endpoint.
+    // Llega tarde un evento del ciclo de PLAN_A con su monto (1000).
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'authorized',
+      external_reference: 'tenant-1',
+      transaction_amount: 10,
+    })
+    const { updates } = localStrategyWithUpdates(
+      [sub({ status: 'active', planId: PLAN_B })],
+      [PLAN_B_ROW],
+    )
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    // Avisa (el monto viejo no coincide con el plan actual)...
+    const diverged = loggerWarn.mock.calls.filter((c) =>
+      String(c[1] ?? '').includes('monto divergente'),
+    )
+    expect(diverged).toHaveLength(1)
+    // ...pero NO revierte planId a PLAN_A. Ese era exactamente el agujero del
+    // diseno original: mapear monto -> plan desde el webhook.
+    expect(updates.some((u) => 'planId' in u)).toBe(false)
+  })
+
+  it('H3: sin planId local -> warn, sin tocar nada', async () => {
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'authorized',
+      external_reference: 'tenant-1',
+      transaction_amount: 10,
+    })
+    const { updates } = localStrategyWithUpdates([sub({ planId: null as never })], [])
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    const warned = loggerWarn.mock.calls.filter((c) =>
+      String(c[1] ?? '').includes('sin planId local'),
+    )
+    expect(warned).toHaveLength(1)
+    expect(updates.some((u) => 'planId' in u)).toBe(false)
+  })
+
   it('H1: la estrategia L usa la funcion SECURITY DEFINER, no un select directo', async () => {
     localStrategy([sub({ tenantId: 'tenant-h1' })])
 

@@ -38,8 +38,12 @@ const bodySchema = z.object({
  * - **`transactionAmount` va en centavos?** NO. La API de MP espera el monto en
  *   la unidad de la moneda; `priceUyu` viene de la DB en centavos (contrato
  *   interno nuestro) y hay que dividir por 100 antes de mandarlo.
- * - **El plan no se escribe en la DB.** Lo hace el webhook, como toda transicion
- *   de estado.
+ * - **`planId` se escribe acá, no en el webhook.** Este endpoint actualiza el
+ *   monto del preapproval y el webhook nunca tuvo logica para escribir
+ *   `planId`, asi que la DB quedaba con el plan de creacion para siempre y el
+ *   409 "Ya tenes ese plan" respondia contra un estado que no existia. Es H3 de
+ *   la auditoria mid-phase (#197). Ver ADR-027 para por que la escritura NO
+ *   puede ser del webhook.
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -279,6 +283,35 @@ export async function PUT(request: NextRequest) {
           field: 'planId',
         },
         { status: 502 },
+      )
+    }
+
+    // H3 fix (rediseno). El endpoint escribe `planId`; el webhook NO.
+    //
+    // El webhook no puede hacerlo: para descubrir el planId tendria que mapear
+    // `transaction_amount` a un plan local, y ese mapeo no es inyectivo en el
+    // tiempo (un evento atrasado tras un A -> B -> A reviria `planId`) y se
+    // dispararia en todo evento con monto, incluidos los cobros recurrentes.
+    // MP reintenta webhooks, asi que el orden no esta garantizado. Ademas el
+    // tenant no puede cambiar el monto desde el panel de MP: todo cambio pasa
+    // por este endpoint. Ver ADR-027.
+    //
+    // Se escribe SOLO si la verificacion post-escritura lo confirmo el monto.
+    // Un GET que falló, o un `transaction_amount` ausente, no permiten afirmar
+    // nada: en esos casos se deja `planId` como estaba y el 202 sigue siendo
+    // valido (el PUT a MP si salio). Grabarlo seria afirmar un estado que
+    // nadie verifico.
+    if (verifiedAmount !== null && verifiedAmount === expectedAmount) {
+      await withTenantContext(tenantId, async (tx) => {
+        await tx
+          .update(dbSubscriptions)
+          .set({ planId: data.newPlan.id, updatedAt: new Date() })
+          .where(eq(dbSubscriptions.tenantId, tenantId))
+      })
+    } else {
+      logger.warn(
+        { tenantId, planId: data.newPlan.id, verifiedAmount, expectedAmount },
+        '[subscriptions/plan] sin verificacion de monto: no se escribe planId',
       )
     }
 
