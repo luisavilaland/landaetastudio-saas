@@ -27,3 +27,4 @@ tags:
 - [[h1-resuelto-security-definer-para-resolver-tenant-por-preapp-168]]
 - [[patron-lookup-de-bootstrap-bajo-rls-via-security-definer-aco-169]]
 - [[reglas-de-proceso-cleanup-de-worktree-en-3-registros-turbo-f-170]]
+- [[tests-que-dependen-de-la-db-skipif-y-registro-en-e2e-yml-o-n-171]]
