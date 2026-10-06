@@ -2239,6 +2239,8 @@ documental. Antes de T7 (docs de Fase 2) alcanza con el scan manual.
 
 ## 56. `resolve_tenant_by_preapproval` es superficie de seguridad permanente
 
+**Estado:** abierto (2026-10-06). Cierra el hallazgo H1 de la auditoria mid-phase (#197).
+
 ## Hecho
 
 El fix de H1 (PR #197 → rama `chore/fix-h1-preapproval-tenant-resolution`) dejo una
@@ -2306,6 +2308,8 @@ crezca y aparezca mas superficie por agregar.
 
 ## 57. `planId` puede quedar desalineado si falla el GET de verificacion
 
+**Estado:** abierto (2026-10-06). Cierra el hallazgo H3 de la auditoria mid-phase (#197).
+
 ## Hecho
 
 Con H3 (PR #200), `PUT /api/subscriptions/plan` escribe `subscriptions.planId`
@@ -2358,6 +2362,8 @@ suscripciones). Antes de eso es ruido de log.
 
 ## 58. `pnpm test --coverage` no mide nada: pnpm se come el flag
 
+**Estado:** abierto (2026-10-06). Detectado en T6. Workaround conocido: `pnpm exec vitest run --coverage`.
+
 ## Hecho
 
 `pnpm test --coverage` falla:
@@ -2390,6 +2396,8 @@ razon de fondo era esta mas que la falta de la dependencia (ver item 59).
 **Urgencia:** junto con 59, o directamente al mismo tiempo.
 
 ## 59. `@vitest/coverage-v8` no estaba declarado en ningun `package.json`
+
+**Estado:** **RESUELTO (2026-10-06)** - PR #201 (`test/fase2-integration-tests`).
 
 ## Hecho
 
@@ -2428,6 +2436,8 @@ medir no es un criterio.
 
 ## 60. El reporter de texto de coverage oculta archivos
 
+**Estado:** abierto (2026-10-06). Detectado en T6. Workaround conocido: leer `coverage/coverage-final.json`.
+
 ## Hecho
 
 Con las rutas de mutacion al 100% (`cancel/route.ts`, `pause/route.ts`,
@@ -2465,6 +2475,8 @@ Con `--coverage.include` tampoco alcanza: los archivos faltan igual en la tabla.
 el numero se lee de una tabla y no de un JSON.
 
 ## 61. Los tests con mock no pueden verificar el `WHERE` de una query
+
+**Estado:** abierto (2026-10-06). Detectado en la mini auditoria de T6 (PR #202).
 
 ## Hecho
 

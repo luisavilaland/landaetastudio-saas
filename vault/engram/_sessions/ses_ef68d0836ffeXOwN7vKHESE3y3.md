@@ -35,3 +35,4 @@ tags:
 - [[session-summary-landaetastudio-saas-176]]
 - [[t6-completo-gap-real-era-el-catch-de-las-3-rutas-de-mutacion-177]]
 - [[auditoria-t6-los-tests-con-mock-no-pueden-verificar-el-where-178]]
+- [[cierre-de-fase-2-decisiones-d1-d7-y-resultados-del-spike-t0-179]]

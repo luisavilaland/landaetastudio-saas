@@ -175,6 +175,32 @@ https://admin.landaetastudio.com/api/webhooks/mercadopago/subscriptions
 - Suscribí los topics: `subscription_preapproval`, `subscription_authorized_payment` y `payment` (legacy).
 - El tenant se resuelve **por el `preapproval_id`**, no por el host ni por el path.
 
+**Cómo se resuelve el tenant (y por qué la URL no lleva tenant).** La resolución es un
+chicken-and-egg: el webhook necesita el `tenantId` para abrir `withTenantContext`, y el
+`tenantId` es justamente lo que hay que descubrir. No se puede consultar `subscriptions`
+con la conexión directa porque la tabla tiene `FORCE ROW LEVEL SECURITY` y sin
+`app.tenant_id` el predicado de la policy nunca es TRUE.
+
+Por eso existe la función `resolve_tenant_by_preapproval(preapproval_id text) RETURNS uuid`:
+es `SECURITY DEFINER`, corre como `neondb_owner` (que tiene `BYPASSRLS`) y expone
+**únicamente** el `tenantId` de un preapproval. No devuelve filas ni otras columnas, y lleva
+`REVOKE ALL ... FROM PUBLIC`. Es un escape hatch acotado y deliberado: **si agregás una
+segunda salida a esa función, abrís una fuga cross-tenant.**
+
+Detalles y alternativas descartadas: **ADR-026** (`vault/01_ADRs/ADR-026-resolucion-tenant-preapproval.md`).
+
+**Quién escribe `planId`.** `PUT /api/subscriptions/plan` actualiza el monto del preapproval
+y, **solo si su `GET` de verificación posterior confirma que el monto quedó aplicado**,
+escribe `subscriptions.planId` dentro de `withTenantContext`. El webhook **no** escribe
+`planId`: solo verifica que el monto que reporta MP coincida con el precio del plan local y
+avisa si difieren.
+
+El webhook no podría hacerlo aunque quisiera: para deducir el planId tendría que mapear
+`transaction_amount` contra la tabla de planes, y ese mapeo no es inyectivo en el tiempo (un
+evento atrasado revertiría el plan) ni está acotado a eventos de cambio (los cobros
+recurrentes también traen monto). Ver **ADR-027**
+(`vault/01_ADRs/ADR-027-planid-endpoint-write.md`).
+
 **Tres trampas verificadas por el spike T0** (`docs/superpowers/specs/2026-10-02-spike-t0-resultado.md`), para no perder tiempo después:
 
 1. **`notification_url` no se persiste.** `POST /preapproval` la acepta y devuelve `201`, pero un `GET /preapproval/{id}` posterior no la muestra. `PUT /preapproval/{id}` devuelve `200` y tampoco la guarda. La única vía es el panel de MP.
