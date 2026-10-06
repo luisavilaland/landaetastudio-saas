@@ -17,3 +17,6 @@ tags:
 - [[pr-195-mergeado-exports-vault-e-issues-168-y-112-reconciliad-156]]
 - [[items-54-y-55-de-deuda-registrados-pr-196-y-me-inyecte-cjk-a-157]]
 - [[auditoria-mid-phase-fase-2-3-defectos-funcionales-confirmado-160]]
+- [[el-swap-de-perfil-de-auditoria-no-es-validable-n-1-sin-contr-161]]
+- [[ling-3-0-fue-removido-de-opencode-zen-agents-md-documenta-un-162]]
+- [[contrafactual-ling-3-1-invalido-por-confound-encontro-4-erro-163]]
