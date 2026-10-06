@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db, dbSubscriptions, withTenantContext } from '@repo/db'
+import { db, dbPlans, dbSubscriptions, withTenantContext } from '@repo/db'
 import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   classifyMpEvent,
+  fromMpAmount,
   getAuthorizedPayment,
   getPayment,
   getPreapproval,
@@ -348,12 +349,20 @@ async function handlePreapproval(
   // podia distinguirlo de cualquier otro estado no autorizante.
   const activating = mpStatus === 'authorized'
 
+  // H3: el monto del preapproval es, por definicion, el precio configurado del
+  // plan. Se pasa para verificar que coincida con el plan local. No se escribe
+  // `planId` desde aca (ADR-027).
+  const rawAmount = preapproval.transaction_amount
+  const amountCents =
+    typeof rawAmount === 'number' ? fromMpAmount(rawAmount) : null
+
   return applyTransition({
     resolved,
     eventKind: 'preapproval',
     paymentId: null,
     approved: activating,
     mpStatus,
+    amountCents,
   })
 }
 
@@ -448,6 +457,19 @@ interface TransitionInput {
    */
   mpStatus?: string | null
   liveMode?: boolean
+  /**
+   * Monto del evento en **centavos**, ya normalizado con `fromMpAmount`.
+   *
+   * Solo se completa para el topic `subscription_preapproval`, donde
+   * `transaction_amount` es por definicion el precio configurado del plan. En
+   * `payment` el monto es "lo que se cobro este ciclo", que legitimamente
+   * difiere del precio del plan (prorrateo, cupones, primer ciclo con
+   * descuento), asi que compararlo contra `plans.priceUyu` daria falsos positivos.
+   *
+   * H3: se usa solo para VERIFICAR que el monto de MP coincida con el plan
+   * local. El webhook no escribe `planId`. Ver ADR-027.
+   */
+  amountCents?: number | null
 }
 
 /**
@@ -482,6 +504,7 @@ async function applyTransition(
         id: dbSubscriptions.id,
         tenantId: dbSubscriptions.tenantId,
         status: dbSubscriptions.status,
+        planId: dbSubscriptions.planId,
         currentPeriodEnd: dbSubscriptions.currentPeriodEnd,
         mpPreapprovalId: dbSubscriptions.mpPreapprovalId,
         lastProcessedPaymentId: dbSubscriptions.lastProcessedPaymentId,
@@ -503,6 +526,28 @@ async function applyTransition(
     }
 
     const current = row.status as SubscriptionStatus
+
+    // H3: verificar convergencia del plan. NO escribe `planId` (ver ADR-027).
+    //
+    // Es un invariante del EVENTO, no de la transicion: "el precio que MP tiene
+    // configurado para esta suscripcion coincide con nuestro plan local" es
+    // cierto o falso estee la suscripcion en `active` o no.
+    //
+    // Por eso va antes de `decideTarget` y no depende de `target`. Gatearlo por
+    // `target === 'active'` lo haria inalcanzable en el caso que mas importa: un
+    // evento atrasado o un reintento de MP sobre una suscripcion ya activa cae en
+    // `no_transition` (transiciones 2 y 3 de la matriz, `active` no esta en
+    // `REVIVABLE`), asi que el aviso nunca saldria justo cuando hay algo que
+    // avisar.
+    if (eventKind === 'preapproval' && input.amountCents != null) {
+      await verifyPlanAmountConvergence(
+        tx,
+        row.planId,
+        input.amountCents,
+        resolved.tenantId,
+      )
+    }
+
     const target = decideTarget(eventKind, input.approved, current, input.mpStatus)
 
     if (!target) {
@@ -572,6 +617,66 @@ async function applyTransition(
 
     return { applied: true, from: current, to: target }
   })
+}
+
+/**
+ * Tipo de la transaccion que abre `withTenantContext`.
+ *
+ * `DbLike` no esta exportado por `@repo/db`, asi que se deriva de la firma en
+ * vez de duplicar la forma del tipo a mano.
+ */
+type TenantTx = Parameters<Parameters<typeof withTenantContext>[1]>[0]
+
+/**
+ * H3: comprueba que el precio del plan local coincida con el monto que MP
+ * reporta, y avisa si no coinciden. **No escribe nada.**
+ *
+ * El que escribe `planId` es `PUT /api/subscriptions/plan`, despues de confirmar
+ * el monto con MP. Esta funcion es la red de seguridad del otro lado: si MP y la
+ * DB discrepan, que quede registrado con el tenant y los dos montos, en vez de
+ * una divergencia silenciosa.
+ *
+ * Solo se mira. Un evento atrasado (un cobro del ciclo anterior que llega tarde,
+ * o un reintento de MP) va a discrepar del plan actual **por diseno**, y por eso
+ * acá no puede haber una escritura: seria exactamente el bug de H3.
+ */
+async function verifyPlanAmountConvergence(
+  tx: TenantTx,
+  planId: string,
+  eventAmountCents: number,
+  tenantId: string,
+): Promise<void> {
+  if (!planId) {
+    logger.warn(
+      { tenantId },
+      'H3: sin planId local para verificar convergencia del monto',
+    )
+    return
+  }
+
+  const planRows = await tx
+    .select({ priceUyu: dbPlans.priceUyu })
+    .from(dbPlans)
+    .where(eq(dbPlans.id, planId))
+    .limit(1)
+
+  const plan = planRows[0]
+  if (!plan) {
+    logger.warn({ tenantId, planId }, 'H3: el plan local de la suscripcion no existe')
+    return
+  }
+
+  if (plan.priceUyu !== eventAmountCents) {
+    logger.warn(
+      {
+        tenantId,
+        planId,
+        planPriceCents: plan.priceUyu,
+        eventAmountCents,
+      },
+      'H3: monto divergente, el precio del plan local no coincide con el monto del evento',
+    )
+  }
 }
 
 /**

@@ -49,19 +49,22 @@ function sub(overrides: Record<string, unknown> = {}) {
   }
 }
 
-/** Selects en orden: suscripcion, plan destino, plan actual. */
+/**
+ * Selects en orden: suscripcion, plan destino, plan actual.
+ *
+ * Devuelve el tx para que los tests puedan afirmar sobre `tx.set`, que es donde
+ * queda registrada la escritura de `planId` (H3).
+ */
 function mockCtx(row: unknown, nuevo = PLAN_PRO, actual = PLAN_BASICO) {
-  vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
-    cb(
-      makeTxMock({
-        select: [
-          { data: row === null ? [] : [row], terminal: 'limit' },
-          { data: nuevo === null ? [] : [nuevo], terminal: 'limit' },
-          { data: actual === null ? [] : [actual], terminal: 'limit' },
-        ],
-      }),
-    ),
-  )
+  const tx = makeTxMock({
+    select: [
+      { data: row === null ? [] : [row], terminal: 'limit' },
+      { data: nuevo === null ? [] : [nuevo], terminal: 'limit' },
+      { data: actual === null ? [] : [actual], terminal: 'limit' },
+    ],
+  })
+  vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+  return tx
 }
 
 function put(body: unknown = { planId: PLAN_ID }) {
@@ -294,6 +297,76 @@ describe('PUT /api/subscriptions/plan — downgrade (202)', () => {
     const [, patch] = vi.mocked(updatePreapproval).mock.calls[0]
     expect(patch).not.toHaveProperty('auto_recurring')
     expect(patch).not.toHaveProperty('status')
+  })
+})
+
+describe('PUT /api/subscriptions/plan — escritura de planId (H3)', () => {
+  /**
+   * Downgrade Pro (9000) -> Basico (3000), que es el unico camino que llega al
+   * 202: un upgrade corta antes en el 402 con el monto a cobrar.
+   */
+  const DOWNGRADE_BODY = { planId: '22222222-2222-4222-8222-222222222222' }
+
+  function downgradeCtx() {
+    return mockCtx(sub({ planId: PLAN_PRO.id }), PLAN_BASICO, PLAN_PRO)
+  }
+
+  it('escribe planId despues de que MP confirme el monto', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    const tx = downgradeCtx()
+    // MP quedo con el monto nuevo: 3000 centavos -> 30 en la moneda de MP.
+    vi.mocked(getPreapproval).mockResolvedValue({ transaction_amount: 30 })
+
+    const res = await PUT(put(DOWNGRADE_BODY))
+
+    expect(res.status).toBe(202)
+    // H3: antes de este PR la DB seguia reportando el plan de creacion.
+    expect(tx.set).toHaveBeenCalledWith({
+      planId: PLAN_BASICO.id,
+      updatedAt: expect.any(Date),
+    })
+  })
+
+  it('NO escribe planId si el monto que quedo en MP no es el esperado', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    const tx = downgradeCtx()
+    // MP acepto el PUT pero el monto sigue siendo el viejo.
+    vi.mocked(getPreapproval).mockResolvedValue({ transaction_amount: 90 })
+
+    const res = await PUT(put(DOWNGRADE_BODY))
+
+    expect(res.status).toBe(502)
+    expect(tx.set).not.toHaveBeenCalled()
+  })
+
+  it('NO escribe planId si la verificacion no pudo confirmar el monto', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    const tx = downgradeCtx()
+    vi.mocked(getPreapproval).mockRejectedValue(new Error('timeout'))
+
+    const res = await PUT(put(DOWNGRADE_BODY))
+
+    // El 202 sigue siendo valido (el PUT a MP si salio, ver el test de arriba),
+    // pero sin confirmacion no se afirma nada en la DB: escribir planId seria
+    // registrar un estado que nadie verifico.
+    expect(res.status).toBe(202)
+    expect(tx.set).not.toHaveBeenCalled()
+  })
+
+  it('el 409 "ya tenes ese plan" ahora refleja la DB real', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    // La suscripcion ya esta en Basico (escribido por el 202 de un cambio
+    // anterior). Pedir Basico de nuevo es un conflicto real, no un falso 409
+    // contra el plan de creacion.
+    mockCtx(sub({ planId: PLAN_BASICO.id }), PLAN_BASICO, PLAN_BASICO)
+
+    const res = await PUT(put({ planId: '33333333-3333-4333-8333-333333333333' }))
+
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({
+      error: 'Ya tenes ese plan',
+      field: 'planId',
+    })
   })
 })
 
