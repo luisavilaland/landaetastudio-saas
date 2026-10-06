@@ -607,6 +607,85 @@ Además: con junction, `prettier` no resuelve `prettier-plugin-tailwindcss`
 **NO correr el DoD en el worktree principal.** El objetivo del DoD es verificar
 el _candidato_ (la rama), y el worktree principal está en otra rama.
 
+### Cleanup de worktree post-merge
+
+Un PR mergeado con worktree de Paseo deja **tres** registros, y cada uno se
+limpia y se verifica con **su propia API**:
+
+1. el worktree de git (`git worktree list`),
+2. la rama local (`git branch -a`),
+3. el workspace de Paseo (`paseo_list_workspaces`).
+
+`--delete-branch` de `gh pr merge` intenta limpiar 1 y 2, y **falla** cuando el
+worktree tiene el `node_modules` del `pnpm install` real (`Directory not empty`).
+Es la consecuencia directa de "no usar junctions": todo worktree con install real
+bloquea el borrado de la rama.
+
+Verificar solo con git no alcanza: el registro de Paseo es independiente y
+sobrevive al worktree. Cuando el worktree desaparece, Paseo **degrada** el
+workspace de `isolation: worktree` a `isolation: local` / `kind: directory`, y
+lo deja apuntando a un path inexistente (PR #198).
+
+Secuencia completa:
+
+```bash
+# 1. Confirmar que el PR esta mergeado
+gh pr view <num> --json state,mergedAt
+
+# 2. Localizar el worktree en git
+git worktree list
+
+# 3. Liberar el worktree (--force si tiene node_modules)
+git worktree remove <path> --force
+git worktree prune
+# Si falla en Windows por lock de CWD: cerrar la tab de Paseo y reintentar.
+
+# 4. Borrar la rama local
+git branch -D <branch>
+
+# 5. Localizar el workspace en Paseo
+#    -> el que apunte al path borrado, o el que tenga isolation: directory
+paseo_list_workspaces
+
+# 6. Archivar SOLO ese workspace (no tocar workspaces de otros proyectos)
+paseo_archive_workspace <id>
+
+# 7. Verificar los tres registros
+git worktree list
+git branch -a
+paseo_list_workspaces
+```
+
+Si el directorio no se puede borrar desde el shell (típico con `node_modules` de
+pnpm en Windows), borrarlo a mano y después `git worktree prune`. El registro de
+git y el de Paseo se limpian por separado; no asumir que uno implica el otro.
+
+### `drizzle-kit` no lee `.env.local`
+
+`pnpm db:migrate` y `pnpm db:generate` leen `process.env.DATABASE_URL`, y
+**cargan `.env`, no `.env.local`** (solo Next.js inyecta `.env.local` solo). En
+un worktree, que por definición no tiene `.env`, fallan con:
+
+```
+Error  Please provide required params for Postgres driver:
+    [x] url: undefined
+```
+
+Cargar las variables de `.env.local` en el entorno antes de correrlas. Nunca
+hardcodear la URL en el comando.
+
+### `db:generate` no detecta funciones, policies ni grants
+
+`drizzle-kit generate` solo ve el schema de Drizzle (tablas, columnas,
+índices). Un cambio de **RLS, policy, function o grant** no genera migración
+automáticamente: hay que escribir el `.sql` a mano y **agregar la entrada al
+`_journal.json`** (append-only, con `idx` correlativo). El precedente está en
+`docs/migrations-archive/2026-09-24/0013_ensure_rls_and_grants.sql`.
+
+`_journal.json` **no** es inmutable (crece con cada migración), pero **nunca se
+edita retroactivamente**: cambiar una entrada existente hace que drizzle intente
+re-aplicar migraciones ya aplicadas.
+
 ## Workflow de skill-improver
 
 - **Cuándo correr**: al cierre de cada fase del SaaS, antes de releases.

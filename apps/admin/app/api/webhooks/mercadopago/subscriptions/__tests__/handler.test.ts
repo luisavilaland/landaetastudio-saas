@@ -13,15 +13,16 @@ vi.mock('@/lib/logger', () => ({
   }),
 }))
 
-// Strategy L reads through the plain `db` client (it cannot use
+// Strategy L resolves the tenant through `resolve_tenant_by_preapproval`, a
+// SECURITY DEFINER function that runs outside any tenant context (it cannot use
 // `withTenantContext`, since resolving the tenantId is exactly what it is for).
-// So the mock needs `db` too, not only `withTenantContext`.
+// So the mock needs `db.execute`, not only `withTenantContext`.
 vi.mock('@repo/db', async () => {
   const actual = await vi.importActual<typeof import('@repo/db')>('@repo/db')
   return {
     ...actual,
     withTenantContext: vi.fn(),
-    db: { select: vi.fn() },
+    db: { select: vi.fn(), execute: vi.fn() },
   }
 })
 
@@ -157,18 +158,16 @@ function sub(overrides: SubOverrides = {}) {
 }
 
 /**
- * Strategy L resolves the tenant by `mpPreapprovalId`, read through the plain
- * `db` client. `localStrategy([])` simulates "the index found nothing", which is
- * what makes the R fallback kick in.
+ * Strategy L resolves the tenant by calling the
+ * `resolve_tenant_by_preapproval` function through the plain `db` client, which
+ * returns a single scalar column. `localStrategy([])` makes it return NULL,
+ * which is what makes the R fallback kick in.
  */
 function localStrategy(rows: unknown[]) {
-  vi.mocked(db.select).mockReturnValue({
-    from: () => ({
-      where: () => ({
-        limit: async () => rows.map((r) => ({ tenantId: (r as { tenantId: string }).tenantId })),
-      }),
-    }),
-  } as never)
+  const first = rows[0] as { tenantId?: string } | undefined
+  vi.mocked(db.execute).mockResolvedValue([
+    { tenantId: first?.tenantId ?? null },
+  ] as never)
 
   vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
     cb(spyTx(rows).tx),
@@ -678,6 +677,50 @@ describe('idempotencia', () => {
 // ---------------------------------------------------------------------------
 
 describe('resolucion de tenant', () => {
+  // -------------------------------------------------------------------------
+  // H1 (auditoria mid-phase #197): la estrategia L era codigo muerto. La
+  // resolucion iba por `db.select` sobre `subscriptions`, que tiene FORCE RLS:
+  // sin `app.tenant_id` el predicado de la policy nunca es TRUE, asi que el
+  // lookup no resolvia nunca y todo caia en R.
+  // -------------------------------------------------------------------------
+  it('H1: la estrategia L usa la funcion SECURITY DEFINER, no un select directo', async () => {
+    localStrategy([sub({ tenantId: 'tenant-h1' })])
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    // La funcion se invoca por `db.execute`. Si alguien vuelve a cambiar esto a
+    // `db.select` sobre la tabla, la estrategia L muere en silencio otra vez.
+    expect(db.execute).toHaveBeenCalled()
+    expect(db.select).not.toHaveBeenCalled()
+  })
+
+  it('H1: con la estrategia L activa hay UN solo GET a MP, no dos', async () => {
+    localStrategy([sub({ tenantId: 'tenant-h1' })])
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    // Antes de H1: la estrategia L nunca resolvia, asi que `resolveTenant` caia
+    // en R (1 GET) y `handlePreapproval` leia el status con otro (1 GET) = 2.
+    // Ahora L resuelve y queda solo la lectura de status.
+    expect(getPreapproval).toHaveBeenCalledTimes(1)
+  })
+
+  it('H1: si la estrategia L falla, R hace su GET y luego el de status: 2 en total', async () => {
+    localStrategy([])
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'authorized',
+      external_reference: 'tenant-42',
+    })
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    // El fallback es lo esperado cuando el preapproval todavia no esta en la DB.
+    // El costo de R queda acotado al caso en que L no puede resolver.
+    expect(getPreapproval).toHaveBeenCalledTimes(2)
+    expect(withTenantContext).toHaveBeenCalledWith('tenant-42', expect.any(Function))
+  })
+
   it('estrategia L: el tenant viene del indice local, NO de external_reference', async () => {
     localStrategy([sub({ tenantId: 'tenant-9' })])
 

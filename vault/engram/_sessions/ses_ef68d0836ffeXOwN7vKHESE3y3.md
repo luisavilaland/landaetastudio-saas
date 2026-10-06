@@ -24,3 +24,7 @@ tags:
 - [[h2-cerrado-decidetarget-soporta-paused-item-38-superseded-op-165]]
 - [[regla-6-del-item-40-nunca-here-strings-de-powershell-para-ma-166]]
 - [[worktree-de-paseo-pnpm-install-env-local-son-bloqueantes-ant-167]]
+- [[h1-resuelto-security-definer-para-resolver-tenant-por-preapp-168]]
+- [[patron-lookup-de-bootstrap-bajo-rls-via-security-definer-aco-169]]
+- [[reglas-de-proceso-cleanup-de-worktree-en-3-registros-turbo-f-170]]
+- [[tests-que-dependen-de-la-db-skipif-y-registro-en-e2e-yml-o-n-171]]

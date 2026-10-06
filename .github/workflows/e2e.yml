@@ -122,8 +122,16 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Run RLS integration test
-        run: pnpm vitest run packages/db/src/__tests__/rls-cross-tenant.test.ts
+      - name: Run RLS integration tests
+        # Estos archivos necesitan una DB real: el mecanismo que cubren (RLS y
+        # SECURITY DEFINER) vive en PostgreSQL. En el job `build` corren con una
+        # URL dummy y se saltean, asi que este paso es su unica cobertura real.
+        # Un archivo nuevo que dependa de la DB tiene que agregarse aca: en
+        # `build` pasaria verde sin ejecutar nada.
+        run: >-
+          pnpm vitest run
+          packages/db/src/__tests__/rls-cross-tenant.test.ts
+          packages/db/src/__tests__/preapproval-tenant-resolution.test.ts
         env:
           DATABASE_APP_URL: ${{ secrets.NEON_DATABASE_APP_URL }}
       - name: Install Playwright Chromium

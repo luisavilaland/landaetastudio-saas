@@ -3206,3 +3206,118 @@ transiciona, y la regresion del 409 eterno de `POST /resume`.
 **Severidad:** ALTO (cierra un bloqueante de auditoria).
 
 **Urgencia:** antes de T6.
+
+## 2026-10-06 - H1: la estrategia L era codigo muerto (CRITICO de la auditoria #197)
+
+Cierra el H1 de la auditoria mid-phase (#197), el bloqueante mas grave de los
+tres. Rama `chore/fix-h1-preapproval-tenant-resolution`.
+
+### El defecto no era de seguridad, era de funcionalidad
+
+`withTenantContextByPreapproval` resolvia el tenant con `db` directo sobre
+`subscriptions`. La tabla tiene `FORCE ROW LEVEL SECURITY` y su policy es
+`tenantId = current_setting('app.tenant_id', true)::UUID`. El rol de la app
+(`app_user`) tiene `rolbypassrls = false`.
+
+El codigo justificaba esa consulta asi: _es seguro porque el filtro es el indice
+unico parcial, que es por definicion de un solo tenant_. **Ese razonamiento era
+falso.** La seguridad nunca estuvo en juego: lo que pasaba es que la consulta
+**no podia devolver nada**. Sin contexto, `current_setting` devuelve NULL, el
+predicado evalua a NULL en vez de TRUE, y RLS rechaza la fila. Estrategia L
+muerta, indice `subscriptions_mp_preapproval_idx` (de T1) sin uso, y todo caia
+en la estrategia R.
+
+### El sintoma real no era el que la auditoria documentaba
+
+El mecanismo falla siempre, pero **como** falla depende del estado de la sesion:
+
+1. **Sesion virgen** (nunca paso por `set_tenant_id`): `current_setting` devuelve
+   NULL, predicado NULL, **0 filas en silencio**.
+2. **Sesion tibia** (ya paso por `withTenantContext`, que hace SET LOCAL): al
+   revertirse, el GUC vuelve a cadena vacia en vez de desaparecer. El cast a
+   `uuid` **revienta con 22P02** (`invalid input syntax for type uuid`).
+
+El webhook corre sobre el pool `db` compartido, que se calienta con cada
+`withTenantContext` de toda la app. O sea: en produccion domina el caso 2 y el
+sintoma es una **excepcion**, no un cero silencioso. La lectura de la auditoria
+(perdida silenciosa) era la optimista; la correcta es "500 en el webhook, con MP
+reintentando".
+
+### La solucion: una funcion SECURITY DEFINER acotada
+
+`resolve_tenant_by_preapproval(preapproval_id TEXT) RETURNS UUID`, con
+`SECURITY DEFINER`, `STABLE` y `SET search_path = public, pg_temp`. Corre como
+`neondb_owner`, que tiene `BYPASSRLS` (verificado), asi que bypasea RLS aun con
+`FORCE`: `FORCE` aplica al owner de la tabla, pero `BYPASSRLS` siempre gana.
+
+Queda acotada en tres puntos: retorna **un escalar**, no un record; acepta solo
+un `mpPreapprovalId` y devuelve solo su `tenantId`; y lleva
+`REVOKE ALL ... FROM PUBLIC`, porque PostgreSQL otorga `EXECUTE` a PUBLIC por
+defecto y sin ese REVOKE cualquier rol conectado resolveria el tenant de
+cualquier preapproval.
+
+Migracion nueva `0002_resolve_tenant_by_preapproval.sql`. **No se toco el
+baseline.** Decision y alternativas en ADR-026.
+
+### Triaje: era el unico caso en el repo
+
+De 162 archivos, 21 usan `db.<mutacion>()` directo. Casi todos tocan `tenants` o
+`admin_users` (tablas sin RLS por diseno) o ya envuelven la query en
+`withTenantContext`. **El webhook de suscripciones era el unico** que consultaba
+una tabla con `FORCE RLS` fuera de contexto.
+
+### Tests: 9 nuevos, **694 en 69 archivos** (base 685/68)
+
+Seis van **contra Neon real** en `preapproval-tenant-resolution.test.ts`, porque
+el mecanismo vive en PostgreSQL: mockear `db.execute` probaria que el handler
+llamo a un doble, no que la funcion bypasea RLS. Cubren happy path, not found,
+cross-tenant safety (y que el SELECT directo desde otro tenant sigue en 0 filas:
+el bypass es de la funcion, no de la tabla), tipo de retorno, que `PUBLIC` no
+tenga `EXECUTE`, y la regresion de sesion tibia.
+
+Tres van en el handler, marcados `H1:`: que la estrategia L use la funcion y no un
+`db.select`, y el conteo de GETs a MP (**1** con L activa, **2** en fallback).
+
+### Tres cosas que la tarea dio por resueltas y no lo estaban
+
+1. **El test 4 del plan era invalido.**
+   `SELECT * FROM resolve_tenant_by_preapproval('x')` **no falla**: una funcion
+   escalar es valida en posicion FROM y devuelve una columna. Lo que si afirma el
+   contrato es `prorettype = uuid` y `pronargs = 1`.
+2. **La DB de desarrollo si tiene datos, pero `app_user` no los ve.** Hay 2 filas
+   reales en `subscriptions` y el conteo sin contexto da 0. Los round-trips de
+   prueba corren en una transaccion con rollback.
+3. **`pnpm db:migrate` no lee `.env.local`**, solo `.env` (eso lo hace Next.js).
+   En un worktree, que por definicion no tiene `.env`, falla con
+   `Please provide required params for Postgres driver: url: undefined`. Y
+   `db:generate` no detecta funciones, policies ni grants: hay que escribir el
+   `.sql` a mano y agregar la entrada al `_journal.json`.
+
+Ademas: un `client!<T>` inline **no compila** en TypeScript, porque lo parsea como
+comparacion y no como llamada generica. Se resuelve con un helper `conn()`.
+
+### Reglas de proceso que se documentan en este PR
+
+1. **Item 40 regla 6, cuarta aparicion:** no escribir markdown con backticks desde
+   PowerShell. En este PR me paso dos veces en la misma sesion, y en la segunda
+   con un array de strings multilinea, donde el error no es visible hasta que el
+   parser revienta. Usar la herramienta de edicion con un ancla, no PowerShell.
+2. **Un pass de CI con cache no es evidencia.** `pnpm lint` dio verde con
+   `5 cached, 6 total`; con `--force` dio `0 cached` y verde tambien. La
+   diferencia importa: en esta sesion un cache ya habia producido un falso
+   positivo. Para el DoD de un candidato, `lint`, `typecheck` y `build` van con
+   `--force`.
+3. **Verificar los hits de una busqueda antes de reportarlos.** Un glob de
+   PowerShell con `**` no es recursivo y devolvio "cero hallazgos" cuando habia uno
+   (el propio bug H1, que tiene `db` y `.select(` en lineas distintas). El grep
+   con regex de una linea tampoco matchea; hacia falta `db\s*\.\s*select\(`.
+
+### DoD
+
+`pnpm lint` 6/6 (0 cached) - `pnpm typecheck` 9/9 (0 cached) - `pnpm test`
+694/694 en 69 archivos - `pnpm build` 3/3 (0 cached) - `pnpm format:check` OK -
+`scripts/check-migrations.sh` OK (Git Bash). Baseline y archive sin tocar.
+
+**Severidad:** CRITICO (cierra el segundo bloqueante de la auditoria).
+
+**Urgencia:** antes de T6, junto con H3.
