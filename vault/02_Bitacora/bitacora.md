@@ -3616,3 +3616,77 @@ de #197 es donde aparecen los errores que la primera no ve. Queda como PR aparte
 **Severidad:** cierra la verificacion de T6.
 
 **Urgencia:** T7 puede arrancar ya.
+
+## 2026-10-06 - Cierre de Fase 2: T0-T6, H1-H3 y auditoria de calidad
+
+Cierra Fase 2. Entrada de cierre de fase (T7 del plan), no de una task.
+
+### Que se entrego
+
+| Bloque | PRs | Que |
+| --- | --- | --- |
+| Spike T0 | #188 | Forma real de los payloads de MP. Deshizo 3 hipótesis del transversal. |
+| T1-T5 | #184-#193 | Indice de preapproval, endpoints de suscripcion, prorrateo, permisos, handler de webhooks. |
+| Auditoria mid-phase | #197 | 3 defectos bloqueantes de T6: H1, H2, H3. |
+| H2 | #198 | `paused` soportado, transiciones 9 y 10. Item 38 superseded. CI a `ubuntu-latest`. |
+| H1 | #199 | `resolve_tenant_by_preapproval` (SECURITY DEFINER). ADR-026. |
+| H3 | #200 | `planId` lo escribe el endpoint, no el webhook. ADR-027. |
+| T6 | #201 | 3 tests de integracion + `@vitest/coverage-v8`. 702 -> 705. |
+| Mini auditoria | #202 | Calidad de tests de T6. Veredicto: T6 pasa. |
+| T7 | este PR | Documentacion y memoria de Fase 2. |
+
+### Decisiones que definen la fase
+
+1. **`paused` es un estado de primera clase** (H2). No se colapsa a
+   `approved: false`. Antes el item 38 decia "el webhook registra warn y no
+   transiciona"; el spike lo refuto porque `paused` es reversible en ambas
+   direcciones. El item quedo **superseded** por el 38-bis con la decision.
+2. **El tenant se resuelve con una funcion `SECURITY DEFINER` acotada** (H1).
+   No con `db` directo: `subscriptions` tiene `FORCE ROW LEVEL SECURITY` y sin
+   `app.tenant_id` el predicado nunca es TRUE. La funcion corre como
+   `neondb_owner` (BYPASSRLS) y expone **solo** el `tenantId`.
+3. **`planId` lo escribe el endpoint** (H3), no el webhook. Mapear
+   `transaction_amount` a un plan no es inyectivo en el tiempo ni acotado a
+   eventos de cambio.
+4. **CI en `ubuntu-latest`.** El runner self-hosted (AlmaLinux) aceptaba jobs y
+   moria durante typecheck. Ya no se usa.
+5. **La cobertura ahora es medible.** `@vitest/coverage-v8` no estaba declarado
+   en ningun `package.json` pese a que la config lo pedia desde el inicio.
+
+### Lo que la auditoria de T6 cambio de la lectura del proyecto
+
+La mini auditoria de calidad (PR #202) dio tres cosas que no sabiamos:
+
+- **Quitar el `tenantId` de una query no rompe ningun test.** Con mocks, la
+  semantica del `WHERE` es invisible por construccion. El aislamiento real
+  esta protegido solo por RLS en Postgres.
+- **La clase de bug del mock de H3 aparece 5 veces mas** en archivos de T1-T5.
+- **Un `mock` que no aplica no produce falsos verdes si nadie afirma sobre
+  logs.** Por eso H-T6-2 quedo LOW y no HIGH.
+
+### Deuda abierta: items 56-61
+
+| Item | Tema | Severidad |
+| --- | --- | --- |
+| 56 | `resolve_tenant_by_preapproval` es superficie de seguridad permanente | MEDIA riesgo / ALTA consecuencia |
+| 57 | `planId` puede quedar desalineado si falla el GET de verificacion | BAJA |
+| 58 | `pnpm test --coverage` no mide nada | BAJA |
+| 59 | `@vitest/coverage-v8` no declarado | **RESUELTO en #201** |
+| 60 | El reporter de texto oculta archivos por truncado | BAJA |
+| 61 | Los tests con mock no pueden verificar el `WHERE` | **ALTA consecuencia** |
+
+**Item 61 es el unico bloqueante declarado para Phase 3.** No es de T7 ni de
+Fase 2: es deuda de diseño de tests que Phase 3 va a multiplicar (Phase 3 es la
+de mayor volumen documental y de endpoints). La mitigacion recomendada es
+mover el aislamiento a un invariante de tipos: que `applyTransition` reciba el
+`row` ya filtrado y no construya el `WHERE`.
+
+### Lo que sigue
+
+Phase 3 arranca con el worktree limpio, `develop` en verde y la suite en 705.
+Antes de Phase 3: item 61. Antes de T8: cerrar el drift de topics en SETUP.md
+(la seccion lista 3 topics y el codigo clasifica 4 mas `UNKNOWN`).
+
+**Severidad:** cierre de fase.
+
+**Urgencia:** Phase 3 puede arrancar ya.
