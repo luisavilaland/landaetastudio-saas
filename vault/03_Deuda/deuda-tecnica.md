@@ -2463,3 +2463,60 @@ Con `--coverage.include` tampoco alcanza: los archivos faltan igual en la tabla.
 
 **Urgencia:** cuando se empiece a usar coverage como criterio en CI, porque ahi
 el numero se lee de una tabla y no de un JSON.
+
+## 61. Los tests con mock no pueden verificar el `WHERE` de una query
+
+## Hecho
+
+Auditoria de calidad de T6 (`audit/t6-test-quality`): se removio el
+`eq(dbSubscriptions.tenantId, resolved.tenantId)` del `SELECT` de la fila y del
+`UPDATE` final de `applyTransition`, y **los 705 tests siguieron verdes**.
+
+Con el filtro del `SELECT` puesto en tautologia, `row` pasa a ser una fila
+arbitraria y el `UPDATE` por `row.id` escribe la que sea: una fuga cross-tenant
+completa que ningun test detecta.
+
+Los tests cross-tenant que existen verifican que se **pase** el tenant correcto a
+`withTenantContext`. No verifican que la query **filtre** por tenant. Son
+distintas, y la segunda es la que evita la fuga.
+
+## Por que no se puede cerrar con un test
+
+`withTenantContext` esta mockeado en las suites de Fase 2 y devuelve filas fijas
+sin importar el `WHERE`. Con mocks, **la semantica de la query es invisible por
+construccion**: no hay codigo de test que pueda distinguir `WHERE tenantId = X`
+de `WHERE true`.
+
+Una asercion sobre la forma del `WHERE` (inspeccionar el objeto de drizzle que
+se pasa a `.where()`) seria debil: verifica que escribiste un filtro, no que
+filtre.
+
+## Opciones
+
+1. Test de integracion contra Neon con dos tenants: insertar, disparar el
+   webhook y verificar que solo se modifica la fila correcta. Costo alto.
+2. Assert sobre la forma de la query. Barato y debil.
+3. **Mover el aislamiento a un invariante de tipos**: que `applyTransition`
+   reciba el `row` ya filtrado y no construya el `WHERE`. Convierte un invariante
+   de SQL en un invariante de tipos, y es la que mejor paga.
+
+Hoy el aislamiento real esta protegido solo por RLS en Postgres
+(`rls-cross-tenant.test.ts`, 8 casos contra Neon), que es una red distinta:
+protege la DB, no el codigo que escribe mal la query.
+
+## Relacionado
+
+- **ADR-026:** por que `resolve_tenant_by_preapproval` no lleva filtro de tenant
+  a proposito (es el escape hatch de bootstrap).
+- **`vault/04_Fases/auditoria-t6-test-quality.md`:** hallazgo H-T6-1.
+- **Item 56:** otro punto donde la seguridad depende de un invariante que ningun
+  test puede observar por construccion.
+
+**Origen:** 2026-10-06, auditoria de calidad de T6.
+
+**Severidad:** ALTA de consecuencia, MEDIA de probabilidad. No hay fuga hoy: el
+codigo tiene los filtros. Lo que falta es que un refactor los pueda quitar en
+silencio.
+
+**Urgencia:** antes de Phase 3, cuando el numero de rutas con RLS crezca y este
+patron (mockear `withTenantContext` y afirmar sobre las llamadas) se replique.

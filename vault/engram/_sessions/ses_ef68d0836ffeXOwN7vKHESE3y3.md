@@ -34,3 +34,4 @@ tags:
 - [[patron-antes-de-mapear-valor-entidad-inyectividad-sobre-la-h-175]]
 - [[session-summary-landaetastudio-saas-176]]
 - [[t6-completo-gap-real-era-el-catch-de-las-3-rutas-de-mutacion-177]]
+- [[auditoria-t6-los-tests-con-mock-no-pueden-verificar-el-where-178]]
