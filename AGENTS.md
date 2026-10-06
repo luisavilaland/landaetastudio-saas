@@ -625,7 +625,36 @@ bloquea el borrado de la rama.
 Verificar solo con git no alcanza: el registro de Paseo es independiente y
 sobrevive al worktree. Cuando el worktree desaparece, Paseo **degrada** el
 workspace de `isolation: worktree` a `isolation: local` / `kind: directory`, y
-lo deja apuntando a un path inexistente (PR #198).
+lo deja apuntando a un path inexistente (PR #198). **Confirmado 3 veces
+seguidas en #204, #205 y #206: la degradación es el caso normal, no la
+excepción.**
+
+### El código de retorno de `gh` no es evidencia
+
+`gh pr merge --squash --delete-branch` devuelve resultados contradictorios y
+**ninguno de los dos dice la verdad sobre el estado final**:
+
+| Caso                                  | Exit | ¿Qué pasó realmente?                            |
+| ------------------------------------- | ---- | ----------------------------------------------- |
+| #204 (el worktree bloqueó el borrado) | 1    | Merge aplicado. Workspace **auto-eliminado**.   |
+| #205 (mismo caso)                     | 0    | Merge aplicado. Directorio **433 MB huérfano**. |
+| #206 (mismo caso)                     | 0    | Merge aplicado. Directorio **433 MB huérfano**. |
+
+Un exit 0 **no** significa que el worktree se borró, y un exit 1 **no** significa
+que el merge falló. Lo único confiable es **verificar cada registro por separado**
+con su propia API.
+
+Dos modos de falla concretos, ambos observados:
+
+1. **git desvincula el worktree pero el directorio sobrevive.** Si `gh` ya lo
+   desregistró, `git worktree remove` responde `'<path>' is not a working tree`
+   (exit 128) y el directorio queda huérfano en disco con los ~433 MB del
+   `node_modules` de pnpm. Hay que borrarlo a mano y recién después
+   `git worktree prune`.
+2. **`paseo_archive_workspace` puede responder `Workspace not found` y aun así
+   archivar** (#205). El conteo de `paseo_list_workspaces` bajó igual. **Verificar
+   por efecto** — que el workspace desaparezca del listado — nunca por el código
+   de retorno.
 
 Secuencia completa:
 
@@ -639,6 +668,8 @@ git worktree list
 # 3. Liberar el worktree (--force si tiene node_modules)
 git worktree remove <path> --force
 git worktree prune
+# Si responde "'<path>' is not a working tree": git ya lo desvinculo y solo
+# queda el directorio. Borrarlo a mano y volver a correr prune.
 # Si falla en Windows por lock de CWD: cerrar la tab de Paseo y reintentar.
 
 # 4. Borrar la rama local
@@ -650,6 +681,7 @@ paseo_list_workspaces
 
 # 6. Archivar SOLO ese workspace (no tocar workspaces de otros proyectos)
 paseo_archive_workspace <id>
+# Puede responder "Workspace not found" y archivar igual: verificar por efecto.
 
 # 7. Verificar los tres registros
 git worktree list
