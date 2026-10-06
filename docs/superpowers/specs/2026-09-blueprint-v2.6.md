@@ -4,12 +4,25 @@
 
 **Versión:** 2.6 Final
 **Fecha:** Septiembre 2026
-**Estado:** Aprobado (2026-09-24). Fase 1 completada.
+**Estado:** Aprobado (2026-09-24). Fase 1 y Fase 2 completadas.
 **Confidencial**
 
-> **Referencia vigente** — Última revisión: 2026-09-17.
-> Si el código diverge de este doc, **actualizar en el mismo PR**.
-> Ver también: ADR-023, ADR-024, ADR-025, `subscription-lifecycle.md`.
+> **Estado: No normativo (desde 2026-10-06).** Este documento describe el diseño
+> original de la plataforma y se conserva como **referencia histórica**. Ya no es la
+> fuente de verdad para construir. Varias secciones quedaron desactualizadas al
+> cerrarse Fase 2 — en particular la de Fase 2 describe la URL del webhook con
+> `:tenantId` y nombres de evento que el código no usa.
+> Para las decisiones vigentes ver los **ADRs** (`vault/01_ADRs/`, indexados en
+> `vault/05_Specs/arquitectura.md`), el design de Fase 2
+> (`docs/superpowers/specs/2026-10-01-fase2-design.md`) y la spec
+> (`docs/superpowers/specs/2026-10-01-fase2-webhook-checkout.md`).
+> Este estado se fijó para cumplir la precondición #2 de la auditoría mid-phase
+> (#197, §7 "Antes de T8"), que pedía marcar el blueprint como no normativo o
+> actualizarlo.
+
+> **Historial de revisión — la última con contenido normativo: 2026-09-17.**
+> Las adiciones de Fase 1 y Fase 2 (2026-09-24 en adelante) ya no son normativas.
+> Ver también: ADR-023, ADR-024, ADR-025, **ADR-026, ADR-027**, `subscription-lifecycle.md`.
 
 ---
 
@@ -184,7 +197,7 @@ openssl rand -base64 32
 | #   | FASE                                               | DÍAS EST. | DEPENDENCIAS | ESTADO        |
 | --- | -------------------------------------------------- | --------- | ------------ | ------------- |
 | 1   | Modelo de datos (plans, subscriptions, mp_config)  | 2-3       | —            | ✅ Completada |
-| 2   | Webhook suscripciones + checkout dinámico          | 3-4       | Fase 1       | Pendiente     |
+| 2   | Webhook suscripciones + checkout dinámico          | 3-4       | Fase 1       | Completada    |
 | 3   | Autoservicio (landing + registro + pago)           | 5-7       | Fase 2       | Pendiente     |
 | 4   | Personalización visual + dominio + infraestructura | 5-7       | Fase 3       | Pendiente     |
 | 5   | Cupones y descuentos                               | 8-10      | Fase 3       | Pendiente     |
@@ -253,6 +266,11 @@ CREATE POLICY tenant_isolation ON subscriptions
 ---
 
 ## 🔗 Fase 2 — Webhook suscripciones + checkout dinámico ⏱ 3-4 días
+
+> **Implementada.** Cerrada el 2026-10-06 (ver `vault/04_Fases/cierre-fase2.md`).
+> **Lo que sigue se conserva sin editar y ya NO describe la implementación.** En
+> particular, la URL del webhook **no** lleva `:tenantId` y los nombres de evento reales
+> son los topics de la plataforma. Decisiones vigentes: ADR-026 y ADR-027.
 
 - **Checkout dinámico:** usar `tenant_mp_config.access_token` (descifrado) para órdenes de clientes finales. Si el tenant no tiene `mp_config` → error claro en el checkout.
 - **Webhook de suscripciones:** `POST /api/webhooks/mercadopago/subscriptions/:tenantId`
@@ -438,6 +456,8 @@ Si se decide ofrecer "frontend personalizable", la opción más equilibrada es l
 ---
 
 **Blueprint SaaS eCommerce v2.6 · Final**
-**Septiembre 2026 · Confidencial · Para aprobación del equipo**
+**Septiembre 2026 · Confidencial · No normativo desde 2026-10-06**
 
-**Próximo paso: Fase 1 — Modelo de datos con Drizzle ORM**
+**Fases 1 y 2 completadas. Próxima fase: Fase 3 — Personalización visual + dominio + infraestructura.**
+**Para el estado real del proyecto ver `vault/05_Specs/arquitectura.md` y el plan de Fase 2
+(`docs/superpowers/plans/2026-10-01-fase2.md`).**
