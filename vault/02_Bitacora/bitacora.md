@@ -3950,3 +3950,88 @@ aceptó las opciones de v10 sin error, igual que las de v11: ningún typecheck n
 build detecta que dejaste de enviar source maps. La única defensa es leer el
 changelog de la versión mayor y probar el camino que el producto usa, no el que
 compila.
+
+---
+
+### Saneamiento documental post-Fase 2
+
+**Fecha:** 2026-10-07
+**Rama:** `docs/saneamiento-post-fase2` desde `develop` @ `a56dc27`
+**Modalidad:** 100% documentación. Ningún cambio en código de producción.
+
+Ocho commits, uno por naturaleza de cambio, para que la historia sea auditable.
+
+#### Qué se corrigió
+
+| #   | Commit  | Cambio                                                         |
+| --- | ------- | -------------------------------------------------------------- |
+| 1   | cb44708 | 6 contadores ACTUAL de tests: 679 → 705                         |
+| 2   | bbf0c49 | 5 entradas de changelog faltantes en 3 archivos                  |
+| 3   | b05225e | `brief-tecnico-fase-5.md` marcado histórico + notas inline      |
+| 4   | 082a220 | Conteo interno de la auditoría #207 corregido                   |
+| 5   | dc2d4cc | Discrepancias pendientes de 6 ADRs registradas                  |
+| 6   | a81ecb6 | 10 hallazgos H-F2 registrados como items 63-71, más item 72     |
+| 7   | bad0a9c | Tabla de resumen manual de TESTING.md notada como incompleta   |
+| 8   | este    | Bitácora + Engram + exports pendientes                          |
+
+#### El plan cambió en 6 puntos, y todos salieron de verificar antes de escribir
+
+1. **Eran 6 contadores ACTUAL, no 5.** `TESTING.md:296` (la fila `Pasando`) no
+   figuraba en el plan. Sin corregirla, la tabla queda `Total 705 · Pasando 679 ·
+   Fallas 0`, que no cuadra.
+2. **"grep 679 → 0" era un criterio imposible.** Quedan 3 ocurrencias legítimas en
+   changelogs históricos de T5 (`README.md:536`, `SETUP.md:605`, `TESTING.md:328`).
+   El criterio correcto es 6 ACTUAL actualizados y 3 HISTÓRICAS intactas. Pedir 0
+   habría obligado a reescribir historia, contradiciendo el propio objetivo del PR.
+3. **Hay 3 changelogs, no 2.** SETUP.md tiene el suyo y quedaba con el mismo hueco.
+4. **La regla "83 archivos = 68 vitest + 15 e2e" no se toca.** Aparece solo en
+   `auditoria-fase2-midphase.md`, una medición fechada que declara su base
+   (`develop` en `260bb39`). Actualizarla es reescribir una auditoría.
+5. **El split de severidades era 8 MEDIUM / 2 LOW, no 5 y 5.** Invalidaba la
+   propuesta de agrupación del paso 2B.
+6. **Eran 4 archivos untracked en Engram, no 2.** Uno era `obs-190`, que la sesión
+   anterior guardó pero nunca exportó ni commiteó — el fallo exacto que AGENTS.md
+   documenta en el PR #150.
+
+#### Lo que no se hizo, y por qué
+
+- **Los hallazgos H-F2 no se arreglaron.** Este PR los registra; los fixes son
+  código y van en su propio PR.
+- **Las discrepancias de los 6 ADRs no se resolvieron.** Cada una exige comparar el
+  ADR contra el código y decidir. Documentar el marcador no es resolverlo.
+- **La tabla de 127 ítems manuales no se rellenó.** Faltan 3 ítems de Admin sin
+  columna asignada. Completarla exige correr el checklist manual con las apps
+  levantadas; inventar números habría reproducido el problema que este PR vino a
+  corregir.
+- **Item 72 (numeración de fases de README.md) queda como decisión, no fix.**
+  Colisiona 1:1 con la del vault y ambas "Fase 2" están marcadas Completada. Va al
+  SDD de Fase 3.
+
+#### Learned
+
+**La auditoría que descubre que "el código puede mentir en su propia documentación"
+tenía el defecto en su propio resumen ejecutivo.** Declaraba 11 hallazgos de código
+con split 6 MEDIUM / 5 LOW; el cuerpo tiene 8 MEDIUM y 2 LOW. El detalle que
+engaña: `grep -c "^### H-F2-"` devuelve **11**, y ese 11 cuadra con lo que decía el
+resumen — pero son 10 hallazgos de código **más** el de proceso, que el resumen
+contaba dos veces. Un número que coincide no es un conteo que cuadra.
+
+**Marcar en las tablas cuesta el append-only.** Agregar una nota dentro de una celda
+obliga a prettier a realinear la tabla entera: pasar "marcar" a "reescribir" por un
+cambio de formato. Las notas van **después** de la tabla. El diff de
+`brief-tecnico-fase-5.md` quedó en 79 inserciones y 0 eliminaciones por eso.
+
+**What:** 8 commits de saneamiento documental sobre 9 items detectados en dos
+análisis de reincorporación. 6 commits de corrección, 1 de registro de deuda, 1 de
+cierre.
+**Why:** cerrar el drift entre documentación y código que quedó sin corregir desde
+T6/T8, y dejar trazabilidad a 10 hallazgos de auditoría que vivían solo en un
+documento de fase.
+**Where:** `README.md`, `SETUP.md`, `TESTING.md`, `TESTING-MANUAL.md`,
+`vault/02_Bitacora/bitacora.md`, `vault/03_Deuda/deuda-tecnica.md`,
+`vault/04_Fases/auditoria-fase2.md`, `vault/05_Specs/arquitectura.md`,
+`vault/05_Specs/brief-tecnico-fase-5.md`.
+**Learned:** el resumen ejecutivo de una auditoría es tan código de producción como
+el `WHERE` de una query: si no lo verificás contra la fuente, te miente con la misma
+autoridad. Y un número que coincide con lo esperado es la forma más común de no
+verificar nada.
