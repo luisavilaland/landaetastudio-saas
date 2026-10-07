@@ -292,8 +292,8 @@ pnpm test
 
 | Métrica      | Valor     |
 | ------------ | --------- |
-| **Total**    | 679 tests |
-| **Pasando**  | 679 ✅    |
+| **Total**    | 705 tests |
+| **Pasando**  | 705 ✅    |
 | **Fallas**   | 0 ✅      |
 | **Archivos** | 69        |
 
@@ -328,7 +328,7 @@ pnpm test
 - Actualización 4 de octubre de 2026 – 679 tests, 69 archivos, T5 de Fase 2: 37 casos del handler del webhook (`__tests__/handler.test.ts`: 8 transiciones de §6.3, firma, clasificación, idempotencia por convergencia, resolución de tenant L+R, aislamiento cross-tenant, tolerancia a UNKNOWN) más 9 casos de `packages/commerce/src/__tests__/mp-subscriptions.test.ts`, los primeros tests directos del cliente de MP. Rama `chore/t5-webhook-handler`.
 - Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
 - Fase 6 completada: withTenantContext real + FORCE RLS (app_user), E2E Playwright 15 specs con CI self-hosted, incidente RLS de 9 Server Components corregido (08-08).
-- Estado actual: 679 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
+- Estado actual: 705 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Sandbox manual de MercadoPago pendiente (cuenta de prueba de MP).
 - Ver AGENTS.md para detalles de convenciones de código y comandos obligatorios.
 
