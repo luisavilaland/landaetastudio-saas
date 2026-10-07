@@ -312,6 +312,19 @@ pnpm test
 | Seguridad  | 5       | 5       | 0     | 0     |
 | **Total**  | **127** | **124** | **0** | **0** |
 
+> ⚠️ **Esta tabla está incompleta y no se corrigió** (nota agregada el
+> 2026-10-07). Los totales de cada columna cuadran:
+> `4+17+51+50+5 = 127` y `4+17+48+50+5 = 124`. Pero **127 − 124 = 3 ítems que no
+> están en ninguna columna**: la fila Admin marca 48 de 51 mientras ⚠️ y ❌ dicen 0. O se saltaron 3 ítems y no se registraron, o la columna ⚠️ se vació.
+>
+> **No se rellenó con números inventados.** Reconstruirlo exige correr el checklist
+> manual de 127 verificaciones (`TESTING-MANUAL.md`), que necesita las apps
+> levantadas y no es parte del DoD. Ese trabajo queda pendiente; lo que se hace acá
+> es dejar el hueco visible en lugar de taparlo.
+>
+> Ojo también: esta tabla cuenta **ítems de prueba manual**, no tests automatizados.
+> El contador de tests de este documento está arriba, en `### Tests Automáticos`.
+
 ---
 
 ## Notas
