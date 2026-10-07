@@ -3869,3 +3869,84 @@ documentación sin que nada falle. Tres defectos de una fase llegaron a producci
 no porque faltaran tests, sino porque un nombre y un comentario afirmaban
 garantías que nadie verificó. El proceso de revisión necesita tratar el
 argumento de seguridad como hallazgo y el nombre como promesa por comprobar.
+
+---
+
+### Cierre del lote Dependabot + migración a Sentry v11
+
+**Fecha:** 2026-10-07
+**Rama:** `chore/sentry-v11-migration` desde `develop` @ `a6d0806`
+
+#### 9 de 10 PRs de Dependabot mergeados
+
+| PR  | Paquete              | Versión             |
+| --- | -------------------- | ------------------- |
+| #210 | `@types/node`        | 26.6.3 → 26.6.4     |
+| #217 | `dotenv`             | 18.0.4 → 18.0.5     |
+| #214 | `turbo`              | 2.11.4 → 2.11.7     |
+| #216 | `drizzle-kit`        | 0.31.10 → 0.31.11   |
+| #213 | `vitest`             | 5.0.2 → 5.0.3       |
+| #215 | `pino`               | 10.3.1 → 10.4.0     |
+| #208 | `resend`             | 6.30.0 → 6.32.0     |
+| #212 | `drizzle-orm`        | 0.45.2 → 0.45.3     |
+| #211 | `next`               | 16.3.6 → 16.3.8     |
+
+DoD verde post-9-merges: lint 6/6, typecheck 9/9, test 705/705 (69 archivos),
+build 3/3, format:check OK. Todo forzado (`--force`) para no leer cache de otro
+worktree.
+
+#### #209 cerrado sin mergear: `@sentry/nextjs` v11
+
+No era un bump. v11 movió el entry point y eliminó opciones:
+
+- `@sentry/nextjs` → `@sentry/nextjs/config`
+- `disableLogger` → `webpack.treeshake.removeDebugLogging`
+- `automaticVercelMonitors` → `webpack.automaticVercelMonitors`
+
+Migrados los 3 `apps/*/next.config.mjs` y las 4 declaraciones de la dependencia
+(`admin`, `storefront`, `superadmin`, `commerce`) a `^11.4.0` (resuelve 11.5.0).
+
+**Verificación empírica del riesgo silencioso.** Un smoke test que llamó a
+`withSentryConfig` con el objeto de opciones nuevo y con el viejo总和 prueba que
+**el SDK no valida nombres de opción**: ambos Acceptance sin error. La config
+devuelta incluye clave `webpack`, o sea que las opciones nuevas sí se consumen.
+Sin haber movido las dos opciones, el build habría pasado verde con source maps
+y Vercel monitors desactivados sin ningún aviso.
+
+#### Decisión: `turbo` 2.11.7 y el bloque `agent-rules`
+
+`turbo` 2.11.7 introduce `agentGuidance`: antes de cualquier comando del repo,
+detecta un agente de IA y **escribe un bloque propio al final de `AGENTS.md`**.
+Apareció como `M AGENTS.md` sin que nadie lo editara, y el PR de Dependabot no
+lo mostraba.
+
+**Decisión: desactivado** con `"agentGuidance": false` en el `turbo.json` raíz,
+y el bloque inyectado revertido. Motivos: `AGENTS.md` ya es un archivo curado a
+mano con bloques gestionados de `gentle-ai` (`persona`, `engram-protocol`); sumar
+un tercer sistema de instrucciones inyectado deja tres fuentes de autoridad
+compitiendo en el mismo archivo. Además el bloque es boilerplate genérico de
+upstream, en inglés, sin nada específico de este proyecto.
+
+**Learned:** un bump de tooling puede modificar el repo sin que el PR lo
+muestre. `git status` es la única red.
+
+#### Pendiente: verificación manual de Sentry
+
+`SENTRY_DSN` no está en `.env.local`. El build verde **no prueba que Sentry
+siga reportando**: con `SENTRY_DSN` ausente, `withSentryConfig` nunca se invoca
+y solo se valida el import. Falta, con credenciales reales: forzar un error,
+confirmar que llega al panel, y confirmar que el release tiene source maps
+subidos (si faltan, es `removeDebugLogging` mal migrado).
+
+**What:** 9 merges de Dependabot, #209 cerrado, migración a Sentry v11,
+`agentGuidance` desactivado.
+**Why:** actualizar dependencias sin romper observabilidad ni el archivo de
+instrucciones del proyecto.
+**Where:** `apps/{admin,storefront,superadmin}/next.config.mjs`, 4
+`package.json`, `turbo.json`, `pnpm-lock.yaml`,
+`vault/02_Bitacora/bitacora.md`.
+**Learned:** una API puede dejar de aceptarte en silencio. `withSentryConfig`
+aceptó las opciones de v10 sin error, igual que las de v11: ningún typecheck ni
+build detecta que dejaste de enviar source maps. La única defensa es leer el
+changelog de la versión mayor y probar el camino que el producto usa, no el que
+compila.
