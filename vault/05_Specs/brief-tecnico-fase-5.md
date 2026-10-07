@@ -6,6 +6,35 @@ Para: Equipo de Ingeniería
 
 _Versión 1.0 — Abril 2026 — Confidencial_
 
+> ## ⚠️ Estado: referencia histórica — NO NORMATIVO
+>
+> **Marcado el 2026-10-07** (saneamiento documental post-Fase 2). Este documento
+> describe el proyecto con la numeración de fases anterior al blueprint v2.6 y
+> **no se actualiza desde abril de 2026**. Se conserva porque registra cómo se
+> planificó la salida a producción.
+>
+> **Para construir hoy, usar** los ADR (`vault/01_ADRs/`, índice en
+> `vault/05_Specs/arquitectura.md`) y las specs de fase
+> (`docs/superpowers/specs/`). No este archivo.
+>
+> ### La numeración de fases de este documento no es la vigente
+>
+> | Este documento (abril 2026)      | Numeración vigente (`vault/04_Fases/`)                    |
+> | -------------------------------- | --------------------------------------------------------- |
+> | Fase 1 – Autenticación y órdenes | Fase 1 – modelo de datos (seed de planes + suscripciones) |
+> | Fase 2 – Dashboard y stock       | **Fase 2 – webhook de suscripciones + checkout dinámico** |
+> | Fase 3 – Experiencia de tienda   | — sin equivalente vigente                                 |
+> | Fase 4 – Autoservicio del tenant | — sin equivalente vigente                                 |
+> | Fase 5 – Producción              | — cerrada el 2026-05-06                                   |
+> | Fase 6 – RLS real y E2E          | — cerrada el 2026-08-12                                   |
+>
+> **"Fase 2" significa dos cosas distintas.** Acá es "Dashboard y stock"; en el
+> vault es el webhook de suscripciones. Las dos están marcadas ✅ Completada.
+>
+> Los ejemplos de código de las secciones 3.1, 3.2, 5 y 6.2 quedaron
+> desactualizados y tienen una nota inline. **No se corrigieron**: este archivo es
+> un registro de una etapa, no una guía.
+
 Resumen Ejecutivo
 
 Las Fases 1 a 4 están completas. El MVP funciona correctamente en local con todas las funcionalidades core: catálogo, carrito, checkout con MercadoPago, panel admin, superadmin y configuración del tenant.
@@ -48,6 +77,18 @@ Antes de arrancar la Fase 5, este es el diagnóstico completo del sistema:
 | **Sentry**                              | ✅ OK        | Integrado en las tres apps con `@sentry/nextjs`. Configuración condicional vía SENTRY_DSN.                                              |
 | **Mensajes de error 409**               | ✅ OK        | Todos los endpoints retornan `field` para identificar el campo conflictivo. UI inline con validación visual en formularios.             |
 | **Configuración de build**              | ✅ OK        | `next.config.mjs` para compatibilidad ESM en Next.js 16. Dotenv integrado en cada app.                                                  |
+
+> ⚠️ **Cuatro filas de esta tabla quedaron desactualizadas al 2026-10-07.**
+>
+> - **Tests** — "225/225" es el contador de abril de 2026. Hoy son **705 tests en
+>   69 archivos** (medido con `pnpm test` sobre `develop` en `a56dc27`).
+> - **CSRF protection** — dice `next.config.ts`; el archivo es `next.config.mjs`.
+> - **Deploy en Vercel** — "🔄 Pendiente" es **falso**: producción está activa
+>   desde el 2026-08-12 (merge `develop`→`main`, tag `v0.9.0`).
+> - **Sentry** — la integración es correcta, pero desde `@sentry/nextjs` v11
+>   (PR #218) `withSentryConfig` se importa de `@sentry/nextjs/config`.
+>
+> No se corrigieron las celdas para no realinear la tabla; quedan señaladas acá.
 
 **2. Pasos previos antes de Fase 5**
 
@@ -143,6 +184,13 @@ En packages/db/src/index.ts, antes de cada query de negocio, ejecutar:
 
 await db.execute(sql`SELECT set_tenant_id(${tenantId}::uuid)`);
 
+> ⚠️ **Este ejemplo ya no aplica y su copia rompe la seguridad.** `db.execute()`
+> es auto-commit: el `SET LOCAL` se pierde antes de la siguiente query y las
+> queries de negocio devuelven 0 filas en lugar de fallar. Hoy toda query con RLS
+> va dentro de `withTenantContext(tenantId, cb)`, que abre una transacción y
+> devuelve `tx`. Ver "Arquitectura y restricciones innegociables" en `AGENTS.md`.
+> Además el `SET LOCAL` se hace con `SET LOCAL`, no con `SELECT set_config(...)`.
+
 Importante
 
 Las tablas tenants y admin_users NO deben tener RLS, porque el superadmin necesita acceso global a todos los tenants.
@@ -152,6 +200,11 @@ Las tablas tenants y admin_users NO deben tener RLS, porque el superadmin necesi
 **3.2 Eliminar fallback de AUTH_SECRET**
 
 El archivo apps/admin/lib/auth.ts y apps/superadmin/lib/auth.ts tienen esta línea:
+
+> ⚠️ **Ese archivo ya no existe.** La configuración de NextAuth está consolidada
+> en `@repo/auth` (ADR-018). El fallback hardcoded sí fue eliminado, pero el
+> archivo citado quedó obsoleto. La línea de abajo se conserva como registro de
+> qué se corrigió, no como referencia de dónde.
 
 secret: process.env.AUTH_SECRET || "dev-secret-key-12345678901234567890",
 
@@ -240,6 +293,14 @@ NEXTAUTH_URL: z.string().url().optional(), // NextAuth v5 la infiere del Host he
 
 MP_ACCESS_TOKEN: z.string().startsWith('TEST-').or(z.string().startsWith('APP_USR-')),
 
+> ⚠️ **El nombre de esta variable no existe.** Hoy conviven dos flujos con
+> secretos separados (ADR-023): `MERCADOPAGO_ACCESS_TOKEN` +
+> `MERCADOPAGO_WEBHOOK_SECRET` para las órdenes del tenant (webhook público en
+> `apps/storefront`), y `MP_PLATFORM_ACCESS_TOKEN` +
+> `MP_PLATFORM_WEBHOOK_SECRET` para las suscripciones de plataforma (webhook
+> privado en `apps/admin`). `MP_PLATFORM_*` es obligatoria en producción desde
+> Fase 2. El schema real está en `packages/validation/src/env.ts`.
+
 RESEND_API_KEY: z.string().startsWith('re_'),
 
 NEXT_PUBLIC_APP_URL: z.string().url(),
@@ -282,6 +343,13 @@ pnpm add @sentry/nextjs --filter admin --filter storefront --filter superadmin
 
 Configurar Sentry en cada app con next.config.ts usando withSentryConfig. En producción captura automáticamente errores no manejados, performance y Web Vitals.
 
+> ⚠️ **Desactualizado en dos puntos.** (1) El archivo es `next.config.mjs`, no
+> `.ts`. (2) Desde `@sentry/nextjs` v11 (PR #218, 2026-10-07) `withSentryConfig`
+> se importa de `@sentry/nextjs/config`, no del entry point principal, y
+> `disableLogger` y `automaticVercelMonitors` se movieron dentro de `webpack`.
+> Ojo: v11 **acepta en silencio** las opciones viejas de v10, así que un build
+> verde no prueba que los source maps sigan subiéndose.
+
 Variables de entorno adicionales para Sentry
 
 SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
@@ -297,6 +365,11 @@ SENTRY_PROJECT=saas-storefront
 **7.1 Refactorización de auth duplicada**
 
 El código de autenticación está duplicado en apps/admin/lib/auth.ts y apps/superadmin/lib/auth.ts. Ya existe @repo/auth pero no todas las apps lo usan. Consolidar en el paquete compartido:
+
+> ⚠️ **Tarea ya completada** (ADR-018). `@repo/auth` exporta `handlers`, `auth`,
+> `signIn` y `signOut`, y `apps/admin/lib/auth.ts` /
+> `apps/superadmin/lib/auth.ts` ya no existen. Se conserva el texto original
+> como registro.
 
 - Mover la configuración de NextAuth a packages/auth/src/index.ts
 - Exportar handlers, auth, signIn, signOut desde @repo/auth
@@ -398,6 +471,12 @@ Observabilidad — Antes de escalar
 *Actualizado 17 de septiembre 2026: Fase 6 completada + v0.9.0 en producción (merge develop→main 2026-08-12). Todas las tareas de seguridad, observabilidad, hardening, RLS real (withTenantContext), FORCE ROW LEVEL SECURITY con rol app_user, y E2E Playwright (15 specs) implementadas. 430/430 tests pasando, 55 archivos. Build limpio en las 3 apps (Next.js 16.3.5, TS 6.0.3).*
 
 *Plan vigente: **Blueprint SaaS eCommerce v2.6** (aprobado, PDF en repo — conversión a markdown pendiente para planificación de Fase 1).*
+
+> ⚠️ **Esta línea quedó desactualizada.** El blueprint v2.6 está marcado **NO
+> NORMATIVO** desde el 2026-10-06 (PR #205) y se conserva solo como referencia
+> histórica: su contenido de Fase 2 quedó viejo (URL del webhook y nombres de
+> evento). El plan vigente son las specs de fase en `docs/superpowers/specs/` y
+> los ADR. Ver "Blueprint vigente" en `vault/05_Specs/arquitectura.md`.
 
 ---
 
