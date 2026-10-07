@@ -19,8 +19,15 @@ antes de que llegara a producción.** H1, H2 y H3 estaban escritos y dados por
 verificados. No se rompieron al ejecutarse: se nacieron rotos, y la suite los
 declaraba buenos.
 
-**Totales: 11 hallazgos de código (0 CRITICAL · 0 HIGH · 6 MEDIUM · 5 LOW) + 1
-hallazgo de proceso (ALTO).**
+**Totales: 10 hallazgos de código (0 CRITICAL · 0 HIGH · 8 MEDIUM · 2 LOW) + 1
+hallazgo de proceso (ALTO). Total: 11 hallazgos.**
+
+> _Corregido el 2026-10-07 (saneamiento documental). El texto original decía
+> "11 hallazgos de código (6 MEDIUM · 5 LOW) + 1 de proceso", que no coincidía con
+> el cuerpo: los 11 headers `### H-F2-N` son H-F2-1 (proceso, ALTO) + H-F2-2 a
+> H-F2-9 (MEDIUM) + H-F2-10 y H-F2-11 (LOW). Es decir, 10 hallazgos de código con
+> split 8/2, no 11 con split 6/5. Solo se corrigió la metadata; ningún hallazgo,
+> severidad ni evidencia del cuerpo fue modificado._
 
 ## Metodología
 
@@ -384,7 +391,13 @@ abrirse.
 4. **El resto (H-F2-4, 6, 7, 8, 9, 10, 11) puede agendarse** en Fase 3 o Fase 4.
    Ninguno bloquea.
 
-Los 6 MEDIUM suman **~12 h** de trabajo. Los 5 LOW, **~4.5 h**.
+Los 8 MEDIUM (H-F2-2 a H-F2-9) suman **~13.5 h** de trabajo: 2 + 1 + 1 + 1 + 2 + 3
+
+- 3 + 0.5. Los 2 LOW (H-F2-10, H-F2-11) suman **~3.5 h**. El hallazgo de proceso
+  H-F2-1 agrega ~1 h de reglas de revisión.
+
+_Cifras corregidas el 2026-10-07: el texto original decía "6 MEDIUM ~12 h" y "5 LOW
+~4.5 h", que no coincidían con los costos por hallazgo del cuerpo._
 
 ## Limitaciones
 

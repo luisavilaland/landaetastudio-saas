@@ -512,7 +512,7 @@ pnpm test        # Unit + integración (vitest)
 pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 ```
 
-- **Total:** 679 tests pasando, 0 fallos (69 archivos).
+- **Total:** 705 tests pasando, 0 fallos (69 archivos).
 - Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 - Los endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, redis).
 - 15 specs E2E en `e2e/` (storefront, checkout, admin, superadmin, security, webhook) — CI con runner self-hosted.
@@ -534,3 +534,13 @@ pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 **Última actualización:** 3 de octubre de 2026 – T4 de Fase 2 (6 endpoints de suscripciones en `apps/admin/app/api/subscriptions`: `preapproval`, `GET`, `cancel`, `pause`, `resume`, `plan`). Nuevo estado `paused` en `derivePermissions` con `canPause`/`canResume`. 619 tests pasando, 0 fallos (66 archivos). Rama `chore/t4-endpoints`.
 
 **Última actualización:** 4 de octubre de 2026 – T5 de Fase 2 (handler completo del webhook de suscripciones, issue #169): 8 transiciones de §6.3, event order B, `data.id` con 3 significados según topic, idempotencia por convergencia. Incluye `getPayment` y sus primeros tests directos del cliente de MP. 679 tests pasando, 0 fallos (69 archivos). Rama `chore/t5-webhook-handler`.
+
+**Última actualización:** 6 de octubre de 2026 – T6 de Fase 2 (tests de integración, #201) y mini auditoría de calidad de tests (#202): 3 tests nuevos sobre la suite de órdenes, base 702. 705 tests pasando, 0 fallos (69 archivos). PR #201, #202.
+
+**Última actualización:** 6 de octubre de 2026 – T7 de Fase 2 (documentación de Fase 2 + memoria, #203). 705 tests pasando, 0 fallos (69 archivos). PR #203.
+
+**Última actualización:** 6 de octubre de 2026 – Mini-PRs documentales de Fase 2: #204 (drift de SETUP.md: topics de MP 3→4) y #205 (precondiciones de T8: blueprint v2.6 marcado NO NORMATIVO, `arquitectura.md` indexando Fase 2). 705 tests pasando, 0 fallos (69 archivos). PR #204, #205.
+
+**Última actualización:** 6 de octubre de 2026 – T8 de Fase 2 (cierre formal, #206) y auditoría de cierre (#207): veredicto "Fase 2 pasa", 10 hallazgos de código (8 MEDIUM, 2 LOW) + 1 de proceso (item 62). T9 (polling) cancelado por H1 confirmada. 705 tests pasando, 0 fallos (69 archivos). PR #206, #207.
+
+**Última actualización:** 7 de octubre de 2026 – Lote de 9 PRs de Dependabot (#208, #210–#217) y migración de `@sentry/nextjs` v10 → v11 (#218): `withSentryConfig` movido a `@sentry/nextjs/config`, `disableLogger` → `webpack.treeshake.removeDebugLogging`, `automaticVercelMonitors` → `webpack.automaticVercelMonitors`. `agentGuidance` de turbo 2.11.7 desactivado en `turbo.json`. 705 tests pasando, 0 fallos (69 archivos). PR #208, #210–#218.

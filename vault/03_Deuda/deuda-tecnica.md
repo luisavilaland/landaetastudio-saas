@@ -2584,3 +2584,286 @@ nombre y el cuerpo discrepan, el nombre es el que gana porque es lo que se lee
 primero. `withTenantContextByPreapproval` no fallaba por estar mal nombrada:
 fallaba porque el nombre prometia un invariante que no existia, y nadie lo
 verifico porque el nombre ya lo decia.
+
+---
+
+## Registro de la auditoria de cierre de Fase 2 (items 63 a 71)
+
+La auditoria de cierre de Fase 2 (`vault/04_Fases/auditoria-fase2.md`, PR #207,
+2026-10-06) produjo 10 hallazgos de codigo: H-F2-2 a H-F2-9 (MEDIUM) y H-F2-10 y
+H-F2-11 (LOW). H-F2-1 ya era el item 62.
+
+**Hasta el 2026-10-07 ninguno estaba registrado aca**: vivian solo en el documento
+de fase. Se registran ahora como items 63 a 71. **Ninguno fue arreglado** — este
+registro es de trazabilidad, no de fix.
+
+| Item | Hallazgo          | Severidad | Costo est. | Verificado en codigo |
+| ---- | ----------------- | --------- | ---------- | -------------------- |
+| 63   | H-F2-10 + H-F2-11 | LOW       | ~3.5 h     | no                   |
+| 64   | H-F2-2            | MEDIUM    | 2 h        | **si, 2026-10-07**   |
+| 65   | H-F2-3            | MEDIUM    | 1 h        | **si, 2026-10-07**   |
+| 66   | H-F2-4            | MEDIUM    | 1 h        | no                   |
+| 67   | H-F2-5            | MEDIUM    | 1 h        | no                   |
+| 68   | H-F2-6            | MEDIUM    | 2 h        | no                   |
+| 69   | H-F2-7            | MEDIUM    | 3 h        | no                   |
+| 70   | H-F2-8            | MEDIUM    | 3 h        | no                   |
+| 71   | H-F2-9            | MEDIUM    | 0.5 h      | **si, 2026-10-07**   |
+
+**"Verificado en codigo"** significa que alguien volvio a leer la linea citada en
+`develop` y la hallo tal cual la describes la auditoria. Los no verificados son
+extractos del documento de fase y **pueden haber cambiado**.
+
+Correccion de conteo aplicada a la auditoria el 2026-10-07: el resumen ejecutivo
+decia "11 hallazgos de codigo (6 MEDIUM, 5 LOW) + 1 de proceso". El cuerpo tiene
+8 MEDIUM y 2 LOW, o sea 10 de codigo mas 1 de proceso.
+
+---
+
+## 63. Documentacion y codigo muerto que afirman cosas que el codigo no hace (H-F2-10 + H-F2-11)
+
+**Estado:** abierto (2026-10-07). Registrado desde `vault/04_Fases/auditoria-fase2.md`
+(PR #207), hallazgos H-F2-10 y H-F2-11. Agrupados: comparten el patron del item 62
+— **la documentacion o el comentario afirma una garantia que el codigo no
+cumplimenta**. Verificado en codigo: **no**.
+
+**Origen:** agrupados por decision del 2026-10-07. Son LOW y de naturalezas
+distintas (codigo muerto vs comentarios), pero el patron es el mismo y separarlos
+los vuelve dos tickets sin relacion aparente.
+
+### H-F2-10 — codigo muerto y guards que no hacen lo que dicen
+
+- `TOPIC_BY_ACTION` en `mp-webhook-events.ts` es un espejo identico de
+  `TOPIC_BY_TYPE` con claves del tipo `payment.created` que **no coinciden con los
+  literales reales**: el fallback nunca se alcanza.
+- `daysRemaining` en `subscription-proration.ts` no tiene cap: el prorrateo es
+  incorrecto sobre periodos de 30 dias.
+- `NaN` pasa el guard `!= null` de H3: el warn se dispara siempre, con lo que deja
+  de ser una senal.
+
+**Recomendacion:** eliminar `TOPIC_BY_ACTION` o corregir sus claves; capar
+`daysRemaining`; cambiar el guard de H3 a un chequeo de finitud.
+
+### H-F2-11 — comentarios que no coinciden con el codigo
+
+- `subscriptions/route.ts:127-135` — el body se materializa **antes** del check de
+  tamano, asi que el 413 llega tarde. Ademas `rawBody.length` cuenta code units
+  UTF-16, no bytes.
+- `subscriptions/route.ts:73-84` — el comentario dice _"se degrada a `none`"_; el
+  codigo devuelve `serverError(...)`, o sea 500.
+- `preapproval/route.ts:151` — `payerEmail: email ?? ''` manda string vacio a
+  MercadoPago si falta el email.
+- `preapproval/route.ts:56` — el rate limit cubre solo el alta, no
+  `cancel`/`pause`/`resume`/`plan`.
+
+**Costo estimado:** ~3.5 h (2 h + 1.5 h).
+
+**Severidad:** LOW. Ninguno rompe un flujo; H-F2-11 es exactamente el modo de falla
+del item 62 a escala menor.
+
+---
+
+## 64. El `dataId` de la firma se lee solo del body (H-F2-2)
+
+**Estado:** abierto (2026-10-07). Verificado en codigo el 2026-10-07: **sigue
+vulnerable**.
+
+**Evidencia:** `apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts:151`
+— `dataId: parsed?.data?.id ?? ''`. Cero ocurrencias de `searchParams`, `nextUrl` o
+`request.url` en todo el archivo.
+
+**Impacto:** el plan (`docs/superpowers/plans/2026-10-01-fase2.md:597` y checkbox
+`:639`) pide `dataId` del query param con fallback al body, y testear ambos. No
+implementado ni testeado.
+
+**Severidad:** MEDIUM, no ALTO. El spike T0 registro tres entregas reales de MP y
+en las tres `data.id` vino **en el body** (`181244133433`, `7032544182`,
+`25f8cf82...`). Una severidad ALTO con el escenario "401 en cada entrega" no se
+sostiene con esa evidencia.
+
+**Riesgo residual real:** el spike **no observo**
+`subscription_preapproval_plan`, que es justamente el topic que sigue sin suscribir
+en el panel de MP. Si MP lo entrega solo en query string, ese topic da 401.
+
+**Relacionado:** accion operacional pendiente de suspender
+`subscription_preapproval_plan` en el panel. Implementar el fallback **despues** de
+suscribirlo, para poder probarlo.
+
+**Costo estimado:** 2 h.
+
+---
+
+## 65. El 409 de doble click omite `initPoint`, y un test consagra la forma equivocada (H-F2-3)
+
+**Estado:** abierto (2026-10-07). Verificado en codigo el 2026-10-07: **sigue
+presente**.
+
+**Evidencia:** `apps/admin/app/api/subscriptions/preapproval/route.ts` — el
+comentario de cabecera de `:39` promete _"Doble click -> 409 con el `initPoint`
+existente"_, pero los 409 de `:116`, `:129` y `:142` **no incluyen `initPoint`**.
+El test `route.test.ts:278-289` asserta la forma incorrecta, asi que **no falla**:
+consagra el error.
+
+**Impacto:** el plan (`:469`, `:481`) y el design (seccion 6.5) dicen que el 409
+devuelve `preapprovalId` con `initPoint` para que la UI pueda navegar al checkout.
+Cuando exista la UI, el tenant queda atrapado en `pending_first_payment` sin poder
+retomar el pago.
+
+**Por que no lo detecto la revision anterior:** nadie contrasto el archivo contra
+el plan de T4 ni contra su propio comentario de cabecera. Es el item 62 aplicado a
+un endpoint.
+
+**Costo estimado:** 1 h (agregar `initPoint` al 409 y corregir el test).
+
+---
+
+## 66. `redisPexpire` sin verificar puede dejar claves sin TTL para siempre (H-F2-4)
+
+**Estado:** abierto (2026-10-07). Verificado en codigo: no.
+
+**Evidencia:** `apps/admin/lib/subscriptions/handlers.ts:137-139` con
+`packages/commerce/src/redis.ts:73-84` y `:106-111`.
+
+**Impacto:** el PEXPIRE se intenta **solo si `count === 1`** y su resultado no se
+chequea (`safeRun` traga el error con `void`). Si falla, la key queda sin TTL, el
+contador crece sin limite y `count > limit` produce un **429 permanente** por IP.
+
+**Por que es un hallazgo y no una nota:** eso es **fail-closed**, y contradice tanto
+el docstring de `handlers.ts:114-118` como la convencion de AGENTS.md ("rate limits
+son fail-open: proteccion, no critica"). Un rate limit que bloquea para siempre es
+un denial of service construido a proposito.
+
+**Costo estimado:** 1 h (loguear el fallo y aceptar la key sin TTL con warning).
+
+---
+
+## 67. `external_reference` sin validar puede producir 500 (H-F2-5)
+
+**Estado:** abierto (2026-10-07). Verificado en codigo: no.
+
+**Evidencia:** `apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts:406`
+hacia `packages/db/src/index.ts:22`.
+
+**Impacto:** la estrategia R devuelve `external_reference` **sin validar que sea
+UUID**. `withTenantContext` corre `set_tenant_id(${tenantId}::uuid)`, que **lanza**
+ante un valor no-UUID, y eso es un **500** que dispara el **loop de reintentos de
+MercadoPago**. Rompe el invariante documentado de "si no resuelve -> `200` + warn,
+nunca `5xx`" (design secciones 3.5 y 6.2, paso 9).
+
+**Costo estimado:** 1 h (validar el formato UUID antes de invocar
+`withTenantContext`; si no matchea, `200` + warn).
+
+---
+
+## 68. `/preapproval` no re-verifica el monto que creo el preapproval (H-F2-6)
+
+**Estado:** abierto (2026-10-07). Verificado en codigo: no.
+
+**Evidencia:** `apps/admin/app/api/subscriptions/preapproval/route.ts:148-164`.
+
+**Impacto:** `plan/route.ts:260-287` y `mutate.ts` **si** re-verifican con un GET
+contra MP. `/preapproval` no. Es el borde exacto del item 48 (el bug del 100x): un
+`2xx` de MP no prueba que el monto sea el que se pidio. La unica deteccion es el
+warn de H3 en el webhook (`:542`), y **solo loguea**.
+
+**Costo estimado:** 2 h (re-verificar antes de persistir, alineando los tres
+endpoints).
+
+---
+
+## 69. Doble POST concurrente crea dos preapprovals en MercadoPago (H-F2-7)
+
+**Estado:** abierto (2026-10-07). Verificado en codigo: no.
+
+**Evidencia:** `apps/admin/app/api/subscriptions/preapproval/route.ts:76-131`.
+
+**Impacto:** guard read-then-act sin lock ni constraint unique. Dos requests
+concurrentes crean **dos preapprovals en MercadoPago**; el segundo pisa el
+`mpPreapprovalId` y deja un preapproval **huérfano en MP**, que hay que cancelar a
+mano. El rate limit (10/min por IP) no lo evita.
+
+**Por que importa mas de lo que sugiere el costo:** el design seccion 6.5 existe
+precisamente para evitar "dos suscripciones -> dos cobros". Hoy esa garantia no la
+impone el codigo.
+
+**Costo estimado:** 3 h (indice unico parcial sobre el estado pending, o lock por
+tenant).
+
+---
+
+## 70. read-modify-write sin `FOR UPDATE` (H-F2-8)
+
+**Estado:** abierto (2026-10-07). Verificado en codigo: no.
+
+**Evidencia:** `apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts:500-517`
+y `:603-611`.
+
+**Impacto:** `SELECT` sin `FOR UPDATE` y `UPDATE ... WHERE id + tenantId` sin
+compare-and-set. Dos eventos concurrentes (`preapproval.cancelled` vs
+`payment.approved`) compiten y gana el ultimo. Si queda `active` mientras MP dice
+`cancelled`, la suscripcion queda desincronizada hasta el proximo evento, o
+indefinidamente.
+
+**Costo estimado:** 3 h (`FOR UPDATE` en el select dentro de la transaccion, o
+compare-and-set sobre `lastProcessedPaymentId`).
+
+**Relacionado:** item 57 (`planId` desalineado si falla el GET) y la idempotencia
+por convergencia de H-F2-8 conviven en el mismo handler.
+
+---
+
+## 71. El secret de plataforma tiene fallback al del tenant (H-F2-9)
+
+**Estado:** abierto (2026-10-07). Verificado en codigo el 2026-10-07: **sigue
+presente**.
+
+**Evidencia:** `apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts:113-115`
+— `MP_PLATFORM_WEBHOOK_SECRET ?? MERCADOPAGO_WEBHOOK_SECRET`.
+
+**Impacto:** es el **unico archivo de produccion** donde conviven ambos secrets.
+Contradice literalmente ADR-023 ("cada flujo tiene su propio `WEBHOOK_SECRET`").
+
+**El codigo esta bien; el ADR esta incompleto.** El fallback es intencional y esta
+testeado: mitiga una regresion real — sin el, dev y preview daban 401. El problema
+no es el comportamiento, es que **el ADR no registra la excepcion**.
+
+**Por que se registra igual:** un ADR que el codigo contradice es peor que ningun
+ADR, porque el codigo es lo que se lee cuando algo falla a las 3 de la manana.
+
+**Costo estimado:** 0.5 h (actualizar ADR-023 con la excepcion y su razon).
+
+---
+
+## 72. README.md tiene una numeracion de fases que colisiona 1:1 con la del vault
+
+**Estado:** abierto (2026-10-07). Decision de Luis: **no es un fix, es una
+decision de alcance**. Va al SDD de Fase 3.
+
+**Hecho:** `README.md` define 6 secciones `## Fase N` con una numeracion propia:
+
+| README.md                                   | Numeracion vigente (`vault/04_Fases/`)                    |
+| ------------------------------------------- | --------------------------------------------------------- |
+| Fase 1 - Autenticacion y ordenes            | Fase 1 - modelo de datos (seed de planes + suscripciones) |
+| **Fase 2 - Dashboard y Stock**              | **Fase 2 - webhook de suscripciones + checkout dinamico** |
+| Fase 3 - Experiencia de Tienda Completa     | - sin equivalente vigente                                 |
+| Fase 4 - Autoservicio del Tenant            | - sin equivalente vigente                                 |
+| Fase 5 - Produccion                         | - cerrada el 2026-05-06                                   |
+| Fase 6 - RLS real (withTenantContext) y E2E | - cerrada el 2026-08-12                                   |
+
+**Impacto:** **"Fase 2" significa dos cosas distintas.** En README es "Dashboard y
+Stock"; en el vault es el webhook de suscripciones. **Las dos estan marcadas
+"Completada"**, asi que un lector no tiene forma de saber que son fases diferentes.
+README es la puerta de entrada del repo: el daño potencial es mayor que en
+`vault/05_Specs/brief-tecnico-fase-5.md`, que sufrio el mismo problema y ya fue
+marcado como historico (commit de saneamiento, 2026-10-07).
+
+**Por que no se arregla aca:** resolverlo exige decidir cual de las dos taxonomias
+manda y que se hace con las 6 secciones de README. Rewriting el indice de fases de
+la puerta de entrada es un cambio de documentacion de producto, no saneamiento. La
+misma decision de fondo que el blueprint v2.6 NO NORMATIVO, que tambien pide una
+decision y no una edicion.
+
+**Costo estimado:** 1 h de decision + rehacer la seccion de fases de README.
+
+**Relacionado:** `vault/05_Specs/brief-tecnico-fase-5.md` (misma colision, ya
+marcado historico) y la seccion "Blueprint vigente" de
+`vault/05_Specs/arquitectura.md`.

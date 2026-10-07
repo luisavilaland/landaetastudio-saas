@@ -479,7 +479,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**679 tests pasando, 0 fallos (69 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**705 tests pasando, 0 fallos (69 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
@@ -603,6 +603,16 @@ Actualización 3 de octubre de 2026 – 523 tests, 62 archivos, fix del stub del
 Actualización 3 de octubre de 2026 – 619 tests, 66 archivos, T4 de Fase 2 (6 endpoints de suscripciones). Rama `chore/t4-endpoints`.
 
 Actualización 4 de octubre de 2026 – 679 tests, 69 archivos, T5 de Fase 2 (handler del webhook de suscripciones). Rama `chore/t5-webhook-handler`.
+
+Actualización 6 de octubre de 2026 – 705 tests, 69 archivos, T6 de Fase 2 (tests de integración) + mini auditoría de calidad de tests. PR #201, #202.
+
+Actualización 6 de octubre de 2026 – 705 tests, 69 archivos, T7 de Fase 2 (documentación + memoria). PR #203.
+
+Actualización 6 de octubre de 2026 – 705 tests, 69 archivos, mini-PRs documentales: corrección del drift de topics de MP (3→4) y precondiciones de T8 (blueprint v2.6 NO NORMATIVO + `arquitectura.md` indexando Fase 2). PR #204, #205.
+
+Actualización 6 de octubre de 2026 – 705 tests, 69 archivos, T8 de Fase 2 (cierre formal) y auditoría de cierre: "Fase 2 pasa", 10 hallazgos de código (8 MEDIUM, 2 LOW) + 1 de proceso. PR #206, #207.
+
+Actualización 7 de octubre de 2026 – 705 tests, 69 archivos, lote de 9 PRs de Dependabot (#208, #210–#217) y migración de `@sentry/nextjs` v10 → v11 (#218). Sin cambios de variables de entorno en esta tanda. PR #208, #210–#218.
 
 ## URLs de producción (Vercel)
 

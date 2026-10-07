@@ -292,8 +292,8 @@ pnpm test
 
 | Métrica      | Valor     |
 | ------------ | --------- |
-| **Total**    | 679 tests |
-| **Pasando**  | 679 ✅    |
+| **Total**    | 705 tests |
+| **Pasando**  | 705 ✅    |
 | **Fallas**   | 0 ✅      |
 | **Archivos** | 69        |
 
@@ -312,6 +312,19 @@ pnpm test
 | Seguridad  | 5       | 5       | 0     | 0     |
 | **Total**  | **127** | **124** | **0** | **0** |
 
+> ⚠️ **Esta tabla está incompleta y no se corrigió** (nota agregada el
+> 2026-10-07). Los totales de cada columna cuadran:
+> `4+17+51+50+5 = 127` y `4+17+48+50+5 = 124`. Pero **127 − 124 = 3 ítems que no
+> están en ninguna columna**: la fila Admin marca 48 de 51 mientras ⚠️ y ❌ dicen 0. O se saltaron 3 ítems y no se registraron, o la columna ⚠️ se vació.
+>
+> **No se rellenó con números inventados.** Reconstruirlo exige correr el checklist
+> manual de 127 verificaciones (`TESTING-MANUAL.md`), que necesita las apps
+> levantadas y no es parte del DoD. Ese trabajo queda pendiente; lo que se hace acá
+> es dejar el hueco visible en lugar de taparlo.
+>
+> Ojo también: esta tabla cuenta **ítems de prueba manual**, no tests automatizados.
+> El contador de tests de este documento está arriba, en `### Tests Automáticos`.
+
 ---
 
 ## Notas
@@ -326,9 +339,14 @@ pnpm test
 - Actualización 3 de octubre de 2026 – 523 tests, 62 archivos, fix del stub de suscripciones: 6 casos de selección de secret y validación de firma en `apps/admin/app/api/webhooks/mercadopago/subscriptions/__tests__/route.test.ts`. Rama `chore/fix-webhook-subscriptions-secret`.
 - Actualización 3 de octubre de 2026 – 619 tests, 66 archivos, T4 de Fase 2: 96 casos nuevos para los 6 endpoints de suscripciones (`preapproval` con rate limit 10/60s y `payerEmail` tomado del JWT, `GET` con permisos, `cancel`/`pause`/`resume` con verificación post-escritura, `plan` con prorrateo 402/202) más el estado `paused` en la matriz de permisos. Rama `chore/t4-endpoints`.
 - Actualización 4 de octubre de 2026 – 679 tests, 69 archivos, T5 de Fase 2: 37 casos del handler del webhook (`__tests__/handler.test.ts`: 8 transiciones de §6.3, firma, clasificación, idempotencia por convergencia, resolución de tenant L+R, aislamiento cross-tenant, tolerancia a UNKNOWN) más 9 casos de `packages/commerce/src/__tests__/mp-subscriptions.test.ts`, los primeros tests directos del cliente de MP. Rama `chore/t5-webhook-handler`.
+- Actualización 6 de octubre de 2026 – 705 tests, 69 archivos, T6 de Fase 2 (tests de integración) más la mini auditoría de calidad de tests (#202). 3 tests nuevos sobre la suite de órdenes, base 702. PR #201, #202.
+- Actualización 6 de octubre de 2026 – 705 tests, 69 archivos, T7 de Fase 2 (documentación + memoria). PR #203.
+- Actualización 6 de octubre de 2026 – 705 tests, 69 archivos, mini-PRs documentales: drift de topics de MP en SETUP.md (3→4) y precondiciones de T8. PR #204, #205.
+- Actualización 6 de octubre de 2026 – 705 tests, 69 archivos, T8 de Fase 2 (cierre formal) y auditoría de cierre: veredicto "Fase 2 pasa", 10 hallazgos de código (8 MEDIUM, 2 LOW) + 1 hallazgo de proceso (item 62). T9 (polling) cancelado. PR #206, #207.
+- Actualización 7 de octubre de 2026 – 705 tests, 69 archivos, lote de 9 PRs de Dependabot (#208, #210–#217) y migración de `@sentry/nextjs` v10 → v11 (#218). DoD verde post-merge: lint 6/6, typecheck 9/9, build 3/3, format:check. PR #208, #210–#218.
 - Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
 - Fase 6 completada: withTenantContext real + FORCE RLS (app_user), E2E Playwright 15 specs con CI self-hosted, incidente RLS de 9 Server Components corregido (08-08).
-- Estado actual: 679 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
+- Estado actual: 705 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Sandbox manual de MercadoPago pendiente (cuenta de prueba de MP).
 - Ver AGENTS.md para detalles de convenciones de código y comandos obligatorios.
 

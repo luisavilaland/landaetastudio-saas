@@ -36,6 +36,42 @@ Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada AD
 | [ADR-026](../01_ADRs/ADR-026-resolucion-tenant-preapproval.md) | Resolución de tenant por preapprovalId sin contexto   | Aceptada — Fase 2           |
 | [ADR-027](../01_ADRs/ADR-027-planid-endpoint-write.md)         | `planId` se escribe en el endpoint, no en el webhook  | Aceptada — Fase 2           |
 
+## Discrepancias pendientes de resolver
+
+Seis ADR de la tabla de arriba están marcadas **"Aceptada — ver discrepancia"**,
+pero **la discrepancia no está escrita en ninguna parte**: ni en el ADR ni en este
+documento. El marcador dice que hay un problema conocido; el problema no está
+registrado.
+
+Se agrega esta sección el 2026-10-07 (saneamiento documental post-Fase 2) para
+que el marcador sea accionable. **No se resuelven acá** — documentar o quitar la
+marca es trabajo de fondo, no de saneamiento.
+
+| ADR     | Título                                | Discrepancia       |
+| ------- | ------------------------------------- | ------------------ |
+| ADR-001 | Multi-tenant con columna tenantId     | **No documentada** |
+| ADR-007 | Estructura de monorepo                | **No documentada** |
+| ADR-008 | Validación con Zod en toda la API     | **No documentada** |
+| ADR-013 | Configuración visual del tenant       | **No documentada** |
+| ADR-017 | Tests de "lógica pura" para endpoints | **No documentada** |
+| ADR-020 | Normalización de slugs                | **No documentada** |
+
+**Por qué importa.** Un ADR aceptado cuyo motivo se desconoce es peor que no
+tener ADR: da la impresión de que la decisión está cerrada cuando en realidad
+nadie puede decir qué se pidió. Mientras la columna diga "ver discrepancia" y no
+exista la discrepancia, esta tabla es la única forma de que alguien la encuentre.
+
+**Cómo cerrar cada una.** Dos salidas válidas, por ADR:
+
+1. La decisión sigue vigente → **quitar** el sufijo "— ver discrepancia" de la
+   tabla de arriba y dejar el ADR como "Aceptada".
+2. La decisión cambió o quedó obsoleta → **documentar la discrepancia** en el
+   ADR (qué promete, qué hace el código, por qué divergen) y decidir si hace
+   falta un ADR que la reemplace.
+
+**No se puede resolver solo con documentación**: cada una requiere comparar el
+ADR contra el código actual y decidir. Por eso no se resuelven en este PR.
+
 ## Fase 2 — Webhook de suscripciones + checkout dinámico
 
 Cerrada el 2026-10-06 (T0–T8). Decisiones de Fase 2 registradas en ADR-026 y ADR-027.
