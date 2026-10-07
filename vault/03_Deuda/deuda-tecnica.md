@@ -2813,23 +2813,51 @@ por convergencia de H-F2-8 conviven en el mismo handler.
 
 ## 71. El secret de plataforma tiene fallback al del tenant (H-F2-9)
 
-**Estado:** abierto (2026-10-07). Verificado en codigo el 2026-10-07: **sigue
-presente**.
+**Estado:** **RESUELTO** (2026-10-07). Fallback eliminado, fail-closed con 503.
 
-**Evidencia:** `apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts:113-115`
+**Evidencia original:** `apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts:113-115`
 — `MP_PLATFORM_WEBHOOK_SECRET ?? MERCADOPAGO_WEBHOOK_SECRET`.
 
 **Impacto:** es el **unico archivo de produccion** donde conviven ambos secrets.
 Contradice literalmente ADR-023 ("cada flujo tiene su propio `WEBHOOK_SECRET`").
 
-**El codigo esta bien; el ADR esta incompleto.** El fallback es intencional y esta
-testeado: mitiga una regresion real — sin el, dev y preview daban 401. El problema
-no es el comportamiento, es que **el ADR no registra la excepcion**.
+**Diagnostico original (SUPERADO por la decision de Luis).** Se registro que "el
+codigo esta bien; el ADR esta incompleto" y que el fallback era intencional porque
+mitigaba una regresion real: sin el, dev y preview daban 401. **Ese diagnostico
+estaba equivocado.** La mitigacion no era necesaria y el riesgo era mayor que el
+problema que resolvia — ver abajo.
 
-**Por que se registra igual:** un ADR que el codigo contradice es peor que ningun
-ADR, porque el codigo es lo que se lee cuando algo falla a las 3 de la manana.
+**Resolucion.** Decision de Luis: **sin fallback**. Si falta
+`MP_PLATFORM_WEBHOOK_SECRET` se devuelve 503 sin procesar el body y sin llamar a
+MercadoPago; MP reintenta hasta que el secret se restaure.
 
-**Costo estimado:** 0.5 h (actualizar ADR-023 con la excepcion y su razon).
+El riesgo real del fallback era cross-tenant: `MERCADOPAGO_WEBHOOK_SECRET` es el
+secret del flujo de ordenes de tienda, el mismo valor que el tenant pega en su
+onboarding. Aceptarlo como alternativa permitia que quien conociera el secret de
+**su propio tenant** firmara webhooks que el handler de plataforma aceptaba —
+bypass de la separacion plataforma/tenant que ADR-023 establece.
+
+**Que se hizo:**
+
+- `route.ts`: `const webhookSecret = process.env.MP_PLATFORM_WEBHOOK_SECRET ?? null`,
+  sin alternativa. Log `MP_PLATFORM_WEBHOOK_SECRET not configured` + 503. El 503 ya
+  existia; lo unico que cambio fue la eliminacion del `??`. El handler de
+  `MP_PLATFORM_ACCESS_TOKEN` (mas abajo en el mismo archivo) ya usaba este patron:
+  el secret ahora se parece al token.
+- Test: se elimino el que consagraba el fallback (`cae al secret del tenant...` → 200)
+  y se agrego `503 si falta el secret de plataforma aunque exista el del tenant`, que
+  ademas afirma que no se resolvio el tenant ni se llamo a la API de MP.
+- ADR-023: corregido el ambito de `MP_PLATFORM_WEBHOOK_SECRET` a `Vercel (apps/admin)`.
+  Decia `Vercel (storefront)` pero el handler vive en `apps/admin`.
+
+**Verificacion:** TDD. El test nuevo fallo primero con `expected 200 to be 503` — la
+prueba de que el fallback era exactamente lo que hacia pasar la peticion. DoD verde:
+lint 6/6, typecheck 9/9, build 3/3, test 705/705 (69 archivos, contador sin cambio:
+-1 test del fallback, +1 test del 503), `format:check` limpio.
+
+**Riesgo operativo asumido:** si el entorno Preview de Vercel no tiene
+`MP_PLATFORM_WEBHOOK_SECRET`, el webhook devuelve 503 ahi hasta que se agregue la
+variable. Fail-closed correcto, pero hay que confirmar la variable antes de mergear.
 
 ---
 
