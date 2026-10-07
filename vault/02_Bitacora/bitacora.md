@@ -4035,3 +4035,66 @@ documento de fase.
 el `WHERE` de una query: si no lo verificás contra la fuente, te miente con la misma
 autoridad. Y un número que coincide con lo esperado es la forma más común de no
 verificar nada.
+
+---
+
+## 2026-10-07 - Item 71 (H-F2-9): sin fallback del secret de plataforma
+
+**Rama:** `fix/h-f2-9-platform-secret-no-fallback` desde `develop` @ `7342f3d`
+**Scope:** 1 handler + su suite + ADR-023 + item 71.
+
+### Qué cambió
+
+`apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts` resolvía el secret
+como `MP_PLATFORM_WEBHOOK_SECRET ?? MERCADOPAGO_WEBHOOK_SECRET`. Se eliminó la
+alternativa: ahora es `process.env.MP_PLATFORM_WEBHOOK_SECRET ?? null`, con 503 si
+falta.
+
+El riesgo era cross-tenant: `MERCADOPAGO_WEBHOOK_SECRET` es el secret del flujo de
+órdenes de tienda — el mismo valor que el tenant pega en su onboarding. Con el
+fallback, quien conociera el secret de su propio tenant firmaba webhooks que el
+handler de plataforma aceptaba.
+
+### El 503 ya existía
+
+El plan daba por hecho que había que agregar un 503. No: ya estaba, y el handler de
+`MP_PLATFORM_ACCESS_TOKEN` sesenta líneas más abajo usaba exactamente el patrón
+correcto (`?? null` + 503). El diff real fueron 4 líneas de código. El fix consistió
+en hacer que el secret se pareciera al token, no en inventar una convención nueva.
+
+### El diagnóstico del item 71 estaba equivocado
+
+El item se registró diciendo "el código está bien; el ADR está incompleto", y que el
+fallback era intencional porque sin él dev y preview daban 401. **Era incorrecto.**
+La mitigación no era necesaria y el riesgo que cubría era peor que el problema que
+resolvía. Corregido en el item, preservando el diagnóstico original como historial.
+
+### TDD: el test demostró el bug
+
+El test nuevo (`503 si falta el secret de plataforma aunque exista el del tenant`)
+falló primero con `expected 200 to be 503`. Ese 200 **era** el fallback. El contador
+quedó en 705: se eliminó el test que consagraba el fallback y se agregó el del 503.
+
+### Corrección de alcance en ADR-023
+
+`MP_PLATFORM_WEBHOOK_SECRET` figuraba como `Vercel (storefront)`. El handler vive en
+`apps/admin`. Corregido, con la decisión de "sin fallback" documentada.
+
+### Riesgo operativo asumido
+
+Si el entorno Preview de Vercel no tiene `MP_PLATFORM_WEBHOOK_SECRET`, el webhook
+devuelve 503 ahí hasta que se agregue la variable. Fail-closed correcto, pero **hay
+que confirmar la variable antes de mergear**. Local no se rompe: `.env.local` tiene
+las dos.
+
+**What:** fallback del secret de plataforma eliminado; 503 fail-closed sin procesar
+el body. Item 71 resuelto, ADR-023 corregido.
+**Why:** bypass cross-tenant — el secret del tenant firmaba webhooks de plataforma.
+**Where:** `apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts`,
+`apps/admin/app/api/webhooks/mercadopago/subscriptions/__tests__/handler.test.ts`,
+`vault/01_ADRs/ADR-023-dos-flujos-mp.md`, `vault/03_Deuda/deuda-tecnica.md`.
+**Learned:** un item de deuda puede registrar el síntoma correcto y el diagnóstico
+invertido. "El código está bien; el ADR está incompleto" era una hipótesis razonable
+— y de haberla aceptado, el bypass cross-tenant quedaba normalizado por escrito.
+Cuando el hallazgo de una auditoría y una decisión de producto chocan, el artefacto
+hay que corregirlo: si no, el próximo que lo lea hereda el error como precedente.

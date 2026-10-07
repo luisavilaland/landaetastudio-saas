@@ -105,19 +105,20 @@ export async function POST(request: NextRequest) {
     //    PLATAFORMA, no la del tenant (Flujo B). Validar contra el equivocado
     //    produce 401 sobre un webhook que si llego.
     //
+    //    Item 71 (H-F2-9): SIN fallback. ADR-023 separa los dos secretos, asi que
+    //    el del tenant no es una alternativa valida — aceptarlo permitiria firmar
+    //    webhooks de plataforma con el secret de un tenant cualquiera.
+    //    Fail-closed: si falta el de plataforma se responde 503 y MP reintenta
+    //    hasta que se restaure. Mismo criterio que MP_PLATFORM_ACCESS_TOKEN mas
+    //    abajo.
+    //
     //    Acceso directo a process.env (no via packages/validation):
     //    validateEnv() corre en el layout.tsx de la app y ya valida que
-    //    estas variables esten presentes y no vacias al arrancar. El fallback
-    //    ?? al secret del tenant no se puede expresar en el schema, que exige
-    //    min(1).
-    const webhookSecret =
-      process.env.MP_PLATFORM_WEBHOOK_SECRET ??
-      process.env.MERCADOPAGO_WEBHOOK_SECRET
+    //    estas variables esten presentes y no vacias al arrancar.
+    const webhookSecret = process.env.MP_PLATFORM_WEBHOOK_SECRET ?? null
 
     if (!webhookSecret) {
-      logger.error(
-        'No webhook secret configured (MP_PLATFORM_WEBHOOK_SECRET or MERCADOPAGO_WEBHOOK_SECRET)',
-      )
+      logger.error('MP_PLATFORM_WEBHOOK_SECRET not configured')
       return NextResponse.json(
         { error: 'Webhook not configured' },
         { status: 503 },

@@ -288,16 +288,23 @@ describe('firma', () => {
     expect(res.status).toBe(503)
   })
 
-  it('cae al secret del tenant si el de plataforma NO esta configurado', async () => {
-    // Mitad de la regresion que arreglo el PR #187. Sin este caso, cambiar el
-    // `??` por `||` o borrar el fallback pasaria los tests y dejaria el webhook
-    // con 401 en dev y preview, donde solo esta el secret del tenant.
+  it('503 si falta el secret de plataforma aunque exista el del tenant', async () => {
+    // Item 71 (H-F2-9). El secret del tenant NO es una alternativa valida: sin el
+    // de plataforma se responde 503 sin procesar. Si cayera al del tenant, quien
+    // conociera el secret de su propio tenant firmaria webhooks que el handler de
+    // plataforma acepta, rompiendo la separacion que fija ADR-023.
     delete process.env.MP_PLATFORM_WEBHOOK_SECRET
     process.env.MERCADOPAGO_WEBHOOK_SECRET = TENANT_SECRET
 
     const res = await POST(request(body('payment', PAYMENT_ID), TENANT_SECRET))
 
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(503)
+    // El body no se procesa: no se resuelve el tenant ni se llama a la API de MP.
+    expect(getPreapproval).not.toHaveBeenCalled()
+    expect(getPayment).not.toHaveBeenCalled()
+    expect(loggerError).toHaveBeenCalledWith(
+      'MP_PLATFORM_WEBHOOK_SECRET not configured',
+    )
   })
 
   it('con el de plataforma configurado, una firma del secret del tenant da 401', async () => {

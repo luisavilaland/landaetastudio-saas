@@ -24,6 +24,17 @@ Implementar dos flujos de MercadoPago completamente independientes:
 
 El `external_reference` de la preapproval de suscripción lleva el `tenantId` para identificar qué tenant activar al recibir el pago.
 
+**Sin fallback entre secrets (item 71, H-F2-9, 2026-10-07).** Cada flujo usa
+exclusivamente su propio secret. El handler de suscripciones (`apps/admin`) **no** cae
+a `MERCADOPAGO_WEBHOOK_SECRET` si falta `MP_PLATFORM_WEBHOOK_SECRET`: devuelve **503
+sin procesar el body** y MercadoPago reintenta hasta que la variable se restaure.
+
+La razón por la que importa: `MERCADOPAGO_WEBHOOK_SECRET` es el secret del flujo de
+órdenes de tienda, el mismo valor que el tenant pega en su onboarding. Aceptarlo como
+alternativa permitía que quien conociera el secret de **su propio tenant** firmara
+webhooks que el handler de plataforma aceptaba — un bypass de la separación que esta
+ADR establece. Fail-closed, igual que `MP_PLATFORM_ACCESS_TOKEN` en el mismo handler.
+
 ## Alternativas consideradas
 
 1. **Cuenta única con sub-cuentas / credenciales OAuth:** Descartada. Agrega complejidad operativa, responsabilidad legal de custodio de fondos, y requiere gestión de `refresh_tokens` por tenant.
@@ -51,7 +62,7 @@ El `external_reference` de la preapproval de suscripción lleva el `tenantId` pa
 | Variable                     | Uso                                                  | Ámbito                  |
 | ---------------------------- | ---------------------------------------------------- | ----------------------- |
 | `MP_PLATFORM_ACCESS_TOKEN`   | Token de nuestra cuenta MP para cobrar suscripciones | Vercel (todas las apps) |
-| `MP_PLATFORM_WEBHOOK_SECRET` | Secret del webhook de suscripciones (nuestra cuenta) | Vercel (storefront)     |
+| `MP_PLATFORM_WEBHOOK_SECRET` | Secret del webhook de suscripciones (nuestra cuenta) | Vercel (apps/admin)     |
 
 ## Referencias
 
