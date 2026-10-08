@@ -2718,21 +2718,54 @@ un endpoint.
 
 ## 66. `redisPexpire` sin verificar puede dejar claves sin TTL para siempre (H-F2-4)
 
-**Estado:** abierto (2026-10-07). Verificado en codigo: no.
+**Severidad:** **MEDIA-ALTA** (subida desde MEDIUM el 2026-10-09).
+**Estado:** RESUELTO (2026-10-09). Ref: issue #228. Hallazgo **H-F2-4** (no H-F2-7:
+ese es el item 69, ya resuelto en #222).
+**Verificado en codigo:** si (2026-10-09).
 
-**Evidencia:** `apps/admin/lib/subscriptions/handlers.ts:137-139` con
-`packages/commerce/src/redis.ts:73-84` y `:106-111`.
+**Evidencia del bug (antes del fix):** `packages/commerce/src/redis.ts:106-111` hacia
+`await safeRun('pexpire', ...)` y **descartaba** el resultado. `safeRun` (L73-84) devuelve
+`T | null` y traga el error en `logger.warn` + Sentry. Un `pexpire` fallido era
+**indistinguible de uno exitoso a nivel de tipos**.
 
-**Impacto:** el PEXPIRE se intenta **solo si `count === 1`** y su resultado no se
-chequea (`safeRun` traga el error con `void`). Si falla, la key queda sin TTL, el
-contador crece sin limite y `count > limit` produce un **429 permanente** por IP.
+**Alcance real: 2 apps, no 1.**
 
-**Por que es un hallazgo y no una nota:** eso es **fail-closed**, y contradice tanto
-el docstring de `handlers.ts:114-118` como la convencion de AGENTS.md ("rate limits
-son fail-open: proteccion, no critica"). Un rate limit que bloquea para siempre es
-un denial of service construido a proposito.
+- `apps/admin/lib/subscriptions/handlers.ts:138` → lockout permanente del alta de
+  suscripciones.
+- `apps/storefront/app/api/checkout/preference/route.ts:29` → lockout permanente del
+  checkout. `apps/storefront/lib/redis.ts:7` re-exporta la misma funcion `void`.
 
-**Costo estimado:** 1 h (loguear el fallo y aceptar la key sin TTL con warning).
+**Huellas del descuido (por que el control no lo atajaba):**
+
+- En `handlers.ts` el `redisIncr` siguiente **si** se verifica (L129-135, `count === null`
+  → fail-open). Solo el write del TTL quedo sin verificar.
+- Los 2 tests mockeaban el contrato viejo: `mockResolvedValue('OK')` en storefront
+  (un contrato que la implementacion nunca tuvo) y `mockResolvedValue(undefined)` en admin.
+  Como el mock es un `vi.fn()` **sin tipar**, `tsc` nunca valido el contrato: los tests
+  pasaban en verde sobre un contrato falso.
+- `packages/commerce/src/redis.ts` no tenia **ningun** test. La firma no estaba verificada
+  en ninguna parte, y `redisPing` —el patron a copiar— tampoco.
+
+**Fix:** `redisPexpire` → `Promise<boolean>`, copiando la forma de `redisPing`
+(`result === 'PONG'` → `result === 1`; `0` = clave inexistente y `null` = error se
+mapean ambos a `false`, porque en los dos casos el TTL **no** quedo aplicado).
+
+**El punto que no alcanza — y por que el fix borra la clave:** log + fail-open en el
+camino de fallo deja pasar **este** request pero no deshace nada: `count === 1` no se
+repite y nadie reintenta el TTL, asi que la clave sigue sin vencimiento y el 429
+permanente ocurre igual. Por eso el camino de `false` hace **`redisDel`**: el siguiente
+request vuelve a ver `count === 1` y **reintenta**. La degradacion es que el rate limit
+puede no aplicarse, en vez de bloquear al tenant para siempre. Eso es fail-open de
+verdad, y es lo que pedia el propio item ("fail-closed es un DoS construido a proposito").
+
+**Tests:** 4 del contrato nuevo en `packages/commerce/src/__tests__/redis.test.ts` +
+2 por call site (TTL aplicado → no borra; TTL falló → borra la misma clave) + 1 de
+regresión (Redis caído en `redisIncr` → no toca el TTL). 6 de los 10 fallan sin el fix
+(verificado con `git stash push` del codigo fuente). Los 2 mocks corregidos: si no,
+quedan mentirosos y los tests pasan sin quejarse.
+
+**Costo real:** ~1.5 h (el estimado original de 1 h asumia "loguear el fallo y aceptar la
+key sin TTL", que es justamente la parte que **no** resolvia el lockout).
 
 ---
 
@@ -3215,3 +3248,63 @@ un archivo limpio.
 - Item 75: un valor corrupto compartido entre mock y assertion.
 - Item 79: un shell que convierte bytes en texto donde se cree que
   mueve archivos.
+
+## 80. Los PRs que cierran items no siempre actualizan la bitacora
+
+**Severidad:** BAJA.
+**Estado:** ABIERTO.
+**Origen:** Detectado durante la verificacion de bitacora del 2026-10-09.
+
+**Problema:** de los 10 PRs mergeados desde 2026-10-07, 7 no tienen entrada en
+`vault/02_Bitacora/bitacora.md`. Solo uno es un hueco material: **#225**, que
+mergeo el item 79 (deuda nueva, MEDIA) y la regla 6.5 de `AGENTS.md` sin
+registrar ninguno de los dos.
+
+Los otros 6 son chores o bumps (`#217` deps, `#218` sentry, `#221` exports de
+Engram, `#219` saneamiento de docs) y no justificación para una entrada. `#219`
+es el borderline: "9 items, 8 commits, solo .md" — si algumo de esos 9 items
+cambio de estado, eso es historia y no quedo escrita.
+
+**Evidencia:** la entrada de cierre del 2026-10-08 enumera la familia "un control
+que parece cubrir y cubre otra" con cuatro casos y dice "ver arriba". El item 79 es
+**el cuarto miembro de esa familia** y su entrada no existia, asi que la narrativa
+no cerraba.
+
+**Riesgo:** bajo en impacto directo, alto en el otro sentido. La bitacora es lo
+unico que dice _por que_ una decision se tomo. Una leccion que solo vive en
+`deuda-tecnica.md` y `AGENTS.md` no aparece cuando alguien lee la historia del
+proyecto, y el error se re-descubre.
+
+**Mitigacion propuesta:** agregar al checklist de cierre de PR (en `AGENTS.md`) un
+paso explicito: **"si el PR cierra un item, introduce una regla en `AGENTS.md` o
+cambia el estado de un item, verificar que la bitacora tenga entrada."** El
+checklist de cierre ya tiene un item para Engram y otro para la bitacora, pero
+ninguno que los condiciona entre si.
+
+## 81. Un stash parcial no protege el working tree, y `stash pop` puede aplicar sobre la rama equivocada
+
+**Severidad:** MEDIA.
+**Estado:** ABIERTO.
+**Origen:** Detectado durante el incidente del worktree de Paseo en el PR #227.
+
+**Problema 1 — el stash protege solo lo stasheado.** Durante el PR #227 se corrio
+`git stash push -- apps/admin/.../route.ts` para verificar que los tests nuevos
+fallaban sin el fix. El worktree de Paseo se auto-elimino a mitad del trabajo. El
+`route.ts` sobrevivio (esta en `stash@{0}`) porque **el stash vive en el repo
+principal, no en el worktree**. Los 4 tests, que eran cambios de working tree
+nunca stasheados, se perdieron y hubo que reescribirlos.
+
+**Problema 2 — `stash pop` aplica sobre la rama del worktree donde corre.** El
+pop se ejecuto en el worktree principal, que estaba en `develop`, y aplico el fix
+ahi en vez de en la rama del fix. Se detecto y se movio antes de commitear, pero
+por millimetros el fix entra a `develop` sin review.
+
+**Evidencia:** `origin/develop` nunca se toco (verificado con `git log
+origin/develop` antes y despues del commit). La rama `fix/h-f2-6-...` arrastro el
+cambio en el `checkout` porque ambas estaban en el mismo commit.
+
+**Mitigacion:** (a) **en worktrees que pueden morir, commit o stash seguido —
+nunca stash parcial de un archivo que se esta verificando en rojo**; (b) un stash
+parcial da sensacion de red sin darla, que es peor que no tenerla; (c) verificar
+`git branch --show-current` despues de toda operacion que mueva cambios entre
+ramas, antes de commitear.

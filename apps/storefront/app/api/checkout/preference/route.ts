@@ -10,7 +10,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { checkoutPreferenceSchema } from '@repo/validation'
 import { getTenantId } from '@/lib/tenant'
 import { getStorefrontBaseUrl } from '@/lib/request'
-import { redisIncr, redisPexpire } from '@/lib/redis'
+import { redisDel, redisIncr, redisPexpire } from '@/lib/redis'
 import { createLogger } from '@/lib/logger'
 
 const logger = createLogger('checkout-preference')
@@ -26,7 +26,18 @@ async function rateLimitKey(ip: string): Promise<number> {
     return 0
   }
   if (current === 1) {
-    await redisPexpire(key, RATE_LIMIT_WINDOW_MS)
+    const ttlApplied = await redisPexpire(key, RATE_LIMIT_WINDOW_MS)
+    if (!ttlApplied) {
+      // Item 66 (H-F2-7): la clave queda sin TTL, el contador sigue subiendo y
+      // se llega a un 429 que no se recupera nunca. Log + fail-open no alcanza:
+      // `current === 1` no se repite y nadie reintenta el TTL. Borrar la clave
+      // hace que el proximo request vuelva a ver `current === 1` y reintente.
+      logger.warn(
+        { ip },
+        'Could not set rate limit TTL, retrying on next request',
+      )
+      await redisDel(key)
+    }
   }
   return current
 }

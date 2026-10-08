@@ -4334,3 +4334,65 @@ repo principal) pero los tests eran cambios de working tree y se perdieron. **`g
 solo protege lo que stasheás** — un archivo sin commitear en un worktree que puede desaparecer
 no tiene red. (4) `git worktree prune` no limpió la registration de un worktree cuyo
 directorio ya no existía: hubo que borrar `.git/worktrees/<nombre>` a mano.
+
+### 2026-10-08 — PR #225: arranque de sesión 2026-10-09 (backfill)
+
+> Esta entrada se registra el 2026-10-09. El PR #225 mergeó el 2026-10-08 sin entrada: el
+> hueco se detectó al verificar la bitácora contra los PRs mergeados. Va al final por la
+> regla append-only, aunque sea cronológicamente anterior a la entrada de H-F2-6.
+
+**What:** PR #225 (merge `1090c85`). Pusheó el commit `5e5b4db` (exports de Engram del
+cierre de sesión, que quedó local por branch protection de `develop`), registró el item 79
+en `deuda-tecnica.md` y agregó la regla 6.5 a `AGENTS.md`.
+**Why:** el push directo a `develop` había fallado por branch protection y el commit quedó
+colgado en local. Además, el cierre de la sesión anterior había detectado que PowerShell
+había inventado un tercer bug de encoding en una sola sesión, y la lección no estaba escrita
+en ningún lado.
+**Where:** `vault/03_Deuda/deuda-tecnica.md` (item 79), `AGENTS.md` L112-119 (regla 6.5),
+`vault/engram/`.
+**Learned:** (1) **Item 79 — cuarto miembro de la familia "un control que parece cubrir y
+cubre otra".** PowerShell con `>` decodifica el blob a string *antes* de escribir, así que
+medir bytes de un archivo temporal mide un artefacto del shell, no el archivo. En el cierre
+de #224 se reportó "68 U+FFFD en offset 968" sobre un blob que estaba **limpio** (3229
+bytes, 0 U+FFFD, idéntico al worktree): tres veces en una sesión, PowerShell inventó un bug
+de encoding. Es la cuarta variante de la familia, después de los items 62 (un nombre hizo el
+trabajo de la review), 61 (un mock hizo invisible el `WHERE`) y 75 (un valor corrupto
+compartido entre mock y assertion). (2) **La entrada de cierre del 2026-10-08 enumera esa
+familia con cuatro casos y dice "ver arriba"; este era el miembro que faltaba.** Sin esta
+entrada, la narrativa no cerraba: el próximo lector iba a re-descubrir el error de PowerShell
+porque la lección solo vivía en `deuda-tecnica.md` y en `AGENTS.md`. (3) **Regla 6.5 en
+`AGENTS.md`:** toda medición de bytes pasa por Node (`child_process.execFileSync` con
+`git cat-file blob`) o por `git diff --numstat`, nunca por `>`. Un `Get-Content` sin
+`-Encoding UTF8` es la misma trampa del otro lado: lee mal en vez de escribir mal.
+
+### 2026-10-09 — Item 66 (H-F2-4) resuelto: `redisPexpire` verificable
+
+**What:** `redisPexpire()` pasó de `Promise<void>` a `Promise<boolean>` en
+`packages/commerce/src/redis.ts`, copiando la forma de `redisPing`. En el camino de `false`,
+los 2 call sites hacen `redisDel` de la clave. Item 66 de MEDIUM a **MEDIA-ALTA** y a
+RESUELTO. Registrados los items 80 y 81.
+**Why:** la función descartaba el resultado de `safeRun`, así que un `pexpire` fallido era
+indistinguible de uno exitoso a nivel de tipos. La clave quedaba sin TTL, el contador subía
+sin reintento (el `count === 1` no se repite) y se llegaba a un **429 permanente** por IP
+con ventana de 60s.
+**Where:** `packages/commerce/src/redis.ts`, `apps/admin/lib/subscriptions/handlers.ts`,
+`apps/storefront/app/api/checkout/preference/route.ts`,
+`packages/commerce/src/__tests__/redis.test.ts` (nuevo), los 2 tests de call site,
+`vault/03_Deuda/deuda-tecnica.md` (items 66, 80, 81), issue #228.
+**Learned:** (1) **Fail-open sin autoreparacion no es fail-open, es solo un log.** Log + fail-open en
+el camino de fallo deja pasar *este* request pero no deshace nada: nadie reintenta el TTL, la
+clave sigue sin vencimiento y el 429 permanente ocurre igual. Lo que hace falta es `redisDel`,
+para que el siguiente request vuelva a ver `count === 1` y reintente. La degradación —
+"el rate limit puede no aplicarse" — es el precio correcto; el precio incorrecto era
+"el tenant queda bloqueado para siempre". (2) **El control que parece cubrir, cubre otra cosa,
+por sexta vez.** `apps/admin/tsconfig.json` excluye `**/__tests__/**` y los mocks son
+`vi.fn()` sin tipar, así que `mockResolvedValue('OK')` sobre una función `void` pasaba el
+DoD en verde. `tsc` nunca vio el contrato. Corregir los mocks es parte del fix, no un
+detalle: si no, quedan mentirosos. (3) **`redis.ts` no tenía ningún test.** El patrón a
+copiar (`redisPing`) tampoco. La firma nueva no estaba verificada en ninguna parte, así que
+se agregó cobertura de contrato. (4) **Trazabilidad: el hallazgo es H-F2-4, no H-F2-7.** El
+brief traía H-F2-7, que es el item 69 (doble POST concurrente, ya resuelto en #222). Segunda
+vez en dos PRs que el ref del brief no coincide con `deuda-tecnica.md` — el mapeo item ↔
+hallazgo está en la tabla de las auditorías de fase y conviene leerlo antes de nombrar una
+rama. (5) **Topología de worktree:** este PR se hizo en el worktree principal con la rama
+checkouteada, no en un worktree de Paseo. El de #227 se auto-eliminó a mitad del trabajo.
