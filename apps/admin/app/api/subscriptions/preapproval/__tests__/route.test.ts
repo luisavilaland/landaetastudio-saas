@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { withTenantContext } from '@repo/db'
 import { makeTxMock, session, mockReq } from '@repo/test-utils'
 
@@ -75,7 +75,7 @@ function req(ip = '1.2.3.4', body: unknown = {}) {
 interface ReservationSlot {
   /** Valor que la DB tiene ahora en `mpPreapprovalId`. */
   holder: string | null
-  /** Reserva creada por ESTE flujo. El cierre solo escribe si sigue siendo la dueÃ±a. */
+  /** Reserva creada por ESTE flujo. El cierre solo escribe si sigue siendo la dueña. */
   mine: string | null
 }
 
@@ -84,7 +84,7 @@ interface ReservationSlot {
  * compartido, en vez de un `returning` fijo.
  *
  * Item 69: el punto del fix es que la escritura de la reserva sea condicional.
- * Un mock que devuelve `[{ id }]` siempre no probaria nada â€” pasaria con y sin
+ * Un mock que devuelve `[{ id }]` siempre no probaria nada — pasaria con y sin
  * el fix. Este lo hace fallar cuando el slot ya esta tomado, que es exactamente
  * lo que hace PostgreSQL con `WHERE mpPreapprovalId IS NULL`.
  */
@@ -142,7 +142,7 @@ beforeEach(() => {
   mockCtx(sub())
 })
 
-describe('POST /api/subscriptions/preapproval â€” auth', () => {
+describe('POST /api/subscriptions/preapproval — auth', () => {
   it('401 sin sesion', async () => {
     vi.mocked(auth).mockResolvedValue(null)
 
@@ -166,7 +166,7 @@ describe('POST /api/subscriptions/preapproval â€” auth', () => {
   })
 })
 
-describe('POST /api/subscriptions/preapproval â€” happy path', () => {
+describe('POST /api/subscriptions/preapproval — happy path', () => {
   it('201 con preapprovalId e initPoint, y persiste el id en la DB', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
 
@@ -176,7 +176,7 @@ describe('POST /api/subscriptions/preapproval â€” happy path', () => {
     expect(res.status).toBe(201)
     expect(body.preapprovalId).toBe('preapproval-nuevo')
     expect(body.initPoint).toContain('mercadopago.com.ar')
-    // Item 69: tres conTenantContext, no dos â€” leer, reservar y cerrar. Cada
+    // Item 69: tres conTenantContext, no dos — leer, reservar y cerrar. Cada
     // escritura va en su propia transaccion.
     expect(withTenantContext).toHaveBeenCalledTimes(3)
   })
@@ -214,7 +214,7 @@ describe('POST /api/subscriptions/preapproval â€” happy path', () => {
   })
 
   it('toma el payerEmail del JWT, no de un header del cliente', async () => {
-    vi.mocked(auth).mockResolvedValue(session('tenant-1', 'dueÃ±o@tenant.com'))
+    vi.mocked(auth).mockResolvedValue(session('tenant-1', 'dueño@tenant.com'))
 
     // Un header arbitrario no debe poder redirigir el cobro.
     const request = mockReq('POST', {}, {
@@ -226,7 +226,7 @@ describe('POST /api/subscriptions/preapproval â€” happy path', () => {
     await POST(request)
 
     const [input] = vi.mocked(createPreapproval).mock.calls[0]
-    expect(input?.payerEmail).toBe('dueÃ±o@tenant.com')
+    expect(input?.payerEmail).toBe('dueño@tenant.com')
   })
 
   it('persiste el preapprovalId con su propia transaccion (SET LOCAL no sobrevive)', async () => {
@@ -242,7 +242,7 @@ describe('POST /api/subscriptions/preapproval â€” happy path', () => {
   })
 })
 
-describe('POST /api/subscriptions/preapproval â€” rate limit', () => {
+describe('POST /api/subscriptions/preapproval — rate limit', () => {
   it('429 al superar 10 intentos en la ventana, sin llamar a MP', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
     vi.mocked(redisIncr).mockResolvedValue(11)
@@ -303,7 +303,7 @@ describe('POST /api/subscriptions/preapproval â€” rate limit', () => {
   })
 })
 
-describe('POST /api/subscriptions/preapproval â€” guardas', () => {
+describe('POST /api/subscriptions/preapproval — guardas', () => {
   it('404 si el tenant no tiene suscripcion', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
     mockCtx(null)
@@ -407,7 +407,7 @@ describe('POST /api/subscriptions/preapproval â€” guardas', () => {
   })
 })
 
-describe('POST /api/subscriptions/preapproval â€” aislamiento multi-tenant', () => {
+describe('POST /api/subscriptions/preapproval — aislamiento multi-tenant', () => {
   it('abre el contexto con el tenantId de la sesion y lo manda a MP', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-77'))
 
@@ -442,7 +442,7 @@ describe('POST /api/subscriptions/preapproval â€” aislamiento multi-tenant'
 // Item 69 (H-F2-7): reserva antes de llamar a MP
 // ---------------------------------------------------------------------------
 
-describe('item 69 â€” reserva: doble POST concurrente', () => {
+describe('item 69 — reserva: doble POST concurrente', () => {
   it('crea UN solo preapproval en MP con dos POST en paralelo', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
     const slot: ReservationSlot = { holder: null, mine: null }
@@ -532,7 +532,7 @@ describe('item 69 â€” reserva: doble POST concurrente', () => {
   })
 })
 
-describe('item 69 â€” la reserva tiene TTL', () => {
+describe('item 69 — la reserva tiene TTL', () => {
   it('409 con "creacion en curso" si la reserva es reciente', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
     // Reserva viva: escrita hace 10 s, muy dentro del TTL.
@@ -577,7 +577,7 @@ describe('item 69 â€” la reserva tiene TTL', () => {
   })
 
   it('el TTL de la reserva es de 5 minutos', async () => {
-    // La constante es parte del contrato con el tenant: "reintentÃ¡ en X
+    // La constante es parte del contrato con el tenant: "reintentá en X
     // minutos" tiene que ser cierto.
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
     mockCtx(
@@ -614,7 +614,7 @@ describe('item 69 â€” la reserva tiene TTL', () => {
   })
 })
 
-describe('item 69 â€” la reserva sobrevive a la llamada de MP', () => {
+describe('item 69 — la reserva sobrevive a la llamada de MP', () => {
 it('si el cierre no puede escribir, el huerfano queda registrado', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
     const slot: ReservationSlot = { holder: null, mine: null }
