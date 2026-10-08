@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, dbSubscriptions, dbPlans, withTenantContext } from '@repo/db'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, isNull, like, lt, or } from 'drizzle-orm'
 import { createPreapproval, toMpAmount } from '@repo/commerce'
 import { getAdminBaseUrl } from '@/lib/get-admin-base-url'
 import { createLogger } from '@/lib/logger'
@@ -23,6 +23,49 @@ const logger = createLogger('admin-subscriptions-preapproval')
 const bodySchema = z.object({})
 
 const RATE_LIMIT = 10
+
+/**
+ * Prefijo del valor centinela que ocupa el slot mientras se crea el preapproval.
+ *
+ * Item 69 (H-F2-7): `mpPreapprovalId` guarda un valor que NO es un id de MP
+ * durante la ventana entre "decido crear" y "MP me devolvio el id". No puede
+ * ser un id real (no existe todavia) ni NULL (no ocuparia el slot).
+ */
+const RESERVATION_PREFIX = 'pending:'
+
+/**
+ * Quanto vive una reserva antes de poder tomarse de nuevo.
+ *
+ * Es la ventana en la que un proceso puede estar entre la reserva y el cierre.
+ * Pasada, se asume que el proceso murio a mitad de camino y otro puede tomar el
+ * lugar — el tenant no queda bloqueado por un crash.
+ *
+ * El costo asumido: si MP rechaza la creacion, la reserva sigue viva hasta que
+ * vence el TTL y el tenant recibe un 409 con "reintenta en unos minutos" en vez
+ * de poder reintentar al instante. Es fail-closed con una ventana de espera, y
+ * se prefiere a crear un preapproval huerfano que hay que cancelar a mano.
+ */
+const PENDING_RESERVATION_TTL_MS = 5 * 60_000
+
+function reservationFor(subscriptionId: string): string {
+  return `${RESERVATION_PREFIX}${subscriptionId}`
+}
+
+function isReservation(value: string): boolean {
+  return value.startsWith(RESERVATION_PREFIX)
+}
+
+/** Respuesta 409 para una reserva viva. El `retryInSeconds` es actionable. */
+function reservationInFlight(retryInSeconds: number) {
+  return NextResponse.json(
+    {
+      error: 'La creacion del preapproval esta en curso. Reintenta en unos minutos.',
+      field: 'preapproval',
+      retryInSeconds,
+    },
+    { status: 409 },
+  )
+}
 
 /**
  * Crea el preapproval de MercadoPago para el tenant y devuelve el
@@ -80,6 +123,9 @@ export async function POST(request: NextRequest) {
           status: dbSubscriptions.status,
           mpPreapprovalId: dbSubscriptions.mpPreapprovalId,
           planId: dbSubscriptions.planId,
+          // Item 69: la edad de la reserva se decide con `updatedAt`, porque no
+          // hay columna de reserva y no se quiere una migracion por esto.
+          updatedAt: dbSubscriptions.updatedAt,
         })
         .from(dbSubscriptions)
         .where(eq(dbSubscriptions.tenantId, tenantId))
@@ -117,17 +163,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Ya hay un preapproval sin pagar: devolver el mismo init_point en vez de
-    // crear otro.
-    if (subscription.subscription.mpPreapprovalId) {
+    // Item 69: tres casos distintos y la confusion entre ellos es el bug.
+    const currentPreapprovalId = subscription.subscription.mpPreapprovalId
+
+    if (currentPreapprovalId && !isReservation(currentPreapprovalId)) {
+      // Preapproval real pendiente de pago: devolver el mismo, no crear otro.
+      // Que sea viejo no lo cambia — un id de MP no es una reserva.
       return NextResponse.json(
         {
           error: 'Ya existe una suscripcion pendiente de pago',
           field: 'preapproval',
-          preapprovalId: subscription.subscription.mpPreapprovalId,
+          preapprovalId: currentPreapprovalId,
         },
         { status: 409 },
       )
+    }
+
+    if (currentPreapprovalId && isReservation(currentPreapprovalId)) {
+      const ageMs =
+        Date.now() - new Date(subscription.subscription.updatedAt).getTime()
+
+      if (ageMs < PENDING_RESERVATION_TTL_MS) {
+        // Otra peticion esta creando el preapproval ahora mismo. Todavia no
+        // existe un id de MP, asi que decir "ya tenes un preapproval" seria
+        // mandar al tenant a uno que no existe.
+        return reservationInFlight(
+          Math.ceil((PENDING_RESERVATION_TTL_MS - ageMs) / 1000),
+        )
+      }
+      // Reserva vencida: se sigue y la nueva la reemplaza. Es el camino de
+      // recuperacion cuando el proceso anterior murio con la reserva viva.
     }
 
     // `pending_first_payment` es el unico estado desde el que se puede iniciar
@@ -140,6 +205,46 @@ export async function POST(request: NextRequest) {
           status: subscription.subscription.status,
         },
         { status: 409 },
+      )
+    }
+
+    // --- Item 69: RESERVA. Ocupa el slot de forma condicional, ANTES de llamar
+    // a MP. Dos POST concurrentes: uno gana la reserva, el otro recibe 0 filas
+    // y devuelve 409 sin haber creado nada en MP.
+    //
+    // Es un compare-and-set, no un lock: la condicion va en el WHERE de la
+    // escritura. No se usa `FOR UPDATE` ni advisory lock porque la llamada a MP
+    // ocurre FUERA de esta transaccion — un lock de fila seria inútil para
+    // protegerla y solo agrega contención.
+    const reservation = reservationFor(subscription.subscription.id)
+    const staleBefore = new Date(Date.now() - PENDING_RESERVATION_TTL_MS)
+
+    const reserved = await withTenantContext(tenantId, async (tx) => {
+      const rows = await tx
+        .update(dbSubscriptions)
+        .set({ mpPreapprovalId: reservation, updatedAt: new Date() })
+        .where(
+          and(
+            eq(dbSubscriptions.id, subscription.subscription.id),
+            eq(dbSubscriptions.tenantId, tenantId),
+            or(
+              isNull(dbSubscriptions.mpPreapprovalId),
+              and(
+                like(dbSubscriptions.mpPreapprovalId, `${RESERVATION_PREFIX}%`),
+                lt(dbSubscriptions.updatedAt, staleBefore),
+              ),
+            ),
+          ),
+        )
+        .returning({ id: dbSubscriptions.id })
+      return rows.length
+    })
+
+    if (reserved === 0) {
+      // Perdimos la carrera contra otra peticion que reservo entre nuestra
+      // lectura y nuestra escritura. No se llamo a MP: no hay huerfano.
+      return reservationInFlight(
+        Math.ceil(PENDING_RESERVATION_TTL_MS / 1000),
       )
     }
 
@@ -174,19 +279,42 @@ export async function POST(request: NextRequest) {
       return serverError('Respuesta inesperada de MercadoPago', null)
     }
 
-    // Segunda transaccion, deliberada: si esto falla, el preapproval ya existe
-    // en MP y hay que reconciliarlo por logs.
-    await withTenantContext(tenantId, (tx) =>
-      tx
+    // Cierre de la reserva: se reemplaza el centinela por el id real de MP. Tambien
+    // condicional — si la reserva dejo de ser nuestra, otro proceso la tomó y el
+    // preapproval que acabamos de crear queda huerfano en MP.
+    const finalized = await withTenantContext(tenantId, async (tx) => {
+      const rows = await tx
         .update(dbSubscriptions)
         .set({ mpPreapprovalId: preapprovalId, updatedAt: new Date() })
         .where(
           and(
             eq(dbSubscriptions.id, subscription.subscription.id),
             eq(dbSubscriptions.tenantId, tenantId),
+            eq(dbSubscriptions.mpPreapprovalId, reservation),
           ),
-        ),
-    )
+        )
+        .returning({ id: dbSubscriptions.id })
+      return rows.length
+    })
+
+    if (finalized === 0) {
+      // El preapproval existe en MP pero la DB no lo apunta: hay que
+      // reconciliarlo a mano. El log lo deja explicito en vez de devolver 201 y
+      // hacer creer que quedo bien.
+      logger.error(
+        { preapprovalId, tenantId },
+        'Orphaned preapproval: the reservation was taken over while MP was called',
+      )
+      return NextResponse.json(
+        {
+          error:
+            'La creacion del preapproval se completo en MercadoPago pero no pudo confirmarse. Contacta a soporte.',
+          field: 'preapproval',
+          preapprovalId,
+        },
+        { status: 409 },
+      )
+    }
 
     return NextResponse.json(
       { preapprovalId, initPoint },

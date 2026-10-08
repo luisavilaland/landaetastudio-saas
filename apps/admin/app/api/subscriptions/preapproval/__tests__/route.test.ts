@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { withTenantContext } from '@repo/db'
 import { makeTxMock, session, mockReq } from '@repo/test-utils'
 
@@ -71,6 +71,64 @@ function req(ip = '1.2.3.4', body: unknown = {}) {
   })
 }
 
+/** Estado compartido del slot que ocupa la reserva. */
+interface ReservationSlot {
+  /** Valor que la DB tiene ahora en `mpPreapprovalId`. */
+  holder: string | null
+  /** Reserva creada por ESTE flujo. El cierre solo escribe si sigue siendo la dueÃ±a. */
+  mine: string | null
+}
+
+/**
+ * Tx que simula la reserva como un compare-and-set real sobre un slot
+ * compartido, en vez de un `returning` fijo.
+ *
+ * Item 69: el punto del fix es que la escritura de la reserva sea condicional.
+ * Un mock que devuelve `[{ id }]` siempre no probaria nada â€” pasaria con y sin
+ * el fix. Este lo hace fallar cuando el slot ya esta tomado, que es exactamente
+ * lo que hace PostgreSQL con `WHERE mpPreapprovalId IS NULL`.
+ */
+function reservationTx(
+  row: unknown,
+  plan: unknown,
+  slot: ReservationSlot,
+) {
+  const tx = makeTxMock({
+    select: [
+      { data: row === null ? [] : [row], terminal: 'limit' },
+      { data: plan === null ? [] : [plan], terminal: 'limit' },
+    ],
+  })
+
+  let written: unknown
+  tx.set.mockImplementation((values: Record<string, unknown>) => {
+    written = values.mpPreapprovalId
+    return tx
+  })
+  tx.returning.mockImplementation(async () => {
+    const value = written as string
+    if (typeof value !== 'string') return [{ id: 'sub-1' }]
+
+    // Reserva (`pending:<id>`): solo gana si el slot esta libre.
+    if (value.startsWith('pending:')) {
+      if (slot.holder !== null) return []
+      slot.holder = value
+      slot.mine = value
+      return [{ id: 'sub-1' }]
+    }
+
+    // Cierre (id real de MP): solo escribe si la fila sigue teniendo NUESTRA
+    // reserva. Si otro proceso reservo o ya escribio su id, no puede.
+    if (slot.holder !== null && slot.holder === slot.mine) {
+      slot.holder = `closed:${slot.mine}`
+      return [{ id: 'sub-1' }]
+    }
+    return []
+  })
+
+  return tx
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   process.env.MP_PLATFORM_ACCESS_TOKEN = TOKEN
@@ -84,7 +142,7 @@ beforeEach(() => {
   mockCtx(sub())
 })
 
-describe('POST /api/subscriptions/preapproval — auth', () => {
+describe('POST /api/subscriptions/preapproval â€” auth', () => {
   it('401 sin sesion', async () => {
     vi.mocked(auth).mockResolvedValue(null)
 
@@ -108,7 +166,7 @@ describe('POST /api/subscriptions/preapproval — auth', () => {
   })
 })
 
-describe('POST /api/subscriptions/preapproval — happy path', () => {
+describe('POST /api/subscriptions/preapproval â€” happy path', () => {
   it('201 con preapprovalId e initPoint, y persiste el id en la DB', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
 
@@ -118,8 +176,9 @@ describe('POST /api/subscriptions/preapproval — happy path', () => {
     expect(res.status).toBe(201)
     expect(body.preapprovalId).toBe('preapproval-nuevo')
     expect(body.initPoint).toContain('mercadopago.com.ar')
-    // La escritura del mpPreapprovalId es una 2da transaccion explicita.
-    expect(withTenantContext).toHaveBeenCalledTimes(2)
+    // Item 69: tres conTenantContext, no dos â€” leer, reservar y cerrar. Cada
+    // escritura va en su propia transaccion.
+    expect(withTenantContext).toHaveBeenCalledTimes(3)
   })
 
   it('manda el precio en la moneda de MP, no en centavos', async () => {
@@ -155,7 +214,7 @@ describe('POST /api/subscriptions/preapproval — happy path', () => {
   })
 
   it('toma el payerEmail del JWT, no de un header del cliente', async () => {
-    vi.mocked(auth).mockResolvedValue(session('tenant-1', 'dueño@tenant.com'))
+    vi.mocked(auth).mockResolvedValue(session('tenant-1', 'dueÃ±o@tenant.com'))
 
     // Un header arbitrario no debe poder redirigir el cobro.
     const request = mockReq('POST', {}, {
@@ -167,21 +226,23 @@ describe('POST /api/subscriptions/preapproval — happy path', () => {
     await POST(request)
 
     const [input] = vi.mocked(createPreapproval).mock.calls[0]
-    expect(input?.payerEmail).toBe('dueño@tenant.com')
+    expect(input?.payerEmail).toBe('dueÃ±o@tenant.com')
   })
 
-  it('persiste el preapprovalId con una 2da transaccion (SET LOCAL no sobrevive)', async () => {
+  it('persiste el preapprovalId con su propia transaccion (SET LOCAL no sobrevive)', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
 
     await POST(req())
 
-    // Dos conTenantContext: leer y luego escribir. Un unico
-    // `db.execute(SET LOCAL)` fuera de transaccion perderia el tenant.
-    expect(withTenantContext).toHaveBeenCalledTimes(2)
+    // Tres conTenantContext: leer, reservar y cerrar. Un unico
+    // `db.execute(SET LOCAL)` fuera de transaccion perderia el tenant. Son tres
+    // y no uno justamente porque la llamada a MP ocurre en el medio: cada
+    // escritura necesita su propio contexto de tenant.
+    expect(withTenantContext).toHaveBeenCalledTimes(3)
   })
 })
 
-describe('POST /api/subscriptions/preapproval — rate limit', () => {
+describe('POST /api/subscriptions/preapproval â€” rate limit', () => {
   it('429 al superar 10 intentos en la ventana, sin llamar a MP', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
     vi.mocked(redisIncr).mockResolvedValue(11)
@@ -242,7 +303,7 @@ describe('POST /api/subscriptions/preapproval — rate limit', () => {
   })
 })
 
-describe('POST /api/subscriptions/preapproval — guardas', () => {
+describe('POST /api/subscriptions/preapproval â€” guardas', () => {
   it('404 si el tenant no tiene suscripcion', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
     mockCtx(null)
@@ -346,7 +407,7 @@ describe('POST /api/subscriptions/preapproval — guardas', () => {
   })
 })
 
-describe('POST /api/subscriptions/preapproval — aislamiento multi-tenant', () => {
+describe('POST /api/subscriptions/preapproval â€” aislamiento multi-tenant', () => {
   it('abre el contexto con el tenantId de la sesion y lo manda a MP', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-77'))
 
@@ -374,5 +435,210 @@ describe('POST /api/subscriptions/preapproval — aislamiento multi-tenant', () 
     expect(firstCall?.[0]).toBe('tenant-77')
     const [input] = vi.mocked(createPreapproval).mock.calls[0]
     expect(input?.externalReference).toBe('tenant-77')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Item 69 (H-F2-7): reserva antes de llamar a MP
+// ---------------------------------------------------------------------------
+
+describe('item 69 â€” reserva: doble POST concurrente', () => {
+  it('crea UN solo preapproval en MP con dos POST en paralelo', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    const slot: ReservationSlot = { holder: null, mine: null }
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(reservationTx(sub(), PLAN, slot)),
+    )
+    // Los 50 ms son la ventana real del bug: el request a MP tarda, y el 2do
+    // POST entra mientras el 1ro esta esperando la respuesta.
+    vi.mocked(createPreapproval).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      return {
+        id: 'preapproval-nuevo',
+        init_point: 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=x',
+      }
+    })
+
+    const responses = await Promise.all([POST(req()), POST(req())])
+
+    // El punto del item: sin la reserva esto seria 2 llamadas a MP y un
+    // preapproval huerfano que hay que cancelar a mano.
+    expect(createPreapproval).toHaveBeenCalledTimes(1)
+    expect(responses.map((r) => r.status).sort()).toEqual([201, 409])
+  })
+
+  it('el 409 del perdedor no dice "ya tenes un preapproval"', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    const slot: ReservationSlot = { holder: null, mine: null }
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(reservationTx(sub(), PLAN, slot)),
+    )
+    vi.mocked(createPreapproval).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      return {
+        id: 'preapproval-nuevo',
+        init_point: 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=x',
+      }
+    })
+
+    const responses = await Promise.all([POST(req()), POST(req())])
+    const conflict = await (
+      responses.find((r) => r.status === 409) as Response
+    ).json()
+
+    // No hay preapproval todavia: la reserva esta en curso. Decir "ya tenes un
+    // preapproval" manda al tenant a uno que no existe.
+    expect(conflict.error).toMatch(/en curso/i)
+    expect(conflict.field).toBe('preapproval')
+  })
+
+  it('la reserva escribe un centinela antes de llamar a MP', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    const slot: ReservationSlot = { holder: null, mine: null }
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(reservationTx(sub(), PLAN, slot)),
+    )
+    // El valor se captura DURANTE la llamada a MP: al terminar, la reserva ya
+    // fue cerrada con el id real y `holder` es `closed:...`.
+    let atMpCall: string | null = null
+    vi.mocked(createPreapproval).mockImplementation(async () => {
+      atMpCall = slot.holder
+      return {
+        id: 'preapproval-nuevo',
+        init_point: 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=x',
+      }
+    })
+
+    await POST(req())
+
+    // La primera escritura tiene que ser la reserva, no el id de MP: cuando se
+    // llama a MP todavia no existe ningun id que escribir.
+    expect(atMpCall).toMatch(/^pending:/)
+  })
+
+  it('el id final de MP se escribe encima de la reserva', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    const slot: ReservationSlot = { holder: null, mine: null }
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(reservationTx(sub(), PLAN, slot)),
+    )
+
+    const res = await POST(req())
+    const body = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(body.preapprovalId).toBe('preapproval-nuevo')
+    expect(slot.holder).toBe('closed:pending:sub-1')
+  })
+})
+
+describe('item 69 â€” la reserva tiene TTL', () => {
+  it('409 con "creacion en curso" si la reserva es reciente', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    // Reserva viva: escrita hace 10 s, muy dentro del TTL.
+    mockCtx(
+      sub({
+        mpPreapprovalId: 'pending:sub-1',
+        updatedAt: new Date(Date.now() - 10_000),
+      }),
+    )
+
+    const res = await POST(req())
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.error).toMatch(/en curso/i)
+    expect(body.retryInSeconds).toBeGreaterThan(0)
+    expect(createPreapproval).not.toHaveBeenCalled()
+  })
+
+  it('permite reservar de nuevo si la reserva vencio (proceso muerto)', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    const slot: ReservationSlot = { holder: null, mine: null }
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(
+        reservationTx(
+          sub({
+            mpPreapprovalId: 'pending:sub-1',
+            // Mas viejo que PENDING_RESERVATION_TTL_MS: nadie completo el
+            // proceso. La reserva tiene que poder tomarse.
+            updatedAt: new Date(Date.now() - 6 * 60_000),
+          }),
+          PLAN,
+          slot,
+        ),
+      ),
+    )
+
+    const res = await POST(req())
+
+    expect(res.status).toBe(201)
+    expect(createPreapproval).toHaveBeenCalledTimes(1)
+  })
+
+  it('el TTL de la reserva es de 5 minutos', async () => {
+    // La constante es parte del contrato con el tenant: "reintentÃ¡ en X
+    // minutos" tiene que ser cierto.
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    mockCtx(
+      sub({
+        mpPreapprovalId: 'pending:sub-1',
+        updatedAt: new Date(Date.now() - 10_000),
+      }),
+    )
+
+    const res = await POST(req())
+    const body = await res.json()
+
+    // ~5 min menos los 10 s que pasaron.
+    expect(body.retryInSeconds).toBeGreaterThan(250)
+    expect(body.retryInSeconds).toBeLessThanOrEqual(300)
+  })
+
+  it('un preapproval real (no centinela) no se confunde con una reserva', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    // Aunque sea viejo, un id de MP es un id de MP: no se puede re-reservar.
+    mockCtx(
+      sub({
+        mpPreapprovalId: 'preapproval-real',
+        updatedAt: new Date(Date.now() - 60 * 60_000),
+      }),
+    )
+
+    const res = await POST(req())
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.preapprovalId).toBe('preapproval-real')
+    expect(createPreapproval).not.toHaveBeenCalled()
+  })
+})
+
+describe('item 69 â€” la reserva sobrevive a la llamada de MP', () => {
+it('si el cierre no puede escribir, el huerfano queda registrado', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    const slot: ReservationSlot = { holder: null, mine: null }
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(reservationTx(sub(), PLAN, slot)),
+    )
+    // La reserva se gana normalmente. El takeover ocurre DURANTE la llamada a
+    // MP, que es la ventana real del bug: entre que reservamos y que cerramos.
+    vi.mocked(createPreapproval).mockImplementation(async () => {
+      slot.holder = 'pending:otra-suscripcion'
+      return {
+        id: 'preapproval-nuevo',
+        init_point: 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=x',
+      }
+    })
+
+    const res = await POST(req())
+    const body = await res.json()
+
+    // El preapproval existe en MP pero la DB no lo apunta: no se puede
+    // devolver 201. El 409 lo dice explicitamente en vez de mentir.
+    expect(res.status).toBe(409)
+    expect(body.preapprovalId).toBe('preapproval-nuevo')
+    expect(body.error).toMatch(/soporte/i)
+    expect(createPreapproval).toHaveBeenCalledTimes(1)
   })
 })

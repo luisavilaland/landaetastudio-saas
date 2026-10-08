@@ -4098,3 +4098,83 @@ invertido. "El código está bien; el ADR está incompleto" era una hipótesis r
 — y de haberla aceptado, el bypass cross-tenant quedaba normalizado por escrito.
 Cuando el hallazgo de una auditoría y una decisión de producto chocan, el artefacto
 hay que corregirlo: si no, el próximo que lo lea hereda el error como precedente.
+
+---
+
+## 2026-10-07 - Cluster H-F2: items 69 + 70 (serialización en mutaciones)
+
+**Rama:** `fix/h-f2-69-70-mutation-serialization` desde `develop` @ `9633f37`
+**Alcance:** 2 endpoints de suscripción, sus suites, ADR-028 nuevo, items 69/70/73/74.
+
+### El path del plan estaba mal
+
+El plan pedía leer `apps/admin/app/api/webhooks/mercadopago/subscriptions/handlers.ts`.
+**Ese archivo no existe.** `applyTransition` vive en `route.ts:497`, dentro del mismo
+archivo de 791 líneas que contiene el handler POST. Un plan que nombra un archivo que
+no existe hace que quien lo ejecute revise el repo entero antes de encontrarlo.
+
+### Ningún lock en el proyecto — y esorushovó la decisión
+
+`FOR UPDATE`, `for("update")`, `skipLocked`, `pg_advisory_lock`: **cero ocurrencias** en
+`apps/`, `packages/` y `e2e/`. Elegir `FOR UPDATE` habría sido el primer lock de fila del
+proyecto, con un costo de verificación que nadie pagó antes.
+
+El compare-and-set ya existía: el **item 1 (TOCTOU checkout)** lo resolvió con
+`gte(stock, qty)` en el `WHERE` + `.returning()`. Mismo problema, misma solución, en
+producción. La consistencia con un precedente probado ganó a la alternativa
+teóricamente más "correcta".
+
+### El 409 del perdedor dice una cosa que antes no se decía
+
+Antes, doble click significaba "ya tenés un preapproval". Con la reserva hay un estado
+intermedio que **no es** un preapproval: el proceso está creando uno ahora mismo. La
+respuesta cambió a "la creación está en curso, reintentá en N minutos", con
+`retryInSeconds` accionable. Confundir los dos casos mandaba al tenant a un preapproval
+inexistente.
+
+### Dead code encontrado de paso: item 74
+
+La rama `target === current` de `applyTransition`, que devuelve `reason: 'converged'`,
+**es inalcanzable**. Recorriendo `decideTarget` contra `CANCELLABLE`, `PAUSABLE` y
+`REVIVABLE`, ningún camino devuelve un valor igual a `current`. El primer test escrito
+para el item 70 la asumía alcanzable y falló con
+`expected 'no_transition' to be 'converged'`.
+
+Se registró como item 74 y **no se tocó en este PR**: es diagnóstico de este trabajo,
+no parte del fix. El riesgo es futuro: si alguien agrega `cancelled` a `CANCELLABLE`, la
+rama despierta con una semántica que nunca fue probada.
+
+### El mock importa tanto como el fix
+
+El test de concurrencia **no habría detectado el bug** con un `returning()` que devuelve
+`[{ id }]` siempre: pasaría con y sin el fix. El mock simula el slot como
+compare-and-set real sobre un estado compartido, y el takeover ocurre *durante* la
+llamada a MP, que es la ventana exacta donde el bug vive.
+
+Eso tuvo un costo: tres assertions mías fallaron porque asumían cosas que el código real
+no hacía (mirar `slot.holder` después del cierre; tomar el slot antes de reservar;
+confundir "cualquier centinela" con "mi centinela"). El mock falso que escribe tests
+verdes es la forma más común de test que no testea nada.
+
+**What:** reserva condicional con centinela `pending:<id>` antes de llamar a MP, y
+compare-and-set sobre `status` en el webhook. Items 69, 70 resueltos; 73 y 74
+registrados. ADR-028 creado.
+**Why:** doble POST concurrente creaba dos preapproval en MP con un huérfano por
+cancelar; dos webhooks concurrentes competían por last-write-wins y podían dejar la
+suscripción desincronizada de MP.
+**Where:** `apps/admin/app/api/subscriptions/preapproval/route.ts`,
+`apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts`,
+sus `__tests__/route.test.ts` y `__tests__/handler.test.ts`,
+`vault/01_ADRs/ADR-028-reserva-condicional-antes-de-crear.md`,
+`vault/03_Deuda/deuda-tecnica.md`, `vault/05_Specs/arquitectura.md`.
+**Learned**: (1) **Un `returning()` que devuelve `[{ id }]` siempre es un test que no
+testea nada** — pasa idéntico con y sin el fix. Para probar un compare-and-set, el mock
+tiene que simular el slot compartido y poder devolver 0 filas. (2) **La reserva crea un
+estado que el código no tenía** y obliga a revisar todos los lectores de la columna:
+`mpPreapprovalId` dejó de ser "id de MP o null". La estrategia L del webhook resuelve por
+`preapproval_id` real, así que un centinela nunca desvía un webhook — pero eso hubo que
+verificarlo, no suponerlo. (3) **El fallo de MP con la reserva viva produce un costo
+visible al tenant**: no puede reintentar hasta el TTL. Fail-closed con espera es mejor
+que un huérfano, pero es una decisión de producto y quedó documentada como tal.
+(4) Verificar `decideTarget` contra sus tres tablas.encontró código muerto que el
+comentario del propio código describía como un mecanismo activo.

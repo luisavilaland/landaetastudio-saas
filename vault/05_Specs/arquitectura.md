@@ -35,6 +35,7 @@ Este documento indexa las Decisiones de Arquitectura (ADR) del proyecto. Cada AD
 | [ADR-025](../01_ADRs/ADR-025-plantillas-composiciones.md)      | Sistema de plantillas intercambiables (composiciones) | Aceptada                    |
 | [ADR-026](../01_ADRs/ADR-026-resolucion-tenant-preapproval.md) | Resolución de tenant por preapprovalId sin contexto   | Aceptada — Fase 2           |
 | [ADR-027](../01_ADRs/ADR-027-planid-endpoint-write.md)         | `planId` se escribe en el endpoint, no en el webhook  | Aceptada — Fase 2           |
+| [ADR-028](../01_ADRs/ADR-028-reserva-condicional-antes-de-crear.md) | Reserva condicional antes de crear un recurso externo | Aceptada — Fase 2   |
 
 ## Discrepancias pendientes de resolver
 
