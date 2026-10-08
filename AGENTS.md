@@ -83,13 +83,31 @@ Antes de considerar cualquier tarea como finalizada, el código debe ejecutar si
 
 ```bash
 pnpm lint          # eslint (turbo run lint)
-pnpm format:check  # prettier --check sobre **/*.md (corre en CI)
+pnpm format:check  # prettier --check sobre **/*.md + check de encoding (corre en CI)
 pnpm typecheck     # tsc --noEmit en todas las apps y paquetes
 pnpm build         # next build en las tres apps
 pnpm test          # vitest (todos los tests existentes)
 ```
 
 > `pnpm lint` NO corre prettier. El check de formato de markdown es `pnpm format:check`, y corre en el job `build` de CI. Si tocás archivos `.md`, corré `pnpm format:check` antes de commitear o el CI falla.
+>
+> **`format:check` incluye el check de encoding** (`scripts/check-encoding.mjs`, item 75), que
+> es el **único** control del repo que detecta doble encoding. ESLint, `tsc`, vitest y
+> prettier son ciegos a esto porque el archivo sigue siendo **UTF-8 válido**: un
+> `.ts` con caracteres corruptos pasa los 727 tests.
+>
+> Detecta: `U+FFFD` (byte no UTF-8), `U+FEFF` al inicio (BOM), doble encoding de 2 bytes
+> (`U+00C3` + Latin-1, o sea una vocal acentuada rota) y de 3 bytes (`U+00E2 U+20AC` +
+> puntuación cp1252, o sea una raya o comilla tipográfica rota), más control chars fuera de
+> tab/LF/CR.
+>
+> **No escribas los caracteres corruptos ni en código, ni en comentarios, ni en tests, ni
+> en documentación** — ni siquiera como ejemplo en el detector. Describilos por codepoint
+> (`String.fromCharCode(0x00c3, 0x00b1)`). Escribir el mojibake a mano lo mete en el repo.
+>
+> **Causa raíz en Windows:** un `Get-Content` **sin `-Encoding UTF8`** decodifica UTF-8 como
+> ANSI, y el `Set-Content -Encoding UTF8` siguiente escribe el resultado deformado **más un
+> BOM**. Para editar archivos del repo usá la herramienta de edición, no PowerShell.
 
 ⚠️ `ignoreBuildErrors` DEBE ser `false` en `next.config.mjs`. Nunca usar `ignoreBuildErrors: true`.
 

@@ -3000,7 +3000,7 @@ diagnostico de este PR, no parte del fix.
 
 ## 75. GGA no cubre los tests, y los tests son donde el mojibake queda consagrado
 
-**Estado:** abierto (2026-10-07). Severidad MEDIA.
+**Estado:** **RESUELTO** (2026-10-08). Check de encoding por codepoints en `format:check`.
 
 **Origen:** detectado al corregir doble encoding en
 `apps/admin/app/api/subscriptions/preapproval/__tests__/route.test.ts` (PR #222,
@@ -3009,39 +3009,45 @@ review de luisavilaland).
 **Problema:** `.gga:40` tiene `EXCLUDE_PATTERNS="*test.ts,*spec.ts,*d.ts,..."`. La
 memoria obs 142 afirma que "GGA es el unico control que detecta doble encoding". Es
 cierto para codigo de produccion — el mojibake que GGA detecto antes estaba en
-`preapproval/route.ts` — pero deja los archivos de test sin ninguna red.
+`preapproval/route.ts` — pero dejaba los archivos de test sin ninguna red.
 
-**Evidencia:**
+**Resolucion:** `scripts/check-encoding.mjs`, Node puro sin dependencias, wireado a
+`format:check` como `prettier --check "**/*.md" && pnpm check:encoding`. Sale de ahi un
+`check:encoding` invocable aislado para debug.
 
-- El archivo tenia doble encoding en 14 lugares y un BOM, y convivio con **727 tests
-  verdes**. El archivo sigue siendo UTF-8 valido, asi que ESLint, `tsc`, vitest y
-  prettier no tienen nada que senalar.
-- El test de `payerEmail` afirmaba contra la cadena corrupta y pasaba igual: el mock y
-  la asercion compartian el mismo valor. **727 tests verdes sobre una direccion de
-  correo que nadie escribiria.**
-- Al commitear el fix **sin `--no-verify`**, el hook respondio literalmente
-  `No matching files staged for commit`: no habia nada que revisar.
+Detecta por codepoint: `U+FFFD`, `U+FEFF` al inicio, doble encoding de 2 bytes
+(`U+00C3` + Latin-1), de 3 bytes (`U+00E2 U+20AC` + mapeo cp1252) y control chars fuera
+de tab/LF/CR. Cubre `.ts .tsx .js .jsx .mjs .cjs .md .json .sql .yml .yaml .sh` en
+`apps/`, `packages/`, `scripts/`, `docs/`, `vault/` y raiz. Excluye `vault/engram/`
+(tool-managed) y artefactos de build. **NO excluye `packages/db/migrations/`**: las
+migraciones son inmutables y si una tuviera mojibake hay que saberlo.
 
-**Por que importa mas de lo que sugiere el costo:** un string corrupto en produccion
-se ve — el usuario ve el texto roto. Un string corrupto en un test se **consagra**:
-queda codificado como la verdad esperada y el suite lo protege. El dano es peor,
-porque se autoperpetua.
+**Que NO se toco y por que:** `vault/02_Bitacora/bitacora.md` y
+`vault/03_Deuda/deuda-tecnica.md` conservan corrupcion preexistente. Son archivos
+append-only/acumulativos: corregirlos exige **reconstruir los bytes**, no editar a mano.
+Quedan en la lista `KNOWN_CORRUPT` del script, que los reporta como warning visible
+sin bloquear el merge. PR aparte.
 
-**Fix propuesto:** agregar un check de encoding por codepoints a `format:check`. Cubre
-todo el repo incluido los `.md` de `vault/`, es barato, y **no toca el exclude de GGA**,
-que existe por una razon valida: los tests son ruido para una review de IA.
+**Verificacion:**
 
-**Alternativa descartada:** sacar `*test.ts` de los `EXCLUDE_PATTERNS` de GGA. El
-motivo del exclude sigue siendo correcto para el review de IA; el problema es de
-alcance del control, no de que el control sea equivocado.
+- 11 tests nuevos en `scripts/__tests__/check-encoding.test.ts` (contador 727 -> 738).
+- **TDD real:** el detector falló el test de 3 bytes en RED. Mi condicion inicial
+  exigia un tercer codepoint en rango Latin-1 `U+0080..U+00BF`, pero el tercero de una
+  raya rota (U+2014) es **U+201D**, fuera de ese rango. El rango Latino-1 solo aplica
+  a las secuencias de 2 bytes; las de 3 bytes terminan en los mapeos de cp1252
+  `0x80-0x9F`. Corregido con el conjunto explicito.
+- Prueba end-to-end: tres archivos sonda generados **por codepoint** (no escritos a
+  mano) con mojibake de 2 bytes, BOM y control char. Los tres detectados, exit 1.
+  Eliminados los tres, el repo vuelve a exit 0.
+- El caso de falsos positivos esta cubierto por test: acentos en portugues y espanol
+  ("Sao", "coracao", "secao") no disparan, porque son codepoints unicos y no el par
+  `U+00C3` + byte de continuacion.
 
-**Nota de alcance:** `vault/02_Bitacora/bitacora.md` tiene 34 caracteres U+FFFD + 9
-mojibake y `deuda-tecnica.md` 1 + 2. Todos **preexistentes en `develop`**, verificado
-byte a byte. No son del item 69 y quedan fuera de su alcance.
+**Impacto en el proceso:** hasta este PR, `format:check` solo cubria `.md`. **Ningun
+PR anterior verifico codepoints sobre codigo TypeScript** — los 727 tests puedan pasar
+con un `.ts` entero en doble encoding. El check es el primero que mira `.ts`.
 
-**Costo estimado:** 0.5 h (un script que recorra el repo y falle ante BOM, U+FFFD o
-firmas de doble encoding).
-
-**Relacionado:** obs 142 (GGA detecta doble encoding que los tests no ven) y obs 34 (el
-glob correcto de GGA es `*test.ts`). Misma familia que el item 62: **un control que
-parece cubrir la zona critica, y cubre otra.**
+**Relacionado:** obs 142 (GGA detecta doble encoding que los tests no ven), obs 34 (el
+glob correcto de GGA es `*test.ts`), item 40 regla 6 (here-strings de PowerShell).
+Misma familia que el item 62: **un control que parece cubrir la zona critica, y cubre
+otra.**

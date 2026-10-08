@@ -4178,3 +4178,66 @@ visible al tenant**: no puede reintentar hasta el TTL. Fail-closed con espera es
 que un huérfano, pero es una decisión de producto y quedó documentada como tal.
 (4) Verificar `decideTarget` contra sus tres tablas.encontró código muerto que el
 comentario del propio código describía como un mecanismo activo.
+
+---
+
+## 2026-10-08 - Item 75: check de encoding por codepoints en format:check
+
+**Rama:** `chore/check-encoding-format` desde `develop` @ `bc15276`
+**Scope:** 1 script nuevo + 1 suite + wiring + BOM de 1 spec + docs.
+
+### El gap que cierra
+
+Hasta hoy `format:check` era `prettier --check "**/*.md"`: **solo markdown**. Ningún PR
+anterior verificó codepoints sobre código TypeScript. Los 727 tests podían pasar con un
+`.ts` entero en doble encoding — que es exactamente lo que pasó en el PR #222, y lo que
+GGA no vio porque `*test.ts` está en su `EXCLUDE_PATTERNS`.
+
+Ahora: `format:check` = `prettier --check "**/*.md" && pnpm check:encoding`.
+
+### El test-atrapó un bug del detector, no del test
+
+Escribí la detección de la secuencia de 3 bytes exigiendo que el tercer codepoint
+estuviera en rango Latin-1 `U+0080..U+00BF`. **El test falló.** El tercero de una raya
+rota (U+2014) es **U+201D**, que está fuera de ese rango: las secuencias de 2 bytes
+terminan en un byte Latin-1, pero las de 3 terminan en los mapeos de cp1252 `0x80-0x9F`.
+
+Con la condición que escribí, **el detector no veía ni las rayas ni las comillas
+tipográficas rotas** — el caso más común de mojibake en un repo con mucho texto en
+español. Mi script de diagnóstico previo reportó `moji3: 0` en todo el repo y lo acepté
+sin cuestionarlo; el test permanente lo.convertó en RED.
+
+### La regla de oro del detector
+
+Ni el script, ni los tests, ni la documentación pueden **contener los caracteres
+corruptos**, ni como ejemplo. Describirlos por codepoint (`String.fromCharCode`). La
+primera versión del test traía un texto corrupto copiado a mano: habría metido en el
+repo justo lo que el detector viene a encontrar. Las sondas end-to-end también se
+generan por codepoint.
+
+### Qué NO se tocó
+
+`vault/02_Bitacora/bitacora.md` y `vault/03_Deuda/deuda-tecnica.md` conservan la
+corrupción preexistente. Son append-only: corregirlos exige reconstruir bytes, no editar.
+Quedan en `KNOWN_CORRUPT`, que los reporta como warning visible sin bloquear el merge.
+El BOM de `docs/superpowers/specs/2026-09-subscription-lifecycle.md` **sí se arregló**
+aquí: eran 3 bytes y demuestra el check funcionando en un caso real.
+
+**What:** `scripts/check-encoding.mjs` (Node puro, sin dependencias) en `format:check`.
+Detecta `U+FFFD`, BOM, doble encoding de 2 y 3 bytes, y control chars fuera de tab/LF/CR.
+11 tests nuevos. Item 75 cerrado.
+**Why:** GGA excluye `*test.ts` y ningún otro control ve el encoding: un `.ts` corrupto
+pasa lint, typecheck, vitest y prettier.
+**Where:** `scripts/check-encoding.mjs`, `scripts/__tests__/check-encoding.test.ts`,
+`package.json`, `AGENTS.md`, `docs/superpowers/specs/2026-09-subscription-lifecycle.md`
+(BOM), `vault/03_Deuda/deuda-tecnica.md`.
+**Learned**: (1) **Un test que genera su propio fixture por codepoint detecta bugs que
+un fixture escrito a mano esconde.** El string "corrupto" a mano estaba mal — y el
+detector que lo tenía que encontrar estaba mal en la misma línea de razonamiento.
+(2) **Corregir un rango sin entender el mapeo produce un detector que funciona y no
+detecta.** Latin-1 cubre 2 bytes; cp1252 cubre 3. Confundirlos deja el caso más común
+—invisibly— fuera del alcance. (3) **Un script de diagnóstico que uno mismo escribió es
+código de producción**: si cuenta líneas en vez de ocurrencias, reporta 3 donde hay 4.
+Vale la pena escribirlo bien la primera vez o descartarlo después. (4) La corrupción
+preexistente en `bitacora.md` se va a tener que reconstruir byte a byte, y eso es un
+trabajo de una hora por archivo que conviene cotizar antes de empezar.

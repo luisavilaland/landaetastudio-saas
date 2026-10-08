@@ -1,4 +1,4 @@
-﻿# Spec Transversal — Ciclo de vida de suscripciones
+# Spec Transversal — Ciclo de vida de suscripciones
 
 **Fecha:** 2026-09-17
 **Versión:** 1.0
