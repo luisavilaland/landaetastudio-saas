@@ -498,7 +498,7 @@ permisos va a leer esa clave como `undefined` (falsy) en lugar de
 
 **Estado:** 15 líneas de `vault/02_Bitacora/bitacora.md` contienen
 U+FFFD (replacement character) donde el byte fuente se perdió antes
-de cualquier fix (ej: `simulaci�n` en lugar de `simulación`).
+de cualquier fix (ej: `simulación` en lugar de `simulación`).
 
 **Origen:** corrupción histórica anterior al PR #143. Detectada al
 reparar el doble-encoding UTF-8→CP1252 de la bitácora.
@@ -3146,42 +3146,86 @@ otra.**
 
 ## 76. Corrupcion byte-level en `bitacora.md`
 
-**Estado:** abierto (2026-10-08). Severidad MEDIA.
+**Estado:** RESUELTO (2026-10-09). Severidad MEDIA. Verificado en codigo: si.
+**Salido de `KNOWN_CORRUPT`** el 2026-10-09: el set quedo VACIO.
 
-**Origen:** detectado al implementar el check de encoding (PR #223).
+**Procedimiento usado (reemplazo dirigido por par, no por offset).** Los offsets se
+corren en cuanto se aplica una sustitucion; el mapeo es por par `(patron corrupto -> texto
+correcto)` con **conteo esperado verificado**, que es lo que lo hace auditable: si el
+archivo tiene otra ocurrencia de la misma palabra, el script falla antes de escribir en
+vez de tocar de mas.
 
-**Problema:** `vault/02_Bitacora/bitacora.md` tiene 34 `U+FFFD`, BOM al inicio, 1
-secuencia mojibake de 2 bytes (`U+00C3 U+00A1` en L1527) y 4 ocurrencias de control chars
-en 3 lineas (`U+000C` en L936, `U+0007` BEL en L942, `U+001D` en L1289). Todo
-preexistente en `develop`, verificado byte a byte.
+- **Autoverificacion como contrato:** despues de aplicar, el script vuelve a escanear y
+  aborta si queda un solo hallazgo. Un par olvidado rompe el script; no puede pasar
+  inadvertido.
+- **Pre-validacion de todos los pares de una vez**, para reportar los 30 fallos juntos y
+  no descubrir uno por ejecucion.
+- **0 reconstrucciones por offset**, que es lo que habia que evitar.
+- **Nunca el roundtrip de `iconv`** (memoria #116): es identidad sobre UTF-8 valido y
+  ademas destruye los caracteres ya correctos, porque el archivo es hibrido.
 
-**Fix propuesto:** reconstruccion byte-level. **NO edicion a mano.** El procedimiento ya
-esta documentado en el incidente previo `reparar-doble-encoding-utf-8-de-bitacora-md-28`:
-leer, normalizar CRLF, escribir con UTF-8 **sin BOM**, y verificar que la reconstruccion
-sea idempotente antes de tocar el archivo.
+**Los 42 puntos de corrupcion, y de donde salio cada uno:**
 
-**Trampa conocida (item 40, regla 6):** `[System.IO.File]::WriteAllLines` introduce CRLF
-en un repo que es LF. Hay que normalizar explicitamente.
+| Tipo             | Cantidad | Recuperacion                                                    |
+| ---------------- | -------- | --------------------------------------------------------------- |
+| `U+FFFD`         | 34       | inferencia linguistica (vocal acentuada de palabra inequivoca)  |
+| control chars    | 4        | inferencia: la letra inicial fue sustituida por el control char |
+| `?` rotos (L864) | 4        | inferencia: separadores tipo flecha                             |
+| BOM              | 1        | eliminado a nivel de bytes (`EF BB BF`)                         |
+| moji2 (L1527)    | 1        | **reescrito por codepoint**, no reparado (ver abajo)            |
 
-**Excluido del check:** esta en `KNOWN_CORRUPT` de `scripts/check-encoding.mjs`. Se
-reporta como warning visible pero no bloquea el merge.
+**Proveniencia — por que 0 eran recuperables de git.** La entrada del 2026-08-08 **nacio
+corrupta** en `a49747f2`: el commit anterior con esas lineas tiene 128. No hay version
+limpia en ninguna rama. Y el commit `77ea187b` —titulado _"fix(bitacora): reparar encoding
+mojibake preexistente"_— es el que **destruyo** los bytes: la corrupcion era la secuencia
+`ï¿½` (doble-encoding de `EF BF BD`) y ese repair la decodifico un nivel y la convertio en
+`U+FFFD`. Los bytes originales no existen mas en ninguna parte. Los 33 `U+FFFD` de hoy son
+el **residual que ese repair dejo**, segun documenta la memoria 28.
+
+**Dos casos con verificacion dura, no inferencia:**
+
+- **L942, hash de commit:** `<U+0007>44612f` — el BEL se comio la primera letra.
+  `git log --all --diff-filter=A -- .prettierrc` devuelve **`a44612f`**, que es el commit que
+  _agrego_ `.prettierrc`, que es lo que la linea describe. No es una suposicion.
+- **L1289, `â¬ <U+001D>`:** mojibake incompleto; los bytes originales eran `E2 AC` y el
+  tercero fue sustituido por un control char. Irreparable automaticamente. Resuelto a
+  `— —` por decision humana del 2026-10-09, por analogia con las otras cabeceras.
+
+**El moji2 de L1527 no se "reparo": se elimino como ejemplo.** Era un ejemplo documentado de
+como se ve un archivo roto, y AGENTS.md L104-106 prohibe explicitamente escribir los
+caracteres corruptos _"ni siquiera como ejemplo en el detector"_, prescribiendo
+describirlos por codepoint. Ademas, mientras ese literal siga en el archivo, el detector lo
+ve como un hallazgo real y `KNOWN_CORRUPT` no puede quedar vacio. Se reescribio como
+`String.fromCharCode(0x00c3, 0x00b1)`. **El ejemplo sigue entendible y ahora cumple la
+regla.**
+
+**Lo que este fix NO respeta: append-only.** El diff muestra lineas modificadas, no solo
+adiciones, porque repara bytes dentro de lineas existentes. Eso es una correccion, no una
+perdida de contenido: el numero de lineas es identico antes y despues (4399), y ninguna
+linea se borro. **Item 88** registra que la regla de append-only no especifica este caso.
+La regla de verificacion (`git diff` solo adiciones) NO debe usarse para "restaurar" este
+archivo a su version previa: eso reintroduce la corrupcion.
 
 ---
 
 ## 77. Corrupcion byte-level en `deuda-tecnica.md`
 
-**Estado:** abierto (2026-10-08). Severidad MEDIA.
+**Estado:** RESUELTO (2026-10-09). Severidad MEDIA. Verificado en codigo: si.
+**Salido de `KNOWN_CORRUPT`** el 2026-10-09.
 
-**Origen:** detectado al implementar el check de encoding (PR #223).
+**Problema (antes):** 1 `U+FFFD` en L501. Preexistente en `develop`, introducido por
+`f4d35c5b` (2026-09-26, "auditoria post-migracion al vault").
 
-**Problema:** `vault/03_Deuda/deuda-tecnica.md` tiene 1 `U+FFFD`. Preexistente en
-`develop`.
+**Resolucion:** 1 sustitucion dirigida. El caso mas simple de los dos porque **no hay
+inferencia**: la frase es ``de cualquier fix (ej: `simulaci?n` en lugar de `simulación`)``
+— la palabra correcta aparece **integra 30 caracteres mas adelante, en la misma frase**. Es
+una copia, no una reconstruccion.
 
-**Fix propuesto:** mismo tratamiento que el item 76, pero **mas delicate**: el archivo es
-acumulativo y cambia con cada item nuevo, asi que una reconstruccion mal alineada
-mezcla el diff con contenido historico. Por eso va en su propio PR y no junto al 76.
-
-**Excluido del check:** `KNOWN_CORRUPT`, igual que el 76.
+**Por que no se hizo junto al item 76 (que es lo que el item pedia):** el archivo es
+acumulativo y cambia con cada item nuevo, asi que una reconstruccion mal alineada mezcla el
+diff con contenido historico. El fix fue minimo y por patron: 1 par, conteo esperado 1,
+sin `prettier --write` sobre el archivo (que lo reescribe entero). Numero de lineas
+identico antes y despues (3435).
 
 ---
 
@@ -3432,3 +3476,80 @@ importe directo de `@repo/commerce` y se borre la facade — pero eso depende de
 porque la facade es hoy la razon por la que `redisClient` se exporta desde commerce.
 
 **Bloquea commits:** si, mientras GGA siga leyendo la inconsistencia como violacion.
+
+## 87. `check:encoding` no ve los caracteres `?` rotos
+
+**Severidad:** MEDIA.
+**Estado:** ABIERTO.
+**Origen:** detectado al repara los items 76 y 77 (2026-10-09).
+
+**Problema:** `scripts/check-encoding.mjs` clasifica 5 categorias: `U+FFFD`, `U+FEFF` al
+inicio, doble encoding de 2 y de 3 bytes, y control chars fuera de tab/LF/CR. Un caracter
+`?` ASCII **no cae en ninguna**. En `bitacora.md` L864 habia 4 separadores rotos
+renderizados como `?` (flechas tipo `→`), invisible para el detector.
+
+El conteo real era **42 puntos de corrupcion, no 39**: 34 `U+FFFD` + 4 control chars +
+4 `?`. Los 4 `?` se repararon en el PR que cierra el item 76, pero **la cobertura del
+detector sigue sin existir**: el mismo tipo de dano puede volver a colarse y dar verde.
+
+**Por que NO se solutiono en el mismo PR:** un patron que detecte `?` produce falsos
+positivos. En markdown un `?` legitimo es normal ("¿que paso?" no, pero "Saber?" si), y
+en este mismo repo la bitácera cita literalmente `? Migración existente modificada`, que es
+la salida real de `scripts/check-migrations.sh`. Detectar `?` a secas rompe el control.
+
+**Mitigacion propuesta (NO implementada):** un patron que exija **contexto**, no el caracter
+suelto. Por ejemplo `?` entre dos palabras no acentuadas donde la palabra resultado es
+spanol conocido, o `?` rodeada de espacios en un contexto enumerativo (`X ? Y ? Z`). Requiere
+disenar el balance falso-positivo antes de anadirlo.
+
+**Regla operativa mientras tanto:** un `?` en un `.md` no es un `?` hasta que se mire el
+byte. Tratarlo como sospechoso y verificar por Node.
+
+**SEGUNDO hueco del mismo tipo, encontrado al repara: CJK.** El detector tampoco mira
+caracteres CJK, y `bitacora.md` tiene **12**: L976 (4) y L977 (6) son el **documentado**
+del incidente historico del item 52 —estan citando el texto chino que se encontro y se
+corrijo, asi que podrian ser ejemplos intencionales—, pero **L3910 (2) parece corrupcion
+real**: "con el viejo" seguido de 2 caracteres CJK donde deberia haber un separador. No se
+toco en este PR porque el item 87 ya es un hueco del detector y ampliarlo aca seria alcance
+no autorizado. **Queda como candidato a item propio**: la decision es si L3910 se repara y
+si el detector gana cobertura de CJK.
+
+**Nota sobre AGENTS.md:** la regla de "escanear en busca de CJK" (item 40, regla 3) es
+manual, con un snippet de PowerShell. El detector de encoding no lo hace. Dos controles
+para lo mismo, y el automatico es el que corre en CI.
+
+## 88. Append-only no especifica si admite reparacion byte-level
+
+**Severidad:** BAJA.
+**Estado:** ABIERTO.
+**Origen:** detectado al repara los items 76 y 77 (2026-10-09).
+
+**Problema:** `AGENTS.md` define dos reglas que chocan en el caso de una reparacion de
+encoding:
+
+1. La bitácora es **append-only**, y la regla de verificacion exige que `git diff` contra
+   `origin/develop` muestre **solo adiciones** (`git diff -- <archivo> | Select-String "^-"`
+   debe dar 0 lineas).
+2. Reparar corrupcion byte-level **modifica lineas existentes**: el diff muestra pares
+   `-`/`+` en ~14 lineas de `bitacora.md`.
+
+No hay regla que diga cual gana. Y el riesgo no es teorico: la regla 1, aplicada por un
+agente futuro sin saber el contexto, lo lleva a **"restaurar"** el archivo a su version
+previa, **reintroduciendo la corrupcion**. Ya paso la inversa en el cierre de #224, donde un
+"bug" imaginario casi destruye un archivo sano.
+
+**Lo que este repo decidioimplicitamente al reparar el item 76:** la reparacion byte-level
+**no viola** append-only, porque no se perdio contenido — el numero de lineas es identico
+antes y despues (4399) y ninguna se borro. Es una _correccion_, no una _edicion_. Pero eso
+deberia estar escrito, no deducido por suerte.
+
+**Fix propuesto:** agregar a la seccion de bitácora de `AGENTS.md` una excepcion explicita:
+
+> **Excepcion — reparacion byte-level.** Si un archivo acumulativo tiene corrupcion de
+> encoding, la reparacion modifica lineas existentes y el diff **va a mostrar borrados**.
+> Eso NO es una regresion: verificar que el numero de lineas no cambio y que ninguna se
+> borro por completo. **Nunca "restaurar" el archivo a una version previa para cumplir la
+> regla de append-only** — eso reintroduce la corrupcion.
+
+Y en la regla de append-only, una linea que diga que la verificacion de "solo adiciones" no
+aplica a una correccionEncoding verificada byte a byte.

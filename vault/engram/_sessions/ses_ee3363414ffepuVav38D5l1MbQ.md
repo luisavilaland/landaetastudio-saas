@@ -19,3 +19,5 @@ tags:
 - [[session-summary-landaetastudio-saas-221]]
 - [[item-66-resuelto-redispexpire-verificable-redisdel-en-el-cam-222]]
 - [[fail-open-sin-autoreparacion-no-es-fail-open-es-un-log-223]]
+- [[items-82-86-gga-preexistentes-y-superadmin-tiene-un-segundo-224]]
+- [[items-76-y-77-resueltos-reconstruccion-byte-level-known-corr-225]]
