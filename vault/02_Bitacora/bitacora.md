@@ -1,4 +1,4 @@
-﻿# Bitácora — saas-ecommerce
+# Bitácora — saas-ecommerce
 
 > SaaS de eCommerce headless, multi-tenant, orientado al Cono Sur.
 > Monorepo Turborepo (pnpm) — Next.js 16, Drizzle ORM, PostgreSQL, NextAuth v5.
@@ -852,16 +852,16 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 
 - **Branch:** `develop`
 
-## 2026-08-08 � E2E de firma real del webhook MP (spec `webhook-signature`)
+## 2026-08-08 — E2E de firma real del webhook MP (spec `webhook-signature`)
 
 **Contexto:** el E2E existente (`checkout.spec.ts`) llega hasta el redirect de MP pero no completa el pago. Para validar la firma real del webhook (spec oficial `ts=...;v1=...`) y el cambio de estado de la orden sin llamar a la API de MP, se agrega un spec E2E que ejercita el endpoint desplegado. El modo `x-test-order-id` solo se activaba con `NODE_ENV=development`; en Vercel (production) no funcionaba.
 
 **Cambios:**
 
-- **`apps/storefront/app/api/webhooks/mercadopago/route.ts`:** refactor del bloque de simulaci�n a `simMode` = `NODE_ENV=development` **o** `E2E_WEBHOOK_TEST=1` + mapa de magic IDs `123456789` (approved) / `000000` (rejected) / `999999` (pending). La firma nunca se salta (fail-closed).
+- **`apps/storefront/app/api/webhooks/mercadopago/route.ts`:** refactor del bloque de simulación a `simMode` = `NODE_ENV=development` **o** `E2E_WEBHOOK_TEST=1` + mapa de magic IDs `123456789` (approved) / `000000` (rejected) / `999999` (pending). La firma nunca se salta (fail-closed).
 - **`packages/commerce`:** `makeSignature` movido del unit test a `webhook-signature.ts` y reexportado (subpath `@repo/commerce/webhook-signature`); unit test refactorizado para usarlo (DRY).
 - **`playwright.config.ts`:** nuevo proyecto `webhook` (testMatch `webhook/*.spec.ts`, baseURL storefront).
-- **Nuevo spec `e2e/webhook/webhook-signature.spec.ts`:** 4 tests � firma v�lida + approved ? orden `confirmed`; firma adulterada ? 401; sin `x-signature` ? 401; pending ? la orden queda `pending_payment`. La orden se crea por insert directo a DB (`orders` camelCase, `total=0` para no disparar email), tienda1 fijo, limpieza en `afterAll` (`DELETE ... WHERE id = ANY(...)`). Guard `test.skip` si CI sin `E2E_WEBHOOK_TEST`.
+- **Nuevo spec `e2e/webhook/webhook-signature.spec.ts`:** 4 tests → firma válida + approved → orden `confirmed`; firma adulterada → 401; sin `x-signature` → 401; pending → la orden queda `pending_payment`. La orden se crea por insert directo a DB (`orders` camelCase, `total=0` para no disparar email), tienda1 fijo, limpieza en `afterAll` (`DELETE ... WHERE id = ANY(...)`). Guard `test.skip` si CI sin `E2E_WEBHOOK_TEST`.
 - **`e2e.yml`:** workflow env `E2E_WEBHOOK_TEST=1` + job `e2e` recibe `DATABASE_URL` (Neon) y `MERCADOPAGO_WEBHOOK_SECRET`.
 - **Docs:** TESTING.md (fila E2E firma + magic ID `999999`) y AGENTS.md (formato `x-test-order-id=<tenantId>:<orderId>`, magic IDs, env `E2E_WEBHOOK_TEST`).
 
@@ -933,16 +933,16 @@ ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY: no entry for
 
 ## 2026-08-11 - Calidad: guard de migraciones en CI, tarjetas de prueba MP, assertions E2E, prettier plugin y formateo global
 
-- **Guard de migraciones inmutables (CI):** nuevo scripts/check-migrations.sh - falla (fail-closed) si git diff origin/develop -- packages/db/migrations/ no est� vac�o: mensaje `? Migraci�n existente modificada - crea una nueva migraci�n, no edites las anteriores.`. .github/workflows/ci.yml: checkout@v7 con etch-depth: 0 + step Guard migraciones inmutables en el job uild. Cierra el �tem 2 de docs/deuda-tecnica.md.
-- **Pin IPv4 de Neon para el runner self-hosted (documentaci�n):** SETUP.md nueva sub-secci�n "Runner self-hosted: pin IPv4 de Neon" (diagn�stico, dig +short A/getent ahostsv4, pin en /etc/hosts, verificaci�n con psql/E2E, alternativa IPv4-only y rotaci�n de IPs). Cierra el �tem 3 de docs/deuda-tecnica.md.
-- **Tarjetas de prueba MercadoPago:** SETUP.md y TESTING.md - placeholder "Pr�ximamente" reemplazado por tabla real del sandbox: Visa 4509 9535 6623 3704 APRO, Mastercard 5031 7557 3453 0604 OTHE, Amex 3711 8030 3257 522 CONT; CVV 123 (Amex 1234), vencimiento 11/25, titular/documento libres.
-- **Assertions de contenido en E2E admin:** products-crud.spec.ts (verifica la fila creada con nombre �nico y que el estado vac�o no aparezca - detectar�a regresi�n RLS), orders.spec.ts ( body tr count > 0), categories.spec.ts (fila creada + sin estado vac�o). Nombres �nicos con Date.now().
-- **Skip del E2E cross-tenant documentado:** comentario al inicio de e2e/security/cross-tenant.spec.ts explicando el skip condicional (falta tenant T2 con productos seed; se habilitar� cuando exista fixture multi-tenant).
-- **prettier-plugin-tailwindcss en ra�z:** pnpm add -D -w prettier-plugin-tailwindcss@0.8.1 (peer prettier ^3.0, compatible con 3.9.6). .prettierrc ya lo referenciaba pero el plugin nunca estuvo instalado: prettier no pod�a correr con la config del repo.
-- **Primer formateo global con prettier:** al instalar el plugin, prettier --write . realine� 285 archivos (single quotes, sin semicolons, orden de clases tailwind, rewraps de markdown) contra el .prettierrc propio del repo (agregado en 44612f y nunca aplicado). Cero cambios funcionales. Archivos excluidos v�a nuevo .prettierignore: pnpm-lock.yaml y packages/db/migrations/ (inmutables). pnpm exec prettier --check . pasa limpio.
-- **Ejecuci�n:** 3 worktrees de Paseo en paralelo (quality-docs, quality-infra, quality-e2e) con subagentes opencode; los agentes quedaron colgados en shells de pnpm install dos veces (patr�n conocido) y se reavivaron re-enviando el prompt. El commit de prettier del agente mezclaba plugin + formateo: se escindi� en chore (2 archivos) + style (285 archivos) y el formateo final se aplic� sobre la rama integrada para evitar conflictos con los commits de docs/e2e.
-- **Integraci�n:** cherry-pick a rama unificada chore/quality-and-docs en orden: ci guard -> IPv4 -> MP cards -> assertions E2E -> skip doc -> chore plugin -> style format (7 commits).
-- **Verificaci�n:** pnpm lint 6/6, pnpm typecheck 9/9, pnpm test 430/430 (55 archivos), pnpm build 3/3, pnpm exec prettier --check . limpio.
+- **Guard de migraciones inmutables (CI):** nuevo scripts/check-migrations.sh - falla (fail-closed) si git diff origin/develop -- packages/db/migrations/ no esté vacío: mensaje `? Migración existente modificada - crea una nueva migración, no edites las anteriores.`. .github/workflows/ci.yml: checkout@v7 con fetch-depth: 0 + step Guard migraciones inmutables en el job build. Cierra el ítem 2 de docs/deuda-tecnica.md.
+- **Pin IPv4 de Neon para el runner self-hosted (documentación):** SETUP.md nueva sub-sección "Runner self-hosted: pin IPv4 de Neon" (diagnóstico, dig +short A/getent ahostsv4, pin en /etc/hosts, verificación con psql/E2E, alternativa IPv4-only y rotación de IPs). Cierra el ítem 3 de docs/deuda-tecnica.md.
+- **Tarjetas de prueba MercadoPago:** SETUP.md y TESTING.md - placeholder "Próximamente" reemplazado por tabla real del sandbox: Visa 4509 9535 6623 3704 APRO, Mastercard 5031 7557 3453 0604 OTHE, Amex 3711 8030 3257 522 CONT; CVV 123 (Amex 1234), vencimiento 11/25, titular/documento libres.
+- **Assertions de contenido en E2E admin:** products-crud.spec.ts (verifica la fila creada con nombre único y que el estado vacío no aparezca - detectaría regresión RLS), orders.spec.ts ( body tr count > 0), categories.spec.ts (fila creada + sin estado vacío). Nombres únicos con Date.now().
+- **Skip del E2E cross-tenant documentado:** comentario al inicio de e2e/security/cross-tenant.spec.ts explicando el skip condicional (falta tenant T2 con productos seed; se habilitará cuando exista fixture multi-tenant).
+- **prettier-plugin-tailwindcss en raíz:** pnpm add -D -w prettier-plugin-tailwindcss@0.8.1 (peer prettier ^3.0, compatible con 3.9.6). .prettierrc ya lo referenciaba pero el plugin nunca estuvo instalado: prettier no podía correr con la config del repo.
+- **Primer formateo global con prettier:** al instalar el plugin, prettier --write . realineó 285 archivos (single quotes, sin semicolons, orden de clases tailwind, rewraps de markdown) contra el .prettierrc propio del repo (agregado en a44612f y nunca aplicado). Cero cambios funcionales. Archivos excluidos vía nuevo .prettierignore: pnpm-lock.yaml y packages/db/migrations/ (inmutables). pnpm exec prettier --check . pasa limpio.
+- **Ejecución:** 3 worktrees de Paseo en paralelo (quality-docs, quality-infra, quality-e2e) con subagentes opencode; los agentes quedaron colgados en shells de pnpm install dos veces (patrón conocido) y se reavivaron re-enviando el prompt. El commit de prettier del agente mezclaba plugin + formateo: se escindió en chore (2 archivos) + style (285 archivos) y el formateo final se aplicó sobre la rama integrada para evitar conflictos con los commits de docs/e2e.
+- **Integración:** cherry-pick a rama unificada chore/quality-and-docs en orden: ci guard -> IPv4 -> MP cards -> assertions E2E -> skip doc -> chore plugin -> style format (7 commits).
+- **Verificación:** pnpm lint 6/6, pnpm typecheck 9/9, pnpm test 430/430 (55 archivos), pnpm build 3/3, pnpm exec prettier --check . limpio.
 - **Branch:** chore/quality-and-docs -> mergeada como PR #47 (merge commit b772445)
 
 ## 2026-08-12 - Merge de 15 PRs dependabot, fix de lockfile corrupto y limpieza de dependencias muertas
@@ -1286,7 +1286,7 @@ prefijo). Verificar después de escribir con:
 Y agregar la verificación al listado de "Bitácora append-only" en
 AGENTS.md (PR B).
 
-### 2026-09-21 â¬   T7: RLS en subscriptions y tenant_mp_config
+### 2026-09-21 — —  T7: RLS en subscriptions y tenant_mp_config
 
 - Migración 0014_enable_rls_new_tables.sql:
   - ENABLE + FORCE RLS + policy tenant_isolation en las 2 tablas.
@@ -1524,7 +1524,7 @@ se mantuvieron en docs/ porque herramientas los leen.
 
 **Contexto.** Al migrar la bitácora al vault (PR #143) y abrirla en
 Obsidian, se detectó corrupción de encoding: caracteres UTF-8
-doble-codificados a CP1252 (ej: `Ã¡` en vez de `á`, `â€"` en vez
+doble-codificados a CP1252 (ej: una "a" con tilde renderizada como `String.fromCharCode(0x00c3, 0x00b1)`, y una raya U+2014 como `String.fromCharCode(0x00e2, 0x20ac, 0x201d)`
 de `—`).
 
 **Diagnóstico:**
@@ -1557,7 +1557,7 @@ evidencia del daño original.
 
 **Pérdida previa detectada.** Además del mojibake, hay 15 líneas
 con U+FFFD (replacement character) donde el byte fuente ya se
-había perdido antes de cualquier fix. Ejemplo: `simulaci�n` donde
+había perdido antes de cualquier fix. Ejemplo: `simulación` donde
 un `ó` desapareció. Irreparables sin inventar contenido.
 ---
 
@@ -4396,3 +4396,50 @@ vez en dos PRs que el ref del brief no coincide con `deuda-tecnica.md` — el ma
 hallazgo está en la tabla de las auditorías de fase y conviene leerlo antes de nombrar una
 rama. (5) **Topología de worktree:** este PR se hizo en el worktree principal con la rama
 checkouteada, no en un worktree de Paseo. El de #227 se auto-eliminó a mitad del trabajo.
+
+### 2026-10-09 — Items 76 y 77 resueltos: reconstrucción byte-level sin append-only
+
+**What:** `bitacora.md` y `deuda-tecnica.md` reparados con reemplazo dirigido byte a byte.
+`KNOWN_CORRUPT` de `check-encoding.mjs` quedó **vacío** y el detector corre sin excepciones.
+Items 76 y 77 a RESUELTO. Registrados los items 87 (el detector no ve `?` ni CJK) y 88
+(append-only no especifica reparación byte-level). En el mismo PR quedaron los items 82-86
+(violaciones de GGA preexistentes, commit `cf39a18`).
+**Why:** 42 puntos de corrupción: 34 `U+FFFD`, 4 control chars, 4 `?` rotos que el detector
+no contaba, y un BOM. Con los dos archivos en `KNOWN_CORRUPT`, el único control del repo que
+detecta doble encoding estaba reportando en vez de bloquear: exactamente el patrón de "un
+control que parece cubrir y no cubre".
+**Where:** `vault/02_Bitacora/bitacora.md`, `vault/03_Deuda/deuda-tecnica.md`,
+`scripts/check-encoding.mjs`, `scripts/__tests__/check-encoding.test.ts`.
+**Learned:** (1) **El commit que "repara" encoding puede ser el que lo destruye.**
+`77ea187b` se titula *"fix(bitacora): reparar encoding mojibake preexistente"* y convirtió
+la corrupción `ï¿½` —el doble-encoding de los bytes `EF BB BD`— en `U+FFFD`. Los bytes
+originales no existen más en ninguna rama. Los 33 `U+FFFD` de hoy son el residual que ese
+repair dejó. **Y la entrada del 2026-08-08 nació corrupta** en `a49747f2`: el commit anterior
+tiene 128 líneas. No había versión limpia: **0 de 34 eran recuperables de git.**
+(2) **El procedimiento que funciona es par → texto, con conteo esperado verificado y
+autoverificación.** Por offset los offsets se corren; por par el mapeo es auditable de un
+vistazo. El conteo esperado convierte "reparé lo que encontré" en "reparé exactamente lo que
+había". La autoverificación —reescanear al final y abortar si queda un hallazgo— es lo que
+impide que un par olvidado pase inadvertido; abortó dos veces durante este trabajo, antes de
+escribir. (3) **Dos casos con verificación dura, no inferencia:** el hash `<U+0007>44612f` es
+`a44612f`, que `git log --diff-filter=A -- .prettierrc` confirma como el commit que *agregó*
+`.prettierrc`, que es lo que la línea describe. Y el `U+FFFD` de `deuda-tecnica.md` tiene la
+palabra correcta **30 caracteres más adelante, en la misma frase**: es una copia, no una
+reconstrucción. (4) **El ejemplo de mojibake también necesitaba reparación, y no era un
+"arreglo".** L1527 citaba literalmente un archivo roto como ejemplo, y eso viola la regla de
+`AGENTS.md` L104-106 ("ni siquiera como ejemplo en el detector"). Mientras el literal siga
+ahí, el detector lo ve como hallazgo real y `KNOWN_CORRUPT` no puede quedar vacío. Se
+reescribió como `String.fromCharCode(0x00c3, 0x00b1)`: el ejemplo sigue entendible y ahora
+cumple la regla. (5) **El detector tiene huecos, y el primero es `?`.** 42 puntos, no 39:
+4 separadores rotos renderizados como `?`, invisibles para toda categoría del detector. No
+se añadió un patrón para `?` porque daría falsos positivos: este mismo repo cita
+`? Migración existente modificada`, que es la salida real de `check-migrations.sh`. Queda
+como item 87. (6) **Este fix no respetó append-only, y está bien.** El diff muestra borrados
+en ~14 líneas porque repara bytes dentro de líneas existentes. No se perdió contenido: el
+número de líneas es idéntico antes y después (4399) y ninguna se borró. **La regla de "el
+diff debe mostrar solo adiciones" NO debe usarse para "restaurar" este archivo a su versión
+previa: eso reintroduce la corrupción.** Item 88. (7) **`formatReport` dependía del estado de
+producción.** Sus tests codificaban `bitacora.md` como fixture de "conocido", así que al
+vaciar `KNOWN_CORRUPT` fallaron. Se le dio un parámetro `knownCorrupt` con default para que
+los tests verifiquen comportamiento y no estado, y se agregó el caso inverso: con el set
+vacío, cualquier hallazgo es nuevo y bloquea.

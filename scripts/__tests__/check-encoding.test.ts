@@ -89,35 +89,46 @@ describe('check-encoding: deteccion', () => {
 })
 
 describe('check-encoding: reporte', () => {
+  // Fixture de archivo corrupto. El path es inventado a proposito: el set real
+  // de KNOWN_CORRUPT esta VACIO desde el 2026-10-09 (items 76 y 77 reparados),
+  // asi que un test que dependa de un path real solo verifica el estado de
+  // produccion, no el comportamiento del reporte. Se inyecta el set.
+  const CORRUPT_FILE = 'vault/02_Bitacora/bitacora.md'
+  const KNOWN = new Set([CORRUPT_FILE])
+
+  const corruptResult = {
+    file: CORRUPT_FILE,
+    replacement: 34,
+    bom: true,
+    moji2: 1,
+    moji3: 0,
+    control: 3,
+    total: 39,
+  }
+
   it('los archivos en KNOWN_CORRUPT se reportan pero no bloquean', () => {
-    const { lines, freshCount, knownCount } = formatReport([
-      {
-        file: 'vault/02_Bitacora/bitacora.md',
-        replacement: 34,
-        bom: true,
-        moji2: 1,
-        moji3: 0,
-        control: 3,
-        total: 39,
-      },
-    ])
+    const { lines, freshCount, knownCount } = formatReport(
+      [corruptResult],
+      KNOWN,
+    )
 
     expect(knownCount).toBe(1)
     expect(freshCount).toBe(0)
     expect(lines.join('\n')).toContain('KNOWN_CORRUPT')
   })
 
+  it('con el set de produccion vacio, un archivo con hallazgos es NUEVO', () => {
+    // Este test es el que detecto que items 76 y 77 quedaban fuera de la lista
+    // Known al repararlos: sinKNOWN_CORRUPT, cualquier hallazgo bloquea.
+    const { freshCount, knownCount } = formatReport([corruptResult])
+
+    expect(knownCount).toBe(0)
+    expect(freshCount).toBe(1)
+  })
+
   it('un hallazgo nuevo se cuenta aparte de los conocidos', () => {
     const { freshCount, knownCount } = formatReport([
-      {
-        file: 'vault/02_Bitacora/bitacora.md',
-        replacement: 34,
-        bom: true,
-        moji2: 1,
-        moji3: 0,
-        control: 3,
-        total: 39,
-      },
+      corruptResult,
       {
         file: 'apps/admin/app/api/x/__tests__/route.test.ts',
         replacement: 0,
@@ -127,7 +138,7 @@ describe('check-encoding: reporte', () => {
         control: 0,
         total: 1,
       },
-    ])
+    ], KNOWN)
 
     expect(knownCount).toBe(1)
     expect(freshCount).toBe(1)

@@ -13,3 +13,4 @@ tags:
 - [[fix-gga-glob-test-no-funciona-verificado-34]] (bugfix)
 - [[item-68-resuelto-preapproval-verifica-el-monto-con-getpreapp-218]] (bugfix)
 - [[item-66-resuelto-redispexpire-verificable-redisdel-en-el-cam-222]] (bugfix)
+- [[items-76-y-77-resueltos-reconstruccion-byte-level-known-corr-225]] (bugfix)

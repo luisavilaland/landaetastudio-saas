@@ -83,18 +83,17 @@ const EXTENSIONS = new Set([
 
 // --- Corrupcion preexistente, documentada ----------------------------------
 //
-// TODO: arreglar cada uno en su propio PR y sacarlo de esta lista.
+// Lista vacia desde el 2026-10-09: los dos archivos que estaban aqui
+// (`bitacora.md` y `deuda-tecnica.md`, items 76 y 77) se repararon con
+// reemplazo dirigido byte a byte. El unico mojibake que queda en `bitacora.md`
+// es INTENTIONAL: es el ejemplo documentado de como se ve un archivo roto, asi
+// que no lo cuenta el detector y no debe "arreglarse".
 //
-//   vault/02_Bitacora/bitacora.md  -- 34 U+FFFD, BOM, 1 secuencia de 2 bytes,
-//     3 control chars (U+000C, U+0007, U+001D). Es append-only: arreglarlo
-//     exige RECONSTRUIR los bytes, no editar a mano.
-//   vault/03_Deuda/deuda-tecnica.md -- 1 U+FFFD. Mismo tratamiento.
-//
-// Se reportan como warning visible pero NO cuentan para el exit code.
-const KNOWN_CORRUPT = new Set([
-  'vault/02_Bitacora/bitacora.md',
-  'vault/03_Deuda/deuda-tecnica.md',
-])
+// Cuando se agregue un archivo aqui, la entrada necesita:
+//   - por que NO se puede reparar todavia,
+//   - el PR que lo va a reparar,
+//   - si el hallazgo es recuperable de git o hay que reconstruir por inferencia.
+const KNOWN_CORRUPT = new Set([])
 
 // --- Deteccion --------------------------------------------------------------
 
@@ -222,9 +221,9 @@ function describe(scan) {
   return parts.join(', ')
 }
 
-export function formatReport(results) {
-  const known = results.filter((r) => KNOWN_CORRUPT.has(r.file))
-  const fresh = results.filter((r) => !KNOWN_CORRUPT.has(r.file))
+export function formatReport(results, knownCorrupt = KNOWN_CORRUPT) {
+  const known = results.filter((r) => knownCorrupt.has(r.file))
+  const fresh = results.filter((r) => !knownCorrupt.has(r.file))
   const lines = []
 
   if (known.length > 0) {
