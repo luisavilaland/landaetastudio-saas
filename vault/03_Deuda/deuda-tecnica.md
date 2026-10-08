@@ -2995,3 +2995,53 @@ en esas tablas la active sin que nadie lo sepa.
 **Costo estimado:** 0.3 h (borrar la rama y su log, o dejarla con un comentario que diga
 que hoy es inalcanzable y por que). No se resuelve en el PR de items 69+70: es
 diagnostico de este PR, no parte del fix.
+
+---
+
+## 75. GGA no cubre los tests, y los tests son donde el mojibake queda consagrado
+
+**Estado:** abierto (2026-10-07). Severidad MEDIA.
+
+**Origen:** detectado al corregir doble encoding en
+`apps/admin/app/api/subscriptions/preapproval/__tests__/route.test.ts` (PR #222,
+review de luisavilaland).
+
+**Problema:** `.gga:40` tiene `EXCLUDE_PATTERNS="*test.ts,*spec.ts,*d.ts,..."`. La
+memoria obs 142 afirma que "GGA es el unico control que detecta doble encoding". Es
+cierto para codigo de produccion — el mojibake que GGA detecto antes estaba en
+`preapproval/route.ts` — pero deja los archivos de test sin ninguna red.
+
+**Evidencia:**
+
+- El archivo tenia doble encoding en 14 lugares y un BOM, y convivio con **727 tests
+  verdes**. El archivo sigue siendo UTF-8 valido, asi que ESLint, `tsc`, vitest y
+  prettier no tienen nada que senalar.
+- El test de `payerEmail` afirmaba contra la cadena corrupta y pasaba igual: el mock y
+  la asercion compartian el mismo valor. **727 tests verdes sobre una direccion de
+  correo que nadie escribiria.**
+- Al commitear el fix **sin `--no-verify`**, el hook respondio literalmente
+  `No matching files staged for commit`: no habia nada que revisar.
+
+**Por que importa mas de lo que sugiere el costo:** un string corrupto en produccion
+se ve — el usuario ve el texto roto. Un string corrupto en un test se **consagra**:
+queda codificado como la verdad esperada y el suite lo protege. El dano es peor,
+porque se autoperpetua.
+
+**Fix propuesto:** agregar un check de encoding por codepoints a `format:check`. Cubre
+todo el repo incluido los `.md` de `vault/`, es barato, y **no toca el exclude de GGA**,
+que existe por una razon valida: los tests son ruido para una review de IA.
+
+**Alternativa descartada:** sacar `*test.ts` de los `EXCLUDE_PATTERNS` de GGA. El
+motivo del exclude sigue siendo correcto para el review de IA; el problema es de
+alcance del control, no de que el control sea equivocado.
+
+**Nota de alcance:** `vault/02_Bitacora/bitacora.md` tiene 34 caracteres U+FFFD + 9
+mojibake y `deuda-tecnica.md` 1 + 2. Todos **preexistentes en `develop`**, verificado
+byte a byte. No son del item 69 y quedan fuera de su alcance.
+
+**Costo estimado:** 0.5 h (un script que recorra el repo y falle ante BOM, U+FFFD o
+firmas de doble encoding).
+
+**Relacionado:** obs 142 (GGA detecta doble encoding que los tests no ven) y obs 34 (el
+glob correcto de GGA es `*test.ts`). Misma familia que el item 62: **un control que
+parece cubrir la zona critica, y cubre otra.**
