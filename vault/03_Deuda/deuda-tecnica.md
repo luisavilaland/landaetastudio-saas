@@ -3141,3 +3141,38 @@ handshake colgado de verdad; la (c) es la que ataca la causa.
 **Nota de proceso:** este item es el antecedente de una regla util — **un `pnpm test` rojo
 aislado no es evidencia hasta que se reproduce.** En este caso la primera conclusion
 (que era regresion del PR) fue falsa, y solo dos repeticiones_clean la refutaron.
+
+## 79. PowerShell `>` decodifica bytes al redirigir
+
+**Severidad:** MEDIA.
+**Estado:** ABIERTO.
+**Origen:** Detectado durante el cierre de la sesión 2026-10-08 (PR #224).
+
+**Problema:** `git show origin/develop:<path> > $env:TEMP\f.md` en
+PowerShell decodifica el contenido a string antes de escribir. El
+archivo resultante tiene bytes inválidos que no existen en el blob
+original.
+
+**Evidencia:** Durante el cierre de #224 se reportó "68 U+FFFD y bytes
+inválidos en offset 968" sobre un blob que estaba LIMPIO (3229 bytes,
+0 U+FFFD, flecha E2 86 92 válida, idéntico al worktree). Los bytes
+inválidos eran artefacto de la redirección de PowerShell.
+
+Es la TERCERA vez en la sesión del 2026-10-08 que PowerShell inventa
+un hallazgo de encoding. Ya no es anécdota, es patrón.
+
+**Riesgo:** el fix de un bug imaginario puede destruir el archivo sano
+que se cree corrupto. En #224 el agente estuvo a un paso de "reparar"
+un archivo limpio.
+
+**Mitigación:** Toda medición de bytes en este repo pasa por Node
+(child_process.execFileSync con 'git cat-file blob') o por
+`git diff --numstat`. NUNCA por redirección de PowerShell (`>`).
+
+**Familia:** cuarta variante de "el control que parece cubrir no cubre":
+
+- Item 62: un nombre hizo el trabajo de la review.
+- Item 61: un mock hizo invisible el WHERE.
+- Item 75: un valor corrupto compartido entre mock y assertion.
+- Item 79: un shell que convierte bytes en texto donde se cree que
+  mueve archivos.
