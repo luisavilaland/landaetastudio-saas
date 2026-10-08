@@ -2772,42 +2772,69 @@ endpoints).
 
 ## 69. Doble POST concurrente crea dos preapprovals en MercadoPago (H-F2-7)
 
-**Estado:** abierto (2026-10-07). Verificado en codigo: no.
+**Estado:** **RESUELTO** (2026-10-07). Reserva condicional antes de llamar a MP.
 
-**Evidencia:** `apps/admin/app/api/subscriptions/preapproval/route.ts:76-131`.
+**Evidencia original:** `apps/admin/app/api/subscriptions/preapproval/route.ts:76-131`
+— guard read-then-act sin lock ni constraint unique.
 
-**Impacto:** guard read-then-act sin lock ni constraint unique. Dos requests
-concurrentes crean **dos preapprovals en MercadoPago**; el segundo pisa el
-`mpPreapprovalId` y deja un preapproval **huérfano en MP**, que hay que cancelar a
-mano. El rate limit (10/min por IP) no lo evita.
+**Impacto:** dos requests concurrentes creaban **dos preapprovals en MercadoPago**; el
+segundo pisaba el `mpPreapprovalId` y dejaba un preapproval **huérfano en MP**, que hay
+que cancelar a mano. El rate limit (10/min por IP) no lo evita.
 
-**Por que importa mas de lo que sugiere el costo:** el design seccion 6.5 existe
-precisamente para evitar "dos suscripciones -> dos cobros". Hoy esa garantia no la
-impone el codigo.
+**Resolución.** `mpPreapprovalId` ahora admite un **valor centinela** `pending:<subId>`
+que ocupa el slot de forma condicional **antes** de llamar a MercadoPago:
 
-**Costo estimado:** 3 h (indice unico parcial sobre el estado pending, o lock por
-tenant).
+1. `UPDATE ... SET mpPreapprovalId = 'pending:<id>' WHERE id AND tenantId AND
+(mpPreapprovalId IS NULL OR (mpPreapprovalId LIKE 'pending:%' AND updatedAt < now - TTL))`
+   con `.returning()`. Si afecta 0 filas → otra petición ganó → **409 sin llamar a MP**.
+2. Se llama a MP (fuera de toda transacción).
+3. `UPDATE ... SET mpPreapprovalId = <id real> WHERE ... AND mpPreapprovalId = 'pending:<id>'`.
+   Si afecta 0 filas → otro proceso tomó la reserva → el preapproval queda huérfano y se
+   registra con `logger.error` + 409 que no promete un alta que no ocurrió.
+
+**Por qué centinela y no lock.** La llamada a MP ocurre **entre** dos transacciones, así
+que un `FOR UPDATE` no la protegería: se necesitaría sostener un lock de fila durante los
+~300 ms de red. El compare-and-set va en el `WHERE` de la escritura, que sí cubre la
+ventana. `PENDING_RESERVATION_TTL_MS` = 5 min: pasada la ventana se asume que el proceso
+murió y otro puede tomar el lugar, para no dejar al tenant bloqueado.
+
+**Costo asumido:** si MP rechaza la creación, la reserva sigue viva hasta el TTL y el
+tenant recibe un 409 con `retryInSeconds` en vez de reintentar al instante. Fail-closed
+con ventana de espera, preferible al huérfano.
+
+**Verificación:** TDD. El test de doble POST concurrente falló primero con
+`expected "vi.fn()" to be called 1 times, but got 2 times`. El mock de `returning` simula
+el slot como compare-and-set real: un mock que devuelve `[{ id }]` siempre pasaría con y
+sin el fix.
 
 ---
 
 ## 70. read-modify-write sin `FOR UPDATE` (H-F2-8)
 
-**Estado:** abierto (2026-10-07). Verificado en codigo: no.
+**Estado:** **RESUELTO** (2026-10-07). Compare-and-set sobre el `status` leído.
 
-**Evidencia:** `apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts:500-517`
+**Evidencia original:** `apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts:500-517`
 y `:603-611`.
 
-**Impacto:** `SELECT` sin `FOR UPDATE` y `UPDATE ... WHERE id + tenantId` sin
-compare-and-set. Dos eventos concurrentes (`preapproval.cancelled` vs
-`payment.approved`) compiten y gana el ultimo. Si queda `active` mientras MP dice
-`cancelled`, la suscripcion queda desincronizada hasta el proximo evento, o
-indefinidamente.
+**Impacto:** `SELECT` sin lock y `UPDATE ... WHERE id + tenantId` sin compare-and-set. Dos
+eventos concurrentes (`preapproval.cancelled` vs `payment.approved`) competían y ganaba el
+último por orden de commit. Si quedaba `active` mientras MP decía `cancelled`, la
+suscripción quedaba desincronizada hasta el próximo evento o indefinidamente.
 
-**Costo estimado:** 3 h (`FOR UPDATE` en el select dentro de la transaccion, o
-compare-and-set sobre `lastProcessedPaymentId`).
+**Resolución.** El `UPDATE` ahora incluye `eq(dbSubscriptions.status, current)` — el
+`status` que se leyó — y se inspecciona `.returning()`. Si afecta 0 filas, otra
+transición movió la fila y este evento se descarta con `{ applied: false, reason:
+'concurrent_update' }` más un log explícito. El perdedor es idempotente: si MP reintenta,
+converge contra el estado correcto.
 
-**Relacionado:** item 57 (`planId` desalineado si falla el GET) y la idempotencia
-por convergencia de H-F2-8 conviven en el mismo handler.
+**Por qué no `FOR UPDATE`.** No hay ningún lock de fila en el proyecto y este caso no lo
+necesita: cada transacción decide desde su propia lectura y la perdedora es descartable.
+Sostener un lock durante `verifyPlanAmountConvergence` sería peor que perder una
+transición idempotente. Es el mismo mecanismo del item 1 (TOCTOU checkout), que ya está
+en producción y testeado.
+
+**Verificación:** TDD. 3 tests en RED antes del cambio, el principal con
+`expected true to be false` — el handler reportaba `applied: true` con 0 filas escritas.
 
 ---
 
@@ -2895,3 +2922,126 @@ decision y no una edicion.
 **Relacionado:** `vault/05_Specs/brief-tecnico-fase-5.md` (misma colision, ya
 marcado historico) y la seccion "Blueprint vigente" de
 `vault/05_Specs/arquitectura.md`.
+
+---
+
+## 73. El cleanup de 3 registros presupone que el worktree y el workspace existen
+
+**Estado:** abierto (2026-10-07). No es codigo: la regla de proceso de AGENTS.md
+("Cleanup de worktree post-merge") tiene un paso cero que no esta escrito.
+
+**Hecho:** la regla manda verificar por separado el worktree de git, la rama local y el
+workspace de Paseo, "porque el registro de git y el de Paseo se limpian por separado". Es
+correcta **cuando se crean el worktree y el workspace**, que es lo que pasa siguiendo el
+ritual completo. En el PR #221 el trabajo se hizo en el worktree principal: no existia
+worktree de la rama y no existia workspace.
+
+**La trampa concreta:** el unico workspace del proyecto era `wks_b14ea16d10d416b5`, con
+`cwd` = el repo principal y `kind: local_checkout` — es la **sesion en curso**. Ejecutar
+el paso 3 del plan al pie de la letra (`paseo_archive_workspace <id>` sobre el unico
+candidato del proyecto) habria **archivado la sesion activa**, cortando la conversacion en
+curso. El mismo paso que en #220 habria sido correcto.
+
+**Por que importa:** un cleanup que asume la existencia de su objetivo es un cleanup que
+puede borrar lo equivocado. El riesgo no es proporcional al error: archivar el workspace
+equivocado no es un directorio huerfano de 433 MB, es perder la sesion.
+
+**Fix propuesto (para el proximo PR que toque AGENTS.md):** agregar el paso cero.
+
+1. `git worktree list` — **si no hay worktree de la rama, no hay nada que limpiar en este
+   registro.** No asumas que existe.
+2. `paseo_list_workspaces` — **filtrar por `projectId` Y por `cwd`.** Si el unico workspace
+   del proyecto tiene `cwd` = el worktree principal, es la sesion activa: **no lo
+   archives.**
+3. Verificar la existencia del objetivo **antes** de ejecutar cada `remove`/`archive`, no
+   despues.
+
+**Costo estimado:** 0.5 h (solo edicion de AGENTS.md, sin codigo). No se resuelve junto con
+items 69+70: es documentacion de proceso y mezclarla con fixes de serializacion ensuciaria
+ambos diffs.
+
+**Relacionado:** item 62 (mismo tipo: un nombre o un comentario reemplazan a un
+procedimiento que deberia existir). Patron de fondo: la regla de 3 registros se escribio
+desde un caso y se aplico a un caso distinto.
+
+---
+
+## 74. La rama `target === current` de `applyTransition` es inalcanzable
+
+**Estado:** abierto (2026-10-07, descubierto al verificar el item 70).
+
+**Hecho:** `route.ts` tiene una rama que devuelve `{ reason: 'converged' }` cuando el target
+calculado es igual al `status` leido. Recorriendo `decideTarget` contra las tres tablas, no
+existe ningun camino que la alcance:
+
+| Camino de `decideTarget`         | Devuelve    | Requiere `current`                                   | Puede coincidir |
+| -------------------------------- | ----------- | ---------------------------------------------------- | --------------- |
+| `preapproval_cancelled`          | `cancelled` | `current ∈ CANCELLABLE` = {active, past_due, paused} | nunca           |
+| `preapproval` + `paused`         | `paused`    | `current ∈ PAUSABLE` = {active, past_due}            | nunca           |
+| `preapproval`/`payment` aprobado | `active`    | `current ∈ REVIVABLE` = {pending, past_due, expired} | nunca           |
+| `payment` fallido                | `past_due`  | `current = 'active'`                                 | nunca           |
+
+**Por que importa:** el comentario de la rama afirma que cubre el caso "ya convergido",
+y da la impresion de que hay un segundo mecanismo de idempotencia ademas de la convergencia
+de estado. **No lo hay.** Un test que lo cubra tiene que mentir: el primer test escrito para
+el item 70 asumio `reason: 'converged'` y fallo con `expected 'no_transition' to be
+'converged'`.
+
+**Riesgo:** si alguien amplia `CANCELLABLE` o `PAUSABLE` con el estado que devuelve la
+rama (por ejemplo, agregar `cancelled` a `CANCELLABLE`), la rama despierta con una
+semantica que nunca fue probada. El riesgo no es que falle hoy: es que el proximo cambio
+en esas tablas la active sin que nadie lo sepa.
+
+**Costo estimado:** 0.3 h (borrar la rama y su log, o dejarla con un comentario que diga
+que hoy es inalcanzable y por que). No se resuelve en el PR de items 69+70: es
+diagnostico de este PR, no parte del fix.
+
+---
+
+## 75. GGA no cubre los tests, y los tests son donde el mojibake queda consagrado
+
+**Estado:** abierto (2026-10-07). Severidad MEDIA.
+
+**Origen:** detectado al corregir doble encoding en
+`apps/admin/app/api/subscriptions/preapproval/__tests__/route.test.ts` (PR #222,
+review de luisavilaland).
+
+**Problema:** `.gga:40` tiene `EXCLUDE_PATTERNS="*test.ts,*spec.ts,*d.ts,..."`. La
+memoria obs 142 afirma que "GGA es el unico control que detecta doble encoding". Es
+cierto para codigo de produccion — el mojibake que GGA detecto antes estaba en
+`preapproval/route.ts` — pero deja los archivos de test sin ninguna red.
+
+**Evidencia:**
+
+- El archivo tenia doble encoding en 14 lugares y un BOM, y convivio con **727 tests
+  verdes**. El archivo sigue siendo UTF-8 valido, asi que ESLint, `tsc`, vitest y
+  prettier no tienen nada que senalar.
+- El test de `payerEmail` afirmaba contra la cadena corrupta y pasaba igual: el mock y
+  la asercion compartian el mismo valor. **727 tests verdes sobre una direccion de
+  correo que nadie escribiria.**
+- Al commitear el fix **sin `--no-verify`**, el hook respondio literalmente
+  `No matching files staged for commit`: no habia nada que revisar.
+
+**Por que importa mas de lo que sugiere el costo:** un string corrupto en produccion
+se ve — el usuario ve el texto roto. Un string corrupto en un test se **consagra**:
+queda codificado como la verdad esperada y el suite lo protege. El dano es peor,
+porque se autoperpetua.
+
+**Fix propuesto:** agregar un check de encoding por codepoints a `format:check`. Cubre
+todo el repo incluido los `.md` de `vault/`, es barato, y **no toca el exclude de GGA**,
+que existe por una razon valida: los tests son ruido para una review de IA.
+
+**Alternativa descartada:** sacar `*test.ts` de los `EXCLUDE_PATTERNS` de GGA. El
+motivo del exclude sigue siendo correcto para el review de IA; el problema es de
+alcance del control, no de que el control sea equivocado.
+
+**Nota de alcance:** `vault/02_Bitacora/bitacora.md` tiene 34 caracteres U+FFFD + 9
+mojibake y `deuda-tecnica.md` 1 + 2. Todos **preexistentes en `develop`**, verificado
+byte a byte. No son del item 69 y quedan fuera de su alcance.
+
+**Costo estimado:** 0.5 h (un script que recorra el repo y falle ante BOM, U+FFFD o
+firmas de doble encoding).
+
+**Relacionado:** obs 142 (GGA detecta doble encoding que los tests no ven) y obs 34 (el
+glob correcto de GGA es `*test.ts`). Misma familia que el item 62: **un control que
+parece cubrir la zona critica, y cubre otra.**

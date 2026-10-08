@@ -61,6 +61,59 @@ beforeEach(() => {
   vi.mocked(getPreapproval).mockResolvedValue({ status: 'authorized' })
 })
 
+describe('invariante del centinela pending:<id> (item 69)', () => {
+  // El centinela que ocupa `mpPreapprovalId` durante la reserva NO es un
+  // preapproval de MP. Las tres mutaciones lo alcanzan solo si su
+  // `allowedFrom` incluyera `pending_first_payment`, y ahi el sentinel se
+  // mandaria a MP como si fuera un id real — un 502 de MP, no algo evidente.
+  //
+  // Este test es conductual a proposito: no mira constantes sino que verifica
+  // que la red nunca se toca. Un test sobre `CANCELLABLE`/`PAUSABLE`/
+  // `REVIVABLE` protege otra cosa — esas viven en el webhook y deciden si una
+  // transicion aplica, no si una mutacion puede llamar a MP. Ademas
+  // `REVIVABLE` contiene `pending_first_payment` por diseno: es lo que hace
+  // funcionar la transicion `pending_first_payment -> active`.
+  for (const [nombre, handler] of [
+    ['cancel', cancel],
+    ['pause', pause],
+    ['resume', resume],
+  ] as const) {
+    it(`${nombre}: con una reserva viva no manda el centinela a MP`, async () => {
+      vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+      mockSubContext(
+        sub({
+          status: 'pending_first_payment',
+          mpPreapprovalId: 'pending:sub-1',
+        }),
+      )
+
+      const res = await handler()
+
+      // 409 por conflicto de estado, no 502 de MP.
+      expect(res.status).toBe(409)
+      expect(updatePreapproval).not.toHaveBeenCalled()
+      expect(getPreapproval).not.toHaveBeenCalled()
+    })
+  }
+
+  it('el 409 dice que el status no habilita la operacion, no que MP fallo', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    mockSubContext(
+      sub({
+        status: 'pending_first_payment',
+        mpPreapprovalId: 'pending:sub-1',
+      }),
+    )
+
+    const res = await cancel()
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.field).toBe('status')
+    expect(body.status).toBe('pending_first_payment')
+  })
+})
+
 describe('mutaciones de estado — auth', () => {
   for (const [nombre, handler] of [
     ['cancel', cancel],

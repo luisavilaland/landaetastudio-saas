@@ -56,6 +56,53 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+describe('GET /api/subscriptions — hasPreapproval con el centinela del item 69', () => {
+  it('false con una reserva viva: el centinela no es un preapproval', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(
+        txMock(
+          sub({
+            status: 'pending_first_payment',
+            mpPreapprovalId: 'pending:sub-1',
+          }),
+        ),
+      ),
+    )
+
+    const res = await GET()
+    const body = await res.json()
+
+    // `Boolean('pending:sub-1')` da true, pero no hay ningun preapproval al que
+    // ir: la creacion esta en curso. Reportar true manda al tenant a una URL que
+    // todavia no existe.
+    expect(res.status).toBe(200)
+    expect(body.hasPreapproval).toBe(false)
+  })
+
+  it('true con un preapproval real de MP', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(txMock()),
+    )
+
+    const res = await GET()
+
+    expect((await res.json()).hasPreapproval).toBe(true)
+  })
+
+  it('false sin preapproval ni reserva', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(txMock(sub({ mpPreapprovalId: null }))),
+    )
+
+    const res = await GET()
+
+    expect((await res.json()).hasPreapproval).toBe(false)
+  })
+})
+
 describe('GET /api/subscriptions — auth', () => {
   it('401 sin sesion', async () => {
     vi.mocked(auth).mockResolvedValue(null)

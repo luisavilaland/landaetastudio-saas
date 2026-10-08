@@ -601,15 +601,40 @@ async function applyTransition(
       patch.lastProcessedPaymentId = paymentId
     }
 
-    await tx
+const written = await tx
       .update(dbSubscriptions)
       .set(patch)
       .where(
         and(
           eq(dbSubscriptions.id, row.id),
           eq(dbSubscriptions.tenantId, resolved.tenantId),
+          // Item 70 (H-F2-8): compare-and-set sobre el `status` leido. Sin esta
+          // condicion el UPDATE es un last-write-wins y dos eventos concurrentes
+          // compiten sin que ninguno se entere: gana el orden de commit, no el
+          // timestamp del evento. Con ella, la transicion perdedora afecta 0
+          // filas y se descarta explicitamente.
+          //
+          // Es el mismo mecanismo del item 1 (TOCTOU checkout): la condicion de
+          // concurrencia va en el `WHERE` de la escritura, no en un lock. No se
+          // usa `FOR UPDATE` a proposito — no hay ningun lock de fila en el
+          // proyecto y sostenerlo durante `verifyPlanAmountConvergence` seria
+          // peor que perder la transicion perdedora, que es idempotente.
+          eq(dbSubscriptions.status, current),
         ),
       )
+      .returning({ id: dbSubscriptions.id })
+
+    if (written.length === 0) {
+      // Otra transicion movio la fila entre el SELECT y el UPDATE. El evento se
+      // descarta: el estado resultante ya lo escribio otra transicion con su
+      // propia lectura, que era tan valida como esta. MP reintentara si hace
+      // falta y entonces converge contra el estado correcto.
+      logger.info(
+        { tenantId: resolved.tenantId, readStatus: current, eventKind },
+        'Concurrent update discarded - row changed under us',
+      )
+      return { applied: false, from: current, reason: 'concurrent_update' }
+    }
 
     logger.info(
       { tenantId: resolved.tenantId, from: current, to: target, eventKind },

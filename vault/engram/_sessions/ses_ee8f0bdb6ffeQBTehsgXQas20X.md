@@ -16,3 +16,6 @@ tags:
 - [[pr-220-mergeado-y-cleanup-verificado-3-registros-2-trampas-d-201]]
 - [[session-summary-landaetastudio-saas-202]]
 - [[pr-221-abierto-8-exports-de-engram-salvageados-del-patron-pr-203]]
+- [[pr-221-mergeado-develop-impecable-y-el-cleanup-reveal-que-la-204]]
+- [[cluster-69-70-resuelto-compare-and-set-sin-locks-reserva-con-205]]
+- [[la-condici-n-de-concurrencia-va-en-el-where-de-la-escritura-206]]

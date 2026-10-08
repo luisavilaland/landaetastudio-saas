@@ -157,7 +157,18 @@ interface TxSpy {
  * no pasan `amountCents` nunca lo consumen, asi que el default vacio no los
  * afecta.
  */
-function spyTx(rows: unknown[], planRows: unknown[] = []): TxSpy {
+/**
+ * `updateReturning` simula lo que devuelve `.returning()` del UPDATE.
+ *
+ * Item 70: el UPDATE es un compare-and-set sobre el `status` leido. Si otra
+ * transicion escribio primero, PostgreSQL afecta 0 filas y `.returning()`
+ * resuelve `[]`. Por default se simula el caso normal (1 fila).
+ */
+function spyTx(
+  rows: unknown[],
+  planRows: unknown[] = [],
+  updateReturning: unknown[] = [{ id: 'sub-1' }],
+): TxSpy {
   const updates: Array<Record<string, unknown>> = []
   const base = makeTxMock({
     select: [
@@ -172,7 +183,11 @@ function spyTx(rows: unknown[], planRows: unknown[] = []): TxSpy {
   tx.update = vi.fn(() => ({
     set: (values: Record<string, unknown>) => {
       updates.push(values)
-      return { where: vi.fn() }
+      return {
+        where: vi.fn(() => ({
+          returning: vi.fn(() => Promise.resolve(updateReturning)),
+        })),
+      }
     },
   }))
   return { tx, updates } as TxSpy
@@ -626,7 +641,15 @@ function statefulTx(rows: unknown[]) {
       set: (values: Record<string, unknown>) => {
         updates.push(values)
         Object.assign(state[0], values)
-        return { where: vi.fn() }
+        // Item 70: compare-and-set. `returningRows` = [] simula que otra
+        // transicion escribio antes y este UPDATE no afecta filas.
+        return {
+          where: vi.fn(() => ({
+            returning: vi.fn(() =>
+              Promise.resolve(rows.length > 0 ? [{ id: 'sub-1' }] : []),
+            ),
+          })),
+        }
       },
     })),
   }
@@ -1011,5 +1034,114 @@ describe('tolerancia', () => {
     } as unknown as NextRequest
 
     expect((await POST(req)).status).toBe(413)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Item 70 (H-F2-8): compare-and-set sobre el status leido
+// ---------------------------------------------------------------------------
+
+describe('item 70 — compare-and-set: otra transicion escribio primero', () => {
+  it('no reporta aplicado si el UPDATE afecta 0 filas', async () => {
+    // `.returning()` vacio = el WHERE con `status = current` no matcheo: otra
+    // transicion movio la suscripcion entre el SELECT y el UPDATE.
+    const { tx } = spyTx(
+      [sub({ status: 'past_due' })],
+      [],
+      [],
+    )
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+
+    const res = await POST(request(body('payment', PAYMENT_ID)))
+
+    expect(res.status).toBe(200)
+    const payload = (await res.json()) as Record<string, unknown>
+    // El punto del item: NO puede decir `applied: true` si la DB no aplico nada.
+    expect(payload.applied).toBe(false)
+    expect(payload.reason).toBe('concurrent_update')
+  })
+
+  it('deja registro de la colision para poder reconciliar por logs', async () => {
+    const { tx } = spyTx([sub({ status: 'past_due' })], [], [])
+
+    expect(loggerInfo).not.toHaveBeenCalled()
+
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+    await POST(request(body('payment', PAYMENT_ID)))
+
+    expect(loggerInfo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        readStatus: 'past_due',
+      }),
+      'Concurrent update discarded - row changed under us',
+    )
+  })
+
+  it('el patch incluye el status leido, para que el compare-and-set pueda fallar', async () => {
+    // Si el UPDATE no filtra por `status`, el compare-and-set no existe por muy
+    // que se detecten las 0 filas. Este test mira lo que se mando a `set`.
+    const { tx, updates } = spyTx([sub({ status: 'past_due' })], [], [])
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+
+    await POST(request(body('payment', PAYMENT_ID)))
+
+    expect(updates).toHaveLength(1)
+    expect(updates[0]).toMatchObject({ status: 'active' })
+  })
+
+  it('regresion: caso normal, el UPDATE afecta 1 fila y aplica', async () => {
+    // El camino feliz no puede romperse por agregar el compare-and-set.
+    const { tx, updates } = spyTx([sub({ status: 'past_due' })])
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+
+    const res = await POST(request(body('payment', PAYMENT_ID)))
+
+    expect(res.status).toBe(200)
+    const payload = (await res.json()) as Record<string, unknown>
+    expect(payload.applied).toBe(true)
+    expect(payload.from).toBe('past_due')
+    expect(payload.to).toBe('active')
+    expect(updates).toHaveLength(1)
+    expect(payload.reason).toBeUndefined()
+  })
+
+  it('regresion: cancelacion sobre `cancelled` no escribe (sin colision)', async () => {
+    // `cancelled` NO esta en CANCELLABLE, asi que `decideTarget` devuelve null y
+    // la rama `target === current` (reason `converged`) no se alcanza. El
+    // comportamiento real es `no_transition`.
+    const { tx, updates } = spyTx([sub({ status: 'cancelled' })])
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'cancelled',
+    })
+
+    const res = await POST(
+      request(
+        body('subscription_preapproval', PREAPPROVAL_ID, {
+          action: 'subscription_preapproval.cancelled',
+        }),
+      ),
+    )
+
+    expect(res.status).toBe(200)
+    const payload = (await res.json()) as Record<string, unknown>
+    expect(payload.applied).toBe(false)
+    expect(updates).toHaveLength(0)
+  })
+
+  it('regresion: evento atrasado sobre `active` tampoco escribe', async () => {
+    // `active` no esta en REVIVABLE: un payment.approved tarde cae en
+    // `no_transition` y devuelve 200 sin escribir.
+    const { tx, updates } = spyTx([sub({ status: 'active' })])
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+
+    const res = await POST(request(body('payment', PAYMENT_ID)))
+
+    const payload = (await res.json()) as Record<string, unknown>
+    expect(payload.applied).toBe(false)
+    expect(payload.reason).toBe('no_transition')
+    expect(updates).toHaveLength(0)
   })
 })
