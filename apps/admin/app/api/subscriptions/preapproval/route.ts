@@ -216,6 +216,15 @@ export async function POST(request: NextRequest) {
     // escritura. No se usa `FOR UPDATE` ni advisory lock porque la llamada a MP
     // ocurre FUERA de esta transaccion — un lock de fila seria inútil para
     // protegerla y solo agrega contención.
+    //
+    // INVARIANTE: el centinela solo existe mientras el status es
+    // `pending_first_payment` (el check de arriba lo garantiza antes de llegar
+    // acá). De eso depende que sea seguro: `mutate.ts` (cancel/pause/resume) y
+    // `plan/route.ts` leen `mpPreapprovalId` y lo mandan a MP, y solo lo hacen
+    // con status `active` o `paused`. Si alguien agrega `pending_first_payment`
+    // a un `allowedFrom`, el centinela llegaría a MP como si fuera un preapproval
+    // y el síntoma sería un 502 de MP, no algo evidente.
+    // Cubierto por el test de invariante en `subscriptions/__tests__/mutations.test.ts`.
     const reservation = reservationFor(subscription.subscription.id)
     const staleBefore = new Date(Date.now() - PENDING_RESERVATION_TTL_MS)
 

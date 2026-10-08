@@ -2785,7 +2785,7 @@ que cancelar a mano. El rate limit (10/min por IP) no lo evita.
 que ocupa el slot de forma condicional **antes** de llamar a MercadoPago:
 
 1. `UPDATE ... SET mpPreapprovalId = 'pending:<id>' WHERE id AND tenantId AND
-   (mpPreapprovalId IS NULL OR (mpPreapprovalId LIKE 'pending:%' AND updatedAt < now - TTL))`
+(mpPreapprovalId IS NULL OR (mpPreapprovalId LIKE 'pending:%' AND updatedAt < now - TTL))`
    con `.returning()`. Si afecta 0 filas → otra petición ganó → **409 sin llamar a MP**.
 2. Se llama a MP (fuera de toda transacción).
 3. `UPDATE ... SET mpPreapprovalId = <id real> WHERE ... AND mpPreapprovalId = 'pending:<id>'`.
@@ -2974,12 +2974,12 @@ desde un caso y se aplico a un caso distinto.
 calculado es igual al `status` leido. Recorriendo `decideTarget` contra las tres tablas, no
 existe ningun camino que la alcance:
 
-| Camino de `decideTarget` | Devuelve | Requiere `current` | Puede coincidir |
-| --- | --- | --- | --- |
-| `preapproval_cancelled` | `cancelled` | `current ∈ CANCELLABLE` = {active, past_due, paused} | nunca |
-| `preapproval` + `paused` | `paused` | `current ∈ PAUSABLE` = {active, past_due} | nunca |
-| `preapproval`/`payment` aprobado | `active` | `current ∈ REVIVABLE` = {pending, past_due, expired} | nunca |
-| `payment` fallido | `past_due` | `current = 'active'` | nunca |
+| Camino de `decideTarget`         | Devuelve    | Requiere `current`                                   | Puede coincidir |
+| -------------------------------- | ----------- | ---------------------------------------------------- | --------------- |
+| `preapproval_cancelled`          | `cancelled` | `current ∈ CANCELLABLE` = {active, past_due, paused} | nunca           |
+| `preapproval` + `paused`         | `paused`    | `current ∈ PAUSABLE` = {active, past_due}            | nunca           |
+| `preapproval`/`payment` aprobado | `active`    | `current ∈ REVIVABLE` = {pending, past_due, expired} | nunca           |
+| `payment` fallido                | `past_due`  | `current = 'active'`                                 | nunca           |
 
 **Por que importa:** el comentario de la rama afirma que cubre el caso "ya convergido",
 y da la impresion de que hay un segundo mecanismo de idempotencia ademas de la convergencia

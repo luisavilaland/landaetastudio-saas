@@ -91,7 +91,14 @@ export async function GET() {
       planSlug: plan?.slug ?? null,
       priceUyu: plan?.priceUyu ?? null,
       currentPeriodEnd: subscription.currentPeriodEnd,
-      hasPreapproval: Boolean(subscription.mpPreapprovalId),
+      // El centinela `pending:<id>` (item 69) NO es un preapproval real: es el
+      // marcador de que otro proceso está creando uno ahora mismo. Contarlo
+      // como `true` le diría al tenant que tiene algo que pagar y lo llevaría a
+      // una `init_point` que todavía no existe.
+      hasPreapproval: Boolean(
+        subscription.mpPreapprovalId &&
+          !subscription.mpPreapprovalId.startsWith('pending:'),
+      ),
       permissions,
       createdAt: subscription.createdAt,
       updatedAt: subscription.updatedAt,
