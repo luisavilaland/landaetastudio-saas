@@ -2756,17 +2756,56 @@ nunca `5xx`" (design secciones 3.5 y 6.2, paso 9).
 
 ## 68. `/preapproval` no re-verifica el monto que creo el preapproval (H-F2-6)
 
-**Estado:** abierto (2026-10-07). Verificado en codigo: no.
+**Severidad:** **ALTA** (subida desde MEDIUM el 2026-10-09).
+**Estado:** RESUELTO (2026-10-09). Ref: issue #226.
+**Verificado en codigo:** si (2026-10-09, sesion de arranque).
 
-**Evidencia:** `apps/admin/app/api/subscriptions/preapproval/route.ts:148-164`.
+**Evidencia del bug (antes del fix):** `apps/admin/app/api/subscriptions/preapproval/route.ts`
+-- `createPreapproval` (L262-278), `id` / `init_point` extraidos (L280-281), un
+presence-check (L283) y `201 { preapprovalId, initPoint }` (L328-331). Cero GET a MP.
+El `bodySchema` es `z.object({})`: el body va vacio, no hay un campo de monto que
+un test pudiera assertar por otro lado.
 
-**Impacto:** `plan/route.ts:260-287` y `mutate.ts` **si** re-verifican con un GET
-contra MP. `/preapproval` no. Es el borde exacto del item 48 (el bug del 100x): un
-`2xx` de MP no prueba que el monto sea el que se pidio. La unica deteccion es el
-warn de H3 en el webhook (`:542`), y **solo loguea**.
+**Por que ALTA y no MEDIUM (evidencia levantada el 2026-10-09):**
 
-**Costo estimado:** 2 h (re-verificar antes de persistir, alineando los tres
-endpoints).
+- **No hay reconciliacion en ningun lado.** 0 rutas `cron` / `scheduled` / `reconcile`
+  en las 3 apps.
+- **Deteccion sin remediacion.** El webhook `subscription_preapproval` lee
+  `preapproval.transaction_amount` (`handlePreapproval`, L356) y compara contra el plan
+  local, pero el unico efecto es un `logger.warn`: sin Sentry, sin email, sin alerta. El
+  codigo lo llama "la red de seguridad del otro lado"; una linea de log no es una red de
+  seguridad para dinero.
+- **El handler del cobro real no mira el monto.** `handleAuthorizedPayment` devuelve
+  `{ ignored: true, reason: 'no_transition_for_this_topic' }` (L314) sin leer
+  `transaction_amount`. Y el check de convergencia solo corre con
+  `eventKind === 'preapproval'` (L543): `handlePayment` llama a `applyTransition` sin
+  `amountCents`, asi que en eventos de pago el monto nunca se compara.
+- **Event order B:** el evento que activa el alta es el mismo donde se detecta la
+  divergencia. La deteccion es timely pero no actuante.
+- **Es el path de creacion:** no hay valor previo contra el cual diffear, y es el primer
+  cargo que el tenant paga.
+- **Precedente:** #188/#189 shipped un cobro 100x en este endpoint exacto. Es el borde
+  del item 48 (el bug del 100x): la conversion hoy es correcta via `toMpAmount`, lo que
+  faltaba era comprobar que MP la aplico.
+- **Ningun webhook llama a `updatePreapproval`.** Los unicos 2 call sites en produccion son
+  `plan/route.ts:235` (cambio de plan) y `mutate.ts:97` (que solo escribe
+  `{ status: target }`, no toca el monto).
+
+**Fix:** `getPreapproval(preapprovalId, token)` + comparacion contra
+`toMpAmount(plan.priceUyu)` + `502` sin `initPoint`, antes de cerrar la reserva. Copia la
+forma de `plan/route.ts:260-309`.
+
+**Divergencia deliberada con `/plan`:** ante un GET fallido, `/plan` devuelve `202` y no
+escribe en DB, porque alla la escritura a MP **ya salio** y un 502 diria "tu cambio fallo"
+cuando si salio. `/preapproval` devuelve `502` sin `initPoint` porque el tenant **todavia
+no pago** y lo unico que hace el endpoint es entregarle un link de pago: entregar un
+`initPoint` con monto no verificado **es** el bug. Reintentar no cuesta nada porque MP no
+cobra hasta el clic.
+
+**Tests:** 4 nuevos (coincide / no coincide / el GET falla / MP no manda
+`transaction_amount`). Verificados en rojo sin el fix: los 4 fallan, con el fix pasan. El
+`beforeEach` necesita `getPreapproval` con default `{ transaction_amount: 49 }`
+(`PLAN.priceUyu = 4900`): sin ese default los 34 tests previos pasaban a 502.
 
 ---
 

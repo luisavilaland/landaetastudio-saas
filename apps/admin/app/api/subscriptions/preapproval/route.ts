@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db, dbSubscriptions, dbPlans, withTenantContext } from '@repo/db'
 import { eq, and, isNull, like, lt, or } from 'drizzle-orm'
-import { createPreapproval, toMpAmount } from '@repo/commerce'
+import { createPreapproval, getPreapproval, toMpAmount } from '@repo/commerce'
 import { getAdminBaseUrl } from '@/lib/get-admin-base-url'
 import { createLogger } from '@/lib/logger'
 import {
@@ -286,6 +286,73 @@ export async function POST(request: NextRequest) {
         'MP respondio sin id o sin init_point',
       )
       return serverError('Respuesta inesperada de MercadoPago', null)
+    }
+
+    // Item 68 (H-F2-6): verificacion post-escritura del monto. Es la misma
+    // disciplina que en `plan/route.ts`: un 2xx de MP no prueba que el campo haya
+    // quedado aplicado. Este endpoint ya tiene un antecedente -- PR #189 shipped un
+    // cobro 100x aca por una conversion de unidades escrita a mano. Hoy la
+    // conversion es correcta via `toMpAmount`, pero nada comprobaba que MP la
+    // hubiera aplicado.
+    //
+    // DIVERGE de `/plan` en el caso "no verificable", a proposito: alla la
+    // escritura a MP ya salio, asi que un 502 diria "tu cambio fallo" cuando si
+    // salio, y lo honesto es 202 + no escribir en DB. Aca el tenant NO pago
+    // todavia y lo unico que hace este endpoint es entregarle un link de pago:
+    // entregar un `initPoint` con monto no verificado ES el bug. Sin confirmacion
+    // no hay nada que entregar, y reintentar no cuesta nada porque MP no cobra
+    // hasta el clic.
+    let verifiedAmount: number | null = null
+    try {
+      const fresh = await getPreapproval(preapprovalId, token)
+      // `getPreapproval` devuelve `Record<string, unknown>`: MP puede no mandar el
+      // campo, y no es un error.
+      const rawAmount = fresh.transaction_amount
+      verifiedAmount = typeof rawAmount === 'number' ? rawAmount : null
+    } catch (err) {
+      logger.warn(
+        { err, preapprovalId },
+        '[subscriptions/preapproval] no pude verificar el monto',
+      )
+    }
+
+    const expectedAmount = toMpAmount(subscription.plan.priceUyu)
+
+    // Sin monto verificable no se entrega el punto de pago ni se escribe el id en
+    // la DB: afirmar un estado que nadie confirmo seria el mismo bug que esta
+    // verificacion previene. La reserva `pending:` sigue viva hasta su TTL, asi
+    // que el tenant puede reintentar en unos minutos.
+    if (verifiedAmount === null) {
+      logger.error(
+        { preapprovalId, tenantId, expectedAmount },
+        '[subscriptions/preapproval] monto no verificable; el preapproval queda huerfano en MP',
+      )
+      return NextResponse.json(
+        {
+          error:
+            'No se pudo verificar el monto en MercadoPago. Reintenta en unos minutos.',
+          field: 'preapproval',
+        },
+        { status: 502 },
+      )
+    }
+
+    if (verifiedAmount !== expectedAmount) {
+      // El preapproval YA existe en MP con un monto que no es el nuestro: nadie
+      // lo va a cobrar solo, pero hay que cancelarlo a mano. Se loguea con el id
+      // explicito, igual que la rama `finalized === 0` de mas abajo.
+      logger.error(
+        { preapprovalId, tenantId, expectedAmount, verifiedAmount },
+        '[subscriptions/preapproval] MP acepto el alta pero el monto no coincide; el preapproval queda huerfano en MP',
+      )
+      return NextResponse.json(
+        {
+          error:
+            'MercadoPago acepto la creacion pero el monto no se actualizo',
+          field: 'transactionAmount',
+        },
+        { status: 502 },
+      )
     }
 
     // Cierre de la reserva: se reemplaza el centinela por el id real de MP. Tambien
