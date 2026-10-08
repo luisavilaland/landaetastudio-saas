@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { redisIncr, redisPexpire } from '@repo/commerce'
+import { redisDel, redisIncr, redisPexpire } from '@repo/commerce'
 import { auth } from '@/lib/auth'
 import { createLogger } from '@/lib/logger'
 
@@ -135,7 +135,23 @@ export async function checkRateLimit(
     }
 
     if (count === 1) {
-      await redisPexpire(redisKey, RATE_LIMIT_WINDOW_MS)
+      const ttlApplied = await redisPexpire(redisKey, RATE_LIMIT_WINDOW_MS)
+      if (!ttlApplied) {
+        // Item 66 (H-F2-7): sin TTL la clave sobrevive para siempre, el contador
+        // sigue subiendo y se llega a un 429 que no se recupera nunca.
+        //
+        // Ojo con lo que NO alcanza: log + fail-open aqui deja pasar ESTE
+        // request pero no deshace nada, porque `count === 1` no se va a repetir
+        // y nadie reintenta el TTL. Por eso se borra la clave: el siguiente
+        // request vuelve a ver `count === 1` y reintenta. La degradacion es que
+        // el rate limit puede no aplicarse, en vez de bloquear al tenant para
+        // siempre — eso es fail-open de verdad.
+        logger.warn(
+          { key: redisKey },
+          'Rate limit: no se pudo fijar el TTL, se reintenta en el proximo request',
+        )
+        await redisDel(redisKey)
+      }
     }
 
     if (count > limit) {

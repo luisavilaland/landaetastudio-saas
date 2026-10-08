@@ -26,6 +26,7 @@ vi.mock('@repo/commerce', async () => {
     ...actual,
     createPreapproval: vi.fn(),
     getPreapproval: vi.fn(),
+    redisDel: vi.fn(),
     redisIncr: vi.fn(),
     redisPexpire: vi.fn(),
   }
@@ -35,6 +36,7 @@ import { auth } from '@/lib/auth'
 import {
   createPreapproval,
   getPreapproval,
+  redisDel,
   redisIncr,
   redisPexpire,
 } from '@repo/commerce'
@@ -145,7 +147,12 @@ beforeEach(() => {
   process.env.MP_PLATFORM_ACCESS_TOKEN = TOKEN
   // Redis sano por defecto: dentro del limite.
   vi.mocked(redisIncr).mockResolvedValue(1)
-  vi.mocked(redisPexpire).mockResolvedValue(undefined)
+  // Item 66 (H-F2-7): `redisPexpire` ahora devuelve `boolean`. Este mock decia
+  // `undefined`, que era el contrato viejo (void) — y como `vi.fn()` no esta
+  // tipado, `tsc` nunca lo detecto. Con `undefined` el call site tomaba el
+  // camino de falla y borraba la clave en cada request.
+  vi.mocked(redisPexpire).mockResolvedValue(true)
+  vi.mocked(redisDel).mockResolvedValue(undefined)
   vi.mocked(createPreapproval).mockResolvedValue({
     id: 'preapproval-nuevo',
     init_point: 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=x',
@@ -368,6 +375,59 @@ describe('POST /api/subscriptions/preapproval — rate limit', () => {
     vi.mocked(redisIncr).mockResolvedValue(2)
     await POST(req())
     expect(redisPexpire).toHaveBeenCalledTimes(1)
+  })
+
+  // Item 66 (H-F2-7). El bug no era que el TTL fallara: era que no se podia
+  // saber si fallaba, y la clave quedaba sin vencimiento.
+  describe('TTL del rate limit (item 66)', () => {
+    it('si el TTL se aplico, NO borra la clave', async () => {
+      vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+      vi.mocked(redisIncr).mockResolvedValue(1)
+      vi.mocked(redisPexpire).mockResolvedValue(true)
+
+      await POST(req())
+
+      expect(redisPexpire).toHaveBeenCalledWith(expect.any(String), 60_000)
+      expect(redisDel).not.toHaveBeenCalled()
+    })
+
+    it('si el TTL fallo, deja pasar el request (fail-open)', async () => {
+      vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+      vi.mocked(redisIncr).mockResolvedValue(1)
+      vi.mocked(redisPexpire).mockResolvedValue(false)
+
+      const res = await POST(req())
+
+      // Fail-open: el rate limit es proteccion, no funcionalidad critica.
+      expect(res.status).toBe(201)
+    })
+
+    it('si el TTL fallo, borra la clave para que el proximo request reintente', async () => {
+      vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+      vi.mocked(redisIncr).mockResolvedValue(1)
+      vi.mocked(redisPexpire).mockResolvedValue(false)
+
+      await POST(req())
+
+      // ESTE es el punto del fix. Sin el borrado, la clave queda sin TTL para
+      // siempre: `count === 1` no se repite, nadie reintenta, el contador sube
+      // y el 429 es permanente. Log + fail-open solo hacia visible el bug.
+      expect(redisDel).toHaveBeenCalledWith(expect.any(String))
+      // La misma clave que se iba a expirar, no una cualquiera.
+      const pexpiredKey = vi.mocked(redisPexpire).mock.calls[0][0]
+      expect(redisDel).toHaveBeenCalledWith(pexpiredKey)
+    })
+
+    it('si Redis no responde al INCR, fail-open sin tocar el TTL', async () => {
+      vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+      vi.mocked(redisIncr).mockResolvedValue(null)
+
+      const res = await POST(req())
+
+      expect(res.status).toBe(201)
+      expect(redisPexpire).not.toHaveBeenCalled()
+      expect(redisDel).not.toHaveBeenCalled()
+    })
   })
 
   it('rate-limit por IP: dos IPs distintas no comparten cuota', async () => {

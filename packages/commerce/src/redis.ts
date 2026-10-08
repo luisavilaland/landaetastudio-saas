@@ -103,11 +103,24 @@ export async function redisIncr(key: string): Promise<number | null> {
   return safeRun('incr', () => redisClient.incr(key))
 }
 
+/**
+ * Fija el TTL de una clave y **dice si lo hizo**.
+ *
+ * Item 66 (H-F2-7): antes devolvia `void`, asi que un `pexpire` fallido era
+ * indistinguible de uno exitoso y el caller no podia decidir nada con el
+ * resultado. `safeRun` devuelve `null` ante error, e ioredis devuelve `0` si la
+ * clave no existe: en los dos casos el TTL **no** quedo aplicado, asi que los dos
+ * son `false`. Un `true` afirma que hay TTL; eso es lo que el caller necesita
+ * para no dejar una clave sin vencimiento.
+ */
 export async function redisPexpire(
   key: string,
   milliseconds: number,
-): Promise<void> {
-  await safeRun('pexpire', () => redisClient.pexpire(key, milliseconds))
+): Promise<boolean> {
+  const result = await safeRun('pexpire', () =>
+    redisClient.pexpire(key, milliseconds),
+  )
+  return result === 1
 }
 
 /**

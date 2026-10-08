@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockRedisIncr, mockRedisPexpire } = vi.hoisted(() => ({
+const { mockRedisDel, mockRedisIncr, mockRedisPexpire } = vi.hoisted(() => ({
+  mockRedisDel: vi.fn(),
   mockRedisIncr: vi.fn(),
   mockRedisPexpire: vi.fn(),
 }))
 
 vi.mock('@/lib/redis', () => ({
+  // Item 66 (H-F2-7): `redisDel` entra al modulo. El factory no usa
+  // `...actual`, asi que sin esto `redisDel` seria `undefined` y llamarlo
+  // tiraria TypeError.
+  redisDel: mockRedisDel,
   redisIncr: mockRedisIncr,
   redisPexpire: mockRedisPexpire,
 }))
@@ -80,6 +85,7 @@ describe('POST /api/checkout/preference', () => {
     vi.mocked(getTenantId).mockResolvedValue(TENANT_ID)
     mockRedisIncr.mockReset()
     mockRedisPexpire.mockReset()
+    mockRedisDel.mockReset()
   })
 
   afterEach(() => {
@@ -89,7 +95,10 @@ describe('POST /api/checkout/preference', () => {
   describe('Rate limiting', () => {
     it('should return 429 when rate limit exceeded', async () => {
       mockRedisIncr.mockResolvedValue(11)
-      mockRedisPexpire.mockResolvedValue('OK')
+      // Item 66 (H-F2-7): `redisPexpire` devuelve `boolean`. Este mock devolvia
+      // 'OK', que era un contrato que la implementacion nunca tuvo: como
+      // `vi.fn()` no esta tipado, `tsc` no lo atajaba y el test pasaba igual.
+      mockRedisPexpire.mockResolvedValue(true)
 
       const res = await POST(
         mockReq(
@@ -106,7 +115,7 @@ describe('POST /api/checkout/preference', () => {
 
     it('should allow requests within rate limit', async () => {
       mockRedisIncr.mockResolvedValue(5)
-      mockRedisPexpire.mockResolvedValue('OK')
+      mockRedisPexpire.mockResolvedValue(true)
 
       const tx = makeTxMock({
         select: [{ data: [MOCK_ORDER], terminal: 'limit' }],
@@ -143,6 +152,60 @@ describe('POST /api/checkout/preference', () => {
       expect(res.status).not.toBe(429)
       const body = await res.json()
       expect(body.error).toBe('MercadoPago no configurado')
+    })
+
+    // Item 66 (H-F2-7). El bug no era que el TTL fallara: era que no se podia
+    // saber si fallaba, y la clave quedaba sin vencimiento.
+    it('if the TTL was applied, does not delete the key', async () => {
+      mockRedisIncr.mockResolvedValue(1)
+      mockRedisPexpire.mockResolvedValue(true)
+
+      await POST(
+        mockReq(
+          'POST',
+          { orderId: ORDER_ID, customerEmail: CALLER_EMAIL },
+          { 'x-forwarded-for': '7.7.7.7' },
+        ),
+      )
+
+      expect(mockRedisPexpire).toHaveBeenCalledWith(expect.any(String), 60_000)
+      expect(mockRedisDel).not.toHaveBeenCalled()
+    })
+
+    it('if the TTL failed, deletes the key so the next request retries', async () => {
+      mockRedisIncr.mockResolvedValue(1)
+      mockRedisPexpire.mockResolvedValue(false)
+
+      await POST(
+        mockReq(
+          'POST',
+          { orderId: ORDER_ID, customerEmail: CALLER_EMAIL },
+          { 'x-forwarded-for': '8.8.8.8' },
+        ),
+      )
+
+      // THIS is the point of the fix. Without the delete the key survives with
+      // no TTL forever: `current === 1` does not repeat, nobody retries, the
+      // counter climbs and the 429 is permanent. Log + fail-open only made the
+      // bug visible.
+      expect(mockRedisDel).toHaveBeenCalledTimes(1)
+      const pexpiredKey = mockRedisPexpire.mock.calls[0][0]
+      expect(mockRedisDel).toHaveBeenCalledWith(pexpiredKey)
+    })
+
+    it('does not touch the TTL path when Redis is unavailable', async () => {
+      mockRedisIncr.mockResolvedValue(null)
+
+      await POST(
+        mockReq(
+          'POST',
+          { orderId: ORDER_ID, customerEmail: CALLER_EMAIL },
+          { 'x-forwarded-for': '6.6.6.6' },
+        ),
+      )
+
+      expect(mockRedisPexpire).not.toHaveBeenCalled()
+      expect(mockRedisDel).not.toHaveBeenCalled()
     })
   })
 

@@ -15,3 +15,4 @@ tags:
 - [[test-que-pasa-local-por-credencial-filtrada-de-env-local-fal-147]] (pattern)
 - [[cleanup-de-pr-en-worktree-principal-el-workspace-de-paseo-es-214]] (discovery)
 - [[la-verificacion-de-un-write-pertenece-al-endpoint-que-escrib-219]] (pattern)
+- [[fail-open-sin-autoreparacion-no-es-fail-open-es-un-log-223]] (pattern)
