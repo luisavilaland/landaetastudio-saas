@@ -19,3 +19,8 @@ tags:
 - [[pr-221-mergeado-develop-impecable-y-el-cleanup-reveal-que-la-204]]
 - [[cluster-69-70-resuelto-compare-and-set-sin-locks-reserva-con-205]]
 - [[la-condici-n-de-concurrencia-va-en-el-where-de-la-escritura-206]]
+- [[mojibake-en-test-gga-excluye-test-ts-y-no-hay-red-para-archi-207]]
+- [[pr-222-mergeado-cluster-69-70-cerrado-424-9-mb-de-worktree-h-208]]
+- [[item-75-resuelto-check-de-encoding-por-codepoints-cierra-el-209]]
+- [[pr-223-mergeado-check-de-encoding-en-develop-738-tests-0-hal-210]]
+- [[sesi-n-2026-10-08-cerrada-items-69-70-71-75-resueltos-73-76-211]]
