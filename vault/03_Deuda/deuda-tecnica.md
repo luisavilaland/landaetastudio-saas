@@ -3552,4 +3552,59 @@ deberia estar escrito, no deducido por suerte.
 > regla de append-only** — eso reintroduce la corrupcion.
 
 Y en la regla de append-only, una linea que diga que la verificacion de "solo adiciones" no
-aplica a una correccionEncoding verificada byte a byte.
+aplica a una correccion de encoding verificada byte a byte.
+
+## 89. GGA no revisa archivos `.mjs`
+
+**Severidad:** BAJA.
+**Estado:** ABIERTO.
+**Origen:** detectado al commitear el PR #231 (2026-10-09).
+
+**Problema:** los patrones de GGA son `*.ts,*.tsx,*.js,*.jsx,*.sql`. **`.mjs` no esta
+incluido.** El PR #231 modifico `scripts/check-encoding.mjs` —**el detector de encoding
+completo**— y GGA respondio _"No matching files staged for commit"_: el commit paso sin
+revision de codigo.
+
+Es el caso mas delicado posible: el hook que valida las reglas del proyecto no revisa los
+scripts que las implementan. `scripts/check-migrations.sh` (`.sh`) tampoco esta cubierto, y
+tampoco `.mjs` de test.
+
+**Mitigacion propuesta:** agregar `.mjs` y `.cjs` a los patrones de GGA, y evaluar `.sh` (mas
+dificil: no es TypeScript y el resto del pipeline asume TS).
+
+**Riesgo de la mitigacion:** GGA manda el archivo a un LLM que responde con formato de
+review de TypeScript. Un `.mjs` o un `.sh` pueden producir falsos positivos o ruido. Conviene
+probarlos antes de agregarlos, no solo broadening el patron.
+
+## 90. CJK no detectado por el check de encoding
+
+**Severidad:** MEDIA.
+**Estado:** ABIERTO.
+**Origen:** detectado durante la reparacion de los items 76 y 77 (PR #231).
+
+**Problema:** `scripts/check-encoding.mjs` no mira caracteres CJK. `bitacora.md` tiene **12**,
+en tres lineas:
+
+| Linea | Cantidad | Que es                                                                       |
+| ----- | -------- | ---------------------------------------------------------------------------- |
+| L976  | 4        | cita del texto chino **encontrado y corregido** en el incidente del item 52  |
+| L977  | 6        | idem                                                                         |
+| L3910 | 2        | **corrupcion real**: "con el viejo" + 2 CJK donde deberia haber un separador |
+
+L976 y L977 son ejemplos documentados, como el moji2 intencional de L1527. **L3910 parece
+corrupcion genuine** y no se toco porque el item 87 (mismo tipo de hueco) ya existia y ampliar
+alcance en el PR de los items 76/77 no estaba autorizado.
+
+**Por que MEDIA y no BAJA:** es el modo de falla que ya produjo dano real. El item 52
+documenta que "caracteres CJK colados en comentarios" pasaron inadvertidos y hubo que
+buscarlos a mano. Y el item 40 tiene una regla manual de escaneo de CJK, es decir, **el
+repo reconoce el problema pero lo mitiga con disciplina, no con un control automatico**.
+
+**Mitigacion:** extender `scanText` con los rangos CJK (`U+4E00-U+9FFF`, `U+3040-U+30FF`,
+`U+AC00-U+D7AF`). El problema es el mismo que con el `?` del item 87: **el detector no puede
+marcar CJK sin falsos positivos** en un repo con español, porque CJK es una categoria
+amplia y un solo caracter colado rompe un archivo entero. Se necesita un umbral o un
+allowlist por linea, como se hizo con el moji2 intencional.
+
+**Nota sobre la regla de AGENTS.md:** el detector de encoding y la regla manual de CJK del
+item 40 son dos controles para lo mismo, y el que corre en CI es el que no lo cubre.

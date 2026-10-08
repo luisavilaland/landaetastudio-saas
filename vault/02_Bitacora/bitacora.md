@@ -4443,3 +4443,34 @@ producción.** Sus tests codificaban `bitacora.md` como fixture de "conocido", a
 vaciar `KNOWN_CORRUPT` fallaron. Se le dio un parámetro `knownCorrupt` con default para que
 los tests verifiquen comportamiento y no estado, y se agregó el caso inverso: con el set
 vacío, cualquier hallazgo es nuevo y bloquea.
+
+### 2026-10-09 — Diseño del item 61: invariante de aislamiento cross-tenant
+
+**What:** propuesta de diseño para el item 61 (H-T6-1), sin implementación. Documento en
+`vault/04_Fases/diseno-item-61-cross-tenant.md`. Registrados los items 89 (GGA no revisa
+`.mjs`) y 90 (CJK no detectado).
+**Why:** los tests con mock no pueden observar el `WHERE` de una query. Quitar
+`eq(dbSubscriptions.tenantId, ...)` del `UPDATE` de `applyTransition` deja la suite verde: la
+auditoría T6 lo demostró con mutaciones reales (53 passed en las dos).
+**Where:** `vault/04_Fases/diseno-item-61-cross-tenant.md`, `vault/03_Deuda/deuda-tecnica.md`.
+**Learned:** (1) **El brief musculaba un tipo, y el problema no es el tipo.** Un
+`TenantFilteredRow<T>` o un branded `TenantId` mueven la responsabilidad a donde el typecheck
+la vigila —eso es real— pero **el test sigue sin poder verificar el `WHERE`**: con
+`withTenantContext` mockeado, ninguna aserción observa la query. Los dos dejan abierto el
+agujero que la auditoría demostró. La opción que sí lo cierra es una **función de dominio que
+posee el read y el write**, porque se puede testear contra Neon con dos tenants reales: ahí el
+`WHERE` deja de ser invisible porque hay filas de verdad. (2) **Un branded type NO detecta
+este bug.** El defecto es *borrar* una expresión, y TypeScript no puede marcar la presencia de
+una expresión dentro de un `.where()` compuesto. Un `TenantId` correctamente branded sigue
+compilando si `eq(tenantId, ...)` desaparece. Previene otro bug — pasar un tenant arbitrario—
+que es real, pero no es este item. (3) **`subscriptions_tenant_idx` es UNIQUE sobre
+`tenantId`:** hay exactamente una suscripción por tenant. La fuga no es "una fila entre
+muchas", es **la fila del otro tenant y solo esa**. (4) **Ref corregido.** El brief daba
+`H-F2-1`; ese es el item 62. El item 61 viene de **H-T6-1** de la mini auditoría T6 (#202).
+Segunda vez en tres PRs que el ref del brief no coincide con la fuente — el primero pasó
+inadvertido al remoto. (5) **El hook que valida las reglas no revisa los scripts que las
+implementan** (item 89): GGA cubre `*.ts,*.tsx,*.js,*.jsx,*.sql` y `check-encoding.mjs` es
+`.mjs`, así que el PR #231 pasó sin revisión de código. Ampliar el patrón tiene riesgo: el
+reviewer devuelve formato de TypeScript. (6) **El repo reconoce el problema del CJK y lo
+mitiga con disciplina, no con control automático** (item 90): el item 40 tiene un snippet
+manual de escaneo, y el detector de CI no lo cubre. Mismo patrón que el `?` del item 87.

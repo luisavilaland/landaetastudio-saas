@@ -21,3 +21,4 @@ tags:
 - [[fail-open-sin-autoreparacion-no-es-fail-open-es-un-log-223]]
 - [[items-82-86-gga-preexistentes-y-superadmin-tiene-un-segundo-224]]
 - [[items-76-y-77-resueltos-reconstruccion-byte-level-known-corr-225]]
+- [[diseno-item-61-la-funcion-de-dominio-cierra-el-agujero-que-l-240]]
