@@ -4241,3 +4241,69 @@ código de producción**: si cuenta líneas en vez de ocurrencias, reporta 3 don
 Vale la pena escribirlo bien la primera vez o descartarlo después. (4) La corrupción
 preexistente en `bitacora.md` se va a tener que reconstruir byte a byte, y eso es un
 trabajo de una hora por archivo que conviene cotizar antes de empezar.
+
+---
+
+## 2026-10-08 - Cierre de sesión: items 69, 70, 71 y 75 resueltos
+
+**PRs de la sesión:** #220 (item 71), #221 (exports), #222 (cluster 69+70), #223
+(check de encoding), este PR de cierre.
+
+### Items resueltos
+
+| # | Qué era | Cómo se cerró |
+|---|---|---|
+| 69 | Doble POST concurrente creaba 2 preapprovals en MP | Reserva condicional con centinela antes de llamar a MP |
+| 70 | read-modify-write sin compare-and-set | `eq(status, current)` + detección de 0 filas |
+| 71 | Fallback del secret de plataforma al del tenant | Sin fallback, 503 fail-closed |
+| 75 | GGA no cubre tests: el mojibake queda consagrado | Check de codepoints en `format:check` |
+
+### Items registrados
+
+- **73** — paso cero del cleanup. **Resuelto**, con evidencia empírica.
+- **76** — corrupción byte-level en `bitacora.md`: 34 U+FFFD, BOM, 1 moji-2, 4 control chars.
+- **77** — corrupción byte-level en `deuda-tecnica.md`: 1 U+FFFD.
+- **78** — tests de DB al borde del timeout: 14/14 en 11.65 s contra un límite de 15 s,
+  fallan intermitentemente 1 de 4 corridas.
+
+### El paso cero demostró que hacía falta
+
+En #222 y #223 el workspace de Paseo del PR **ya no existía** (auto-eliminado al
+desaparecer el worktree). El único workspace del proyecto era **la sesión en curso**
+(`cwd` = repo principal, `kind: local_checkout`). Ejecutar el paso 3 del plan al pie
+de la letra habría **cortado la conversación**. El paso cero lo impidió dos veces.
+
+Es el único item de esta sesión que se cierra con una demostración en vez de un
+argumento: el riesgo no era hipotético, ya había pasado.
+
+### Tres cosas que me costaron una repetición
+
+1. **Concluí causalidad con una sola muestra.** Un A/B de una corrida por brazo dio "es
+   mío" y era un flake. Dos repeticiones limpias lo refutaron. Un test rojo aislado no
+   es evidencia hasta que se reproduce.
+2. **Me diagnostiqué un error y volví a caerlo.** Horas antes había descubierto que
+   `Get-Content` sin `-Encoding UTF8` deforma UTF-8 —por eso un chequeo de CJK me dio
+   falso "0 caracteres"— lo documenté, y después usé exactamente esa secuencia.
+3. **Metí mojibake al escribir código**, tres veces, incluida una dentro del test del
+   detector que viene justamente a encontrarlo. Se describe por codepoint, nunca a mano.
+
+### El patrón de la sesión
+
+Cuatro veces, el control que parecía cubrir la zona crítica cubría otra cosa: GGA excluye
+`*test.ts`; el exclude de prettier tapa las migraciones; `format:check` solo miraba `.md`;
+y el cleanup asumía registros que no existían. Cada una cerró con un item nuevo. El
+item 62 ya describía esta familia —**un control que parece cubrir, y cubre otra**— y esta
+sesión le agregó cuatro miembros.
+
+**What:** cierre de sesión. Items 69, 70, 71 y 75 resueltos; 73 resuelto con evidencia;
+76, 77 y 78 registrados.
+**Why:** dejar el repo con la red de seguridad cerrada y la deuda visible.
+**Where:** `vault/03_Deuda/deuda-tecnica.md`, `AGENTS.md` (paso cero),
+`vault/02_Bitacora/bitacora.md`, `vault/engram/`.
+**Learned:** (1) **La regla que parece cubrir, cubre** — ver arriba, cuatro casos en una
+sesión. (2) **Un test-atrapó un bug del detector, no del test**: mi condición de 3 bytes
+usaba rango Latin-1 donde correspondía cp1252, y eso dejaba las rayas rotas invisibles,
+que es el caso más común de mojibake en un repo con texto en español. (3) **La
+verificación más dura es la que no se quiere hacer**: confirmar que lo que vas a borrar
+no es lo único. Los exports de Engram vivían solo en el worktree que borraba; lo verifiqué
+re-exportando en vez de asumir.

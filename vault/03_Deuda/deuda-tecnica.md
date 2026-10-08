@@ -2927,7 +2927,25 @@ marcado historico) y la seccion "Blueprint vigente" de
 
 ## 73. El cleanup de 3 registros presupone que el worktree y el workspace existen
 
-**Estado:** abierto (2026-10-07). No es codigo: la regla de proceso de AGENTS.md
+**Estado:** **RESUELTO** (2026-10-08). Paso cero agregado a la seccion de cleanup de
+worktree en AGENTS.md.
+
+**Fix:** la seccion "Cleanup de worktree post-merge" ahora arranca con **Paso cero —
+confirmar que el registro existe**, que obliga a correr `git worktree list`,
+`git branch -a` y `paseo_list_workspaces` **antes** de limpiar. Si un registro no existe,
+la instruccion es reportar y seguir, no intentar limpiarlo.
+
+**Evidencia empirica que lo justifica (no fue teorico):** en dos PRs consecutivos
+(#222 y #223) el workspace de Paseo del PR **ya no existia** —Paseo lo auto-elimina al
+desaparecer el worktree—. En ambos, el unico workspace del proyecto era
+`wks_b14ea16d10d416b5`, con `cwd` = el repo principal y `kind: local_checkout`: **la
+sesion en curso**. Ejecutar el paso 3 del plan al pie de la letra habria **archivado la
+sesion activa**, cortando la conversacion. El paso cero lo impidio las dos veces.
+
+**Riesgo no proporcional:** archivar el workspace equivocado no es un directorio huerfano
+de 1.2 GB que se borra y se sigue — es perder la sesion.
+
+**Hecho:** abierto (2026-10-07). No es codigo: la regla de proceso de AGENTS.md
 ("Cleanup de worktree post-merge") tiene un paso cero que no esta escrito.
 
 **Hecho:** la regla manda verificar por separado el worktree de git, la rama local y el
@@ -3051,3 +3069,75 @@ con un `.ts` entero en doble encoding. El check es el primero que mira `.ts`.
 glob correcto de GGA es `*test.ts`), item 40 regla 6 (here-strings de PowerShell).
 Misma familia que el item 62: **un control que parece cubrir la zona critica, y cubre
 otra.**
+
+---
+
+## 76. Corrupcion byte-level en `bitacora.md`
+
+**Estado:** abierto (2026-10-08). Severidad MEDIA.
+
+**Origen:** detectado al implementar el check de encoding (PR #223).
+
+**Problema:** `vault/02_Bitacora/bitacora.md` tiene 34 `U+FFFD`, BOM al inicio, 1
+secuencia mojibake de 2 bytes (`U+00C3 U+00A1` en L1527) y 4 ocurrencias de control chars
+en 3 lineas (`U+000C` en L936, `U+0007` BEL en L942, `U+001D` en L1289). Todo
+preexistente en `develop`, verificado byte a byte.
+
+**Fix propuesto:** reconstruccion byte-level. **NO edicion a mano.** El procedimiento ya
+esta documentado en el incidente previo `reparar-doble-encoding-utf-8-de-bitacora-md-28`:
+leer, normalizar CRLF, escribir con UTF-8 **sin BOM**, y verificar que la reconstruccion
+sea idempotente antes de tocar el archivo.
+
+**Trampa conocida (item 40, regla 6):** `[System.IO.File]::WriteAllLines` introduce CRLF
+en un repo que es LF. Hay que normalizar explicitamente.
+
+**Excluido del check:** esta en `KNOWN_CORRUPT` de `scripts/check-encoding.mjs`. Se
+reporta como warning visible pero no bloquea el merge.
+
+---
+
+## 77. Corrupcion byte-level en `deuda-tecnica.md`
+
+**Estado:** abierto (2026-10-08). Severidad MEDIA.
+
+**Origen:** detectado al implementar el check de encoding (PR #223).
+
+**Problema:** `vault/03_Deuda/deuda-tecnica.md` tiene 1 `U+FFFD`. Preexistente en
+`develop`.
+
+**Fix propuesto:** mismo tratamiento que el item 76, pero **mas delicate**: el archivo es
+acumulativo y cambia con cada item nuevo, asi que una reconstruccion mal alineada
+mezcla el diff con contenido historico. Por eso va en su propio PR y no junto al 76.
+
+**Excluido del check:** `KNOWN_CORRUPT`, igual que el 76.
+
+---
+
+## 78. Tests de DB al borde del timeout
+
+**Estado:** abierto (2026-10-08). Severidad MEDIA.
+
+**Origen:** detectado durante el DoD del PR #223.
+
+**Problema:** los dos archivos que testean contra **Neon real** con `DATABASE_APP_URL` —
+`packages/db/src/__tests__/rls-cross-tenant.test.ts` y
+`preapproval-tenant-resolution.test.ts` — consumen casi todo su presupuesto: **14/14 tests
+en 11.65 s en aislamiento, contra un limite de 15 s.** Con la suite completa el margen se
+evapora y fallan de forma intermitente.
+
+**Evidencia:** durante el DoD de #223, `pnpm test` dio `1 failed | 69 passed` con
+**738/738 tests pasando** — un fallo a nivel de archivo sin ningun test roto. Corriendo
+la suite dos veces mas: 70/70 limpio, ambas.
+
+**Por que no se atribuyo al PR #223:** los dos archivos fallaron **simultaneamente**.
+Workers independientes fallando a la vez apuntan a un blip de red hacia Neon, no a
+contencion por el worker adicional. Y en aislamiento pasan.
+
+**Fix propuesto — investigar antes de decidir:** (a) subir el timeout de esos dos
+archivos a 30 s; (b) serializarlos en un pool separado; (c) limitar conexiones
+concurrentes a la DB de test. La opcion (a) es la mas simple pero la que mas oculta un
+handshake colgado de verdad; la (c) es la que ataca la causa.
+
+**Nota de proceso:** este item es el antecedente de una regla util — **un `pnpm test` rojo
+aislado no es evidencia hasta que se reproduce.** En este caso la primera conclusion
+(que era regresion del PR) fue falsa, y solo dos repeticiones_clean la refutaron.

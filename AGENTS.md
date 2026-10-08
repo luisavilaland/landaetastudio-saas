@@ -628,6 +628,34 @@ el _candidato_ (la rama), y el worktree principal está en otra rama.
 
 ### Cleanup de worktree post-merge
 
+#### Paso cero — confirmar que el registro existe
+
+**Antes de limpiar CADA registro, confirmar que existe.** Si no existe, **no intentar
+limpiarlo**: reportar y seguir.
+
+```bash
+git worktree list        # ¿existe el worktree de la rama?
+git branch -a            # ¿existe la rama?
+paseo_list_workspaces    # ¿existe el workspace?
+```
+
+**Por qué este paso es obligatorio.** La regla de los tres registros se escribió para el
+caso "se creó worktree + workspace" y se aplicó a un caso distinto. Cuando el trabajo se
+hizo en el worktree principal, los dos primeros registros no tienen objetivo — y el
+tercero tiene **un solo candidate**: el workspace del propio proyecto, que es **la
+sesión en curso**. Ejecutar `paseo_archive_workspace` sobre él **corta la sesión**.
+
+Evidencia empírica del 2026-10-08: en dos PRs consecutivos (#222 y #223) el workspace del
+PR ya no existía —Paseo lo auto-elimina cuando desaparece el worktree— y el paso cero evitó
+archivar la sesión activa. En ambos, sin el paso cero, el plan se ejecutaba "al pie de la
+letra" y cortaba la conversación.
+
+Un cleanup que **asume** la existencia de su objetivo es un cleanup que puede borrar lo
+equivocado. Y el riesgo no es proporcional: archivar el workspace equivocado no es un
+directorio huérfano de 1.2 GB, es perder la sesión.
+
+#### Los tres registros
+
 Un PR mergeado con worktree de Paseo deja **tres** registros, y cada uno se
 limpia y se verifica con **su propia API**:
 
