@@ -108,6 +108,17 @@ pnpm test          # vitest (todos los tests existentes)
 > **Causa raíz en Windows:** un `Get-Content` **sin `-Encoding UTF8`** decodifica UTF-8 como
 > ANSI, y el `Set-Content -Encoding UTF8` siguiente escribe el resultado deformado **más un
 > BOM**. Para editar archivos del repo usá la herramienta de edición, no PowerShell.
+>
+> **6.5 — Nunca medir bytes por redirección de PowerShell (`>`).** Es la regla 6 del item 40
+> aplicada al caso de la redirección: `git show <ref>:<path> > $env:TEMP\f.md` decodifica el
+> blob a string ANTES de escribir, así que el archivo temporal puede tener bytes inválidos
+> que **no existen en el blob original**. Medir un blob para saber si está corrupto con `>`
+> es medir un artefacto del shell, no el archivo.
+>
+> Toda medición de bytes (hashes, conteos de codepoints, comparaciones binarias) pasa por
+> **Node** (`child_process.execFileSync` con `git cat-file blob`) o por **`git diff --numstat`**.
+> NUNCA por `>`. Ídem los here-strings de la regla 6: no son solo un problema de acentos,
+> son un problema de decodificación.
 
 ⚠️ `ignoreBuildErrors` DEBE ser `false` en `next.config.mjs`. Nunca usar `ignoreBuildErrors: true`.
 

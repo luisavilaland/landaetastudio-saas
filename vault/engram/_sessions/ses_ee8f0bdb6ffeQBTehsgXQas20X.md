@@ -24,3 +24,4 @@ tags:
 - [[item-75-resuelto-check-de-encoding-por-codepoints-cierra-el-209]]
 - [[pr-223-mergeado-check-de-encoding-en-develop-738-tests-0-hal-210]]
 - [[sesi-n-2026-10-08-cerrada-items-69-70-71-75-resueltos-73-76-211]]
+- [[sesi-n-2026-10-08-cerrada-con-pr-224-mergeado-212]]
