@@ -4307,3 +4307,30 @@ que es el caso más común de mojibake en un repo con texto en español. (3) **L
 verificación más dura es la que no se quiere hacer**: confirmar que lo que vas a borrar
 no es lo único. Los exports de Engram vivían solo en el worktree que borraba; lo verifiqué
 re-exportando en vez de asumir.
+
+### 2026-10-09 — Item 68 (H-F2-6) resuelto: `/preapproval` verifica el monto
+
+**What:** `POST /api/subscriptions/preapproval` ahora llama `getPreapproval` después de
+`createPreapproval`, compara `transaction_amount` contra `toMpAmount(plan.priceUyu)` y
+devuelve `502` sin `initPoint` si no coincide o si no se pudo verificar. 4 tests nuevos,
+verificados en rojo sin el fix. Severidad del item subida de MEDIUM a **ALTA**.
+**Why:** el endpoint mandaba el monto a MP y devolvía el link de pago con un presence-check
+(L283), sin GET. Un `2xx` de MP no prueba que el campo haya quedado aplicado, y este
+endpoint ya había shipped un cobro 100x (#188/#189).
+**Where:** `apps/admin/app/api/subscriptions/preapproval/route.ts`,
+`apps/admin/app/api/subscriptions/preapproval/__tests__/route.test.ts`,
+`vault/03_Deuda/deuda-tecnica.md`, issue #226.
+**Learned:** (1) **La verificación de un write pertenece al endpoint que escribe, no al que
+observa.** El webhook detecta la divergencia del monto y solo puede loguearla — por ADR-027
+escribir desde ahí reintroduciría H3, y esa decisión es correcta para `planId`, pero el
+monto es plata, no un dato stale. (2) **Copiar un patrón sin entender su semántica produce
+el bug al revés:** `/plan` ante un GET fallido devuelve `202` + no escribe, porque la
+escritura a MP ya salió y un 502 mentiría. `/preapproval` devuelve `502`, porque el tenant
+todavía no pagó y entregarle el link con monto sin verificar **es** el bug. Mismo patrón,
+semántica opuesta, y la divergencia hay que documentarla en el código. (3) **El control que
+parece cubrir, cubre otra cosa, por cuarta vez:** el worktree de Paseo se auto-eliminó a
+mitad del trabajo; el fix estaba en `stash@{0}` (recuperable, porque el stash vive en el
+repo principal) pero los tests eran cambios de working tree y se perdieron. **`git stash`
+solo protege lo que stasheás** — un archivo sin commitear en un worktree que puede desaparecer
+no tiene red. (4) `git worktree prune` no limpió la registration de un worktree cuyo
+directorio ya no existía: hubo que borrar `.git/worktrees/<nombre>` a mano.

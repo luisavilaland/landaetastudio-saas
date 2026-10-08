@@ -22,11 +22,22 @@ vi.mock('@repo/commerce', async () => {
   const actual = await vi.importActual<typeof import('@repo/commerce')>(
     '@repo/commerce',
   )
-  return { ...actual, createPreapproval: vi.fn(), redisIncr: vi.fn(), redisPexpire: vi.fn() }
+  return {
+    ...actual,
+    createPreapproval: vi.fn(),
+    getPreapproval: vi.fn(),
+    redisIncr: vi.fn(),
+    redisPexpire: vi.fn(),
+  }
 })
 
 import { auth } from '@/lib/auth'
-import { createPreapproval, redisIncr, redisPexpire } from '@repo/commerce'
+import {
+  createPreapproval,
+  getPreapproval,
+  redisIncr,
+  redisPexpire,
+} from '@repo/commerce'
 import { POST } from '../route'
 
 const TOKEN = 'APP_USR-platform-token'
@@ -139,6 +150,11 @@ beforeEach(() => {
     id: 'preapproval-nuevo',
     init_point: 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=x',
   })
+  // Item 68 (H-F2-6): la verificacion post-escritura exige que MP confirme el
+  // monto. Sin este default `verifiedAmount` queda `null` y TODOS los tests que
+  // esperan 201 recibirian 502. El fixture cobra 4900 centavos, que en la moneda
+  // de MP son 49 (`toMpAmount`).
+  vi.mocked(getPreapproval).mockResolvedValue({ transaction_amount: 49 })
   mockCtx(sub())
 })
 
@@ -190,6 +206,85 @@ describe('POST /api/subscriptions/preapproval — happy path', () => {
     // 4900 centavos -> 49 UYU. Mandar 4900 seria cobrar 49 veces mas.
     expect(input?.transactionAmount).toBe(49)
     expect(input?.currencyId).toBe('UYU')
+  })
+
+  // Item 68 (H-F2-6). El caso del monto ya cubierto arriba ("manda el precio en
+  // la moneda de MP") asserta el ARGUMENTO enviado; estos assertan lo que MP
+  // devolvio, que es lo unico que prueba que el cobro va a ser el correcto.
+  describe('verificacion post-escritura del monto', () => {
+    /** Tx con el slot de la reserva, para poder observar las escrituras. */
+    function ctxWithTx() {
+      const slot: ReservationSlot = { holder: null, mine: null }
+      const tx = reservationTx(sub(), PLAN, slot)
+      vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
+      return tx
+    }
+
+    it('201 con initPoint cuando MP confirma el monto', async () => {
+      vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+      vi.mocked(getPreapproval).mockResolvedValue({ transaction_amount: 49 })
+
+      const res = await POST(req())
+      const body = await res.json()
+
+      expect(res.status).toBe(201)
+      expect(body.initPoint).toContain('mercadopago.com.ar')
+      // La llamada es el punto del fix: sin ella el monto nunca se compara.
+      expect(getPreapproval).toHaveBeenCalledWith('preapproval-nuevo', TOKEN)
+    })
+
+    it('502 sin initPoint si MP acepto pero el monto no coincide', async () => {
+      vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+      const tx = ctxWithTx()
+      // MP quedo con 4900 en vez de 49: el tenant pagaria 100 veces mas.
+      vi.mocked(getPreapproval).mockResolvedValue({ transaction_amount: 4900 })
+
+      const res = await POST(req())
+      const body = await res.json()
+
+      expect(res.status).toBe(502)
+      expect(body).not.toHaveProperty('initPoint')
+      expect(body.field).toBe('transactionAmount')
+      // El id real de MP no puede quedar escrito: se afirmaria un estado que
+      // nadie confirmo.
+      expect(tx.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({ mpPreapprovalId: 'preapproval-nuevo' }),
+      )
+    })
+
+    it('502 sin initPoint si el GET de verificacion falla', async () => {
+      vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+      const tx = ctxWithTx()
+      vi.mocked(getPreapproval).mockRejectedValue(new Error('timeout'))
+
+      const res = await POST(req())
+      const body = await res.json()
+
+      // DIVERGE de `/plan` a proposito: alla el PUT ya habia salido y un 502
+      // diria "tu cambio fallo" cuando si salio. Aca no se entrego nada todavia
+      // y el tenant no pago, asi que no hay nada que affirmar ni nada que
+      // entregar.
+      expect(res.status).toBe(502)
+      expect(body).not.toHaveProperty('initPoint')
+      expect(tx.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({ mpPreapprovalId: 'preapproval-nuevo' }),
+      )
+    })
+
+    it('502 si MP no devuelve transaction_amount', async () => {
+      vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+      const tx = ctxWithTx()
+      vi.mocked(getPreapproval).mockResolvedValue({})
+
+      const res = await POST(req())
+
+      // Campo ausente != monto incorrecto, pero tampoco es confirmacion: sin
+      // monto verificado no se entrega el punto de pago.
+      expect(res.status).toBe(502)
+      expect(tx.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({ mpPreapprovalId: 'preapproval-nuevo' }),
+      )
+    })
   })
 
   it('NO manda notification_url (MP la descarta en silencio)', async () => {
