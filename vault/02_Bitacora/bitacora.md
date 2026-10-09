@@ -4474,3 +4474,38 @@ implementan** (item 89): GGA cubre `*.ts,*.tsx,*.js,*.jsx,*.sql` y `check-encodi
 reviewer devuelve formato de TypeScript. (6) **El repo reconoce el problema del CJK y lo
 mitiga con disciplina, no con control automático** (item 90): el item 40 tiene un snippet
 manual de escaneo, y el detector de CI no lo cubre. Mismo patrón que el `?` del item 87.
+
+### 2026-10-09 — Item 61 resuelto: `transitionSubscription` y el WHERE deja de ser código escrito a mano
+
+**What:** `transitionSubscription` en `packages/commerce/src/subscription-transition.ts`
+(exportada desde `@repo/commerce`), con el `WHERE` construido internamente.
+`applyTransition` (webhook) ya no escribe el `UPDATE`: lo llama. Test de integración contra
+Neon con 2 tenants, en dos capas. Item 61 a RESUELTO. Diseño en #233.
+**Why:** los tests mock-based no observan el `WHERE`. Quitar
+`eq(dbSubscriptions.tenantId, ...)` del `UPDATE` dejaba la suite completa en verde.
+**Where:** `packages/commerce/src/subscription-transition.ts`,
+`packages/commerce/src/index.ts`,
+`apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts`,
+`packages/commerce/src/__tests__/subscription-transition.test.ts`.
+**Learned:** (1) **RLS ENMASCARA EL `WHERE`, y eso casi hace que el fix fuera
+indetectable.** Con la mutación de la auditoría aplicada, los tests en contexto de producción
+pasaban 4/4. No faltaba una aserción: **otra capa detenía la escritura** — el `UPDATE` corre
+dentro de `withTenantContext(A)` → `set_tenant_id(A)` → la policy bloquea la fila de B. RLS es
+la red real y el `WHERE` es defensa en profundidad. Por eso el test tiene **dos capas**: capa 1
+con el rol sin BYPASSRLS para el comportamiento real y el compare-and-set del item 70, y
+**capa 2 con el owner BYPASSRLS**, donde el `WHERE` es el único guard y por lo tanto es
+observable. **Sin la capa 2 el test no probaría nada.** (2) **El criterio de aceptación se
+verificó en rojo y fue quirúrgico:** con la mutación aplicada fallan **exactamente los 2 tests
+de la capa 2**, y los 3 de la capa 1 siguen verdes. Ese patrón es la prueba de que las dos
+capas hacen trabajos distintos. (3) **El primer intento de test falló sin detectar la
+mutación, y el motivo era correcto:** usé el cliente de `app_user` para las lecturas "sin
+protección", así que RLS devolvía 0 filas y yo observaba `undefined`. Hizo falta un segundo
+cliente owner solo para poder *ver* la fila ajena — que es justamente lo que el test necesita
+observar. (4) **Quitar `id` del `WHERE` es más seguro, no menos.** `subscriptions_tenant_idx`
+es UNIQUE sobre `tenantId`, así que `tenantId AND status` alcanza y elimina una segunda fuente
+de verdad que puede estar equivocada sin que nadie lo note. (5) **La función vive en
+`@repo/commerce`, no en `@repo/db`:** `SubscriptionStatus` es de dominio y `@repo/db` no depende
+de nada interno, así que importarlo desde ahí habría sido una dependencia circular. Es el
+mismo criterio que ya aplica `health.ts` y `encryption.ts`. (6) **Migrar los 30 call sites
+restantes es otro PR.** Este endpoint primero porque es donde la auditoría demostró que el
+defecto es explotable.

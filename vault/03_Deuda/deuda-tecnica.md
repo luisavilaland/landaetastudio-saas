@@ -2476,7 +2476,60 @@ el numero se lee de una tabla y no de un JSON.
 
 ## 61. Los tests con mock no pueden verificar el `WHERE` de una query
 
-**Estado:** abierto (2026-10-06). Detectado en la mini auditoria de T6 (PR #202).
+**Severidad:** ALTA. Bloqueante de Fase 3.
+**Estado:** RESUELTO (2026-10-09), parcial por diseño. Ref: **H-T6-1** (NO H-F2-1: ese es
+el item 62), auditoría T6 (PR #202), diseño en #233.
+**Verificado en codigo:** si, con la mutación de la auditoría.
+
+**Hecho original.** Se removió el `eq(dbSubscriptions.tenantId, resolved.tenantId)` del
+`SELECT` de la fila y del `UPDATE` de `applyTransition`, y la suite siguió verde. Los tests
+mock-based no observan el `WHERE`: con `withTenantContext` mockeado, el mock devuelve filas
+fijas sin importar qué filtro lleve la query. Los tests cross-tenant que existían verifican
+que se **pase** el tenant, no que la query **filtre** por tenant.
+
+**Por qué era ALTA.** `subscriptions_tenant_idx` es UNIQUE sobre `tenantId`
+(`schema.ts:91`): hay exactamente una suscripción por tenant. La fuga no es "una fila entre
+muchas", es **la fila del otro tenant y solo esa**.
+
+**Fix.** `transitionSubscription(tenantId, from, to, patch)` en
+`packages/commerce/src/subscription-transition.ts`, con el `WHERE` construido internamente.
+`applyTransition` ya no escribe el `UPDATE`: llama a la función. Vive en `@repo/commerce` y no
+en `@repo/db` porque `SubscriptionStatus` es de dominio y `@repo/db` no depende de nada
+interno — importarlo desde ahí sería una dependencia circular.
+
+**El `WHERE` quedó como `tenantId AND status`, sin `id`.** El índice UNIQUE alcanza para
+identificar la fila, y dejar `id` agregaba una segunda fuente de verdad que puede estar
+equivocada sin que nadie lo note. Con el índice, filtrar solo por tenant y status es
+**estrictamente más seguro**: si el `SELECT` devolviera la fila de otro tenant, el `WHERE` ya
+no la alcanza.
+
+**Criterio de aceptación: verificado.** Aplicar la mutación de la auditoría (quitar el filtro
+por tenantId) hace fallar los tests. Verificado en rojo: **2 de 5 fallan, y son exactamente
+los dos de la capa 2**. Los tres de la capa 1 siguen en verde, y eso es lo que proved el
+descubrimiento de abajo.
+
+**El hallazgo que el fix tuvo que resolver para poder verificarse — RLS ENMASCARA EL
+`WHERE`.** Con la mutación aplicada, los tests en contexto de producción pasaban 4/4. No era
+que faltara una aserción: era que **otra capa detenía la escritura**. El `UPDATE` corre dentro
+de `withTenantContext(A)` → `set_tenant_id(A)` → la policy de RLS bloquea escribir la fila de
+B. RLS es la red real, y el `WHERE` es defensa en profundidad.
+
+Por eso el test tiene **dos capas**: capa 1 con `DATABASE_APP_URL` (rol sin BYPASSRLS, RLS
+activo) para el comportamiento real y el compare-and-set del item 70; y **capa 2 con
+`DATABASE_URL` (owner, BYPASSRLS)**, donde el `WHERE` es el único guard y por lo tanto es
+observable. Sin la capa 2 el invariante sería indetectable y el test no probaría nada.
+
+**El compare-and-set del item 70 sigue intacto.** `from` viaja como parámetro de la función, y
+si otra transición movió la fila, el `WHERE` no matchea y se devuelve `concurrent_update`. Sin
+`FOR UPDATE`, a propósito: no hay locks de fila en el proyecto.
+
+**Lo que este fix NO resuelve.** Los 30 call sites restantes de `withTenantContext` (de 31:
+admin 11 archivos / 19 usos, storefront 9 / 12, commerce 4 / 6) siguen construyendo su propio
+`WHERE`. Migrarlos es trabajo incremental, **fuera de scope por decisión explícita**, y solo
+este endpoint migraba porque es donde la auditoría demostró que el defecto es explotable.
+
+Tampoco cubre: queries Drizzle crudas escritas fuera de la función (el tipo no lo impide, solo
+lo desalienta), el `SELECT` si queda separado, ni las tablas globales `tenants` y `plans`.
 
 ## Hecho
 
