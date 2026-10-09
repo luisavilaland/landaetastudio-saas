@@ -275,6 +275,16 @@ Si durante el review de un PR se acuerda un cambio:
 - No mergear el PR original y abrir un follow-up.
 - Excepción: cuando el cambio requiere un PR separado por razones técnicas. Documentar la excepción en la descripción.
 
+### Cierre de issues
+
+Las palabras de cierre (`Cierra #N`, `Closes #N`) **solo se procesan al mergear contra la rama por defecto**, que en este repo es `main`.
+
+El flujo real es `rama → develop → main`, así que **mergear a `develop` nunca cierra nada**: el issue queda abierto aunque el PR lleve la palabra de cierre y aunque el PR se cierre.
+
+Evidencia: PR #235 llevaba `Cierra #234` y el issue siguió abierto tras el merge; se cerró a mano 90 segundos después.
+
+**Regla: todo issue de implementación se cierra a mano, verificando con `gh issue view <n> --json state,closedAt` y no con el exit code del comando que lo cierra.** Si el PR dice "Cierra #N", verificar después del merge que #N quedó cerrado, y cerrarlo a mano si no.
+
 ## Auditorías por tarea
 
 Al terminar cada tarea (T1, T2, ..., T14) antes de mergear el PR, correr una auditoría con 2 subagentes (@QA + @Diseñador).

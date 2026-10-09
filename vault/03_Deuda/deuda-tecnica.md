@@ -3312,6 +3312,14 @@ handshake colgado de verdad; la (c) es la que ataca la causa.
 aislado no es evidencia hasta que se reproduce.** En este caso la primera conclusion
 (que era regresion del PR) fue falsa, y solo dos repeticiones_clean la refutaron.
 
+**Tasa empirica (2026-10-09, cierre del item 61):** ~1 de cada 4-5 corridas de la suite
+completa. 2 flakes sobre ~9 corridas entre el PR #235 y el cierre del #237. **No
+reproducible en aislamiento:** 6 corridas limpias consecutivas de los archivos que
+tocaba el item 61 (110 tests, 3 veces), mas `e2e` en verde en CI. El culprit nunca
+pudo capturarse: cuando el flake ocurre, el nombre del test no quedo en el output
+que se leyo. Cada flake tiene un culprit y una ventana de reproduccion, y no se
+conoce ninguno de los dos.
+
 ## 79. PowerShell `>` decodifica bytes al redirigir
 
 **Severidad:** MEDIA.
@@ -3635,6 +3643,38 @@ probarlos antes de agregarlos, no solo broadening el patron.
 **Severidad:** MEDIA.
 **Estado:** ABIERTO.
 **Origen:** detectado durante la reparacion de los items 76 y 77 (PR #231).
+**Confirmado en vivo durante el SDD de Fase 3 (2026-10-09).**
+
+**Reproduccion en vivo.** Escribiendo el spec de Fase 3
+(`docs/superpowers/specs/2026-10-09-fase3-autoservicio-tenants.md`) se colaron **4
+caracteres CJK** (U+75D5, U+9ED8, U+8BA4, U+503C) escribiendo espanol normal.
+`pnpm check:encoding` devolvio **"0 con hallazgos nuevos", exit 0**, sobre ese archivo.
+
+**Por que esto cambia la severidad.** El item se registro originalmente como un caso raro:
+12 caracteres en tres lineas de `bitacora.md`, en un archivo que ya estaba sospechoso. La
+reproduccion demuestra que **no requiere un caso raro**: alcanza con escribir el spec de
+una fase y el modelo produce CJK en un `.md`. Es el comportamiento por defecto, no una
+excepcion.
+
+**El detector no chequea rangos CJK. No es que falle el umbral, es que no los mira.
+Reproducido en vivo durante el SDD de Fase 3: 4 CJK en un `.md`, exit 0.**
+
+**Que chequea el detector hoy:** `U+FFFD` (byte no UTF-8), `U+FEFF` al inicio (BOM),
+doble encoding de 2 bytes (`U+00C3` + Latin-1) y de 3 bytes (`U+20AC` + puntuacion
+cp1252), y control chars fuera de tab/LF/CR. Los rangos CJK (`U+4E00-U+9FFF`,
+`U+3040-U+30FF`, `U+AC00-U+D7AF`) **no estan en esa lista**. Un CJK entra por la puerta de
+atras porque no se mira, no porque falle un umbral.
+
+**Por que el resto de los controles tampoco lo ven:** ESLint, `tsc`, `vitest` y prettier
+son ciegos a esto porque el archivo sigue siendo **UTF-8 valido**. CJK es un caracter
+perfectamente legal en UTF-8; lo unico raro es que no pertenezca al idioma del repo.
+
+**Mismo patron que el item 61.** RLS enmascaraba un `WHERE` mal escrito y dejaba la suite
+verde; el detector enmascaraba CJK y dejaba el CI verde. En los dos casos **una capa que
+parece cubrir y no cubre**, y en los dos casos el "todo verde" no era evidencia. La
+defensa que funciono fue externa al repo: un regex de rangos CJK en PowerShell sobre el
+archivo. Mientras tanto, todo `.md` nuevo que escriba el agente debe pasar por ese chequeo
+antes del commit, porque el control del CI no lo cubre.
 
 **Problema:** `scripts/check-encoding.mjs` no mira caracteres CJK. `bitacora.md` tiene **12**,
 en tres lineas:
@@ -3662,3 +3702,31 @@ allowlist por linea, como se hizo con el moji2 intencional.
 
 **Nota sobre la regla de AGENTS.md:** el detector de encoding y la regla manual de CJK del
 item 40 son dos controles para lo mismo, y el que corre en CI es el que no lo cubre.
+
+## 91. Cada export de Engram genera un PR propio
+
+**Severidad:** BAJA.
+**Estado:** ABIERTO.
+**Origen:** PRs #221, #225, #237. Ciclo conocido desde el PR #150.
+
+**Problema.** Cada sesion que hace `mem_save` + `pnpm vault:export` deja archivos
+untracked en `vault/engram/`. Como `develop` tiene branch protection y rechaza el push
+directo, esos archivos necesitan un PR para llegar al repositorio. El resultado es un
+PR que no contiene trabajo: solo el export.
+
+Eso choca con dos cosas a la vez:
+
+1. El checklist de cierre de PR de `AGENTS.md` exige "`vault/engram/` esta en el commit",
+   lo que fuerza el PR.
+2. El baseline para SDD exige working tree limpio y 0 PRs abiertos, que el PR rompe.
+
+El conflicto no es del export: es de que **la memoria persistente y las ramas protegidas
+estan en repos con reglas distintas**.
+
+**Fix propuesto.** Los exports de Engram se acumulan y viajan con el proximo PR de docs
+o de trabajo. Solo si no hay ningun PR en cola al cerrar la sesion, se abre un PR
+exclusivo de export.
+
+**Efecto secundario aceptable.** Un PR de trabajo queda con un commit de `vault/engram/`
+que no pertenece a su cambio. Es ruido, pero es ruido que ya existe y que el
+checklist de cierre exige. La alternativa (violar el checklist) es peor.

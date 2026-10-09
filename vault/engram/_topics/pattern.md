@@ -18,4 +18,5 @@ tags:
 - [[fail-open-sin-autoreparacion-no-es-fail-open-es-un-log-223]] (pattern)
 - [[una-capa-de-proteccion-puede-enmascarar-un-defecto-y-hacerlo-259]] (pattern)
 - [[regla-de-luis-pr-en-review-se-congela-el-diseno-es-historia-263]] (preference)
-- [[pr-236-mergeado-por-luis-verificar-state-antes-de-mergear-266]] (pattern)
+- [[baseline-limpio-para-sdd-el-check-de-drift-compara-contra-el-266]] (pattern)
+- [[pattern-la-ausencia-de-una-capa-de-proteccion-hace-el-test-m-270]] (pattern)
