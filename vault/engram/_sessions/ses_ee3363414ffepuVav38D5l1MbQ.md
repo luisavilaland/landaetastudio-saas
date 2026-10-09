@@ -25,3 +25,4 @@ tags:
 - [[item-61-resuelto-transitionsubscription-y-rls-enmascaraba-el-258]]
 - [[una-capa-de-proteccion-puede-enmascarar-un-defecto-y-hacerlo-259]]
 - [[item-61-entregado-pr-235-con-ci-9-9-y-el-fix-de-dblike-de-gg-262]]
+- [[regla-de-luis-pr-en-review-se-congela-el-diseno-es-historia-263]]

@@ -17,3 +17,4 @@ tags:
 - [[la-verificacion-de-un-write-pertenece-al-endpoint-que-escrib-219]] (pattern)
 - [[fail-open-sin-autoreparacion-no-es-fail-open-es-un-log-223]] (pattern)
 - [[una-capa-de-proteccion-puede-enmascarar-un-defecto-y-hacerlo-259]] (pattern)
+- [[regla-de-luis-pr-en-review-se-congela-el-diseno-es-historia-263]] (preference)
