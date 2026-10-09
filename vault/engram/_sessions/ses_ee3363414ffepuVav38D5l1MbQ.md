@@ -27,3 +27,5 @@ tags:
 - [[item-61-mergeado-paso-cero-salv-la-sesi-n-y-el-issue-no-se-a-262]]
 - [[regla-de-luis-pr-en-review-se-congela-el-diseno-es-historia-263]]
 - [[session-summary-landaetastudio-saas-264]]
+- [[session-summary-landaetastudio-saas-265]]
+- [[pr-236-mergeado-por-luis-verificar-state-antes-de-mergear-266]]
