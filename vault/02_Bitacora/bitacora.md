@@ -4480,7 +4480,8 @@ manual de escaneo, y el detector de CI no lo cubre. Mismo patrón que el `?` del
 **What:** `transitionSubscription` en `packages/commerce/src/subscription-transition.ts`
 (exportada desde `@repo/commerce`), con el `WHERE` construido internamente.
 `applyTransition` (webhook) ya no escribe el `UPDATE`: lo llama. Test de integración contra
-Neon con 2 tenants, en dos capas. Item 61 a RESUELTO. Diseño en #233.
+Neon con 2 tenants, en dos capas. Item 61 a RESUELTO. Diseño en #233,
+implementación en #235 (issue #234). CI 9/9 en verde, incluido `e2e` contra Neon real.
 **Why:** los tests mock-based no observan el `WHERE`. Quitar
 `eq(dbSubscriptions.tenantId, ...)` del `UPDATE` dejaba la suite completa en verde.
 **Where:** `packages/commerce/src/subscription-transition.ts`,
