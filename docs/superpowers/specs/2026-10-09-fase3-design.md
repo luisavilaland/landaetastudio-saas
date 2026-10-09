@@ -1,7 +1,7 @@
 # Design — Fase 3: Autoservicio de tenants
 
 **Fecha:** 2026-10-09
-**Estado:** borrador, esperando aprobación humana (Checkpoint 2)
+**Estado:** aprobado por Luis el 2026-10-09 (D17 y D18 confirmadas). Plan en curso.
 **Spec:** `docs/superpowers/specs/2026-10-09-fase3-autoservicio-tenants.md`
 **Issue:** #238
 
@@ -509,10 +509,10 @@ en Preview (ya configurado) para no depender de MP real.
 | D14 | Los 45 call sites no se migran; la regla es para código nuevo | Propuesta                                       |
 | D15 | Slug en el registro, subdominio activo con el pago            | Propuesta                                       |
 | D16 | Branding básico entra; `customDomain` queda fuera             | Propuesta                                       |
-| D17 | P5: `past_due` permite vender durante la gracia, no publicar  | **Requiere tu confirmación**                    |
-| D18 | P6 resuelto en D8                                             | **Requiere tu confirmación**                    |
+| D17 | P5: `past_due` permite vender durante la gracia, no publicar  | **APROBADA (2026-10-09)**                       |
+| D18 | P6: slug nunca se reutiliza + 16 reservados                   | **APROBADA (2026-10-09)**                       |
 
-### 8.1 D17 — La regla de "puede vender" (spec P5)
+### 8.1 D17 — La regla de "puede vender" (spec P5) — APROBADA 2026-10-09
 
 El transversal §2 sugiere que `past_due` es "limitado" pero no define el límite. Este
 design propone:
@@ -527,11 +527,19 @@ design propone:
 | `suspended`      | cualquiera              | No        | No                                                 |
 | `cancelled`      | cualquiera              | No        | No                                                 |
 
-**La asimetría de `past_due` es deliberada:** durante la gracia el comprador no tiene por
-qué sufrir por un rechazo de tarjeta. Cortarle la tienda castiga al que no Jatapa.
+**La asimetría de `past_due` es deliberada:** el comprador no falló el pago, el tenant sí.
+Cortarle la tienda castiga al que no corresponde.
 
-**Lo que no bloquea la implementación:** la regla se puede cambiar después sin migración,
-porque es un guard que ya existe. Por eso no bloquea el Checkpoint 3.
+**Reversibilidad:** es un guard sin migración. Si la práctica lo desmiente, se cambia la
+regla sin tocar el schema. Por eso no bloquea el plan.
+
+### 8.2 D18 — Slug: nunca se reutiliza (spec P6) — APROBADA 2026-10-09
+
+**Es seguridad, no naming.** Un slug liberado deja contenido cacheado, links viejos de
+compradores del tenant cancelado, y URLs que resuelven al nuevo tenant sin que nadie lo
+sepa.
+
+Los 16 slugs reservados cubren los que rompen infraestructura.
 
 ---
 

@@ -3656,9 +3656,18 @@ reproduccion demuestra que **no requiere un caso raro**: alcanza con escribir el
 una fase y el modelo produce CJK en un `.md`. Es el comportamiento por defecto, no una
 excepcion.
 
-**El hole es exacto, no aproximado.** El detector chequea `U+FFFD`, `U+FEFF` al inicio,
-doble encoding de 2 y 3 bytes, y control chars. **Los rangos CJK no estan en la lista.**
-Un CJK entra por la puerta de atras porque no se chequea, no porque falle un umbral.
+**El detector no chequea rangos CJK. No es que falle el umbral, es que no los mira.
+Reproducido en vivo durante el SDD de Fase 3: 4 CJK en un `.md`, exit 0.**
+
+**Que chequea el detector hoy:** `U+FFFD` (byte no UTF-8), `U+FEFF` al inicio (BOM),
+doble encoding de 2 bytes (`U+00C3` + Latin-1) y de 3 bytes (`U+20AC` + puntuacion
+cp1252), y control chars fuera de tab/LF/CR. Los rangos CJK (`U+4E00-U+9FFF`,
+`U+3040-U+30FF`, `U+AC00-U+D7AF`) **no estan en esa lista**. Un CJK entra por la puerta de
+atras porque no se mira, no porque falle un umbral.
+
+**Por que el resto de los controles tampoco lo ven:** ESLint, `tsc`, `vitest` y prettier
+son ciegos a esto porque el archivo sigue siendo **UTF-8 valido**. CJK es un caracter
+perfectamente legal en UTF-8; lo unico raro es que no pertenezca al idioma del repo.
 
 **Mismo patron que el item 61.** RLS enmascaraba un `WHERE` mal escrito y dejaba la suite
 verde; el detector enmascaraba CJK y dejaba el CI verde. En los dos casos **una capa que
