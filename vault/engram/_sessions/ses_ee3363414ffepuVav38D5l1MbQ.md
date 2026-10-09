@@ -24,5 +24,6 @@ tags:
 - [[diseno-item-61-la-funcion-de-dominio-cierra-el-agujero-que-l-240]]
 - [[item-61-resuelto-transitionsubscription-y-rls-enmascaraba-el-258]]
 - [[una-capa-de-proteccion-puede-enmascarar-un-defecto-y-hacerlo-259]]
-- [[item-61-entregado-pr-235-con-ci-9-9-y-el-fix-de-dblike-de-gg-262]]
+- [[item-61-mergeado-paso-cero-salv-la-sesi-n-y-el-issue-no-se-a-262]]
 - [[regla-de-luis-pr-en-review-se-congela-el-diseno-es-historia-263]]
+- [[session-summary-landaetastudio-saas-264]]
