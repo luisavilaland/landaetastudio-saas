@@ -2478,7 +2478,8 @@ el numero se lee de una tabla y no de un JSON.
 
 **Severidad:** ALTA. Bloqueante de Fase 3.
 **Estado:** RESUELTO (2026-10-09), parcial por diseño. Ref: **H-T6-1** (NO H-F2-1: ese es
-el item 62), auditoría T6 (PR #202), diseño en #233.
+el item 62), auditoría T6 (PR #202), diseño en #233, implementación en #235 (issue #234,
+mergeado en `develop` como `e7d3f67`).
 **Verificado en codigo:** si, con la mutación de la auditoría.
 
 **Hecho original.** Se removió el `eq(dbSubscriptions.tenantId, resolved.tenantId)` del
