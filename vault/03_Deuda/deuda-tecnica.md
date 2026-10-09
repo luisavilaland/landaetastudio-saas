@@ -3643,6 +3643,29 @@ probarlos antes de agregarlos, no solo broadening el patron.
 **Severidad:** MEDIA.
 **Estado:** ABIERTO.
 **Origen:** detectado durante la reparacion de los items 76 y 77 (PR #231).
+**Confirmado en vivo durante el SDD de Fase 3 (2026-10-09).**
+
+**Reproduccion en vivo.** Escribiendo el spec de Fase 3
+(`docs/superpowers/specs/2026-10-09-fase3-autoservicio-tenants.md`) se colaron **4
+caracteres CJK** (U+75D5, U+9ED8, U+8BA4, U+503C) escribiendo espanol normal.
+`pnpm check:encoding` devolvio **"0 con hallazgos nuevos", exit 0**, sobre ese archivo.
+
+**Por que esto cambia la severidad.** El item se registro originalmente como un caso raro:
+12 caracteres en tres lineas de `bitacora.md`, en un archivo que ya estaba sospechoso. La
+reproduccion demuestra que **no requiere un caso raro**: alcanza con escribir el spec de
+una fase y el modelo produce CJK en un `.md`. Es el comportamiento por defecto, no una
+excepcion.
+
+**El hole es exacto, no aproximado.** El detector chequea `U+FFFD`, `U+FEFF` al inicio,
+doble encoding de 2 y 3 bytes, y control chars. **Los rangos CJK no estan en la lista.**
+Un CJK entra por la puerta de atras porque no se chequea, no porque falle un umbral.
+
+**Mismo patron que el item 61.** RLS enmascaraba un `WHERE` mal escrito y dejaba la suite
+verde; el detector enmascaraba CJK y dejaba el CI verde. En los dos casos **una capa que
+parece cubrir y no cubre**, y en los dos casos el "todo verde" no era evidencia. La
+defensa que funciono fue externa al repo: un regex de rangos CJK en PowerShell sobre el
+archivo. Mientras tanto, todo `.md` nuevo que escriba el agente debe pasar por ese chequeo
+antes del commit, porque el control del CI no lo cubre.
 
 **Problema:** `scripts/check-encoding.mjs` no mira caracteres CJK. `bitacora.md` tiene **12**,
 en tres lineas:
