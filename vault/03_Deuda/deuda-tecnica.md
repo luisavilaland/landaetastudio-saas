@@ -3312,6 +3312,14 @@ handshake colgado de verdad; la (c) es la que ataca la causa.
 aislado no es evidencia hasta que se reproduce.** En este caso la primera conclusion
 (que era regresion del PR) fue falsa, y solo dos repeticiones_clean la refutaron.
 
+**Tasa empirica (2026-10-09, cierre del item 61):** ~1 de cada 4-5 corridas de la suite
+completa. 2 flakes sobre ~9 corridas entre el PR #235 y el cierre del #237. **No
+reproducible en aislamiento:** 6 corridas limpias consecutivas de los archivos que
+tocaba el item 61 (110 tests, 3 veces), mas `e2e` en verde en CI. El culprit nunca
+pudo capturarse: cuando el flake ocurre, el nombre del test no quedo en el output
+que se leyo. Cada flake tiene un culprit y una ventana de reproduccion, y no se
+conoce ninguno de los dos.
+
 ## 79. PowerShell `>` decodifica bytes al redirigir
 
 **Severidad:** MEDIA.
@@ -3662,3 +3670,31 @@ allowlist por linea, como se hizo con el moji2 intencional.
 
 **Nota sobre la regla de AGENTS.md:** el detector de encoding y la regla manual de CJK del
 item 40 son dos controles para lo mismo, y el que corre en CI es el que no lo cubre.
+
+## 91. Cada export de Engram genera un PR propio
+
+**Severidad:** BAJA.
+**Estado:** ABIERTO.
+**Origen:** PRs #221, #225, #237. Ciclo conocido desde el PR #150.
+
+**Problema.** Cada sesion que hace `mem_save` + `pnpm vault:export` deja archivos
+untracked en `vault/engram/`. Como `develop` tiene branch protection y rechaza el push
+directo, esos archivos necesitan un PR para llegar al repositorio. El resultado es un
+PR que no contiene trabajo: solo el export.
+
+Eso choca con dos cosas a la vez:
+
+1. El checklist de cierre de PR de `AGENTS.md` exige "`vault/engram/` esta en el commit",
+   lo que fuerza el PR.
+2. El baseline para SDD exige working tree limpio y 0 PRs abiertos, que el PR rompe.
+
+El conflicto no es del export: es de que **la memoria persistente y las ramas protegidas
+estan en repos con reglas distintas**.
+
+**Fix propuesto.** Los exports de Engram se acumulan y viajan con el proximo PR de docs
+o de trabajo. Solo si no hay ningun PR en cola al cerrar la sesion, se abre un PR
+exclusivo de export.
+
+**Efecto secundario aceptable.** Un PR de trabajo queda con un commit de `vault/engram/`
+que no pertenece a su cambio. Es ruido, pero es ruido que ya existe y que el
+checklist de cierre exige. La alternativa (violar el checklist) es peor.
