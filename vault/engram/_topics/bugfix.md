@@ -15,3 +15,4 @@ tags:
 - [[item-66-resuelto-redispexpire-verificable-redisdel-en-el-cam-222]] (bugfix)
 - [[items-76-y-77-resueltos-reconstruccion-byte-level-known-corr-225]] (bugfix)
 - [[item-61-resuelto-transitionsubscription-y-rls-enmascaraba-el-258]] (bugfix)
+- [[item-61-entregado-pr-235-con-ci-9-9-y-el-fix-de-dblike-de-gg-262]] (bugfix)
