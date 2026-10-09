@@ -40,6 +40,16 @@ export type {
 } from './subscription-permissions'
 export { derivePermissions } from './subscription-permissions'
 
+// Item 61 (H-T6-1): transicion de suscripcion con el filtro por tenant
+// garantizado por construccion. Vive en commerce (y no en @repo/db) porque
+// `SubscriptionStatus` es de dominio y `@repo/db` no depende de nada interno:
+// importarlo desde alla seria una dependencia circular.
+export type {
+  SubscriptionTransitionPatch,
+  SubscriptionTransitionResult,
+} from './subscription-transition'
+export { transitionSubscription } from './subscription-transition'
+
 export type {
   ProrationInput,
   ProrationResult,

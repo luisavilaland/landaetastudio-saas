@@ -14,6 +14,16 @@ export const db = drizzle(client, { schema })
 
 type DbLike = Omit<typeof db, '$client'>
 
+/**
+ * El tipo de la transaccion que abre `withTenantContext`.
+ *
+ * Exportado para que los callers no lo deriven con
+ * `Parameters<Parameters<typeof withTenantContext>[1]>[0]`: esa derivacion era
+ * fragile y repetida en dos archivos, y el compilador no la valida contra la
+ * forma real del callback. Item 61.
+ */
+export type { DbLike }
+
 export async function withTenantContext<T>(
   tenantId: string,
   callback: (tx: DbLike) => Promise<T>,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, dbPlans, dbSubscriptions, withTenantContext } from '@repo/db'
-import { and, eq, sql } from 'drizzle-orm'
+import type { DbLike } from '@repo/db'
+import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   classifyMpEvent,
@@ -8,6 +9,7 @@ import {
   getAuthorizedPayment,
   getPayment,
   getPreapproval,
+  transitionSubscription,
   verifyMercadoPagoSignature,
   type MpTopic,
   type SubscriptionStatus,
@@ -601,30 +603,28 @@ async function applyTransition(
       patch.lastProcessedPaymentId = paymentId
     }
 
-const written = await tx
-      .update(dbSubscriptions)
-      .set(patch)
-      .where(
-        and(
-          eq(dbSubscriptions.id, row.id),
-          eq(dbSubscriptions.tenantId, resolved.tenantId),
-          // Item 70 (H-F2-8): compare-and-set sobre el `status` leido. Sin esta
-          // condicion el UPDATE es un last-write-wins y dos eventos concurrentes
-          // compiten sin que ninguno se entere: gana el orden de commit, no el
-          // timestamp del evento. Con ella, la transicion perdedora afecta 0
-          // filas y se descarta explicitamente.
-          //
-          // Es el mismo mecanismo del item 1 (TOCTOU checkout): la condicion de
-          // concurrencia va en el `WHERE` de la escritura, no en un lock. No se
-          // usa `FOR UPDATE` a proposito — no hay ningun lock de fila en el
-          // proyecto y sostenerlo durante `verifyPlanAmountConvergence` seria
-          // peor que perder la transicion perdedora, que es idempotente.
-          eq(dbSubscriptions.status, current),
-        ),
-      )
-      .returning({ id: dbSubscriptions.id })
+    // Item 61 (H-T6-1): el `WHERE` deja de ser codigo escrito a mano.
+    //
+    // Antes vivia aqui, y quitarle el `eq(dbSubscriptions.tenantId, ...)` dejaba
+    // la suite COMPLETA en verde: con `withTenantContext` mockeado, ninguna
+    // asercion observa el `WHERE`. La funcion de dominio lo construye internamente
+    // y es testeable contra Neon con dos tenants reales.
+    //
+    // El compare-and-set del item 70 sigue intacto: `current` viaja como la
+    // condicion `from`, y si otra transicion movio la fila entre el SELECT y esta
+    // escritura, el `WHERE` no matchea y se descarta explicitamente. El item 70
+    // sigue sin usar `FOR UPDATE` a proposito: no hay locks de fila en el proyecto
+    // y sostenerlo durante `verifyPlanAmountConvergence` seria peor que perder la
+    // transicion perdedora, que es idempotente.
+    const result = await transitionSubscription(
+      tx,
+      resolved.tenantId,
+      current,
+      target,
+      patch,
+    )
 
-    if (written.length === 0) {
+    if (!result.applied) {
       // Otra transicion movio la fila entre el SELECT y el UPDATE. El evento se
       // descarta: el estado resultante ya lo escribio otra transicion con su
       // propia lectura, que era tan valida como esta. MP reintentara si hace
@@ -633,7 +633,7 @@ const written = await tx
         { tenantId: resolved.tenantId, readStatus: current, eventKind },
         'Concurrent update discarded - row changed under us',
       )
-      return { applied: false, from: current, reason: 'concurrent_update' }
+      return { applied: false, from: current, reason: result.reason }
     }
 
     logger.info(
@@ -648,10 +648,11 @@ const written = await tx
 /**
  * Tipo de la transaccion que abre `withTenantContext`.
  *
- * `DbLike` no esta exportado por `@repo/db`, asi que se deriva de la firma en
- * vez de duplicar la forma del tipo a mano.
+ * Ahora importado de `@repo/db` en vez de derivado de la firma: la derivacion
+ * estaba duplicada en dos archivos y no la valida el compilador contra la forma
+ * real del callback (item 61).
  */
-type TenantTx = Parameters<Parameters<typeof withTenantContext>[1]>[0]
+type TenantTx = DbLike
 
 /**
  * H3: comprueba que el precio del plan local coincida con el monto que MP
