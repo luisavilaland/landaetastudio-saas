@@ -1,7 +1,7 @@
 # Design — Fase 3: Autoservicio de tenants
 
 **Fecha:** 2026-10-09
-**Estado:** aprobado por Luis el 2026-10-09 (D17 y D18 confirmadas). Plan en curso.
+**Estado:** aprobado por Luis el 2026-10-09 (D1, D17 y D18 confirmadas). Plan en curso.
 **Spec:** `docs/superpowers/specs/2026-10-09-fase3-autoservicio-tenants.md`
 **Issue:** #238
 
@@ -148,6 +148,32 @@ atómica; si no, son dos y el tenant puede quedar sin suscripción.
 
 **Sobre `return await`:** obligatorio, sin excepción (AGENTS.md). Una rejection de
 `db.transaction` sin `await` bypasea el `try/catch` del handler.
+
+### 1.6 D1 en detalle — por qué la landing vive en `storefront` y no en un proyecto nuevo
+
+**Decisión de Luis (2026-10-09): mantener D1. La landing va en `apps/storefront` con
+`PLATFORM_HOST`. No se crea un proyecto de Vercel nuevo.**
+
+Es una decisión que va contra la intuición habitual — "una landing de producto no va en
+la app de las tiendas" — y el criterio es de coste:
+
+|                    | `storefront` + `PLATFORM_HOST` | Proyecto Vercel nuevo                            |
+| ------------------ | ------------------------------ | ------------------------------------------------ |
+| Código             | ~10 líneas en el proxy         | Una 4ta app, un `package.json`, un `next.config` |
+| Infraestructura    | 0                              | Deploy, env vars, dominios, pipeline de CI       |
+| El proxy existente | Se reusa                       | Se duplica la lógica de resolución de tenant     |
+| Migrar después     | —                              | Trivial: es mover una ruta                       |
+
+**La divergencia con la recomendación previa queda registrada:** la intuición de
+arquitectura ("¿no debería la landing ser su propia app?") es razonable y la respuesta
+es no, porque el costo de la alternativa es un proyecto de infraestructura entero contra
+diez líneas. **Si en el futuro hace falta deploy independiente, la migración no rompe
+nada** porque la landing no comparte estado con el storefront: solo lee `plans`, que es
+catálogo global.
+
+**Lo que sí tiene que quedar bien:** `PLATFORM_HOST` va en `packages/validation/src/env.ts`
+con Zod, y en el proxy **antes** de los tres fallbacks. Si va después, `DEFAULT_TENANT_SLUG`
+lo secuestra en local y el síntoma es un `404` que parece un bug de resolución de tenant.
 
 ---
 
@@ -493,7 +519,7 @@ en Preview (ya configurado) para no depender de MP real.
 
 | #   | Decisión                                                      | Estado                                          |
 | --- | ------------------------------------------------------------- | ----------------------------------------------- |
-| D1  | `PLATFORM_HOST` en el proxy, antes de los fallbacks           | Propuesta                                       |
+| D1  | `PLATFORM_HOST` en el proxy, antes de los fallbacks           | **APROBADA (2026-10-09)** — ver §1.6            |
 | D2  | El proxy filtra `status = 'active'`                           | Propuesta — **sin esto el pgEnum es cosmético** |
 | D3  | `tenantId` pre-generado en la app, alta en una transacción    | Propuesta                                       |
 | D4  | `tenants.status` → `pgEnum`, default `pending`, sin RLS       | Aprobada en spec (P2)                           |

@@ -16,3 +16,4 @@ tags:
 - [[items-76-y-77-resueltos-reconstruccion-byte-level-known-corr-225]] (bugfix)
 - [[item-61-resuelto-transitionsubscription-y-rls-enmascaraba-el-258]] (bugfix)
 - [[item-61-mergeado-paso-cero-salv-la-sesi-n-y-el-issue-no-se-a-262]] (bugfix)
+- [[el-item-90-se-reprodujo-en-vivo-check-encoding-dio-verde-con-268]] (discovery)

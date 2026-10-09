@@ -4510,3 +4510,39 @@ de nada interno, así que importarlo desde ahí habría sido una dependencia cir
 mismo criterio que ya aplica `health.ts` y `encryption.ts`. (6) **Migrar los 30 call sites
 restantes es otro PR.** Este endpoint primero porque es donde la auditoría demostró que el
 defecto es explotable.
+
+### 2026-10-09 - SDD de Fase 3: autoservicio de tenants (spec, design y plan)
+
+**What:** SDD completo de Fase 3 en `docs/superpowers/specs/2026-10-09-fase3-autoservicio-tenants.md`
+(spec), `2026-10-09-fase3-design.md` (design, 18 decisiones D1-D18) y
+`docs/superpowers/plans/2026-10-09-fase3.md` (plan, 16 tasks en 6 slices). Issue #238.
+**Why:** el item 61 quedo cerrado en #235 y era el unico bloqueante de Fase 3.
+**Where:** los tres documentos mas `AGENTS.md` y los items 78 y 90 de
+`vault/03_Deuda/deuda-tecnica.md`.
+**Learned:**
+(1) **P1 era una contradiccion real entre documentos, no una ambiguedad:** el plan de
+fase decia que la suscripcion se cobraba con MP del tenant; el spec transversal y el
+codigo de Fase 2 decian plataforma con `MP_PLATFORM_*`. Resuelto por Luis: cobra la
+plataforma, y el MP del tenant es para cobrar a SUS compradores. **No habia
+chicken-and-egg** porque son dos cuentas distintas: el confounding era el mismo nombre
+"MP" para dos cosas. (2) **`proxy.ts` tiene dos restricciones que la migracion de estado
+tiene que absorber:** devuelve 404 si no resuelve tenant (la landing necesita
+`PLATFORM_HOST`), y **busca por slug SIN filtro de status**, asi que sin ese filtro el
+`pgEnum` es cosmetico: un tenant `pending` tendria su tienda publica. (3) **La ausencia
+de RLS invierte el criterio de testing:** con `subscriptions` (con RLS) un `WHERE` mal
+escrito queda enmascarado por la policy y hacen falta 2 capas; con `tenants` (sin RLS) no
+hay nada que lo enmascare y **1 sola capa alcanza**. El enmascaramiento venia de *haber*
+una capa de proteccion. (4) **Se decidio NO una abstraccion generica tipo
+`updateWhere(table, tenantId, values)`:** seria el cajon de sastre desde el dia 1 y
+reintroduce el problema del item 61. Tres funciones hoja que dicen que hacen > una que
+puede hacer todo. (5) **Fase 3 no entra en un PR:** ~1900 lineas contra un presupuesto de
+review de 400, asi que 6 slices encadenados. El orden acordado es **S2 primero** (T1 +
+T6): 3 h, sin datos de produccion, y cumple la deuda explicita de la auditoria de Fase 2
+(items 65 y 67). (6) **El riesgo mayor del plan no es una task dificil sino el backfill de
+`tenants.status`:** si queda mal, les cae la tienda a tenants que hoy funcionan, y el
+sintoma es un 404 que no dice "migracion mal hecha". Protocolo: dry-run con conteo previo,
+`size:exception`, revision humana + @QA, y el resultado del dry-run en el commit message.
+(7) **El item 90 se reprodujo en vivo** durante este SDD: 4 caracteres CJK escritos en
+espanol normal, y `check:encoding` devolvio exit 0. El detector no chequea rangos CJK; no
+es que falle el umbral, es que no los mira. Mismo patron que el item 61 - una capa que
+parece cubrir y no cubre.
