@@ -62,6 +62,21 @@ const EXPECTED = {
     // La funcion SECURITY DEFINER que resuelve tenant por preapprovalId (H1).
     functions: ['resolve_tenant_by_preapproval'],
   },
+  // La 0003 crea un tipo enum. Sin esta senal, el wrapper falla con "sin senal
+  // declarada" - que es el comportamiento correcto, pero por una limitacion del
+  // check y no porque el enum falte. Ese falso positivo entrena a ignorar el
+  // wrapper, que es peor que no tenerlo.
+  //
+  // Se verifica contra `pg_type`, no contra la tabla de control: el efecto
+  // observable de la migracion es que el tipo existe.
+  '0003_tenants_status_enum': {
+    types: ['tenants_status'],
+    // Y ademas la columna tiene que **usar** ese tipo. El enum por si solo
+    // no dice nada: una migracion puede crear el tipo y fallar en el `ALTER
+    // COLUMN`, y con el error tragado por drizzle (item 43) eso pasaria
+    //_reportando exito_.
+    columns: { 'tenants.status': 'tenants_status' },
+  },
 }
 
 async function main() {
@@ -101,6 +116,30 @@ async function main() {
     ).map((r) => r.proname),
   )
 
+  // `typtype = 'e'` filtra a enums. Sin ese filtro, `tenants_status` tambien
+  // apareceria como el tipo compuesto que crea una tabla o una vista con el
+  // mismo nombre.
+  const types = new Set(
+    (
+      await sql.unsafe(
+        "SELECT t.typname FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typtype = 'e'",
+      )
+    ).map((r) => r.typname),
+  )
+
+  // Columnas que deben haber cambiado de tipo. Se guarda como
+  // `tabla.columna -> udt_name` porque **la existencia del tipo no alcanza**:
+  // una migracion con varios pasos puede crear el enum y fallar en el `ALTER
+  // COLUMN`, y como el item 43 documenta que drizzle se traga los errores, el
+  // comando reportaria exito con el enum a medio aplicar.
+  const columns = new Map(
+    (
+      await sql.unsafe(
+        "SELECT table_name, column_name, udt_name FROM information_schema.columns WHERE table_schema = 'public'",
+      )
+    ).map((r) => [`${r.table_name}.${r.column_name}`, r.udt_name]),
+  )
+
   const missing = []
   const undeclared = []
 
@@ -119,6 +158,14 @@ async function main() {
       if (!indexes.has(i)) absent.push(`indice ${i}`)
     for (const f of expected.functions ?? [])
       if (!functions.has(f)) absent.push(`funcion ${f}`)
+    for (const t of expected.types ?? [])
+      if (!types.has(t)) absent.push(`tipo enum ${t}`)
+    for (const [col, wantType] of Object.entries(expected.columns ?? {})) {
+      const got = columns.get(col)
+      if (got === undefined) absent.push(`columna ${col}`)
+      else if (got !== wantType)
+        absent.push(`columna ${col} es ${got}, se esperaba ${wantType}`)
+    }
 
     if (absent.length === 0) {
       console.log(`  ok ${entry.tag}`)

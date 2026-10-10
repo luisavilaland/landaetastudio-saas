@@ -61,13 +61,16 @@ describe('proxy - excepcion de PLATFORM_HOST (D1)', () => {
     // de ubicar la excepcion antes de los fallbacks.
     process.env.DEFAULT_TENANT_SLUG = 'tienda1'
     process.env.PLATFORM_HOST = 'app.landaetastudio.com'
+    process.env.ENABLE_DEFAULT_TENANT_FALLBACK = 'true'
   })
 
   afterEach(() => {
     if (originalPlatformHost === undefined) delete process.env.PLATFORM_HOST
     else process.env.PLATFORM_HOST = originalPlatformHost
-    if (originalDefaultSlug === undefined) delete process.env.DEFAULT_TENANT_SLUG
+    if (originalDefaultSlug === undefined)
+      delete process.env.DEFAULT_TENANT_SLUG
     else process.env.DEFAULT_TENANT_SLUG = originalDefaultSlug
+    delete process.env.ENABLE_DEFAULT_TENANT_FALLBACK
   })
 
   it('el host de plataforma pasa sin resolver tenant y sin tocar la DB', async () => {
@@ -108,6 +111,9 @@ describe('proxy - excepcion de PLATFORM_HOST (D1)', () => {
     // ESTE es el motivo de D1. Sin la excepcion, el host de plataforma pasa por
     // los fallbacks y `DEFAULT_TENANT_SLUG` le asigna una tienda: la landing se
     // serviria dentro del storefront de un tenant.
+    //
+    // Necesita `ENABLE_DEFAULT_TENANT_FALLBACK=true` (lo pone `beforeEach`):
+    // desde T4 los fallbacks de dev estan gateados por env var.
     delete process.env.PLATFORM_HOST
 
     const res = await proxy(requestFor('app.landaetastudio.com'))
@@ -117,14 +123,41 @@ describe('proxy - excepcion de PLATFORM_HOST (D1)', () => {
     expect(selectMock).toHaveBeenCalled()
   })
 
-  it('el fallback DEFAULT_TENANT_SLUG resuelve slug sin confirmar el status en la DB', async () => {
-    // Este test documenta el HALLAZGO que se le paso a T4 (slice S1), no un
-    // comportamiento deseado.
+  it('T4: sin ENABLE_DEFAULT_TENANT_FALLBACK, el fallback NO resuelve', async () => {
+    // El refinamiento de T4: los fallbacks de dev no se validan contra la
+    // base, se **gatean**. Apagados, el host cae en el 404.
     //
-    // `DEFAULT_TENANT_SLUG` asigna un tenant sin consultar la DB: no verifica
-    // que exista, ni su `status`, y deja `tenantId` en null. Cuando el design
-    // agregue el filtro `status = 'active'` a los lookups por dominio y
-    // subdominio, este camino seguira sin filtrar.
+    // Este es el cierre del hallazgo que reporto el PR #240: antes,
+    // `DEFAULT_TENANT_SLUG` resolvia un tenant sin filtro en cualquier entorno.
+    delete process.env.PLATFORM_HOST
+    delete process.env.ENABLE_DEFAULT_TENANT_FALLBACK
+
+    const res = await proxy(requestFor('tenant-inexistente.example.com'))
+
+    expect(res.status).toBe(404)
+    expect(res.headers.get('x-tenant-slug')).toBeNull()
+  })
+
+  it('T4: el gate exige el string exacto "true" (fail-closed)', async () => {
+    // `z.literal('true')` en la validacion y `=== 'true'` en el proxy: un
+    // `'1'` o un `'TRUE'` dejan el fallback apagado. El costo de un fallback
+    // apagado de mas es un 404 visible; el de uno encendido de mas es un tenant
+    // equivocado servido.
+    delete process.env.PLATFORM_HOST
+    process.env.ENABLE_DEFAULT_TENANT_FALLBACK = '1'
+
+    const res = await proxy(requestFor('tenant-inexistente.example.com'))
+
+    expect(res.status).toBe(404)
+  })
+
+  it('T4: el fallback gateado resuelve sin confirmar el status en la DB', async () => {
+    // Documenta lo que el refinamiento de T4 decidio **a proposito**: el
+    // fallback de dev no consulta la base, no verifica existencia ni status, y
+    // deja `tenantId` en null.
+    //
+    // La compensacion es el gate, no la validacion: en cualquier entorno donde
+    // este camino no deberia existir, no existe.
     const res = await proxy(requestFor('tenant-inexistente.example.com'))
 
     expect(res.status).toBe(200)

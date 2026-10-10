@@ -103,11 +103,39 @@ export const customDomainSchema = z
     },
   )
 
+/**
+ * Valores admitidos en `tenants.status`.
+ *
+ * Tiene que coincidir con el enum `tenants_status` de la base. Si diverge, el
+ * endpoint acepta un valor que la DB rechaza.
+ */
+export const tenantStatusValues = [
+  'pending',
+  'active',
+  'suspended',
+  'cancelled',
+] as const
+
+export const tenantStatusSchema = z.enum(tenantStatusValues)
+
 export const createTenantSchema = z.object({
   slug: z.string().min(1).max(255),
   name: z.string().min(1).max(255),
   plan: z.string().min(1),
-  status: z.string().min(1),
+  // `z.enum` y no `z.string()` porque la columna paso a `pgEnum` (T2).
+  //
+  // Con `text`, un status invalido se guardaba y nadie lo notaba: nada leia la
+  // columna. Con `pgEnum`, la DB lanza `invalid input value for enum
+  // tenants_status` y el endpoint responde **500** en vez de **400** - y es el
+  // endpoint que el superadmin usa para editar tenants.
+  //
+  // Es el mismo patron del item 67: validar antes de escribir convierte un
+  // error de infraestructura en uno de peticion.
+  //
+  // Sigue siendo **obligatorio**, igual que antes del cambio: hacer opcional
+  // seria relajar el contrato de la API de paso, y ese no es el PR que decide
+  // eso.
+  status: tenantStatusSchema,
   customDomain: customDomainSchema.optional(),
 })
 
@@ -115,7 +143,7 @@ export const updateTenantSchema = z.object({
   slug: z.string().min(1).max(255).optional(),
   name: z.string().min(1).max(255).optional(),
   plan: z.string().min(1).optional(),
-  status: z.string().min(1).optional(),
+  status: tenantStatusSchema.optional(),
   customDomain: customDomainSchema.optional(),
 })
 

@@ -70,8 +70,23 @@ const productionSchema = coreSchema.extend({
   // nunca matchearia y el fallback 404 seguiria.
   PLATFORM_HOST: z
     .string()
-    .regex(/^[a-z0-9.-]+$/i, 'PLATFORM_HOST must be a bare hostname, without scheme or port')
+    .regex(
+      /^[a-z0-9.-]+$/i,
+      'PLATFORM_HOST must be a bare hostname, without scheme or port',
+    )
     .optional(),
+  // Fase 3 (T4): habilita los fallbacks de desarrollo del proxy del storefront
+  // (`localhost -> tienda1` y `DEFAULT_TENANT_SLUG`).
+  //
+  // Deliberadamente NO se deriva de NODE_ENV: Preview de Vercel no es
+  // development ni production, es un tercer estado. Una env var explicita la
+  // decide el humano y queda en el audit trail; `NODE_ENV === 'development'` es
+  // una suposicion que en Preview es falsa sin producir ningun error visible.
+  //
+  // Tiene que ser el string exacto `'true'`. Cualquier otra cosa -`'1'`,
+  // `'TRUE'`, `'yes'`- lo deja apagado: es fail-closed, y el costo de un
+  // fallback apagado de mas es un 404 visible, no un tenant equivocado servido.
+  ENABLE_DEFAULT_TENANT_FALLBACK: z.literal('true').optional(),
 })
 
 const developmentSchema = coreSchema.extend({
@@ -91,7 +106,10 @@ const developmentSchema = coreSchema.extend({
   SENTRY_DSN: z.string().url().optional(),
   PLATFORM_HOST: z
     .string()
-    .regex(/^[a-z0-9.-]+$/i, 'PLATFORM_HOST must be a bare hostname, without scheme or port')
+    .regex(
+      /^[a-z0-9.-]+$/i,
+      'PLATFORM_HOST must be a bare hostname, without scheme or port',
+    )
     .optional(),
 })
 

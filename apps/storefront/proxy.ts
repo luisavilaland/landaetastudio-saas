@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { db } from '@repo/db'
 import { dbTenants } from '@repo/db'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { createLogger } from '@/lib/logger'
 
 const logger = createLogger('storefront-proxy')
@@ -14,6 +14,21 @@ export const config = {
 }
 
 const CART_COOKIE_NAME = 'cart_session_id'
+
+/**
+ * Un tenant solo se sirve si esta `active`.
+ *
+ * El enum `tenants_status` (migracion `0003`) tiene cuatro valores y solo este
+ * opera la tienda. Sin este filtro, la migracion habria sido cosmetica: el
+ * campo existiria, Drizzle lo tiparia, y el proxy resolveria igual un tenant
+ * `pending` o `cancelled`.
+ *
+ * Los tenants que hoy no estan `active` (ninguno: los 3 son `active`) no
+ * perderian su tienda con este filtro, pero cuando exista el onboarding -que
+ * crea tenants en `pending` hasta que el webhook de plataforma confirma el
+ * pago- ese estado es justamente el que este filtro protege.
+ */
+const ACTIVE_STATUS = 'active' as const
 
 function getOrCreateSessionId(request: NextRequest): string {
   const cookie = request.cookies.get(CART_COOKIE_NAME)
@@ -54,7 +69,12 @@ export async function proxy(request: NextRequest) {
       const byDomain = await db
         .select({ slug: dbTenants.slug, id: dbTenants.id })
         .from(dbTenants)
-        .where(eq(dbTenants.customDomain, hostname))
+        .where(
+          and(
+            eq(dbTenants.customDomain, hostname),
+            eq(dbTenants.status, ACTIVE_STATUS),
+          ),
+        )
         .limit(1)
 
       if (byDomain.length > 0) {
@@ -76,7 +96,9 @@ export async function proxy(request: NextRequest) {
         const bySlug = await db
           .select({ slug: dbTenants.slug, id: dbTenants.id })
           .from(dbTenants)
-          .where(eq(dbTenants.slug, sub))
+          .where(
+            and(eq(dbTenants.slug, sub), eq(dbTenants.status, ACTIVE_STATUS)),
+          )
           .limit(1)
 
         if (bySlug.length > 0) {
@@ -89,22 +111,71 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // 3. Fallback: cookie de tenant
+  // 3. Cookie de tenant.
+  //
+  // A diferencia de 1 y 2, este valor **lo elige el cliente**: la cookie la
+  // manda el navegador. Por eso se valida contra la base SIEMPRE, sin
+  // importar el entorno.
+  //
+  // Sin el filtro de status, un tenant `pending` o `cancelled` seguiria
+  // resolviendo por cookie aunque los lookups por host lo filtraran. Y un
+  // slug inventado en la cookie resolveria un tenant que existe pero que
+  // el visitante no navego.
+  //
+  // Ademas consulta la base, asi que tambien obtiene `tenantId`: antes el
+  // camino 3 dejaba `tenantId` en null y el header `x-tenant-id` no se
+  // seteaba. Ese header es lo que despues usan las queries con RLS.
   if (!tenantSlug) {
     const tenantCookie = request.cookies.get('tenant-slug')
     if (tenantCookie?.value) {
-      tenantSlug = tenantCookie.value
+      try {
+        const byCookie = await db
+          .select({ slug: dbTenants.slug, id: dbTenants.id })
+          .from(dbTenants)
+          .where(
+            and(
+              eq(dbTenants.slug, tenantCookie.value),
+              eq(dbTenants.status, ACTIVE_STATUS),
+            ),
+          )
+          .limit(1)
+
+        if (byCookie.length > 0) {
+          tenantSlug = byCookie[0].slug
+          tenantId = byCookie[0].id
+        } else {
+          logger.debug(
+            { slug: tenantCookie.value },
+            'Tenant cookie did not resolve to an active tenant - ignored',
+          )
+        }
+      } catch (e) {
+        logger.error({ error: e }, 'Error resolving tenant cookie')
+      }
     }
   }
 
-  // 4. Fallback para localhost (desarrollo): usar tenant por defecto
-  if (!tenantSlug && hostname.startsWith('localhost')) {
+  // 4 y 4b. Fallbacks de desarrollo.
+  //
+  // Van gateados por `ENABLE_DEFAULT_TENANT_FALLBACK`, no por `NODE_ENV`.
+  // La razon: **Preview de Vercel no es development ni production**, es un
+  // tercer estado. `NODE_ENV === 'development'` es una suposicion sobre cual
+  // entorno es, y una suposicion que en Preview es falsa: dejaria el fallback
+  // apagado donde hace falta y nadie tendria un error que explicar.
+  // Una env var explicita la decide el humano y queda en el audit trail.
+  //
+  // Estos dos **no se validan contra la base**: no son input del cliente, son
+  // configuracion del operador. Validarlos seria mas raro que eliminarlos:
+  // en un entorno donde no deberian existir, directamente no existen.
+  const devFallbackEnabled =
+    process.env.ENABLE_DEFAULT_TENANT_FALLBACK === 'true'
+
+  if (!tenantSlug && devFallbackEnabled && hostname.startsWith('localhost')) {
     tenantSlug = 'tienda1'
     logger.debug({ hostname, tenantSlug }, 'Using default tenant for localhost')
   }
 
-  // 4b. Fallback para dominio de Vercel sin subdominio de tenant
-  if (!tenantSlug && process.env.DEFAULT_TENANT_SLUG) {
+  if (!tenantSlug && devFallbackEnabled && process.env.DEFAULT_TENANT_SLUG) {
     tenantSlug = process.env.DEFAULT_TENANT_SLUG
     logger.debug({ hostname, tenantSlug }, 'Using DEFAULT_TENANT_SLUG')
   }
