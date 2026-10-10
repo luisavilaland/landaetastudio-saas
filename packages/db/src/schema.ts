@@ -1,5 +1,6 @@
 import {
   pgTable,
+  pgEnum,
   uuid,
   text,
   integer,
@@ -19,13 +20,35 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   },
 })
 
+/**
+ * Estado de operacion de un tenant (T2, SDD Fase 3).
+ *
+ * Antes era `text` con default `'active'`, lo que hacia que un tenant recien
+ * creado naciera activo sin haber pagado. Los cuatro valores responden a una
+ * sola pregunta - ¿puede este tenant operar? - que es distinta de la que
+ * responde `subscriptions.status` (¿esta al día el cobro?).
+ *
+ * `tenants` NO tiene RLS: es tabla raiz, y el checklist de RLS del repo lo
+ * prohibe sin `tenantId` + policy. El unico filtro por tenant posible aca es
+ * el del codigo, que es lo que hace `activateTenant` en `@repo/commerce`.
+ */
+export const tenantsStatus = pgEnum('tenants_status', [
+  'pending',
+  'active',
+  'suspended',
+  'cancelled',
+])
+
+/** Union de TypeScript equivalente al enum, para el codigo que no toca Drizzle. */
+export type TenantsStatus = (typeof tenantsStatus.enumValues)[number]
+
 export const dbTenants = pgTable('tenants', {
   id: uuid('id').primaryKey().defaultRandom(),
   slug: text('slug').unique().notNull(),
   customDomain: text('customDomain').unique(),
   name: text('name').notNull(),
   plan: text('plan').default('starter'),
-  status: text('status').default('active'),
+  status: tenantsStatus('status').default('pending'),
   settings: jsonb('settings').default({}),
   createdAt: timestamp('createdAt', { withTimezone: true })
     .defaultNow()

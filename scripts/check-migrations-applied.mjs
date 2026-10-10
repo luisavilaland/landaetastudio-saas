@@ -62,6 +62,16 @@ const EXPECTED = {
     // La funcion SECURITY DEFINER que resuelve tenant por preapprovalId (H1).
     functions: ['resolve_tenant_by_preapproval'],
   },
+  // La 0003 crea un tipo enum. Sin esta senal, el wrapper falla con "sin senal
+  // declarada" - que es el comportamiento correcto, pero por una limitacion del
+  // check y no porque el enum falte. Ese falso positivo entrena a ignorar el
+  // wrapper, que es peor que no tenerlo.
+  //
+  // Se verifica contra `pg_type`, no contra la tabla de control: el efecto
+  // observable de la migracion es que el tipo existe.
+  '0003_tenants_status_enum': {
+    types: ['tenants_status'],
+  },
 }
 
 async function main() {
@@ -101,6 +111,17 @@ async function main() {
     ).map((r) => r.proname),
   )
 
+  // `typtype = 'e'` filtra a enums. Sin ese filtro, `tenants_status` tambien
+  // apareceria como el tipo compuesto que crea una tabla o una vista con el
+  // mismo nombre.
+  const types = new Set(
+    (
+      await sql.unsafe(
+        "SELECT t.typname FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typtype = 'e'",
+      )
+    ).map((r) => r.typname),
+  )
+
   const missing = []
   const undeclared = []
 
@@ -119,6 +140,8 @@ async function main() {
       if (!indexes.has(i)) absent.push(`indice ${i}`)
     for (const f of expected.functions ?? [])
       if (!functions.has(f)) absent.push(`funcion ${f}`)
+    for (const t of expected.types ?? [])
+      if (!types.has(t)) absent.push(`tipo enum ${t}`)
 
     if (absent.length === 0) {
       console.log(`  ok ${entry.tag}`)
