@@ -4546,3 +4546,47 @@ sintoma es un 404 que no dice "migracion mal hecha". Protocolo: dry-run con cont
 espanol normal, y `check:encoding` devolvio exit 0. El detector no chequea rangos CJK; no
 es que falle el umbral, es que no los mira. Mismo patron que el item 61 - una capa que
 parece cubrir y no cubre.
+
+### 2026-10-09 - S2 del plan de Fase 3: PLATFORM_HOST + items 65 y 67
+
+**What:** slice S2 del plan de Fase 3 (T1 `PLATFORM_HOST` + T6 items 65 y 67). Tres
+hallazgos que no estaban en el plan.
+**Why:** S2 arranca primero por decision de Luis (3 h contra 10 h, no toca datos de
+produccion, y cumple la deuda explicita de la auditoria de Fase 2).
+**Where:** `apps/storefront/proxy.ts`,
+`apps/admin/app/api/subscriptions/preapproval/route.ts`,
+`apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts`,
+`packages/validation/src/env.ts`, `apps/storefront/__tests__/proxy-platform-host.test.ts`
+(nuevo), items 62/65/67/78 de `vault/03_Deuda/deuda-tecnica.md`.
+**Learned:**
+(1) **T4 del plan estaba incompleta y no lo sabiamos.** De los cuatro caminos de
+resolucion del proxy, **solo dos consultan la DB**: la cookie `tenant-slug`,
+`localhost -> tienda1` y `DEFAULT_TENANT_SLUG` asignan tenant **sin tocar la base**, sin
+verificar que exista ni su `status`, y con `tenantId` en `null`. Filtrar por status solo
+los lookups de dominio y subdominio deja el agujero abierto: **un tenant `pending`
+seguiria resolviendo por cookie, y su tienda quedaria accesible aunque el proxy filtre.**
+Hoy no es una brecha de datos - el storefront es publico - pero en cuanto exista un tenant
+`pending` lo es. Recomendacion para S1: validar los slugs de los fallbacks contra la DB
+(opcion A), que es un camino frio y no cuesta en el caliente.
+(2) **La excepcion de plataforma va AL PRINCIPIO del proxy, no antes de los fallbacks** como
+decia el design. Motivo: si fuera despues, un `tenant-slug` de una visita previa a una
+tienda resolveria un tenant en el host de plataforma y la landing mostraria esa tienda.
+El host de plataforma no tiene tenant por definicion. Ademas `PLATFORM_HOST` se valida con
+Zod como **host sin esquema ni puerto**, porque se compara contra el header `host` que el
+proxy ya limpio de puerto: poner `https://app.example.com` seria un error silencioso.
+(3) **El item 78 no era un test de DB.** El titulo decia DB y asumia Neon; el culprit es
+`redis.test.ts` y el timeout viene de que `redisDown()` hace
+`await import('@sentry/nextjs')` dentro del `catch` de degradacion. Aislado 2.44 s; en la
+suite completa 6863 ms y cruza los 5000 ms de vitest. **El sintoma de item 78 era el
+mismo durante meses y la accion que falto fue una sola: correr la suite guardando el
+output a archivo para leer la linea `FAIL`, que es donde esta el nombre.**
+(4) **Dos tests del item 67 fallaron al aplicar el fix, y fallaron bien:** usaban
+`external_reference: 'tenant-42'`. El codigo real setea `externalReference: tenantId`, un
+UUID, asi que esa era una ficcion que solo existia porque nadie validaba. El test "que
+consagra la forma equivocada" del item 65 era de otro tipo: **no afirmaba que `initPoint`
+faltara, simplemente no lo mencionaba.**
+(5) **`apps/storefront/__tests__/proxy.test.ts` no importa el proxy.** Son 24 lineas que
+reimplementan la resolucion con `split('.')` y assertan sobre la copia: pasaria en verde
+si se borrara `proxy.ts` entero. Es el item 62 con un caso nuevo: **el archivo entero
+miente sobre si existe cobertura.** El test nuevo de T1 importa `proxy()` de verdad y el
+mock de `db.select` tira si se lo llama.

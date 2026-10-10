@@ -34,3 +34,4 @@ tags:
 - [[sdd-fase-3-spec-y-design-escritos-18-decisiones-2-hallazgos-269]]
 - [[pattern-la-ausencia-de-una-capa-de-proteccion-hace-el-test-m-270]]
 - [[plan-fase-3-16-tasks-6-slices-y-el-backfill-como-riesgo-mayo-271]]
+- [[session-summary-landaetastudio-saas-272]]
