@@ -71,6 +71,11 @@ const EXPECTED = {
   // observable de la migracion es que el tipo existe.
   '0003_tenants_status_enum': {
     types: ['tenants_status'],
+    // Y ademas la columna tiene que **usar** ese tipo. El enum por si solo
+    // no dice nada: una migracion puede crear el tipo y fallar en el `ALTER
+    // COLUMN`, y con el error tragado por drizzle (item 43) eso pasaria
+    //_reportando exito_.
+    columns: { 'tenants.status': 'tenants_status' },
   },
 }
 
@@ -122,6 +127,19 @@ async function main() {
     ).map((r) => r.typname),
   )
 
+  // Columnas que deben haber cambiado de tipo. Se guarda como
+  // `tabla.columna -> udt_name` porque **la existencia del tipo no alcanza**:
+  // una migracion con varios pasos puede crear el enum y fallar en el `ALTER
+  // COLUMN`, y como el item 43 documenta que drizzle se traga los errores, el
+  // comando reportaria exito con el enum a medio aplicar.
+  const columns = new Map(
+    (
+      await sql.unsafe(
+        "SELECT table_name, column_name, udt_name FROM information_schema.columns WHERE table_schema = 'public'",
+      )
+    ).map((r) => [`${r.table_name}.${r.column_name}`, r.udt_name]),
+  )
+
   const missing = []
   const undeclared = []
 
@@ -142,6 +160,12 @@ async function main() {
       if (!functions.has(f)) absent.push(`funcion ${f}`)
     for (const t of expected.types ?? [])
       if (!types.has(t)) absent.push(`tipo enum ${t}`)
+    for (const [col, wantType] of Object.entries(expected.columns ?? {})) {
+      const got = columns.get(col)
+      if (got === undefined) absent.push(`columna ${col}`)
+      else if (got !== wantType)
+        absent.push(`columna ${col} es ${got}, se esperaba ${wantType}`)
+    }
 
     if (absent.length === 0) {
       console.log(`  ok ${entry.tag}`)
