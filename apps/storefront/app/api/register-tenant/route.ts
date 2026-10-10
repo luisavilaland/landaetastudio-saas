@@ -29,12 +29,56 @@ export const dynamic = 'force-dynamic'
 const SLUG_CONSTRAINT = 'tenants_slug_unique'
 const EMAIL_CONSTRAINT = 'admin_users_email_unique'
 
-/** Postgres 23505: violation de restriccion unique. */
-function constraintOf(error: unknown): string | null {
-  if (!error || typeof error !== 'object' || !('code' in error)) return null
-  const e = error as { code?: unknown; constraint?: unknown }
-  if (e.code !== '23505') return null
-  return typeof e.constraint === 'string' ? e.constraint : null
+/** Postgres 23505: violacion de restriccion unique. */
+const UNIQUE_VIOLATION = '23505'
+
+/** Cuanto se desenrolla la cadena `cause` antes de rendirse. */
+const MAX_CAUSE_DEPTH = 5
+
+/**
+ * Saca el codigo y el nombre de la constraint de un error de Postgres.
+ *
+ * **Las dos trampas, y las dos costaron un 500 en vez de un 409:**
+ *
+ * 1. `withTenantContext` lanza `DrizzleQueryError`, que envuelve el error real
+ *    de Postgres en `.cause`. El `code` esta en la causa, no en la superficie.
+ *    Sin desenrollar, `error.code` es `undefined` y el catch nunca matchea.
+ * 2. `postgres.js` llama al campo **`constraint_name`**, no `constraint`. Ese
+ *    nombre viene de `node-postgres` y por eso es el nombre que uno escribe sin
+ *    pensar. Se acepta cualquiera de los dos para no depender de la libreria.
+ *
+ * El limite de profundidad evita un loop infinito si dos causas se apuntaran
+ * mutuamente.
+ */
+function uniqueViolation(
+  error: unknown,
+): { code: string; constraint: string | null } | null {
+  let current: unknown = error
+
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth += 1) {
+    if (!current || typeof current !== 'object') return null
+
+    const candidate = current as {
+      code?: unknown
+      constraint?: unknown
+      constraint_name?: unknown
+      cause?: unknown
+    }
+
+    if (candidate.code === UNIQUE_VIOLATION) {
+      const name =
+        typeof candidate.constraint_name === 'string'
+          ? candidate.constraint_name
+          : typeof candidate.constraint === 'string'
+            ? candidate.constraint
+            : null
+      return { code: UNIQUE_VIOLATION, constraint: name }
+    }
+
+    current = candidate.cause
+  }
+
+  return null
 }
 
 /**
@@ -146,25 +190,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ tenantId: newTenantId, slug }, { status: 201 })
     })
   } catch (error) {
-    const constraint = constraintOf(error)
+    const violation = uniqueViolation(error)
 
-    if (constraint === SLUG_CONSTRAINT) {
+    if (violation?.constraint === SLUG_CONSTRAINT) {
       return NextResponse.json(
         { error: 'Slug ya existe', field: 'slug' },
         { status: 409 },
       )
     }
 
-    if (constraint === EMAIL_CONSTRAINT) {
+    if (violation?.constraint === EMAIL_CONSTRAINT) {
       return NextResponse.json(
         { error: 'Email ya registrado', field: 'email' },
         { status: 409 },
       )
     }
 
-    // 23505 sin constraint utilizable: se reporta por el slug, que es la
-    // restriccion que este endpoint controla de verdad.
-    if (constraint !== null) {
+    // 23505 con constraint desconocida: se reporta por el slug, que es la
+    // restriccion que este endpoint controla de verdad. Un `customDomain` no se
+    // inserta aca, asi que no hay tercera possibility en el camino feliz.
+    if (violation !== null) {
       return NextResponse.json(
         { error: 'Slug ya existe', field: 'slug' },
         { status: 409 },
