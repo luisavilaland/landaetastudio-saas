@@ -292,10 +292,10 @@ pnpm test
 
 | Métrica      | Valor     |
 | ------------ | --------- |
-| **Total**    | 705 tests |
-| **Pasando**  | 705 ✅    |
+| **Total**    | 769 tests |
+| **Pasando**  | 769 ✅    |
 | **Fallas**   | 0 ✅      |
-| **Archivos** | 69        |
+| **Archivos** | 72        |
 
 > Los tests de endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, Redis, storage). Helpers centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`). Además: 15 specs E2E en `e2e/` (Playwright, CI self-hosted).
 
@@ -344,9 +344,10 @@ pnpm test
 - Actualización 6 de octubre de 2026 – 705 tests, 69 archivos, mini-PRs documentales: drift de topics de MP en SETUP.md (3→4) y precondiciones de T8. PR #204, #205.
 - Actualización 6 de octubre de 2026 – 705 tests, 69 archivos, T8 de Fase 2 (cierre formal) y auditoría de cierre: veredicto "Fase 2 pasa", 10 hallazgos de código (8 MEDIUM, 2 LOW) + 1 hallazgo de proceso (item 62). T9 (polling) cancelado. PR #206, #207.
 - Actualización 7 de octubre de 2026 – 705 tests, 69 archivos, lote de 9 PRs de Dependabot (#208, #210–#217) y migración de `@sentry/nextjs` v10 → v11 (#218). DoD verde post-merge: lint 6/6, typecheck 9/9, build 3/3, format:check. PR #208, #210–#218.
+- Actualización 10 de octubre de 2026 – 769 tests, 72 archivos. Items 61, 66, 68, 69, 70, 71, 75, 76 y 77 resueltos en la tanda de auditoría, más el item 65 (409 con `initPoint`) y el 67 (validación de `external_reference`) en S2 del plan de Fase 3. 10 tests nuevos: 6 del proxy con `PLATFORM_HOST`, 2 del item 67, 2 del item 65. CI 9/9. PR #235, #240.
 - Fase 5 completada: RLS ✅, AUTH_SECRET ✅, CSRF ✅, validación de variables de entorno ✅, logs estructurados con Pino ✅, Sentry integrado ✅, NEXTAUTH_URL dinámica ✅, errores 409 con campo específico ✅, UI de validación inline ✅, configuración de build corregida (next.config.mjs) ✅.
 - Fase 6 completada: withTenantContext real + FORCE RLS (app_user), E2E Playwright 15 specs con CI self-hosted, incidente RLS de 9 Server Components corregido (08-08).
-- Estado actual: 705 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
+- Estado actual: 769 tests automatizados pasando (0 fallos). Build limpio en las 3 apps.
 - Sandbox manual de MercadoPago pendiente (cuenta de prueba de MP).
 - Ver AGENTS.md para detalles de convenciones de código y comandos obligatorios.
 

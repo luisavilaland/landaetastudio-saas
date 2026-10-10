@@ -36,3 +36,4 @@ tags:
 - [[plan-fase-3-16-tasks-6-slices-y-el-backfill-como-riesgo-mayo-271]]
 - [[session-summary-landaetastudio-saas-272]]
 - [[s2-fase-3-t4-incompleta-item-78-era-redis-y-un-test-que-no-i-273]]
+- [[session-summary-landaetastudio-saas-274]]
