@@ -184,13 +184,11 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
 
   describe('T7.2 slug reservado', () => {
     it('devuelve 409 con field slug y NO toca la base', async () => {
-      const antes = await ownerClient<{ n: number }[]>`
-        SELECT count(*)::int AS n FROM "tenants"
-      `
+      const email = uniqueEmail()
 
       const res = await request({
         name: 'Reservado',
-        email: uniqueEmail(),
+        email,
         password: 'contrasena123',
         slug: 'admin',
         planId,
@@ -200,10 +198,27 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
       const body = (await res.json()) as { field: string; error: string }
       expect(body.field).toBe('slug')
 
-      const despues = await ownerClient<{ n: number }[]>`
-        SELECT count(*)::int AS n FROM "tenants"
+      // El marcador es el email, no `count(*) FROM tenants`.
+      //
+      // La primera version comparaba el total de tenants antes y despues, y
+      // fallo en CI: **cuatro** archivos de test crean tenants en paralelo
+      // (`tenant-lifecycle`, `subscription-transition`,
+      // `preapproval-tenant-resolution`, `rls-cross-tenant`). Si cualquiera
+      // creaba o borraba entre las dos queries, el assert fallaba por un motivo
+      // que no era del endpoint. Pasa en verde aislado y en rojo en la suite
+      // completa: el clasico flake que en realidad es un test mal escrito.
+      //
+      // El email es unico por corrida y lo genera este test, asi que es un
+      // marcador preciso: si la request creo algo, existira una fila con el.
+      const adminRows = await ownerClient<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM "admin_users" WHERE "email" = ${email}
       `
-      expect(despues[0]?.n).toBe(antes[0]?.n)
+      expect(adminRows[0]?.n).toBe(0)
+
+      const nameRows = await ownerClient<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM "tenants" WHERE "name" = 'Reservado'
+      `
+      expect(nameRows[0]?.n).toBe(0)
     })
 
     it('un slug con formato invalido devuelve 400, no 409', async () => {
@@ -296,24 +311,29 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
 
   describe('T7.5 plan inexistente', () => {
     it('devuelve 404 y no crea nada', async () => {
-      const antes = await ownerClient<{ n: number }[]>`
-        SELECT count(*)::int AS n FROM "tenants"
-      `
+      const email = uniqueEmail()
+      const slug = uniqueSlug('np')
 
       const res = await request({
         name: 'Sin plan',
-        email: uniqueEmail(),
+        email,
         password: 'contrasena123',
-        slug: uniqueSlug('np'),
+        slug,
         planId: randomUUID(),
       })
 
       expect(res.status).toBe(404)
 
-      const despues = await ownerClient<{ n: number }[]>`
-        SELECT count(*)::int AS n FROM "tenants"
+      // Mismo marcador con scope que T7.2: nada de `count(*)` global.
+      const adminRows = await ownerClient<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM "admin_users" WHERE "email" = ${email}
       `
-      expect(despues[0]?.n).toBe(antes[0]?.n)
+      expect(adminRows[0]?.n).toBe(0)
+
+      const tenantRows = await ownerClient<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM "tenants" WHERE "slug" = ${slug}
+      `
+      expect(tenantRows[0]?.n).toBe(0)
     })
   })
 
