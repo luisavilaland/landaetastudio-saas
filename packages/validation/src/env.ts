@@ -60,6 +60,18 @@ const productionSchema = coreSchema.extend({
     .string()
     .url('STOREFRONT_URL must be a valid URL in production'),
   SENTRY_DSN: z.string().url('SENTRY_DSN must be a valid URL').optional(),
+  // Fase 3 (D1): host que sirve la superficie de la plataforma (landing,
+  // registro). Sin esto el proxy del storefront devuelve 404 en ese host
+  // porque no hay tenant que resolver.
+  //
+  // Se valida como host sin puerto ni esquema, porque es contra lo que se
+  // compara el `host` de la request (proxy.ts:26 le saca el puerto). Aceptar
+  // `https://app.example.com` aca seria un error silencioso: la comparacion
+  // nunca matchearia y el fallback 404 seguiria.
+  PLATFORM_HOST: z
+    .string()
+    .regex(/^[a-z0-9.-]+$/i, 'PLATFORM_HOST must be a bare hostname, without scheme or port')
+    .optional(),
 })
 
 const developmentSchema = coreSchema.extend({
@@ -77,6 +89,10 @@ const developmentSchema = coreSchema.extend({
   MP_PLATFORM_WEBHOOK_SECRET: z.string().optional(),
   STOREFRONT_URL: z.string().url().optional(),
   SENTRY_DSN: z.string().url().optional(),
+  PLATFORM_HOST: z
+    .string()
+    .regex(/^[a-z0-9.-]+$/i, 'PLATFORM_HOST must be a bare hostname, without scheme or port')
+    .optional(),
 })
 
 type SafeParseResult = ReturnType<typeof coreSchema.safeParse>

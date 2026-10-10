@@ -2639,6 +2639,39 @@ primero. `withTenantContextByPreapproval` no fallaba por estar mal nombrada:
 fallaba porque el nombre prometia un invariante que no existia, y nadie lo
 verifico porque el nombre ya lo decia.
 
+### Caso 2, encontrado el 2026-10-09: un test que no ejecuta lo que dice probar
+
+Al implementar T1 del plan de Fase 3 (`PLATFORM_HOST` en el proxy del storefront) se
+reviso el test existente, `apps/storefront/__tests__/proxy.test.ts`. **Son 24 lineas que
+no importan el proxy.** Reimplementan la resolucion con `split('.')` sobre strings y
+assertan sobre esa copia:
+
+```ts
+it('should fallback to subdomain when customDomain not found', () => {
+  const hostname = 'tienda1.lvh.me'
+  const slug = hostname.split('.')[0]
+  expect(slug).toBe('tienda1')
+})
+```
+
+**Ese test pasaria en verde si se borrara `proxy.ts` entero.** El nombre del describe
+promete "custom domain resolution logic" y no ejecuta una linea de la resolucion.
+
+**Por que es peor que el caso de `withTenantContextByPreapproval`:** ahi el nombre
+mentia sobre el codigo. Aca el archivo entero miente sobre si existe cobertura. Un
+reviewer que ve `proxy.test.ts` con 3 tests en verde marca el casillero de resolucion
+de tenant sin abrir el archivo.
+
+**Regla que sale de aca, ademas de las dos de Mitigacion:** un test cuyo nombre dice
+probar una unidad tiene que **importar esa unidad**. Si no la importa, no la prueba,
+y la cantidad de tests no es evidencia de nada. El caso extremo es el item 61 por el
+otro lado: tests que si importan el codigo y no observan su garantia. Los dos extremos
+producen el mismo silencio.
+
+El test de T1 (`proxy-platform-host.test.ts`) se escribio con la regla inversa:
+importa `proxy()` de verdad, y el mock de `db.select` **tira** si se lo llama, para
+poder afirmar "no se resolvio tenant" sin inspeccionar cadenas.
+
 ---
 
 ## Registro de la auditoria de cierre de Fase 2 (items 63 a 71)
@@ -2748,25 +2781,29 @@ suscribirlo, para poder probarlo.
 
 ## 65. El 409 de doble click omite `initPoint`, y un test consagra la forma equivocada (H-F2-3)
 
-**Estado:** abierto (2026-10-07). Verificado en codigo el 2026-10-07: **sigue
-presente**.
+**Estado:** **RESUELTO (2026-10-09)** en S2 del plan de Fase 3 (T6).
 
-**Evidencia:** `apps/admin/app/api/subscriptions/preapproval/route.ts` — el
-comentario de cabecera de `:39` promete _"Doble click -> 409 con el `initPoint`
-existente"_, pero los 409 de `:116`, `:129` y `:142` **no incluyen `initPoint`**.
-El test `route.test.ts:278-289` asserta la forma incorrecta, asi que **no falla**:
-consagra el error.
+**Que se corrigio.** El 409 de `apps/admin/app/api/subscriptions/preapproval/route.ts` que
+devuelve el `preapprovalId` existente ahora incluye tambien el `initPoint`, que se pide a
+MP con `getPreapproval`. El caso de doble click es el unico de los tres 409 que tiene un
+preapproval real al que preguntarle: los otros dos (plan inactivo, estado invalido) y el
+`reservationInFlight` no tienen ningun preapproval, asi que sin `initPoint` es correcto.
 
-**Impacto:** el plan (`:469`, `:481`) y el design (seccion 6.5) dicen que el 409
-devuelve `preapprovalId` con `initPoint` para que la UI pueda navegar al checkout.
-Cuando exista la UI, el tenant queda atrapado en `pending_first_payment` sin poder
-retomar el pago.
+**Degradacion, que es lo importante.** Si la llamada a MP falla, el 409 se devuelve **sin**
+`initPoint` en vez de convertirse en un 500. El invariante del design (secciones 3.5 y
+6.2) es "si no resuelve -> 200/409 + warn, nunca 5xx", y un doble click con MP caido no
+puede romper el endpoint.
 
-**Por que no lo detecto la revision anterior:** nadie contrasto el archivo contra
-el plan de T4 ni contra su propio comentario de cabecera. Es el item 62 aplicado a
-un endpoint.
+**El test.** El original **no afirmaba que `initPoint` faltara: simplemente no lo
+mencionaba**, y por eso el handler podia omitirlo sin que nadie lo notara. Ahora hay tres
+casos: `initPoint` presente, MP caido (409 sin `initPoint`, nunca 5xx), y MP que responde
+sin el campo (el spike T0 demostro que MP devuelve 2xx al descartar campos sin avisar).
 
-**Costo estimado:** 1 h (agregar `initPoint` al 409 y corregir el test).
+**Nota de precision sobre las referencias.** El item apuntaba a los 409 de `:116`, `:129`
+y `:142`. Cuando se implemento el fix, el archivo habia corrido: son la 160 (plan
+inactivo), la 172 (doble click) y la 201 (estado invalido). El contenido del hallazgo era
+correcto; la referencia de linea ya no. Un item de deuda con lineas hardcodeadas envejece
+y hay que verificar contra el codigo antes de actuar sobre el.
 
 ---
 
@@ -2825,19 +2862,28 @@ key sin TTL", que es justamente la parte que **no** resolvia el lockout).
 
 ## 67. `external_reference` sin validar puede producir 500 (H-F2-5)
 
-**Estado:** abierto (2026-10-07). Verificado en codigo: no.
+**Estado:** **RESUELTO (2026-10-09)** en S2 del plan de Fase 3 (T6).
 
-**Evidencia:** `apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts:406`
-hacia `packages/db/src/index.ts:22`.
+**Que se corrigio.** La estrategia R de `resolveTenant` valida la **forma** del
+`external_reference` antes de devolverlo como `tenantId`. Sin esa comprobacion el valor
+llegaba a `set_tenant_id(${tenantId}::uuid)`, el cast **lanza**, y eso es el 500 que
+dispara el loop de reintentos de MP.
 
-**Impacto:** la estrategia R devuelve `external_reference` **sin validar que sea
-UUID**. `withTenantContext` corre `set_tenant_id(${tenantId}::uuid)`, que **lanza**
-ante un valor no-UUID, y eso es un **500** que dispara el **loop de reintentos de
-MercadoPago**. Rompe el invariante documentado de "si no resuelve -> `200` + warn,
-nunca `5xx`" (design secciones 3.5 y 6.2, paso 9).
+**La validacion es de forma, no de version.** Alcanza con que el cast de PostgreSQL no
+tie. Los tests cubren un UUID canonico en minusculas y uno en mayusculas.
 
-**Costo estimado:** 1 h (validar el formato UUID antes de invocar
-`withTenantContext`; si no matchea, `200` + warn).
+**El hallazgo de los tests, que es la parte interesante.** Dos tests fallaron al aplicar
+el fix, y **fallaron bien**: usaban `external_reference: 'tenant-42'`. El codigo real
+setea `externalReference: tenantId`, o sea un UUID, asi que `'tenant-42'` era una ficcion
+que solo podia existir porque nadie validaba. Si el bug hubiera estado activo en
+produccion, ese webhook ya estaria devolviendo 500 en loop.
+
+Los tests de la estrategia L siguen usando `tenant-1` y `tenant-9` a proposito: ahi el
+valor viene del indice local de la DB, no de MP, y no se valida.
+
+**Verificacion en rojo.** Con el filtro de forma desactivado, falla **exactamente 1 test**:
+el que afirma que un `external_reference` no-UUID no produce un 5xx. Los otros 60 siguen
+verdes. Mutacion revertida, 61/61.
 
 ---
 
@@ -3286,6 +3332,54 @@ identico antes y despues (3435).
 ## 78. Tests de DB al borde del timeout
 
 **Estado:** abierto (2026-10-08). Severidad MEDIA.
+**Culprit identificado (2026-10-09): NO es un test de Neon. Es `redis.test.ts`.**
+
+**El titulo de este item estaba equivocado.** Dice "tests de DB" y asumia Neon, y durante
+seis meses el item estuvo abierto sin culprit con esa premisa. Es un test **de Redis**, y
+el timeout no viene de la base.
+
+**Culprit, verificado con el nombre del test en el output:**
+
+```
+FAIL  packages/commerce/src/__tests__/redis.test.ts
+  > redisPexpire - contrato (item 66)
+  > devuelve false si el comando lanza "Redis degradado"
+Error: Test timed out in 5000ms.
+```
+
+**Mecanismo.** `redisDown()` (`packages/commerce/src/redis.ts:53-66`) hace
+`await import('@sentry/nextjs')` **dentro del `catch` de degradacion**. Cada vez que Redis
+se degrada, el camino de error paga la carga de importar un modulo pesado.
+
+- Aislado: el archivo tarda **2.44 s** para 4 tests. Verde.
+- En la suite completa: **6863 ms**, y un test cruza los 5000 ms de vitest.
+
+No es una carrera: es que el presupuesto de tiempo del test incluye la carga del import
+dinamico, y bajo carga esa carga se come el margen.
+
+**Por que los tests de degradacion lo pagan y los otros no.** El mock de `ioredis` en
+`redis.test.ts` pone `status = 'ready'`, asi que `whenReady` retorna inmediato y **no**
+es el culpable (esa hipotesis se verifico y se descarto). Los dos tests que mockean
+`mockRejectedValue` entran por definicion al `catch`, y ahi ocurre el import.
+
+**Consecuencia de produccion, no solo de test.** Cada degradacion de Redis paga el import
+de Sentry. Con `lazyConnect:true` en un cold-start serverless, la primera comando se
+rechaza mientras el socket conecta - que es exactamente cuando mas degradaciones hay - y
+cada una arrastra esa carga.
+
+**Fix propuesto (NO aplicado, es scope de otro PR):**
+
+1. **Test:** mockear `@sentry/nextjs` en `redis.test.ts`. Quita el costo del camino de
+   error del test. Cambio de ~5 lineas en un archivo de test existente.
+2. **Codigo:** cargar Sentry una sola vez (lazy a nivel de modulo) en vez de en cada
+   degradacion, o no importarlo si no hay `SENTRY_DSN`. La guarda de L57 ya evita la
+   llamada, pero **no evita el import**: se importa para despues no llamarlo.
+3. Subir el timeout por test de este archivo a 30 s, como opcion (a) del item original.
+
+**Nota de proceso, y es la leccion:** el item abria con "no reproducible" y la accion
+correcta era **correr la suite guardando el output a archivo** para leer la linea `FAIL`,
+que es donde esta el nombre. Ese paso falto durante meses de item abierto. Repetir un
+test que flakea sin capturar su nombre no produce informacion.
 
 **Origen:** detectado durante el DoD del PR #223.
 

@@ -406,6 +406,27 @@ async function resolveTenant(
     return null
   }
 
+  // Item 67 (H-F2-5): se valida la forma antes de devolver. Este valor se usa
+  // como `tenantId`, y `withTenantContext` lo castea a `::uuid` en un
+  // `SET LOCAL`: si no tiene forma de UUID, el cast **lanza** y la excepcion sale
+  // como 500, que hace que MP reintente el webhook en loop.
+  //
+  // Un `external_reference` que MP acepta puede ser cualquier string: es un
+  // campo de texto libre del lado del integrador, no un id restringido a UUID.
+  // Validar acá convierte un 500 en el "no resuelve -> warn" que el design
+  // exige.
+  if (!isTenantIdShape(externalReference)) {
+    logger.warn(
+      {
+        preapprovalId,
+        externalReference,
+        reason: 'not a uuid shape - would throw on set_tenant_id(::uuid)',
+      },
+      'Strategy R produced an external_reference that is not a tenant id',
+    )
+    return null
+  }
+
   return { tenantId: externalReference, preapprovalId }
 }
 
@@ -794,6 +815,28 @@ function safeParse(rawBody: string): EventBody | null {
 /** Lee un string de un payload de MP sin asumir que existe. */
 function str(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
+}
+
+/**
+ * Forma de un UUID tal como lo acepta PostgreSQL en un cast `::uuid`.
+ *
+ * Item 67 (H-F2-5). Existe por una razon puntual: `withTenantContext` ejecuta
+ * `set_tenant_id(${tenantId}::uuid)`, y ese cast **lanza** ante un valor que no
+ * sea un UUID. Sin esta comprobacion, un `external_reference` con cualquier otra
+ * forma se convierte en un **500**, que dispara el loop de reintentos de MP y
+ * rompe el invariante del design (secciones 3.5 y 6.2): "si no resuelve ->
+ * 200/409 + warn, nunca 5xx".
+ *
+ * No es un validador de version: alcanza con la forma, porque el cast de
+ * PostgreSQL tampoco distingue versiones y lo que se quiere evitar es el throw,
+ * no la semantica del UUID.
+ */
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Un id de tenant tiene que poder castearse a `uuid` sin tirar. */
+function isTenantIdShape(value: string): boolean {
+  return UUID_PATTERN.test(value)
 }
 
 /**

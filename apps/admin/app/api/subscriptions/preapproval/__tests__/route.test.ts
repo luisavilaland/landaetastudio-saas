@@ -494,6 +494,10 @@ describe('POST /api/subscriptions/preapproval — guardas', () => {
   it('409 con el preapproval existente en vez de crear otro (doble click)', async () => {
     vi.mocked(auth).mockResolvedValue(session('tenant-1'))
     mockCtx(sub({ mpPreapprovalId: 'preapproval-ya-existe' }))
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: 'preapproval-ya-existe',
+      init_point: 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref=ya-existe',
+    })
 
     const res = await POST(req())
     const body = await res.json()
@@ -502,7 +506,45 @@ describe('POST /api/subscriptions/preapproval — guardas', () => {
     // mano.
     expect(res.status).toBe(409)
     expect(body.preapprovalId).toBe('preapproval-ya-existe')
+    // Item 65 (H-F2-3): el 409 tambien trae `initPoint`. Sin el, la UI puede
+    // mostrar el error pero no puede retomar el pago, y el tenant queda
+    // atrapado en `pending_first_payment`. Este assert es el que hacia pasar el
+    // bug: antes el test no mencionaba `initPoint`, asi que el handler podia
+    // omitirlo sin que nadie lo notara.
+    expect(body.initPoint).toBe(
+      'https://www.mercadopago.com.ar/checkout/v1/redirect?pref=ya-existe',
+    )
     expect(createPreapproval).not.toHaveBeenCalled()
+  })
+
+  it('409 sin initPoint si MP no responde, y nunca un 5xx (item 65)', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    mockCtx(sub({ mpPreapprovalId: 'preapproval-ya-existe' }))
+    vi.mocked(getPreapproval).mockRejectedValue(new Error('MP timeout'))
+
+    const res = await POST(req())
+    const body = await res.json()
+
+    // El invariante del design (secciones 3.5 y 6.2) es "si no resuelve ->
+    // 200/409 + warn, nunca 5xx". Un doble click con MP caido no puede romper
+    // el endpoint: se degrada a un 409 sin `initPoint`.
+    expect(res.status).toBe(409)
+    expect(body.preapprovalId).toBe('preapproval-ya-existe')
+    expect(body.initPoint).toBeUndefined()
+    expect(createPreapproval).not.toHaveBeenCalled()
+  })
+
+  it('409 sin initPoint si MP responde sin el campo (item 65)', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    mockCtx(sub({ mpPreapprovalId: 'preapproval-ya-existe' }))
+    // El spike T0 demostro que MP devuelve 2xx al descartar campos sin avisar.
+    vi.mocked(getPreapproval).mockResolvedValue({ id: 'preapproval-ya-existe' })
+
+    const res = await POST(req())
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.initPoint).toBeUndefined()
   })
 
   it('409 si la suscripcion no esta en `pending_first_payment`', async () => {
