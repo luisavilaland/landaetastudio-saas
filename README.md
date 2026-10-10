@@ -512,7 +512,7 @@ pnpm test        # Unit + integración (vitest)
 pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 ```
 
-- **Total:** 769 tests pasando, 0 fallos (72 archivos).
+- **Total:** 769 tests pasando, 0 fallos (73 archivos).
 - Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 - Los endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, redis).
 - 15 specs E2E en `e2e/` (storefront, checkout, admin, superadmin, security, webhook) — CI con runner self-hosted.
@@ -545,4 +545,4 @@ pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 
 **Última actualización:** 7 de octubre de 2026 – Lote de 9 PRs de Dependabot (#208, #210–#217) y migración de `@sentry/nextjs` v10 → v11 (#218): `withSentryConfig` movido a `@sentry/nextjs/config`, `disableLogger` → `webpack.treeshake.removeDebugLogging`, `automaticVercelMonitors` → `webpack.automaticVercelMonitors`. `agentGuidance` de turbo 2.11.7 desactivado en `turbo.json`. 705 tests pasando, 0 fallos (69 archivos). PR #208, #210–#218.
 
-**Última actualización:** 10 de octubre de 2026 – Tanda de auditoría de Fase 3: items 61, 65, 66, 67, 68, 69, 70, 71, 75, 76 y 77 resueltos. `transitionSubscription` (#235) con verificación en rojo contra Neon, y S2 con `PLATFORM_HOST` + items 65 y 67 (#240). 769 tests pasando, 0 fallos (72 archivos). PR #235, #239, #240.
+**Última actualización:** 10 de octubre de 2026 – Tanda de auditoría de Fase 3: items 61, 65, 66, 67, 68, 69, 70, 71, 75, 76 y 77 resueltos. `transitionSubscription` (#235) con verificación en rojo contra Neon, y S2 con `PLATFORM_HOST` + items 65 y 67 (#240). 769 tests pasando, 0 fallos (73 archivos). PR #235, #239, #240.
