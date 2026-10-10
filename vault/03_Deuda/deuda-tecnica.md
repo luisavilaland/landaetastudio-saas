@@ -4029,3 +4029,89 @@ contar los `it(` de los diffs.
 decia `72 passed, 1 FAILED`. El numero correcto es **73**. Es el **mismo error** que el
 de arriba, con la misma forma: **un numero parcial tomado de una corrida con fallos.** Ver
 la seccion "Correccion: los 72 archivos eran 73" dentro del item 92.
+---
+
+## 95. Env vars leidas por el codigo sin declarar en el schema
+
+**Severidad:** BAJA · **Estado:** ABIERTO · **Origen:** detectado verificando #245 (S1).
+
+**Problema.** `apps/storefront/proxy.ts:171` lee `process.env.ENABLE_DEFAULT_TENANT_FALLBACK`
+directo, sin pasar por `validateEnv`. `DEFAULT_TENANT_SLUG` tampoco esta en ningun schema.
+
+Las dos se leen, ninguna se declara. Un typo (`ENABLE_DEFAULT_TENANT_FALLBACck=true`) deja el
+gate apagado sin que nada lo distinga de la variable ausente.
+
+**Por que no hay warning.** Los tres schemas (`coreSchema`, `productionSchema`,
+`developmentSchema`) son `z.object({...})` **sin `.strict()`**. Zod 4.6.5 hace *strip* de las
+claves no declaradas: las ignora en silencio. Verificado empiricamente - `safeParse` da
+`success: true` y la clave no aparece en `result.data`. Con `.strict()` da `success: false`.
+Y `formatValidationError` solo imprime `result.error.issues`, que un strip no produce.
+
+**La asimetria que si importa.** `isProduction = NODE_ENV === 'production' && hasCloudVars`.
+En Preview de Vercel **con** credenciales cloud se cae a `productionSchema`; **sin** ellas,
+a `developmentSchema`. El comportamiento de la variable depende de si el entorno tiene
+credenciales, no de que entorno es.
+
+**Fix propuesto.** Agregar las 2 a `developmentSchema` en `packages/validation/src/env.ts`.
+Tres lineas, sin cambio de comportamiento.
+
+**Lo que NO se propone: `.strict()`.** El repo depende de variables que Zod no ve como
+propias pero Next si necesita - `NODE_ENV` y los `_` de prefijo que inyecta Next. Un strict
+sobre `process.env` falla por motivos ajenos a este bug.
+
+**Familia:** sexta variante de "un control que reporta exito y no ejecuta el trabajo":
+item 61 (RLS enmascarando el WHERE), item 62 (el nombre haciendo la review), item 67
+(`external_reference` sin validar), item 90 (el detector que no mira CJK), item 94
+(`db:migrate` que no verifica), item 95 (env var leida sin schema).
+
+---
+
+## 96. El owner de un tenant `pending` puede acceder a `apps/admin`
+
+**Severidad:** BAJA · **Estado:** CERRADO (documentacion) · **Origen:** detectado al disenar S3.
+
+**Aclaracion: el comportamiento actual es el correcto.** No es un bug.
+
+El onboarding exige que el tenant configure subdominio, branding y MP **antes** de pagar
+(spec seccion 1, paso 2, con el pago en el paso 3). Eso es imposible sin acceso a
+`apps/admin`, asi que el owner de un tenant `pending` tiene que poder entrar.
+
+Lo que D17 restringe ("no publica, no vende") es sobre el **contenido**, no sobre el
+**acceso**. Y el 404 del storefront (D2, filtro por `active` de S1) es sobre el comprador,
+no sobre el owner. Son dos planos distintos y el diseno solo define el segundo.
+
+**Lo que S3 confirma.** `createAdminAuth.authorize()` no consulta `tenants.status`, y no
+debería: con este gate, el paso 2 del onboarding quedaria inejecutable. El guard de
+"puede publicar" es T10/S4, y va por el lado del contenido.
+
+**Sin accion requerida en S3.** Se documenta para que la ausencia del gate se lea como
+decision y no como olvido.
+
+---
+
+## 97. El acceso al panel no esta definido para `abandoned`, `expired` ni `cancelled`
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** detectado al disenar S3.
+
+**Problema.** D17 define "puede publicar / puede vender" para los 7 estados de la
+subscription. No define **"puede acceder al panel"**, que es un eje ortogonal:
+
+| Estado | Acceso al panel | Fuente |
+| --- | --- | --- |
+| `pending` | si | spec seccion 1 paso 2 (ver item 96) |
+| `active` | si | implicito |
+| `past_due` | si, en modo limitado | D17: no publica, si vende |
+| `cancelled` | read-only hasta fin de periodo | D17 |
+| `expired` | **sin definir** | - |
+| `abandoned` | **sin definir** | - |
+
+**Por que importa ahora.** S3 crea el `admin_user` en la misma transaccion que el tenant, asi
+que desde el alta existe una cuenta que autentica sinrestriction de estado. Con `pending` y
+`active` esta bien. Los otros cuatro estados no tienen regla, y el alta es la que hace
+concreto el caso: un tenant que abandona el checkout queda con panel accesible y sin regla
+que diga si debe poder editar el catalogo, cobrar, o solo mirar.
+
+**Fix propuesto.** Decidir en T10 junto con el guard "puede publicar", y si aplica agregar el
+gate por status en el middleware de `apps/admin` (hoy `authorize()` no mira `tenants.status`).
+El gate no va en `authorize()` salvo para el caso de `abandoned`, que si deberia cortar el
+acceso de entrada: un tenant abandonado es uno que ya dio de alta su tienda y no pago.
