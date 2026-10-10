@@ -4042,7 +4042,7 @@ Las dos se leen, ninguna se declara. Un typo (`ENABLE_DEFAULT_TENANT_FALLBACck=t
 gate apagado sin que nada lo distinga de la variable ausente.
 
 **Por que no hay warning.** Los tres schemas (`coreSchema`, `productionSchema`,
-`developmentSchema`) son `z.object({...})` **sin `.strict()`**. Zod 4.6.5 hace *strip* de las
+`developmentSchema`) son `z.object({...})` **sin `.strict()`**. Zod 4.6.5 hace _strip_ de las
 claves no declaradas: las ignora en silencio. Verificado empiricamente - `safeParse` da
 `success: true` y la clave no aparece en `result.data`. Con `.strict()` da `success: false`.
 Y `formatValidationError` solo imprime `result.error.issues`, que un strip no produce.
@@ -4096,14 +4096,14 @@ decision y no como olvido.
 **Problema.** D17 define "puede publicar / puede vender" para los 7 estados de la
 subscription. No define **"puede acceder al panel"**, que es un eje ortogonal:
 
-| Estado | Acceso al panel | Fuente |
-| --- | --- | --- |
-| `pending` | si | spec seccion 1 paso 2 (ver item 96) |
-| `active` | si | implicito |
-| `past_due` | si, en modo limitado | D17: no publica, si vende |
-| `cancelled` | read-only hasta fin de periodo | D17 |
-| `expired` | **sin definir** | - |
-| `abandoned` | **sin definir** | - |
+| Estado      | Acceso al panel                | Fuente                              |
+| ----------- | ------------------------------ | ----------------------------------- |
+| `pending`   | si                             | spec seccion 1 paso 2 (ver item 96) |
+| `active`    | si                             | implicito                           |
+| `past_due`  | si, en modo limitado           | D17: no publica, si vende           |
+| `cancelled` | read-only hasta fin de periodo | D17                                 |
+| `expired`   | **sin definir**                | -                                   |
+| `abandoned` | **sin definir**                | -                                   |
 
 **Por que importa ahora.** S3 crea el `admin_user` en la misma transaccion que el tenant, asi
 que desde el alta existe una cuenta que autentica sinrestriction de estado. Con `pending` y
