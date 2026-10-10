@@ -18,3 +18,4 @@ tags:
 - [[item-61-mergeado-paso-cero-salv-la-sesi-n-y-el-issue-no-se-a-262]] (bugfix)
 - [[el-item-90-se-reprodujo-en-vivo-check-encoding-dio-verde-con-268]] (discovery)
 - [[s2-fase-3-t4-incompleta-item-78-era-redis-y-un-test-que-no-i-273]] (bugfix)
+- [[item-94-db-migrate-reportaba-exito-sin-aplicar-por-un-create-276]] (bugfix)
