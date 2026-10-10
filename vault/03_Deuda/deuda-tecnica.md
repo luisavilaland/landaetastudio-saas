@@ -1202,6 +1202,16 @@ aplica las migraciones.
 ## 43. `drizzle-kit` no imprime errores en modo no-interactivo
 
 **Estado:** abierto (2026-10-02).
+**Relacionado con el item 94** (2026-10-10): mismo sintoma superficial - drizzle reporta
+exito - con **mecanismo distinto**. Aca la migracion **se intenta y falla**, y `hanji` se
+traga el error. En el item 94 la migracion **ni se intenta**, porque un `created_at`
+corrupto hace que drizzle la considere ya aplicada. No son el mismo defecto: el fix de
+este item no tapa el otro.
+
+**Severidad (revisada 2026-10-10): ALTA, no MEDIA-ALTA.** La severidad original estaba
+subestimada por el supuesto de que solo afectaba el modo no-interactivo y que el error
+igual se veria en otro lado. El item 94 mostro que **la combinacion de los dos es peor que
+cada uno**: el 43 evita que se vea un error, y el 94 evita que exista un error que ver.
 
 **Versiones:** `drizzle-kit@0.31.10`, que embebe `hanji@0.0.8`.
 
@@ -3925,6 +3935,83 @@ la medicion es exactamente el error que la coexistencia del flake vuelve probabl
 **Regla que sale:** el contador se saca de una **corrida limpia**. Si la corrida tiene
 fallos, los numeros que importan son los dos que aparecen y hay que sumarlos, o se espera
 una corrida limpia. No se lee el primer numero que se ve.
+
+---
+
+## 94. `db:migrate` reporta exito sin verificar que la migracion aplico
+
+**Severidad:** ALTA.
+**Estado:** PARCIAL (2026-10-10). Registro corrupto corregido + wrapper implementado.
+**Origen:** detectado durante S1 del plan de Fase 3, al aplicar la migracion
+`0003_tenants_status_enum`.
+
+**Cercania con el item 43 - leer los dos juntos.** Los dos son el mismo sintoma
+superficial ("drizzle dice que salio bien") con **mecanismos distintos**, asi que van
+como items separados y no como duplicado:
+
+|          | Item 43                                       | Item 94                                       |
+| -------- | --------------------------------------------- | --------------------------------------------- |
+| Que pasa | La migracion **se intenta** y falla           | La migracion **ni se intenta**                |
+| Causa    | `hanji` se traga el error y sale con codigo 0 | `created_at` corrupto en la tabla de tracking |
+| Sintoma  | El error no se ve                             | No hay nada que ver: nunca corrio             |
+
+### Mecanismo (item 94)
+
+`drizzle-kit migrate` decide que migrar comparando el `when` de cada entrada del journal
+contra el `created_at` mas alto registrado en `drizzle.__drizzle_migrations`. Si una
+migracion nueva tiene `when` **menor** que ese maximo, drizzle concluye que ya fue
+aplicada y la salta.
+
+El registro `id=3` (migracion `0002_resolve_tenant_by_preapproval`) tenia:
+
+```
+created_at  = 1799110400000  ->  2027-01-05T00:53:20Z   (3 meses en el FUTURO)
+journal.when = 1791301469000  ->  2026-10-06T15:44:29Z
+```
+
+Con ese maximo, **toda migracion creada desde ese momento era invisible**: su `when`
+("ahora") siempre seria menor que 2027-01-05.
+
+### Por que el fix de #222 fue parcial
+
+El fix de #222 corrigio **el journal** a `1791301469000` y dejo el valor correcto ahi. No
+corrigio **el registro en la base**, que seguia con el timestamp corrupto. La fuente
+visible quedo bien y el estado real quedo mal.
+
+**Es la misma forma de los items 61, 62, 67 y 90:** un fix que arregla donde se ve el
+problema y no donde esta el estado. Ahi se corrigio un nombre en vez del codigo; aca se
+corrigio un archivo en vez de una fila en la base.
+
+### Impacto
+
+**Ninguna migracion ejecutada desde el fix de #222 corrio, y todas reportaron exito.**
+No es teorico: la `0003` de S1 se salto en silencio, con `migrations applied
+successfully` en la salida y el schema sin cambios. El DoD del repo pide correr
+`db:migrate` cuando hay migracion, y ese paso no probaba nada.
+
+El riesgo de un PR con migracion era **que el schema de produccion no coincidiera con el
+schema del codigo** - que es el incidente de los 9 Server Components (RLS), en otro lugar.
+
+### Fix aplicado en este PR
+
+1. **Registro corrupto corregido:** `UPDATE drizzle.__drizzle_migrations SET created_at =
+1791301469000 WHERE id = 3`. Una fila, reversible, con el valor original documentado en
+   el PR.
+2. **Wrapper post-migracion:** `scripts/check-migrations-applied.mjs`, cableado a
+   `pnpm db:migrate`. Para cada entrada del journal verifica que **el efecto observable**
+   exista en la base (tabla, indice, funcion, tipo). No mira la tabla de tracking, que es
+   justamente lo que puede estar mintiendo.
+3. **Una migracion sin senal declarada hace fallar el script.** Si se agrega un `.sql` y no
+   se declara que se espera ver, el check falla. Sin eso el wrapper seria decorativo:
+   pasaria en verde sobre migraciones que no aplicaron, que es el bug.
+
+### Lo que NO se cerro
+
+El fix upstream de drizzle para el item 43 sigue pendiente. Y el wrapper **no corre en CI
+contra produccion**: hoy corre cuando alguien invoca `db:migrate`. El `e2e.yml:108` lo
+invoca, pero contra la base del runner. **El bug del `created_at` es de la base de
+produccion, asi que el wrapper solo lo atrapa si alguien corre `db:migrate` contra
+produccion.** Esa es la costura que queda y no se resuelve desde el codigo de este PR.
 
 ---
 
