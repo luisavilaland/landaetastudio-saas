@@ -3906,6 +3906,26 @@ fecha de la medicion.
 PR de `AGENTS.md`, no solo al de fin de PR. La razon: la mayoria de los PRs agregan tests,
 y el de "fin de PR" solo lo pide el ultimo PR de una fase.
 
+### Correccion: los 72 archivos eran 73 (2026-10-10)
+
+El PR #241 escribio "769 tests, 72 archivos". **La medicion real es 769 tests, 73 archivos.**
+Verificado con tres corridas limpias de la suite.
+
+**El origen del error fue el mismo del conteo de tests:** la primera medicion dio
+`FILES: 72 passed, 1 FAILED` — o sea 72 pasados **y** 1 fallado, 73 en total — y se leyo
+solo el `72 passed` sin sumar el que estaba al lado.
+
+**Es la segunda vez que el mismo error produce un numero equivocado:** primero fueron 768
+tests en vez de 769, ahora 72 archivos en vez de 73. Los dos casos tienen la misma forma:
+**un numero parcial tomado de una corrida con fallos.** Cuando la suite tiene un flake, el
+output da dos numeros y hay que sumarlos. El item 78 ya hacia que las corridas con fallos
+sean la norma esperable, asi que **leer el output de una corrida fallida como si fuera
+la medicion es exactamente el error que la coexistencia del flake vuelve probable.**
+
+**Regla que sale:** el contador se saca de una **corrida limpia**. Si la corrida tiene
+fallos, los numeros que importan son los dos que aparecen y hay que sumarlos, o se espera
+una corrida limpia. No se lee el primer numero que se ve.
+
 ---
 
 ## Registro de correccion de conteo (2026-10-10)
@@ -3917,3 +3937,8 @@ La medicion real es **769 (+10)**: 6 en `proxy-platform-host.test.ts`, 2 de item
 Se registra la discrepancia en vez de dejarla pasar: **el numero anotado a mano no es
 evidencia, la corrida si.** Los contadores de este archivo salen de correr la suite, no de
 contar los `it(` de los diffs.
+
+**Epílogo.** El PR #241 escribio "72 archivos" tomando el `72 passed` de una corrida que
+decia `72 passed, 1 FAILED`. El numero correcto es **73**. Es el **mismo error** que el
+de arriba, con la misma forma: **un numero parcial tomado de una corrida con fallos.** Ver
+la seccion "Correccion: los 72 archivos eran 73" dentro del item 92.

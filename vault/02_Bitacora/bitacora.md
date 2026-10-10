@@ -4590,3 +4590,10 @@ reimplementan la resolucion con `split('.')` y assertan sobre la copia: pasaria 
 si se borrara `proxy.ts` entero. Es el item 62 con un caso nuevo: **el archivo entero
 miente sobre si existe cobertura.** El test nuevo de T1 importa `proxy()` de verdad y el
 mock de `db.select` tira si se lo llama.
+
+### 2026-10-10 - Correccion de contadores: 72 archivos eran 73
+
+**What:** el PR #241 escribio `769 tests, 72 archivos`; la medicion real es **769 tests, 73 archivos**.
+**Why:** el numero 72 salio de leer el `72 passed` de una corrida que decia `72 passed, 1 FAILED`, sin sumar el que estaba al lado.
+**Where:** `README.md`, `SETUP.md`, `TESTING.md`, `TESTING-MANUAL.md`, items 92 y `Registro de correccion de conteo` de `vault/03_Deuda/deuda-tecnica.md`.
+**Learned:** es la **segunda vez** que el mismo error produce un numero equivocado - primero 768 tests en vez de 769, ahora 72 archivos en vez de 73 - y las dos veces fue **un numero parcial tomado de una corrida con fallos**. Con el item 78 abierto (flake ~25%), las corridas con fallos son la norma esperable, asi que leer el output de una de ellas como si fuera la medicion no es un descuido raro: es el caso probable. **El contador se saca de una corrida limpia, y si la corrida tiene fallos, los dos numeros se suman.** Nota adicional: un `Select-String` sobre el array del diff de git en PowerShell devolvio 4 de 7 eliminaciones, dos veces seguidas; `git diff --numstat` es la herramienta sancionada para contar.

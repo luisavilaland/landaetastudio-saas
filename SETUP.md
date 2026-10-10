@@ -479,7 +479,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**769 tests pasando, 0 fallos (72 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**769 tests pasando, 0 fallos (73 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 
@@ -614,7 +614,7 @@ Actualización 6 de octubre de 2026 – 705 tests, 69 archivos, T8 de Fase 2 (ci
 
 Actualización 7 de octubre de 2026 – 705 tests, 69 archivos, lote de 9 PRs de Dependabot (#208, #210–#217) y migración de `@sentry/nextjs` v10 → v11 (#218). Sin cambios de variables de entorno en esta tanda. PR #208, #210–#218.
 
-Actualización 10 de octubre de 2026 – 769 tests, 72 archivos, tanda de auditoría de Fase 3 con los items 61, 65, 66, 67, 68, 69, 70, 71, 75, 76 y 77 resueltos. **Variable de entorno nueva:** `PLATFORM_HOST`, opcional, host **sin esquema ni puerto** que sirve la superficie de la plataforma (landing, registro) en el storefront. Sin ella, ese host devuelve 404. Validada con Zod en `packages/validation/src/env.ts`. PR #235, #239, #240.
+Actualización 10 de octubre de 2026 – 769 tests, 73 archivos, tanda de auditoría de Fase 3 con los items 61, 65, 66, 67, 68, 69, 70, 71, 75, 76 y 77 resueltos. **Variable de entorno nueva:** `PLATFORM_HOST`, opcional, host **sin esquema ni puerto** que sirve la superficie de la plataforma (landing, registro) en el storefront. Sin ella, ese host devuelve 404. Validada con Zod en `packages/validation/src/env.ts`. PR #235, #239, #240.
 
 ## URLs de producción (Vercel)
 
