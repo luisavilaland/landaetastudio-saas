@@ -153,6 +153,29 @@ export const registerSchema = z.object({
   password: z.string().min(6),
 })
 
+// S3 / D3, D6: alta publica de tenant. A diferencia de `registerSchema` (que
+// registra un COMPRADOR dentro de una tienda existente), este crea el tenant.
+//
+// `status` NO es un campo del request: el backend lo fuerza a `pending` (D2 - el
+// subdominio no resuelve hasta que el pago lo activa). Aceptarlo del cliente
+// seria darle al comprador el control de si su tienda sale al mundo.
+//
+// Lo mismo con `customDomain`: es D16 y no entra en este slice.
+//
+// `min(8)` en password contra el `min(6)` de `registerSchema`: un tenant admin
+// tiene mas superficie que un comprador (catalogo, configuracion, MP). Los dos
+// floors conviven y no es una contradiccion - son superficies distintas.
+export const registerTenantSchema = z.object({
+  name: z.string().min(1).max(255),
+  email: z.string().email(),
+  password: z.string().min(8),
+  // El formato y los reservados los valida `validateSlug` de
+  // `@repo/commerce`, que es donde vive la regla de negocio de D8. Acá solo
+  // el largo, para no rechazar por longitud antes de haber evaluado el slug.
+  slug: z.string().min(3).max(30),
+  planId: z.string().uuid(),
+})
+
 export const webhookSchema = z.object({
   type: z.string(),
   data: z.object({

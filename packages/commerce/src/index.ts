@@ -84,3 +84,14 @@ export {
 
 // Conversion centavos <-> unidad de moneda (item 48)
 export { toMpAmount, fromMpAmount } from './mp-amounts'
+
+// S3 / T8 / D8: reserva y validacion de slugs de tenant
+export {
+  RESERVED_SLUGS,
+  SLUG_MIN_LENGTH,
+  SLUG_MAX_LENGTH,
+  validateSlug,
+  isReservedSlug,
+  slugRejectionMessage,
+} from './tenant-slug'
+export type { SlugRejection, ReservedSlug } from './tenant-slug'
