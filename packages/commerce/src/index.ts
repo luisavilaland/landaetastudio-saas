@@ -50,6 +50,18 @@ export type {
 } from './subscription-transition'
 export { transitionSubscription } from './subscription-transition'
 
+// Tenant lifecycle
+//
+// Hoja propia y no una variante de `transitionSubscription`: la regla del
+// diseno del item 61 (§9) es que una transicion que necesita otra forma se
+// agrega como funcion nueva, no como flag. Un flag devuelve el filtro a ser
+// codigo escrito a mano.
+export type {
+  TenantActivationPatch,
+  TenantActivationResult,
+} from './tenant-lifecycle'
+export { activateTenant } from './tenant-lifecycle'
+
 export type {
   ProrationInput,
   ProrationResult,
