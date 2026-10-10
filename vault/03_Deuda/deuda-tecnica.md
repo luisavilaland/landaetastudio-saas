@@ -3824,3 +3824,96 @@ exclusivo de export.
 **Efecto secundario aceptable.** Un PR de trabajo queda con un commit de `vault/engram/`
 que no pertenece a su cambio. Es ruido, pero es ruido que ya existe y que el
 checklist de cierre exige. La alternativa (violar el checklist) es peor.
+
+## 92. Contadores de tests en docs con drift de 64 tests
+
+**Severidad:** ALTA.
+**Estado:** ABIERTO.
+**Origen:** encontrado el 2026-10-09 al implementar T1 del plan de Fase 3
+(`PLATFORM_HOST`), en el PR #240.
+
+**Problema.** `apps/storefront/__tests__/proxy.test.ts` son **24 lineas que no importan
+el proxy**. Reimplementan la resolucion de tenant con `split('.')` sobre strings y
+assertan sobre esa copia:
+
+```ts
+it('should fallback to subdomain when customDomain not found', () => {
+  const hostname = 'tienda1.lvh.me'
+  const slug = hostname.split('.')[0]
+  expect(slug).toBe('tienda1')
+})
+```
+
+**Ese test pasaria en verde si se borrara `apps/storefront/proxy.ts` entero.** El
+nombre del `describe` promete "custom domain resolution logic" y no ejecuta una sola
+linea de la resolucion.
+
+**Por que es peor que el caso 1 del item 62.** En `withTenantContextByPreapproval` (item
+62 original) el **nombre** mentia sobre el codigo. Aca miente **el archivo entero** sobre
+si existe cobertura. Un reviewer que ve `proxy.test.ts` con 3 tests en verde marca el
+casillero de resolucion de tenant sin abrir el archivo, y el nombre del archivo confirma
+que hay tests.
+
+**Impacto especifico.** La resolucion de tenant del storefront es la pieza que decide que
+tienda se sirve en cada request. Con T4 (slice S1) se va a agregar el filtro por status
+justo ahi, y este test no habria detectado **ninguna** regresion de ese filtro: no ejecuta
+el codigo que se esta cambiando.
+
+**Fix (NO aplicado, va con el PR de S1).** Reescribir el archivo para que importe
+`proxy()` de verdad, siguiendo el patron que ya se escribio en
+`apps/storefront/__tests__/proxy-platform-host.test.ts`: el mock de `db.select` **tira**
+si se lo llama, para poder afirmar "no se resolvio tenant" sin inspeccionar cadenas.
+
+**Regla que sale de acui, ademas de las dos del item 62:** un test cuyo nombre dice
+probar una unidad tiene que **importar esa unidad**. Si no la importa, no la prueba, y
+**la cantidad de tests no es evidencia de nada**. Es el otro extremo del item 61: tests
+que si importan el codigo pero no observan su garantia. Los dos extremos producen el
+mismo silencio.
+
+**Nota de alcance.** Hay que revisar si el mismo patrón existe en otros archivos de test
+del repo: reimplementar la logica y assertar sobre la copia en vez de importarla. No se
+hizo un barrido; este item registra el caso confirmado.
+
+---
+
+## 93. `proxy.test.ts` no importa el proxy: miente sobre la cobertura (caso 2 del item 62)
+
+**Severidad:** MEDIA.
+**Estado:** ABIERTO.
+**Origen:** verificado el 2026-10-10 al cerrar el PR #240.
+
+**Problema.** `README.md`, `SETUP.md`, `TESTING.md` y `TESTING-MANUAL.md` reportan
+**705 tests en 69 archivos**. La realidad medida en `develop` (`5cc32b2`) es
+**769 tests en 72 archivos**.
+
+**Drift: 64 tests y 3 archivos.** Los contadores no se actualizan desde el cierre de T6/T7
+de Fase 2 (PR #201, 2026-10-06).
+
+**Por que importa mas de lo que parece.** `AGENTS.md` es explicito: _"los contadores en
+docs son el primer dato que consultan los agentes al reincorporarse. Si estan
+desactualizados, generan discrepancias falsas que consumen tiempo de auditoria"_. Un
+agente que lee 705 y cuenta 769 spends el primer rato buscando 64 tests que no faltan.
+
+**Es la segunda vez que aparece este drift.** Ya se registro con 679 vs 705 al
+reincorporarse despues del PR #196. El patron no es un error puntual: es que **nadie
+tiene la tarea de actualizar contadores** porque no esta en el checklist de ningun PR de
+implementacion, solo en el de cierre de PR.
+
+**Fix aplicado en este PR:** contadores actualizados a **769 tests, 72 archivos**, con la
+fecha de la medicion.
+
+**Fix del patron (NO aplicado).** Agregar "actualizar contadores" al checklist de cierre de
+PR de `AGENTS.md`, no solo al de fin de PR. La razon: la mayoria de los PRs agregan tests,
+y el de "fin de PR" solo lo pide el ultimo PR de una fase.
+
+---
+
+## Registro de correccion de conteo (2026-10-10)
+
+El commit de S2 (#240) aumento los tests y **el commit message decia 759 -> 768 (+9)**.
+La medicion real es **769 (+10)**: 6 en `proxy-platform-host.test.ts`, 2 de item 67 en
+`handler.test.ts` y 2 de item 65 en el test del preapproval.
+
+Se registra la discrepancia en vez de dejarla pasar: **el numero anotado a mano no es
+evidencia, la corrida si.** Los contadores de este archivo salen de correr la suite, no de
+contar los `it(` de los diffs.
