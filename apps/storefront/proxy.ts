@@ -27,6 +27,24 @@ export async function proxy(request: NextRequest) {
 
   logger.debug({ hostname, pathname }, 'Proxy request')
 
+  // 0. Host de plataforma: superficie del SaaS, no de una tienda.
+  //
+  // D1 del design de Fase 3. Sin esta salida, el dominio de la plataforma
+  // caeria en el paso 5 y devolveria 404, porque no hay tenant que resolver.
+  //
+  // Va **antes de todo**, no solo antes de los fallbacks. Si fuera despues, un
+  // `tenant-slug` de una visita anterior a una tienda resolveria un tenant en el
+  // host de plataforma y la landing mostraria esa tienda. El host de plataforma
+  // no tiene tenant por definicion, asi que no se intenta resolver ninguno.
+  //
+  // Esto tambien reserva el host de plataforma como `customDomain`: si se
+  // llegara aqui con un tenant que lo reclama, la peticion va a la landing y no
+  // a su tienda, que es el resultado correcto.
+  if (process.env.PLATFORM_HOST && hostname === process.env.PLATFORM_HOST) {
+    logger.debug({ hostname, pathname }, 'Platform host - no tenant resolution')
+    return NextResponse.next()
+  }
+
   let tenantSlug: string | null = null
   let tenantId: string | null = null
 

@@ -168,12 +168,36 @@ export async function POST(request: NextRequest) {
 
     if (currentPreapprovalId && !isReservation(currentPreapprovalId)) {
       // Preapproval real pendiente de pago: devolver el mismo, no crear otro.
-      // Que sea viejo no lo cambia — un id de MP no es una reserva.
+      // Que sea viejo no lo cambia - un id de MP no es una reserva.
+      //
+      // Item 65 (H-F2-3): el 409 tambien devuelve `initPoint`. Sin el, la UI
+      // tiene el `preapprovalId` pero no puede navegar al checkout, y el tenant
+      // queda atrapado en `pending_first_payment` sin poder retomar el pago. El
+      // `init_point` solo existe en MP, asi que hay que pedirlo.
+      //
+      // Si la consulta a MP falla, se devuelve el 409 SIN `initPoint` en vez de
+      // un 500: el invariante del design (secciones 3.5 y 6.2) es "si no
+      // resuelve -> 200/409 + warn, nunca 5xx", y un doble click nunca debe
+      // romper el endpoint. El 409 sin `initPoint` es el caso degradado, no el
+      // camino normal.
+      let initPoint: string | null = null
+      try {
+        const fresh = await getPreapproval(currentPreapprovalId, token)
+        const rawInitPoint = fresh.init_point
+        initPoint = typeof rawInitPoint === 'string' ? rawInitPoint : null
+      } catch (err) {
+        logger.warn(
+          { err, preapprovalId: currentPreapprovalId },
+          '[subscriptions/preapproval] no pude obtener el initPoint del preapproval existente',
+        )
+      }
+
       return NextResponse.json(
         {
           error: 'Ya existe una suscripcion pendiente de pago',
           field: 'preapproval',
           preapprovalId: currentPreapprovalId,
+          ...(initPoint ? { initPoint } : {}),
         },
         { status: 409 },
       )

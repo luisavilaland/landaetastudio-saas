@@ -73,6 +73,20 @@ const PREAPPROVAL_ID = 'preapproval-1'
 const INVOICE_ID = '7032544182'
 const PAYMENT_ID = '181244133433'
 
+/**
+ * Tenant id con forma de UUID, para los tests que pasan por la **estrategia R**.
+ *
+ * Item 67 (H-F2-5). La estrategia R toma `external_reference` y lo usa como
+ * `tenantId`. El codigo real lo setea a un UUID (`externalReference: tenantId`
+ * en el preapproval), asi que un valor como `'tenant-42'` era una ficcion que
+ * solo podia existir porque nadie validaba la forma: `set_tenant_id(${tenantId}
+ * ::uuid)` habria lanzado en produccion y el webhook habria devuelto 500.
+ *
+ * Los tests de la estrategia L siguen usando `tenant-1` y `tenant-9` a proposito:
+ * ahi el valor viene del indice local de la DB, no de MP, y no se valida.
+ */
+const TENANT_UUID = '3f2504e0-4f89-11d3-9a0c-0305e82c3301'
+
 /** Planes locales, en centavos. H3 compara `priceUyu` contra el monto del evento. */
 const PLAN_A = 'aaaaaaaa-1111-4111-8111-111111111111'
 const PLAN_B = 'bbbbbbbb-2222-4222-8222-222222222222'
@@ -866,7 +880,7 @@ describe('resolucion de tenant', () => {
     vi.mocked(getPreapproval).mockResolvedValue({
       id: PREAPPROVAL_ID,
       status: 'authorized',
-      external_reference: 'tenant-42',
+      external_reference: TENANT_UUID,
     })
 
     await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
@@ -874,7 +888,46 @@ describe('resolucion de tenant', () => {
     // El fallback es lo esperado cuando el preapproval todavia no esta en la DB.
     // El costo de R queda acotado al caso en que L no puede resolver.
     expect(getPreapproval).toHaveBeenCalledTimes(2)
-    expect(withTenantContext).toHaveBeenCalledWith('tenant-42', expect.any(Function))
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_UUID, expect.any(Function))
+  })
+
+  it('item 67: un external_reference que no es UUID NO produce un 5xx', async () => {
+    // Este es el caso que el item 67 describe: sin la validacion de forma, un
+    // `external_reference` con cualquier otra cosa llega a
+    // `set_tenant_id(${tenantId}::uuid)`, el cast **lanza**, y el webhook
+    // responde 500. MP reintenta el webhook en loop.
+    localStrategy([])
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'authorized',
+      external_reference: 'no-soy-un-uuid',
+    })
+    const { tx } = spyTx([sub({ tenantId: TENANT_UUID })])
+
+    const res = await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    // El invariante del design (secciones 3.5 y 6.2): si no resuelve, 200 + warn.
+    expect(res.status).toBe(200)
+    expect(withTenantContext).not.toHaveBeenCalled()
+    expect(tx.update).not.toHaveBeenCalled()
+  })
+
+  it('item 67: un external_reference con forma de UUID pero de otra variante tambien pasa el filtro de forma', async () => {
+    // El filtro es de FORMA, no de version: valida contra lo que acepta el cast
+    // `::uuid` de PostgreSQL, que es lo que evita el throw.
+    localStrategy([])
+    vi.mocked(getPreapproval).mockResolvedValue({
+      id: PREAPPROVAL_ID,
+      status: 'authorized',
+      external_reference: '3F2504E0-4F89-11D3-9A0C-0305E82C3301',
+    })
+
+    await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+
+    expect(withTenantContext).toHaveBeenCalledWith(
+      '3F2504E0-4F89-11D3-9A0C-0305E82C3301',
+      expect.any(Function),
+    )
   })
 
   it('estrategia L: el tenant viene del indice local, NO de external_reference', async () => {
@@ -915,9 +968,9 @@ describe('resolucion de tenant', () => {
     vi.mocked(getPreapproval).mockResolvedValue({
       id: PREAPPROVAL_ID,
       status: 'authorized',
-      external_reference: 'tenant-42',
+      external_reference: TENANT_UUID,
     })
-    const { tx } = spyTx([sub({ tenantId: 'tenant-42' })])
+    const { tx } = spyTx([sub({ tenantId: TENANT_UUID })])
 
     const res = await POST(
       request(body('subscription_preapproval', PREAPPROVAL_ID)),
@@ -925,7 +978,7 @@ describe('resolucion de tenant', () => {
 
     expect(res.status).toBe(200)
     expect(getPreapproval).toHaveBeenCalledWith(PREAPPROVAL_ID, TOKEN)
-    expect(withTenantContext).toHaveBeenCalledWith('tenant-42', expect.any(Function))
+    expect(withTenantContext).toHaveBeenCalledWith(TENANT_UUID, expect.any(Function))
     expect(tx).toBeDefined()
   })
 
