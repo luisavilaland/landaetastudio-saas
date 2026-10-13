@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import crypto from 'crypto'
 import { NextRequest } from 'next/server'
-import { withTenantContext } from '@repo/db'
+import { withTenantContext, dbTenants } from '@repo/db'
 import { makeTxMock } from '@repo/test-utils'
 
 /**
@@ -51,9 +51,8 @@ import { db } from '@repo/db'
 // Solo se pisa la red. `classifyMpEvent` y la verificacion de firma siguen
 // siendo los reales: el test cubre el handler, no un doble de el.
 vi.mock('@repo/commerce', async () => {
-  const actual = await vi.importActual<typeof import('@repo/commerce')>(
-    '@repo/commerce',
-  )
+  const actual =
+    await vi.importActual<typeof import('@repo/commerce')>('@repo/commerce')
   return {
     ...actual,
     getPreapproval: vi.fn(),
@@ -62,7 +61,11 @@ vi.mock('@repo/commerce', async () => {
   }
 })
 
-import { getPreapproval, getAuthorizedPayment, getPayment } from '@repo/commerce'
+import {
+  getPreapproval,
+  getAuthorizedPayment,
+  getPayment,
+} from '@repo/commerce'
 import { POST } from '../route'
 
 const PLATFORM_SECRET = 'test-platform-webhook-secret'
@@ -124,8 +127,7 @@ function body(
 function signatureFor(rawBody: string, secret: string): string {
   let dataId = ''
   try {
-    dataId =
-      (JSON.parse(rawBody) as { data?: { id?: string } }).data?.id ?? ''
+    dataId = (JSON.parse(rawBody) as { data?: { id?: string } }).data?.id ?? ''
   } catch {
     dataId = ''
   }
@@ -160,7 +162,21 @@ function request(rawBody: string, secret: string | null = PLATFORM_SECRET) {
  */
 interface TxSpy {
   tx: ReturnType<typeof makeTxMock>
+  /** Escrituras sobre `subscriptions`. */
   updates: Array<Record<string, unknown>>
+  /**
+   * Escrituras sobre `tenants` (T9, `activateTenant`).
+   *
+   * Separate de `updates` porque antes habia **un** solo `UPDATE` por webhook.
+   * T9 agrega el segundo, y un spy que cuenta "todos los updates" mezclaria las
+   * dos tablas: un test que afirma "el idempotente no escribe nada" pasaria a
+   * ver 1 escritura de `tenants` y dira que el idempotente escribio.
+   *
+   * Que el split sea por tabla y no por cantidad es lo que hace que las
+   * aserciones existentes conserven su significado: `updates` sigue significando
+   * "escribio la suscripcion".
+   */
+  tenantUpdates: Array<Record<string, unknown>>
 }
 
 /**
@@ -178,12 +194,28 @@ interface TxSpy {
  * transicion escribio primero, PostgreSQL afecta 0 filas y `.returning()`
  * resuelve `[]`. Por default se simula el caso normal (1 fila).
  */
+/**
+ * Nombre SQL de una tabla de Drizzle, o `undefined` si no se puede leer.
+ *
+ * Comparar por **identidad de objeto** (`table === dbTenants`) es frágil
+ * acá: `@repo/db` esta mockeado con `importActual`, y `@repo/commerce` lo
+ * importa por su cuenta. Si el resolutor de vitest les da instancias
+ * distintas del mismo modulo, la identidad falla aunque sean la misma tabla.
+ * Con la identidad rota, la escritura de `tenants` caia en `updates` y
+ * contaminaba las aserciones de "la suscripcion no se escribio".
+ */
+function sqlNameOf(table: unknown): string | undefined {
+  const cfg = (table as { _?: { name?: unknown } } | null)?._
+  return typeof cfg?.name === 'string' ? cfg.name : undefined
+}
+
 function spyTx(
   rows: unknown[],
   planRows: unknown[] = [],
   updateReturning: unknown[] = [{ id: 'sub-1' }],
 ): TxSpy {
   const updates: Array<Record<string, unknown>> = []
+  const tenantUpdates: Array<Record<string, unknown>> = []
   const base = makeTxMock({
     select: [
       { data: rows, terminal: 'limit' },
@@ -194,9 +226,13 @@ function spyTx(
     update: ReturnType<typeof vi.fn>
     select: ReturnType<typeof makeTxMock>['select']
   }
-  tx.update = vi.fn(() => ({
+  tx.update = vi.fn((table: unknown) => ({
     set: (values: Record<string, unknown>) => {
-      updates.push(values)
+      if (sqlNameOf(table) === 'tenants' || table === dbTenants) {
+        tenantUpdates.push(values)
+      } else {
+        updates.push(values)
+      }
       return {
         where: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve(updateReturning)),
@@ -204,7 +240,7 @@ function spyTx(
       }
     },
   }))
-  return { tx, updates } as TxSpy
+  return { tx, updates, tenantUpdates } as TxSpy
 }
 
 interface SubOverrides {
@@ -357,7 +393,9 @@ describe('transicion 1 — preapproval.authorized desde pending/past_due/expired
       const { tx, updates } = spyTx([sub({ status: from })])
       vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
 
-      const res = await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+      const res = await POST(
+        request(body('subscription_preapproval', PREAPPROVAL_ID)),
+      )
 
       expect(res.status).toBe(200)
       expect(updates).toHaveLength(1)
@@ -390,7 +428,9 @@ describe('transicion 2 — preapproval.authorized desde cancelled -> SIN CAMBIO'
     const { tx, updates } = spyTx([sub({ status: 'cancelled' })])
     vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
 
-    const res = await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+    const res = await POST(
+      request(body('subscription_preapproval', PREAPPROVAL_ID)),
+    )
 
     expect(res.status).toBe(200)
     expect(updates).toHaveLength(0)
@@ -614,7 +654,11 @@ describe('transicion 7 — payment.approved desde active/cancelled -> SIN CAMBIO
 })
 
 describe('transicion 8 — payment fallido desde active -> past_due', () => {
-  for (const action of ['payment.rejected', 'payment.cancelled', 'payment.refunded']) {
+  for (const action of [
+    'payment.rejected',
+    'payment.cancelled',
+    'payment.refunded',
+  ]) {
     it(`action=${action}`, async () => {
       const { tx, updates } = spyTx([sub({ status: 'active' })])
       vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
@@ -645,14 +689,28 @@ describe('transicion 8 — payment fallido desde active -> past_due', () => {
 function statefulTx(rows: unknown[]) {
   const state = rows.map((r) => ({ ...(r as Record<string, unknown>) }))
   const updates: Array<Record<string, unknown>> = []
+  const tenantUpdates: Array<Record<string, unknown>> = []
 
   const tx = {
     select: vi.fn(() => tx),
     from: vi.fn(() => tx),
     where: vi.fn(() => tx),
     limit: vi.fn(async () => state),
-    update: vi.fn(() => ({
+    update: vi.fn((table: unknown) => ({
       set: (values: Record<string, unknown>) => {
+        const esTenant = sqlNameOf(table) === 'tenants' || table === dbTenants
+        if (esTenant) {
+          // **NO** se hace `Object.assign` aca. `state[0]` modela la fila de
+          // `subscriptions`, y meterle el status del tenant lo deformaria: el
+          // replay de una segunda llamada convergeria contra un estado que ya
+          // no corresponde a ninguna fila real.
+          tenantUpdates.push(values)
+          return {
+            where: vi.fn(() => ({
+              returning: vi.fn(() => Promise.resolve([{ id: 'tenant-1' }])),
+            })),
+          }
+        }
         updates.push(values)
         Object.assign(state[0], values)
         // Item 70: compare-and-set. `returningRows` = [] simula que otra
@@ -667,7 +725,7 @@ function statefulTx(rows: unknown[]) {
       },
     })),
   }
-  return { tx, updates, state }
+  return { tx, updates, tenantUpdates, state }
 }
 
 /** Strategy L resuelve siempre `tenant-1` para estos casos. */
@@ -688,11 +746,115 @@ function localStrategyWithUpdates(rows: unknown[], planRows: unknown[] = []) {
   // Re-wired: `localStrategy` built its own spyTx internally; rebuild one we
   // can hold onto.
   const spy = spyTx(rows, planRows)
-  vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
-    cb(spy.tx),
-  )
+  vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(spy.tx))
   return spy
 }
+
+/**
+ * T9: activacion del tenant desde el webhook.
+ *
+ * `activateTenant` (S1) ya existe y ya tiene su propio test contra Neon. Lo que
+ * se prueba aca es **la integracion**: que el webhook la llame, y que la llame
+ * en el caso que de otro modo la dejaba sin ejecutar.
+ */
+describe('T9 - activacion del tenant', () => {
+  beforeEach(() => {
+    localHitsTenantOne()
+  })
+
+  it('un pago aprobado deja la suscripcion Y el tenant en active', async () => {
+    const spy = localStrategyWithUpdates([
+      sub({ status: 'pending_first_payment' }),
+    ])
+
+    const res = await POST(
+      request(body('payment', PAYMENT_ID, { liveMode: false })),
+    )
+
+    expect(res.status).toBe(200)
+    // La suscripcion se escribio (comportamiento previo, no cambia).
+    expect(spy.updates).toHaveLength(1)
+    expect(spy.updates[0].status).toBe('active')
+    // Y el tenant tambien.
+    expect(spy.tenantUpdates).toHaveLength(1)
+    expect(spy.tenantUpdates[0].status).toBe('active')
+  })
+
+  it('el webhook NO activa el tenant si la suscripcion no queda active', async () => {
+    // Un pago rechazado: el target nunca es `active`, asi que activar el tenant
+    // dejaria una tienda viva sin suscripcion.
+    const spy = localStrategyWithUpdates([
+      sub({ status: 'active', lastProcessedPaymentId: null }),
+    ])
+    vi.mocked(getPayment).mockResolvedValue({
+      status: 'rejected',
+      live_mode: false,
+    } as never)
+
+    await POST(request(body('payment', PAYMENT_ID, { liveMode: false })))
+
+    expect(spy.tenantUpdates).toHaveLength(0)
+  })
+
+  /**
+   * El caso que justifico llamar a `activateTenant` **incondicionalmente**.
+   *
+   * La suscripcion ya esta `active` y el pago ya fue procesado, asi que el
+   * webhook cae en `no_transition` o `duplicate_payment` y **no** llega al final
+   * de `applyTransition`. Con la activacion al final de esa funcion, el tenant se
+   * quedaria `pending` para siempre: pago sin tienda, recuperable solo a mano.
+   */
+  it('un reintento con la suscripcion ya activa igual activa el tenant', async () => {
+    const spy = localStrategyWithUpdates([
+      sub({ status: 'active', lastProcessedPaymentId: PAYMENT_ID }),
+    ])
+
+    const res = await POST(
+      request(body('payment', PAYMENT_ID, { liveMode: false })),
+    )
+
+    expect(res.status).toBe(200)
+    // Ni la suscripcion ni el tenant se escriben: `activateTenant` hace un
+    // UPDATE que no matchea y devuelve `not_pending`.
+    expect(spy.updates).toHaveLength(0)
+    expect(spy.tenantUpdates).toHaveLength(1)
+    expect(spy.tenantUpdates[0].status).toBe('active')
+  })
+
+  it('reporta tenantActivation en la respuesta, incluso en los early-returns', async () => {
+    // Sin esto, un reintento que activa el tenant seria invisible en la
+    // respuesta del webhook y nadie podria distinguirlo de un no-op.
+    localStrategyWithUpdates([
+      sub({ status: 'active', lastProcessedPaymentId: PAYMENT_ID }),
+    ])
+
+    const res = await POST(
+      request(body('payment', PAYMENT_ID, { liveMode: false })),
+    )
+    const payload = (await res.json()) as Record<string, unknown>
+
+    expect(payload.tenantActivation).toBe('applied')
+  })
+
+  it('tenantActivation es not_applicable cuando la suscripcion no llega a active', async () => {
+    // `cancelled` es terminal: ningun evento lo mueve, asi que `decideTarget`
+    // devuelve null y el estado efectivo sigue siendo `cancelled`.
+    //
+    // Ojo con elegir mal el ejemplo: una suscripcion en `past_due` con pago
+    // aprobado **si** activa el tenant, porque `past_due -> active` es una
+    // transicion valida. El caso a probar es el que NO termina en `active`.
+    localStrategyWithUpdates([
+      sub({ status: 'cancelled', lastProcessedPaymentId: null }),
+    ])
+
+    const res = await POST(
+      request(body('payment', PAYMENT_ID, { liveMode: false })),
+    )
+    const payload = (await res.json()) as Record<string, unknown>
+
+    expect(payload.tenantActivation).toBe('not_applicable')
+  })
+})
 
 describe('idempotencia', () => {
   it('mismo paymentId 2 veces -> 1 sola escritura', async () => {
@@ -776,7 +938,10 @@ describe('resolucion de tenant', () => {
       external_reference: 'tenant-1',
       transaction_amount: 10,
     })
-    const { updates } = localStrategyWithUpdates([sub({ planId: PLAN_A })], [PLAN_A_ROW])
+    const { updates } = localStrategyWithUpdates(
+      [sub({ planId: PLAN_A })],
+      [PLAN_A_ROW],
+    )
 
     await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
 
@@ -793,7 +958,10 @@ describe('resolucion de tenant', () => {
       external_reference: 'tenant-1',
       transaction_amount: 20,
     })
-    const { updates } = localStrategyWithUpdates([sub({ planId: PLAN_A })], [PLAN_A_ROW])
+    const { updates } = localStrategyWithUpdates(
+      [sub({ planId: PLAN_A })],
+      [PLAN_A_ROW],
+    )
 
     await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
 
@@ -842,7 +1010,10 @@ describe('resolucion de tenant', () => {
       external_reference: 'tenant-1',
       transaction_amount: 10,
     })
-    const { updates } = localStrategyWithUpdates([sub({ planId: null as never })], [])
+    const { updates } = localStrategyWithUpdates(
+      [sub({ planId: null as never })],
+      [],
+    )
 
     await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
 
@@ -888,7 +1059,10 @@ describe('resolucion de tenant', () => {
     // El fallback es lo esperado cuando el preapproval todavia no esta en la DB.
     // El costo de R queda acotado al caso en que L no puede resolver.
     expect(getPreapproval).toHaveBeenCalledTimes(2)
-    expect(withTenantContext).toHaveBeenCalledWith(TENANT_UUID, expect.any(Function))
+    expect(withTenantContext).toHaveBeenCalledWith(
+      TENANT_UUID,
+      expect.any(Function),
+    )
   })
 
   it('item 67: un external_reference que no es UUID NO produce un 5xx', async () => {
@@ -904,7 +1078,9 @@ describe('resolucion de tenant', () => {
     })
     const { tx } = spyTx([sub({ tenantId: TENANT_UUID })])
 
-    const res = await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
+    const res = await POST(
+      request(body('subscription_preapproval', PREAPPROVAL_ID)),
+    )
 
     // El invariante del design (secciones 3.5 y 6.2): si no resuelve, 200 + warn.
     expect(res.status).toBe(200)
@@ -944,7 +1120,10 @@ describe('resolucion de tenant', () => {
 
     await POST(request(body('subscription_preapproval', PREAPPROVAL_ID)))
 
-    expect(withTenantContext).toHaveBeenCalledWith('tenant-9', expect.any(Function))
+    expect(withTenantContext).toHaveBeenCalledWith(
+      'tenant-9',
+      expect.any(Function),
+    )
     expect(withTenantContext).not.toHaveBeenCalledWith(
       'tenant-OTRO',
       expect.any(Function),
@@ -978,7 +1157,10 @@ describe('resolucion de tenant', () => {
 
     expect(res.status).toBe(200)
     expect(getPreapproval).toHaveBeenCalledWith(PREAPPROVAL_ID, TOKEN)
-    expect(withTenantContext).toHaveBeenCalledWith(TENANT_UUID, expect.any(Function))
+    expect(withTenantContext).toHaveBeenCalledWith(
+      TENANT_UUID,
+      expect.any(Function),
+    )
     expect(tx).toBeDefined()
   })
 
@@ -1012,7 +1194,10 @@ describe('aislamiento cross-tenant', () => {
 
     await POST(request(body('payment', PAYMENT_ID, { liveMode: false })))
 
-    expect(withTenantContext).toHaveBeenCalledWith('tenant-b', expect.any(Function))
+    expect(withTenantContext).toHaveBeenCalledWith(
+      'tenant-b',
+      expect.any(Function),
+    )
     expect(updates).toHaveLength(1)
   })
 
@@ -1098,11 +1283,7 @@ describe('item 70 — compare-and-set: otra transicion escribio primero', () => 
   it('no reporta aplicado si el UPDATE afecta 0 filas', async () => {
     // `.returning()` vacio = el WHERE con `status = current` no matcheo: otra
     // transicion movio la suscripcion entre el SELECT y el UPDATE.
-    const { tx } = spyTx(
-      [sub({ status: 'past_due' })],
-      [],
-      [],
-    )
+    const { tx } = spyTx([sub({ status: 'past_due' })], [], [])
     vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(tx))
 
     const res = await POST(request(body('payment', PAYMENT_ID)))
