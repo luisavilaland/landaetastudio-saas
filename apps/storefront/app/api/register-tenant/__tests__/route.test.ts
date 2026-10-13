@@ -52,14 +52,41 @@ let POST: RouteModule['POST']
 let dbAdminUsers: DbModule['dbAdminUsers']
 let dbTenants: DbModule['dbTenants']
 
-const createdTenantIds: string[] = []
-const createdAdminEmails: string[] = []
-
 let planId: string
+
+/**
+ * Sufijo de los emails que crea este archivo. `.invalid` es reservado por
+ * RFC 2606, asi que no puede colisionar con una direccion real.
+ *
+ * Todo email de este archivo lo produce `uniqueEmail()`, asi que el cleanup por
+ * patron es exacto. El unico literal es `'no-es-email'`, que muere en Zod antes
+ * de tocar la base.
+ */
+const TEST_EMAIL_SUFFIX = '%@test.invalid'
+
+/**
+ * Slugs usados por este archivo, para la limpieza del `afterAll`.
+ *
+ * El cleanup es por **slug**, no por `tenantId`, y esa es la distincion que
+ * importa: **el slug lo elige el test, el `tenantId` lo genera la app** (D3,
+ * `crypto.randomUUID()`) y solo existe en el body del 201. Un test que espera
+ * rechazo nunca ve ese id, asi que un cleanup por id no puede cubrirlo - y por
+ * eso las filas de un rechazo mal manejado quedaban huerfanas en produccion.
+ *
+ * El slug, en cambio, se conoce **antes** de la request, asi que se registra
+ * siempre, haya exito o no.
+ */
+const usedSlugs: string[] = []
+
+/** Registra un slug literal (los de rechazo) y lo devuelve. */
+function trackSlug(slug: string): string {
+  usedSlugs.push(slug)
+  return slug
+}
 
 /** Slug valido y unico por corrida. Nunca colisiona con un reservado. */
 function uniqueSlug(prefix = 's3'): string {
-  return `${prefix}-${randomUUID().slice(0, 8)}`
+  return trackSlug(`${prefix}-${randomUUID().slice(0, 8)}`)
 }
 
 function uniqueEmail(): string {
@@ -97,15 +124,28 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
   })
 
   afterAll(async () => {
-    // `admin_users` primero: su FK a tenant es `set null`, no cascade. Si se
-    // borrara el tenant primero, el admin_user quedaria huerfano con el email
-    // global tomado y el test siguiente fallaria por un motivo que no es suyo.
-    for (const email of createdAdminEmails) {
-      await ownerClient`DELETE FROM "admin_users" WHERE "email" = ${email}`
+    // Cleanup por patron, no por registro explicito de filas creadas.
+    //
+    // La primera version borra los `admin_users` y los `tenants` que cada test
+    // fue anotando segun leia la respuesta. Eso tiene un hole: un test de
+    // rechazo **nunca llega a anotar nada**, porque el assert falla antes (o
+    // porque la respuesta no trae id). Con la mutacion M5 -endpoint que escribe
+    // y aun asi devuelve 409- quedaron 2 tenants y 1 admin_user huerfanos en
+    // produccion, y el `afterAll` no los conocia.
+    //
+    // Borrar por patron cierra la clase de bug entera, no dos instancias: da
+    // igual que test falle y cual.
+    //
+    // Orden por FK: `admin_users` primero, porque su FK a tenant es `set null`
+    // y no `cascade`. Al reves el admin_user queda huerfano con el email global
+    // tomado. `subscriptions` tiene `onDelete: 'cascade'` desde tenant, asi que
+    // borrar el tenant se lleva las suyas.
+    await ownerClient`DELETE FROM "admin_users" WHERE "email" LIKE ${TEST_EMAIL_SUFFIX}`
+
+    if (usedSlugs.length > 0) {
+      await ownerClient`DELETE FROM "tenants" WHERE "slug" = ANY(${usedSlugs})`
     }
-    for (const id of createdTenantIds) {
-      await ownerClient`DELETE FROM "tenants" WHERE "id" = ${id}::uuid`
-    }
+
     await ownerClient.end({ timeout: 5 })
   })
 
@@ -126,7 +166,6 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
 
       const body = (await res.json()) as { tenantId: string; slug: string }
       expect(body.slug).toBe(slug)
-      createdTenantIds.push(body.tenantId)
 
       // Fila 1: el tenant nace `pending` (D2: el subdominio no resuelve todavia).
       const [tenant] = await ownerClient<{ status: string }[]>`
@@ -144,7 +183,6 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
                "password" LIKE '$2%' AS "hashed"
         FROM "admin_users" WHERE "email" = ${email}
       `
-      createdAdminEmails.push(email)
       expect(adminUser?.role).toBe('admin')
       expect(adminUser?.tenantId).toBe(body.tenantId)
       // El password va hasheado, no en claro. `$2` es el prefijo de bcrypt.
@@ -171,8 +209,6 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
       })
       expect(res.status).toBe(201)
       const body = (await res.json()) as { tenantId: string }
-      createdTenantIds.push(body.tenantId)
-      createdAdminEmails.push(email)
 
       const rows = await ownerClient<{ password: string }[]>`
         SELECT "password" FROM "admin_users" WHERE "email" = ${email}
@@ -184,15 +220,18 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
 
   describe('T7.2 slug reservado', () => {
     it('devuelve 409 con field slug y NO toca la base', async () => {
-      const antes = await ownerClient<{ n: number }[]>`
-        SELECT count(*)::int AS n FROM "tenants"
-      `
+      const email = uniqueEmail()
+      // El slug se registra por `trackSlug` **antes** del request. No hay push de
+      // email aca: el `afterAll` borra los admin_users por patron
+      // (`%@test.invalid`), y este test es justamente el caso que el cleanup por
+      // patron tiene que cubrir, porque el endpoint no escribe nada.
+      const slug = trackSlug('admin')
 
       const res = await request({
         name: 'Reservado',
-        email: uniqueEmail(),
+        email,
         password: 'contrasena123',
-        slug: 'admin',
+        slug,
         planId,
       })
 
@@ -200,18 +239,39 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
       const body = (await res.json()) as { field: string; error: string }
       expect(body.field).toBe('slug')
 
-      const despues = await ownerClient<{ n: number }[]>`
-        SELECT count(*)::int AS n FROM "tenants"
+      // El marcador es el email, no `count(*) FROM tenants`.
+      //
+      // La primera version comparaba el total de tenants antes y despues, y
+      // fallo en CI: **cuatro** archivos de test crean tenants en paralelo
+      // (`tenant-lifecycle`, `subscription-transition`,
+      // `preapproval-tenant-resolution`, `rls-cross-tenant`). Si cualquiera
+      // creaba o borraba entre las dos queries, el assert fallaba por un motivo
+      // que no era del endpoint. Pasa en verde aislado y en rojo en la suite
+      // completa: el clasico flake que en realidad es un test mal escrito.
+      //
+      // El email es unico por corrida y lo genera este test, asi que es un
+      // marcador preciso: si la request creo algo, existira una fila con el.
+      const adminRows = await ownerClient<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM "admin_users" WHERE "email" = ${email}
       `
-      expect(despues[0]?.n).toBe(antes[0]?.n)
+      expect(adminRows[0]?.n).toBe(0)
+
+      const nameRows = await ownerClient<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM "tenants" WHERE "name" = 'Reservado'
+      `
+      expect(nameRows[0]?.n).toBe(0)
     })
 
     it('un slug con formato invalido devuelve 400, no 409', async () => {
+      // Registrado por `trackSlug`: es el segundo caso que dejo filas huerfanas
+      // con la mutacion M5, porque usa un slug literal y no `uniqueSlug`.
+      const slug = trackSlug('Mi Tienda')
+
       const res = await request({
         name: 'Formato',
         email: uniqueEmail(),
         password: 'contrasena123',
-        slug: 'Mi Tienda',
+        slug,
         planId,
       })
 
@@ -233,13 +293,6 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
       })
       expect(first.status).toBe(201)
       const firstBody = (await first.json()) as { tenantId: string }
-      createdTenantIds.push(firstBody.tenantId)
-      const firstEmail = (
-        await ownerClient<{ email: string }[]>`
-          SELECT "email" FROM "admin_users" WHERE "tenantId" = ${firstBody.tenantId}::uuid
-        `
-      )[0]
-      if (firstEmail) createdAdminEmails.push(firstEmail.email)
 
       // Segundo alta con el mismo slug, email distinto.
       const res = await request({
@@ -270,8 +323,6 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
       })
       expect(a.status).toBe(201)
       const aBody = (await a.json()) as { tenantId: string }
-      createdTenantIds.push(aBody.tenantId)
-      createdAdminEmails.push(email)
 
       // Mismo email, slug distinto y otro tenant: el UNIQUE de admin_users es
       // GLOBAL, no por tenant. Sin esto, un usuario tendria dos cuentas.
@@ -296,24 +347,32 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
 
   describe('T7.5 plan inexistente', () => {
     it('devuelve 404 y no crea nada', async () => {
-      const antes = await ownerClient<{ n: number }[]>`
-        SELECT count(*)::int AS n FROM "tenants"
-      `
+      const email = uniqueEmail()
+      // Registrado por `uniqueSlug` antes del request: mismo razonamiento que
+      // T7.2. El cleanup por slug cubre tambien el caso en que el endpoint
+      // escribiera y aun asi devolviera 404.
+      const slug = uniqueSlug('np')
 
       const res = await request({
         name: 'Sin plan',
-        email: uniqueEmail(),
+        email,
         password: 'contrasena123',
-        slug: uniqueSlug('np'),
+        slug,
         planId: randomUUID(),
       })
 
       expect(res.status).toBe(404)
 
-      const despues = await ownerClient<{ n: number }[]>`
-        SELECT count(*)::int AS n FROM "tenants"
+      // Mismo marcador con scope que T7.2: nada de `count(*)` global.
+      const adminRows = await ownerClient<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM "admin_users" WHERE "email" = ${email}
       `
-      expect(despues[0]?.n).toBe(antes[0]?.n)
+      expect(adminRows[0]?.n).toBe(0)
+
+      const tenantRows = await ownerClient<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM "tenants" WHERE "slug" = ${slug}
+      `
+      expect(tenantRows[0]?.n).toBe(0)
     })
   })
 
@@ -351,8 +410,6 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
 
       expect(res.status).toBe(201)
       const body = (await res.json()) as { tenantId: string }
-      createdTenantIds.push(body.tenantId)
-      createdAdminEmails.push(email)
 
       const [tenant] = await ownerClient<{ status: string }[]>`
         SELECT "status"::text FROM "tenants" WHERE "id" = ${body.tenantId}::uuid
@@ -375,8 +432,6 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
       })
       expect(a.status).toBe(201)
       const aBody = (await a.json()) as { tenantId: string }
-      createdTenantIds.push(aBody.tenantId)
-      createdAdminEmails.push(emailA)
 
       // El tenant se cancela. D8: el slug queda tomado para siempre, porque si
       // se liberara el proximo podria heredar contenido cacheado, enlaces viejos
@@ -414,8 +469,6 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
       })
       expect(resA.status).toBe(201)
       const a = (await resA.json()) as { tenantId: string }
-      createdTenantIds.push(a.tenantId)
-      createdAdminEmails.push(emailA)
 
       const slugB = uniqueSlug('ib')
       const emailB = uniqueEmail()
@@ -428,8 +481,6 @@ describe.skipIf(!canRun)('POST /api/register-tenant - integracion Neon', () => {
       })
       expect(resB.status).toBe(201)
       const b = (await resB.json()) as { tenantId: string }
-      createdTenantIds.push(b.tenantId)
-      createdAdminEmails.push(emailB)
 
       // Cada tenant tiene exactamente su suscripcion. Si el INSERT de B hubiera
       // colado en el contexto de A, B tendria dos y A ninguna.

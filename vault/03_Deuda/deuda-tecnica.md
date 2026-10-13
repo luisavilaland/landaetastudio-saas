@@ -4115,3 +4115,59 @@ que diga si debe poder editar el catalogo, cobrar, o solo mirar.
 gate por status en el middleware de `apps/admin` (hoy `authorize()` no mira `tenants.status`).
 El gate no va en `authorize()` salvo para el caso de `abandoned`, que si deberia cortar el
 acceso de entrada: un tenant abandonado es uno que ya dio de alta su tienda y no pago.
+---
+
+## 98. `describe.skipIf(!canRun)` puede dejar la suite en verde sin ejecutar la integracion
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** verificacion post-merge de #246.
+
+**Problema.** Seis `describe.skipIf` repartidos en cinco archivos de test:
+
+| Archivo                                                           | Linea   |
+| ----------------------------------------------------------------- | ------- |
+| `apps/storefront/app/api/register-tenant/__tests__/route.test.ts` | 75      |
+| `packages/commerce/src/__tests__/subscription-transition.test.ts` | 198     |
+| `packages/commerce/src/__tests__/tenant-lifecycle.test.ts`        | 91      |
+| `packages/db/src/__tests__/preapproval-tenant-resolution.test.ts` | 47, 100 |
+| `packages/db/src/__tests__/rls-cross-tenant.test.ts`              | 161     |
+
+La condicion es `canRun = isUsableUrl(process.env.DATABASE_URL)`. Si `DATABASE_URL` no
+está disponible cuando corre la suite, **todos los describes se skipean y `pnpm test`
+devuelve exit 0 igual**: "All matched files use Prettier code style"-equivalente para
+tests. Verde con cero cobertura de integracion.
+
+**Evidencia.** Durante la verificacion de #246 se observo una corrida con
+`829 passed | 8 skipped (837)` y las cuatro siguientes con `837 passed (837)`. El
+`canRun` fallo una vez y no otra. Ninguna de las dos es el resultado que el numero de
+tests sugiere.
+
+**Por que importa mas de lo que parece.** Los cinco archivos son los unicos que
+verifican el comportamiento real contra Neon: transiciones de suscripcion,
+activacion de tenant, resolucion de tenant por preapproval y RLS cross-tenant. Un skip
+no es una linea de test que no corrio: es la **unica** cobertura de los invariantes de
+tenant isolation del repo.
+
+**Relacion con la familia "un control que reporta exito y no ejecuta el trabajo".** Es
+el mismo patron que el item 94 (`db:migrate` que no verifica) y que el item 61 (el
+`WHERE` enmascarado por RLS), en su forma mas simple: el skip **acompania** y no
+**verifica**, y la suite lo lee como exito.
+
+**Fix propuesto.** Distinguir dos casos que hoy son el mismo:
+
+1. **Sin `DATABASE_URL` configurada en el entorno** (developer nueva maquina, CI mal
+   configurado): skip es lo correcto, pero deberia **visible** - `pnpm test` deberia
+   fallar o al menos imprimir en stderr que N tests se saltearon por falta de la
+   variable. Hoy el skip es silencioso.
+2. **`DATABASE_URL` presente pero inservible** (localhost, dummy): ahi el skip es una
+   trampa. `isUsableUrl` ya lo detecta; lo que falta es que ese caso **falle** en vez
+   de skipear, porque significa que alguien apunta a una base que no es la de pruebas
+   y va a creer que corrio.
+
+Un flag explicito (`REQUIRE_DB_TESTS=1`) que convierta el skip en fallo cuando el
+entorno pretende correr la suite completa es la opcion mas simple.
+
+**Lo que NO se propone:** quitar los `skipIf`. Sin `DATABASE_URL` no hay nada que
+probar, y fallar ahi seria peor que saltar.
+
+**Nota de alcance.** No bloquea #247 (arregla el aislamiento de dos asserts) ni el
+cierre de S3. Es deuda propia.
