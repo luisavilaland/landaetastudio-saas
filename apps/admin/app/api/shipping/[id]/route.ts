@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { eq, and } from 'drizzle-orm'
 import { updateShippingMethodSchema } from '@repo/validation'
 import { createLogger } from '@repo/logger'
+import { denyIfNoPermission } from '@/lib/permission-guard'
 
 const logger = createLogger('shipping-id')
 
@@ -60,6 +61,10 @@ export async function PUT(
     }
 
     const tenantId = session.user?.tenantId as string
+
+    // S4c / item 103: el permiso se IMPONE aca, antes de cualquier efecto.
+    const denied = await denyIfNoPermission(tenantId, 'canWrite')
+    if (denied) return denied
     const { id } = await params
 
     return await withTenantContext(tenantId, async (tx) => {
@@ -132,6 +137,10 @@ export async function DELETE(
     }
 
     const tenantId = session.user?.tenantId as string
+
+    // S4c / item 103: el permiso se IMPONE aca, antes de cualquier efecto.
+    const denied = await denyIfNoPermission(tenantId, 'canWrite')
+    if (denied) return denied
     const { id } = await params
 
     return await withTenantContext(tenantId, async (tx) => {

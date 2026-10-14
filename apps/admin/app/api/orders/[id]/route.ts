@@ -11,6 +11,7 @@ import {
 import { eq, and, inArray } from 'drizzle-orm'
 import { updateOrderStatusSchema } from '@repo/validation'
 import { createLogger } from '@repo/logger'
+import { denyIfNoPermission } from '@/lib/permission-guard'
 
 const logger = createLogger('orders-id')
 
@@ -154,6 +155,10 @@ export async function PUT(
         { status: 400 },
       )
     }
+
+    // S4c / item 103: el permiso se IMPONE aca, antes de cualquier efecto.
+    const denied = await denyIfNoPermission(tenantId, 'canSell')
+    if (denied) return denied
 
     const body = await request.json()
     const validation = updateOrderStatusSchema.safeParse(body)

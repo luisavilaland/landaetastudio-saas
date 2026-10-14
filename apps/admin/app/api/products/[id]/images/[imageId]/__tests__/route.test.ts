@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { withTenantContext } from '@repo/db'
 import { makeTxMock, session } from '@repo/test-utils'
+// S4c/item 103: se mockea `getPermissions` (la FUENTE), no el guard.
+// El endpoint sigue llamando al guard REAL, asi que el cableado se verifica
+// en cada test: si alguien borra la linea del guard, el 403 no aparece.
+vi.mock('@repo/commerce', async () => {
+  const actual = await vi.importActual<typeof import('@repo/commerce')>(
+    '@repo/commerce',
+  )
+  return { ...actual, getPermissions: vi.fn() }
+})
+
 
 vi.mock('@/lib/auth', () => ({ auth: vi.fn() }))
 vi.mock('@/lib/logger', () => ({
@@ -20,6 +30,7 @@ vi.mock('@repo/storage', () => ({
 
 import { auth } from '@/lib/auth'
 import { DELETE } from '../route'
+import { getPermissions } from '@repo/commerce'
 
 function makeReq() {
   return {
@@ -42,8 +53,34 @@ const mockImage = {
   position: 0,
 }
 
+
+/** Tenant `active` + suscripcion `active`: todo permitido. */
+const FULL_ACCESS = {
+  canWrite: true,
+  canSell: true,
+  canChangePlan: true,
+  canCancel: true,
+  canReactivate: false,
+  canPause: true,
+  canResume: false,
+  canAccessStorefront: true,
+  canAccessPanel: 'full',
+} as const
+
+/**
+ * El guard (S4c/item 103) abre su propia transaccion ANTES que el handler, asi
+ * que consume la primera entrada de la cola. `getPermissions` esta mockeado y
+ * no usa el tx, asi que este valor es irrelevante: solo tiene que existir.
+ */
+const GUARD_TX = makeTxMock()
+
 beforeEach(() => {
   vi.clearAllMocks()
+  // Por defecto el tenant tiene acceso; los tests que niegan lo sobreescriben.
+  vi.mocked(getPermissions).mockResolvedValue(FULL_ACCESS)
+  // El guard (S4c) abre su propia transaccion antes que el handler. Sin este default el
+  // mock devuelve undefined y el guard revienta con TypeError en vez de devolver 403.
+  vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(makeTxMock()))
 })
 
 describe('DELETE /api/products/[id]/images/[imageId]', () => {
@@ -101,7 +138,7 @@ describe('DELETE /api/products/[id]/images/[imageId]', () => {
     let callCount = 0
     vi.mocked(withTenantContext).mockImplementation(async (_tid, cb) => {
       callCount++
-      if (callCount === 1) {
+      if (callCount === 2) {
         return cb(
           makeTxMock({ select: [{ data: [mockImage], terminal: 'limit' }] }),
         )

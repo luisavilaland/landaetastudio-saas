@@ -2,6 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Product, ProductVariant } from '@repo/db'
 import { db, withTenantContext } from '@repo/db'
 import { makeTxMock, session, mockReq } from '@repo/test-utils'
+// S4c/item 103: se mockea getPermissions (la FUENTE), no el guard.
+// El endpoint sigue llamando al guard REAL: si alguien borra la linea del
+// guard, el 403 no aparece y el test falla.
+vi.mock('@repo/commerce', async () => {
+  const actual = await vi.importActual<typeof import('@repo/commerce')>(
+    '@repo/commerce',
+  )
+  return { ...actual, getPermissions: vi.fn() }
+})
+
 
 vi.mock('@/lib/auth', () => ({
   auth: vi.fn(),
@@ -23,6 +33,24 @@ vi.mock('@repo/db', async () => {
 
 import { auth } from '@/lib/auth'
 import { GET, POST } from '../route'
+import { getPermissions } from '@repo/commerce'
+/** Tenant active + suscripcion active: todo permitido. */
+const FULL_ACCESS = {
+  canWrite: true,
+  canSell: true,
+  canChangePlan: true,
+  canCancel: true,
+  canReactivate: false,
+  canPause: true,
+  canResume: false,
+  canAccessStorefront: true,
+  canAccessPanel: 'full',
+} as const
+
+beforeEach(() => {
+  vi.mocked(getPermissions).mockResolvedValue(FULL_ACCESS)
+})
+
 
 const TENANT_A = 'tenant-a'
 const TENANT_B = 'tenant-b'

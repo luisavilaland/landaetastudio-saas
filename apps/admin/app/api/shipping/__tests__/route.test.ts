@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { withTenantContext } from '@repo/db'
 import { makeTxMock, session, mockReq } from '@repo/test-utils'
+// S4c/item 103: se mockea `getPermissions` (la FUENTE), no el guard.
+// El endpoint sigue llamando al guard REAL, asi que el cableado se verifica
+// en cada test: si alguien borra la linea del guard, el 403 no aparece.
+vi.mock('@repo/commerce', async () => {
+  const actual = await vi.importActual<typeof import('@repo/commerce')>(
+    '@repo/commerce',
+  )
+  return { ...actual, getPermissions: vi.fn() }
+})
+
 
 vi.mock('@/lib/auth', () => ({ auth: vi.fn() }))
 
@@ -20,6 +30,7 @@ vi.mock('@repo/db', async () => {
 
 import { auth } from '@/lib/auth'
 import { GET, POST } from '../route'
+import { getPermissions } from '@repo/commerce'
 
 const mockMethod = {
   id: 'method-1',
@@ -36,8 +47,24 @@ const mockMethod = {
   updatedAt: new Date(),
 }
 
+
+/** Tenant `active` + suscripcion `active`: todo permitido. */
+const FULL_ACCESS = {
+  canWrite: true,
+  canSell: true,
+  canChangePlan: true,
+  canCancel: true,
+  canReactivate: false,
+  canPause: true,
+  canResume: false,
+  canAccessStorefront: true,
+  canAccessPanel: 'full',
+} as const
+
 beforeEach(() => {
   vi.clearAllMocks()
+  // Por defecto el tenant tiene acceso; los tests que niegan lo sobreescriben.
+  vi.mocked(getPermissions).mockResolvedValue(FULL_ACCESS)
 })
 
 describe('GET /api/shipping', () => {
@@ -126,5 +153,26 @@ describe('POST /api/shipping', () => {
 
     expect(response.status).toBe(400)
     expect(body.error).toBe('Validación fallida')
+  })
+})
+
+describe('S4c / item 103 — el guard IMPONE', () => {
+  it('deniega cuando falta el permiso', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    // sin canWrite: el guard tiene que responder 403
+    vi.mocked(getPermissions).mockResolvedValue({
+      ...FULL_ACCESS,
+      canWrite: false,
+      canSell: false,
+      canAccessPanel: 'none',
+    })
+
+    const response = await POST(
+      mockReq('POST', JSON.stringify({ name: 'Envio', price: 100 })),
+    )
+
+    expect(response.status).toBe(403)
+    const body = await response.json()
+    expect(body.permission).toBe('canWrite')
   })
 })

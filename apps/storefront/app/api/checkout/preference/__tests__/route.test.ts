@@ -1,4 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+// S4c/item 103: se mockea getPermissions (la FUENTE), no el guard.
+// El endpoint sigue llamando al guard REAL: si alguien borra la linea del
+// guard, el 403 no aparece y el test falla.
+vi.mock('@repo/commerce', async () => {
+  const actual = await vi.importActual<typeof import('@repo/commerce')>(
+    '@repo/commerce',
+  )
+  return { ...actual, getPermissions: vi.fn() }
+})
+
 
 const { mockRedisDel, mockRedisIncr, mockRedisPexpire } = vi.hoisted(() => ({
   mockRedisDel: vi.fn(),
@@ -37,6 +47,24 @@ import { withTenantContext } from '@repo/db'
 import { makeTxMock, mockReq } from '@repo/test-utils'
 import { getTenantId } from '@/lib/tenant'
 import { POST } from '../route'
+import { getPermissions } from '@repo/commerce'
+/** Tenant active + suscripcion active: todo permitido. */
+const FULL_ACCESS = {
+  canWrite: true,
+  canSell: true,
+  canChangePlan: true,
+  canCancel: true,
+  canReactivate: false,
+  canPause: true,
+  canResume: false,
+  canAccessStorefront: true,
+  canAccessPanel: 'full',
+} as const
+
+beforeEach(() => {
+  vi.mocked(getPermissions).mockResolvedValue(FULL_ACCESS)
+})
+
 
 const TENANT_ID = 'tenant-123'
 const ORDER_ID = 'order-abc'
@@ -75,6 +103,45 @@ const MOCK_PRODUCTS = [
   { id: 'prod-1', name: 'Producto 1' },
   { id: 'prod-2', name: 'Producto 2' },
 ]
+
+describe('S4c / item 103 — el guard IMPONE canSell', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.MERCADOPAGO_ACCESS_TOKEN = 'TEST-12345-test_access_token'
+    vi.mocked(getTenantId).mockResolvedValue(TENANT_ID)
+    mockRedisIncr.mockReset()
+    mockRedisPexpire.mockReset()
+    mockRedisDel.mockReset()
+    // El guard abre su propia transaccion antes que el handler.
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(makeTxMock()),
+    )
+  })
+
+  afterEach(() => {
+    delete process.env.MERCADOPAGO_ACCESS_TOKEN
+  })
+
+  it('deniega cuando el tenant no puede vender (403)', async () => {
+    vi.mocked(getPermissions).mockResolvedValue({
+      ...FULL_ACCESS,
+      canSell: false,
+      canWrite: false,
+      canAccessPanel: 'readonly',
+    })
+
+    const res = await POST(
+      mockReq('POST', {
+        orderId: 'order-1',
+        customerEmail: 'test@test.com',
+      }),
+    )
+
+    expect(res.status).toBe(403)
+    const body = await res.json()
+    expect(body.permission).toBe('canSell')
+  })
+})
 
 describe('POST /api/checkout/preference', () => {
   beforeEach(() => {

@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { and, eq } from 'drizzle-orm'
 import { uploadImage } from '@repo/storage'
 import { createLogger } from '@/lib/logger'
+import { denyIfNoPermission } from '@/lib/permission-guard'
 
 const logger = createLogger('admin-product-images-api')
 
@@ -72,6 +73,10 @@ export async function POST(
 
     const { id } = await params
     const tenantId = session.user?.tenantId as string
+
+// S4c / item 103: el permiso se IMPONE aca, antes de cualquier efecto.
+const denied = await denyIfNoPermission(tenantId, 'canWrite')
+    if (denied) return denied
 
     const product = await withTenantContext(tenantId, async (tx) => {
       const [product] = await tx

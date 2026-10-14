@@ -12,6 +12,7 @@ import { getTenantId } from '@/lib/tenant'
 import { getStorefrontBaseUrl } from '@/lib/request'
 import { redisDel, redisIncr, redisPexpire } from '@/lib/redis'
 import { createLogger } from '@/lib/logger'
+import { denyIfNoPermission } from '@/lib/permission-guard'
 
 const logger = createLogger('checkout-preference')
 
@@ -100,6 +101,10 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       )
     }
+
+    // S4c / item 103: el permiso se IMPONE aca, antes de cualquier efecto.
+    const denied = await denyIfNoPermission(tenantId, 'canSell')
+    if (denied) return denied
 
     if (!orderId) {
       return NextResponse.json(

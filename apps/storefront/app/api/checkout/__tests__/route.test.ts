@@ -1,4 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+// S4c/item 103: se mockea getPermissions (la FUENTE), no el guard.
+// El endpoint sigue llamando al guard REAL: si alguien borra la linea del
+// guard, el 403 no aparece y el test falla.
+vi.mock('@repo/commerce', async () => {
+  const actual = await vi.importActual<typeof import('@repo/commerce')>(
+    '@repo/commerce',
+  )
+  return { ...actual, getPermissions: vi.fn() }
+})
+
 
 vi.mock('@/lib/tenant', () => ({
   getTenantId: vi.fn(),
@@ -39,6 +49,24 @@ import { safeGet, redisDel } from '@/lib/redis'
 import { getTenantId } from '@/lib/tenant'
 import { auth } from '@/lib/auth'
 import { POST } from '../route'
+import { getPermissions } from '@repo/commerce'
+/** Tenant active + suscripcion active: todo permitido. */
+const FULL_ACCESS = {
+  canWrite: true,
+  canSell: true,
+  canChangePlan: true,
+  canCancel: true,
+  canReactivate: false,
+  canPause: true,
+  canResume: false,
+  canAccessStorefront: true,
+  canAccessPanel: 'full',
+} as const
+
+beforeEach(() => {
+  vi.mocked(getPermissions).mockResolvedValue(FULL_ACCESS)
+})
+
 
 const TENANT_ID = 'tenant-123'
 const CROSS_TENANT_ID = 'tenant-b'
@@ -114,6 +142,45 @@ function setupCookie(sessionId: string | undefined) {
     return undefined
   })
 }
+
+describe('S4c / item 103 — el guard IMPONE canSell', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(getTenantId).mockResolvedValue(TENANT_ID)
+    vi.mocked(auth).mockRejectedValue(new Error('No session'))
+    // El guard (S4c) abre su propia transaccion antes que el handler. Sin este
+    // default el mock devuelve undefined y el guard revienta con TypeError.
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(makeTxMock()),
+    )
+  })
+
+  it('deniega cuando el tenant no puede vender (403)', async () => {
+    // `past_due` vende; `cancelled` no. Este caso es el segundo.
+    vi.mocked(getPermissions).mockResolvedValue({
+      ...FULL_ACCESS,
+      canSell: false,
+      canWrite: false,
+      canAccessStorefront: true,
+      canAccessPanel: 'readonly',
+    })
+    setupCookie('session-denegado')
+    vi.mocked(safeGet).mockResolvedValue(JSON.stringify(MOCK_CART))
+
+    const res = await POST(
+      mockReq('POST', {
+        email: 'test@test.com',
+        name: 'Juan Perez',
+        phone: '099123456',
+        address: 'Calle 123',
+      }),
+    )
+
+    expect(res.status).toBe(403)
+    const body = await res.json()
+    expect(body.permission).toBe('canSell')
+  })
+})
 
 describe('POST /api/checkout', () => {
   beforeEach(() => {

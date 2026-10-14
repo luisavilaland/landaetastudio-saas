@@ -13,6 +13,7 @@ import {
 import { eq, inArray, and, gte, sql } from 'drizzle-orm'
 import { createCheckoutSchema } from '@repo/validation'
 import { createLogger } from '@/lib/logger'
+import { denyIfNoPermission } from '@/lib/permission-guard'
 
 const logger = createLogger('checkout-api')
 
@@ -78,6 +79,11 @@ export async function POST(request: NextRequest) {
     if (!tenantIdFromSlug) {
       return NextResponse.json({ error: 'Tenant no válido' }, { status: 400 })
     }
+
+
+    // S4c / item 103: el permiso se IMPONE aca, antes de cualquier efecto.
+    const denied = await denyIfNoPermission(tenantIdFromSlug, 'canSell')
+    if (denied) return denied
 
     const variantIds = cart.items.map((item) => item.variantId)
 

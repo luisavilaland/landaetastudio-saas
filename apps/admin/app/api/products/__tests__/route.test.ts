@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { withTenantContext } from '@repo/db'
-import { makeTxMock, session } from '@repo/test-utils'
+import { makeTxMock, session, mockReq } from '@repo/test-utils'
 
 vi.mock('@/lib/auth', () => ({ auth: vi.fn() }))
 
@@ -30,8 +30,34 @@ vi.mock('@repo/db', async () => {
   }
 })
 
+// S4c/item 103: se mockea `getPermissions` (la FUENTE), no `denyIfNoPermission`.
+//
+// Asi el endpoint sigue llamando al guard REAL y el cableado se verifica en
+// cada test: si alguien borra la linea del guard, el 403 no aparece y el test
+// falla. Mockear el guard entero dejaria el cableado sin cubrir.
+vi.mock('@repo/commerce', async () => {
+  const actual = await vi.importActual<typeof import('@repo/commerce')>(
+    '@repo/commerce',
+  )
+  return { ...actual, getPermissions: vi.fn() }
+})
+
 import { auth } from '@/lib/auth'
+import { getPermissions } from '@repo/commerce'
 import { GET, POST } from '../route'
+
+/** Tenant `active` + suscripcion `active`: todo permitido. */
+const FULL_ACCESS = {
+  canWrite: true,
+  canSell: true,
+  canChangePlan: true,
+  canCancel: true,
+  canReactivate: false,
+  canPause: true,
+  canResume: false,
+  canAccessStorefront: true,
+  canAccessPanel: 'full',
+} as const
 
 function makeFormData(data: Record<string, string>): FormData {
   const fd = new FormData()
@@ -70,6 +96,98 @@ const baseProduct = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Por defecto el tenant puede publicar. Los tests que necesitan denegar lo
+  // sobreescriben esto.
+  vi.mocked(getPermissions).mockResolvedValue(FULL_ACCESS)
+})
+
+describe('S4c / item 103 — el guard IMPONE canWrite', () => {
+  /** `past_due`: vende pero no publica (D17). */
+  const PAST_DUE = { ...FULL_ACCESS, canWrite: false, canSell: true }
+
+  it('un tenant past_due NO puede crear productos (403)', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(getPermissions).mockResolvedValue(PAST_DUE)
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(makeTxMock({ select: [{ data: [], terminal: 'where' }] })),
+    )
+
+    const response = await POST(
+      mockReq(
+        'POST',
+        makeFormData({
+          name: 'Producto',
+          slug: 'producto',
+          description: 'x',
+          categoryId: '',
+          price: '1000',
+          stock: '1',
+        }),
+      ),
+    )
+
+    expect(response.status).toBe(403)
+    const body = await response.json()
+    expect(body.permission).toBe('canWrite')
+  })
+
+  it('un tenant pending_first_payment NO puede crear productos (403)', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(getPermissions).mockResolvedValue({
+      ...FULL_ACCESS,
+      canWrite: false,
+      canSell: false,
+      canAccessPanel: 'readonly',
+    })
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(makeTxMock({ select: [{ data: [], terminal: 'where' }] })),
+    )
+
+    const response = await POST(
+      mockReq(
+        'POST',
+        makeFormData({
+          name: 'Producto',
+          slug: 'producto',
+          description: 'x',
+          categoryId: '',
+          price: '1000',
+          stock: '1',
+        }),
+      ),
+    )
+
+    expect(response.status).toBe(403)
+  })
+
+  it('un tenant suspended NO puede crear productos (403)', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(getPermissions).mockResolvedValue({
+      ...FULL_ACCESS,
+      canWrite: false,
+      canSell: false,
+      canAccessPanel: 'none',
+    })
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) =>
+      cb(makeTxMock({ select: [{ data: [], terminal: 'where' }] })),
+    )
+
+    const response = await POST(
+      mockReq(
+        'POST',
+        makeFormData({
+          name: 'Producto',
+          slug: 'producto',
+          description: 'x',
+          categoryId: '',
+          price: '1000',
+          stock: '1',
+        }),
+      ),
+    )
+
+    expect(response.status).toBe(403)
+  })
 })
 
 describe('GET /api/products', () => {

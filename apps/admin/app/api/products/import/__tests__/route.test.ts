@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { withTenantContext } from '@repo/db'
 import { makeTxMock, session } from '@repo/test-utils'
+// S4c/item 103: se mockea `getPermissions` (la FUENTE), no el guard.
+// El endpoint sigue llamando al guard REAL, asi que el cableado se verifica
+// en cada test: si alguien borra la linea del guard, el 403 no aparece.
+vi.mock('@repo/commerce', async () => {
+  const actual = await vi.importActual<typeof import('@repo/commerce')>(
+    '@repo/commerce',
+  )
+  return { ...actual, getPermissions: vi.fn() }
+})
+
 
 vi.mock('@/lib/auth', () => ({ auth: vi.fn() }))
 
@@ -20,6 +30,7 @@ vi.mock('@repo/db', async () => {
 
 import { auth } from '@/lib/auth'
 import { POST } from '../route'
+import { getPermissions } from '@repo/commerce'
 
 function makeImportReq(csvContent: string | null) {
   const fd = new FormData()
@@ -46,8 +57,34 @@ Pantalón Jeans,pantalon-jeans,Jeans clásico,5000,5,active,pantalones,jeans-001
 const csvMissingColumns = `name,description
 Remera,Descripción`
 
+
+/** Tenant `active` + suscripcion `active`: todo permitido. */
+const FULL_ACCESS = {
+  canWrite: true,
+  canSell: true,
+  canChangePlan: true,
+  canCancel: true,
+  canReactivate: false,
+  canPause: true,
+  canResume: false,
+  canAccessStorefront: true,
+  canAccessPanel: 'full',
+} as const
+
+/**
+ * El guard (S4c/item 103) abre su propia transaccion ANTES que el handler, asi
+ * que consume la primera entrada de la cola. `getPermissions` esta mockeado y
+ * no usa el tx, asi que este valor es irrelevante: solo tiene que existir.
+ */
+const GUARD_TX = makeTxMock()
+
 beforeEach(() => {
   vi.clearAllMocks()
+  // Por defecto el tenant tiene acceso; los tests que niegan lo sobreescriben.
+  vi.mocked(getPermissions).mockResolvedValue(FULL_ACCESS)
+  // El guard (S4c) abre su propia transaccion antes que el handler. Sin este default el
+  // mock devuelve undefined y el guard revienta con TypeError en vez de devolver 403.
+  vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(makeTxMock()))
 })
 
 describe('POST /api/products/import', () => {
@@ -86,7 +123,7 @@ describe('POST /api/products/import', () => {
     let callCount = 0
     vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
       callCount++
-      if (callCount === 1) {
+      if (callCount === 2) {
         const tx = makeTxMock({
           select: [
             {
@@ -120,7 +157,7 @@ describe('POST /api/products/import', () => {
     let callCount = 0
     vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
       callCount++
-      if (callCount === 1) {
+      if (callCount === 2) {
         const tx = makeTxMock({
           select: [
             {
@@ -133,7 +170,7 @@ describe('POST /api/products/import', () => {
         })
         return cb(tx)
       }
-      const existing = callCount === 2 ? [{}] : []
+      const existing = callCount === 3 ? [{}] : []
       const tx = makeTxMock({
         select: [{ data: existing, terminal: 'limit' }],
         repeatLastSelect: true,
@@ -202,8 +239,9 @@ describe('POST /api/products/import', () => {
     let catCallCount = 0
     vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
       catCallCount++
+      // La llamada 1 es la del guard (S4c), que corre antes que el handler.
       const tx =
-        catCallCount === 1
+        catCallCount === 2
           ? makeTxMock({ select: [{ data: [] }] })
           : makeTxMock({ select: [{ data: [], terminal: 'limit' }] })
       return cb(tx)
@@ -223,7 +261,7 @@ describe('POST /api/products/import', () => {
     let callCount = 0
     vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
       callCount++
-      if (callCount === 1) {
+      if (callCount === 2) {
         return cb(makeTxMock({ select: [{ data: [] }] }))
       }
       const tx = makeTxMock({ select: [{ data: [], terminal: 'limit' }] })
@@ -245,10 +283,10 @@ describe('POST /api/products/import', () => {
     let callCount = 0
     vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
       callCount++
-      if (callCount === 1) {
+      if (callCount === 2) {
         return cb(makeTxMock({ select: [{ data: [] }] }))
       }
-      const existing = callCount === 3 ? [{}] : []
+      const existing = callCount === 4 ? [{}] : []
       const tx = makeTxMock({
         select: [{ data: existing, terminal: 'limit' }],
         repeatLastSelect: true,

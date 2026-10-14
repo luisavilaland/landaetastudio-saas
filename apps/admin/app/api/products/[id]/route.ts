@@ -14,6 +14,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { uploadImage, deleteImage } from '@repo/storage'
 import { updateProductSchema, normalizeSlug } from '@repo/validation'
 import { createLogger } from '@/lib/logger'
+import { denyIfNoPermission } from '@/lib/permission-guard'
 
 const logger = createLogger('admin-products-api')
 
@@ -115,6 +116,12 @@ export async function PUT(
     const resolvedParams = await params
     id = resolvedParams.id
     tenantId = session.user?.tenantId as string
+
+    // S4c / item 103: el permiso se IMPONE aca, antes de cualquier efecto.
+    // Despues de resolver `tenantId`: el guard consulta por el, y con el
+    // string vacio denies para todos.
+    const denied = await denyIfNoPermission(tenantId, 'canWrite')
+    if (denied) return denied
 
     const contentType = request.headers.get('content-type') || ''
 
@@ -627,6 +634,10 @@ export async function DELETE(
 
     const { id } = await params
     const tenantId = session.user?.tenantId as string
+
+// S4c / item 103: el permiso se IMPONE aca, antes de cualquier efecto.
+const denied = await denyIfNoPermission(tenantId, 'canWrite')
+    if (denied) return denied
 
     return await withTenantContext(tenantId, async (tx) => {
       const product = await tx
