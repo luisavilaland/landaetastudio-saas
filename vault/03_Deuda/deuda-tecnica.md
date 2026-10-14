@@ -4185,6 +4185,20 @@ vive en la respuesta de `GET /api/subscriptions` y en nada más. Ver item 101.
 
 **Problema.** Seis `describe.skipIf` repartidos en cinco archivos de test:
 
+**CORRECCION (2026-10-14, auditoria v2, PR #257-doc).** El conteo era **off-by-one**: son
+**cinco** `describe.skipIf`, uno por archivo. Ademas los guards **no son homogeneos**:
+2 guardan con `DATABASE_URL`, 2 con `DATABASE_APP_URL`, y **1 exige ambas**
+(`packages/commerce/src/__tests__/subscription-transition.test.ts:77`).
+
+**Y el mecanismo del riesgo era otro.** No es "si falta `DATABASE_APP_URL`, los 39 tests
+se saltan en silencio": 2 de los 5 archivos guardan con `DATABASE_URL`. Si faltara
+**solo** `DATABASE_APP_URL`, esos **20** tests seguirian corriendo y su `beforeAll`
+reventaria con el throw de `packages/db/src/index.ts:6-11` -> **20 en ROJO**, no skip.
+
+El skip silencioso real ocurre en **CI**, por URLs dummy: `.github/workflows/ci.yml:48-49`
+escribe `postgresql://dummy:dummy@localhost:5432/dummy` y los guards rechazan URLs dummy.
+Ver el item **108**: de estos 39 tests, 25 no corren en ningun workflow.
+
 | Archivo                                                           | Linea   |
 | ----------------------------------------------------------------- | ------- |
 | `apps/storefront/app/api/register-tenant/__tests__/route.test.ts` | 75      |
@@ -4279,6 +4293,28 @@ integración.
 | ---------------- | ------------------------------ | ------------ |
 | `pnpm typecheck` | `tsc --noEmit` por paquete     | **no**       |
 | `pnpm build`     | `next build`, que type-checkea | **si**       |
+
+**CORRECCION (2026-10-14, auditoria v2).** La tabla de arriba es **falsa como regla
+general**. El unico workspace que excluye los tests de su programa es `apps/admin`:
+
+| Workspace         | `exclude` del tsconfig               | Test files en el programa |
+| ----------------- | ------------------------------------ | ------------------------- |
+| `apps/admin`      | `["node_modules","**/__tests__/**"]` | **0** de 28               |
+| `apps/storefront` | `["node_modules"]`                   | 16                        |
+| `apps/superadmin` | `["node_modules"]`                   | 4                         |
+| `packages/*`      | incluye `src`                        | si                        |
+
+Medido con `tsc --noEmit --listFiles -p <tsconfig>`.
+
+**La consecuencia real es peor que la que este item suponia.** `next build` usa el
+**mismo** `apps/admin/tsconfig.json`, asi que los **28 archivos de test de admin no los
+typechequea NINGUN comando del DoD** — ni `typecheck` ni `build`. Vitest no typechequea.
+No es "falta typecheck", es "falta todo".
+
+La anécdota original (`TS2741` en superadmin durante S4a) **no puede explicarse con este
+mecanismo**, porque superadmin si incluye sus tests. Sospechoso: cache de turbo.
+
+Ver el item **109**.
 
 Al agregar `tenants.logoUrl` (S4a, T11), un literal de `Tenant` en
 `apps/superadmin/app/api/tenants/[id]/__tests__/route.test.ts` quedo incompleto.
@@ -4515,5 +4551,223 @@ blobs de git.
 recibirla explicitamente, no por herencia de AGENTS.md.
 
 **Costo:** ~0.2 h (regla).
+
+---
+
+## 107. T11 (branding) esta inerte: escribe una columna que nadie lee
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, segunda pasada, 2026-10-14 (H-F3-v2-1).
+
+**Problema.** La feature de branding de S4a esta construida, testeada y mergeada, y
+**no produce ningun efecto observable**.
+
+- Unico escritor de `dbTenants.logoUrl`:
+  `apps/admin/app/api/config/tenant/branding/route.ts:86`. Lo devuelve en `:92`.
+- **Nadie lo lee.** No hay ninguna lectura de `dbTenants.logoUrl` en `apps/` ni `packages/`.
+- El storefront lee **`settings.logoUrl`**, la columna **jsonb**:
+  `apps/storefront/app/layout.tsx:53,77,83`.
+- La UI de admin escribe y lee la misma jsonb:
+  `apps/admin/app/(dashboard)/store/settings/page.tsx:64,93`.
+- Unico llamador del endpoint: su propio test,
+  `branding/__tests__/route.test.ts:76`.
+
+**Impacto.** **Dos fuentes de verdad, y la visible es la anterior.** El logo que un
+tenant sube por la feature de Fase 3 nunca aparece en su tienda. T11 cumplio su
+criterio de salida (`plans/2026-10-09-fase3.md:~519`, "tenant sin branding -> defaults")
+y aun asi la feature no hace nada visible.
+
+**Por que importa mas alla de T11.** Es la **cuarta ocurrencia** del patron
+"construido pero no aplicado", despues del item 61, el item 94 y el item 103. Las
+cuatro caen en features cuyo criterio de salida no exige efecto observable.
+
+**Decision que requiere (no es un fix mecanico).** Antes de S5 hay que elegir:
+
+1. Si la fuente de verdad es `tenants.logoUrl`: la UI de admin debe escribir ahi y el
+   storefront debe leer de ahi. Hay que migrar el dato existente de `settings`.
+2. Si la fuente de verdad es `settings.logoUrl` (jsonb): la feature de Fase 3 sobra y
+   la migracion `0004` se puede revertir.
+
+**Costo:** ~2 h + migracion de datos, segun la opcion.
+
+---
+
+## 108. 25 tests de base de datos no se ejecutan en ningun workflow
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, segunda pasada, 2026-10-14 (H-F3-v2-2).
+
+**Problema.** `.github/workflows/e2e.yml` corre contra Neon real **solo** dos archivos
+de test:
+
+```
+pnpm vitest run
+  packages/db/src/__tests__/rls-cross-tenant.test.ts
+  packages/db/src/__tests__/preapproval-tenant-resolution.test.ts
+```
+
+El job `build` los saltea siempre: `.github/workflows/ci.yml:48-49` escribe
+`postgresql://dummy:dummy@localhost:5432/dummy` para `DATABASE_URL` y
+`DATABASE_APP_URL`, y los guards de `describe.skipIf` rechazan URLs dummy.
+
+**Lo que falta** (39 tests gated en total, 14 se corren):
+
+| Archivo                                                           | Tests | Corriendo en CI |
+| ----------------------------------------------------------------- | ----- | --------------- |
+| `apps/storefront/.../register-tenant/__tests__/route.test.ts`     | 15    | **NO**          |
+| `packages/commerce/src/__tests__/tenant-lifecycle.test.ts`        | 5     | **NO**          |
+| `packages/commerce/src/__tests__/subscription-transition.test.ts` | 5     | **NO**          |
+
+**El workflow ya lo advertia.** `e2e.yml:129-130` dice textualmente:
+
+> "Un archivo nuevo que dependa de la DB tiene que agregarse aca: en `build` pasaria
+> verde sin ejecutar nada."
+
+Se agregaron tres archivos y no se agregaron al workflow.
+
+**Impacto.** El job `build` reporta verde sin haber ejecutado **un solo** test contra
+la base de datos. Y el **endpoint publico de alta de tenant tiene cobertura efectiva
+cero en CI**: sus 15 tests son su unica evidencia y no corren nunca.
+
+**Fix propuesto.**
+
+1. Agregar los 3 archivos a `e2e.yml`.
+2. **Convertir el comentario en control**: contar los archivos con `describe.skipIf`
+   del repo contra los listados en el workflow, y fallar si no coinciden. Si la
+   proxima depende de que alguien lea el comentario, se pierde igual.
+
+**Costo:** ~0.5 h. Es lo mas barato de toda la cola y lo que mas riesgo cubre.
+
+---
+
+## 109. Los 28 archivos de test de `apps/admin` no los typechequea ningun comando del DoD
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, segunda pasada, 2026-10-14 (correccion del item 100).
+
+**Problema.** `apps/admin/tsconfig.json` declara
+`"exclude": ["node_modules", "**/__tests__/**"]`. Como `next build` usa **el mismo**
+tsconfig, y `pnpm typecheck` corre `tsc --noEmit` sobre el mismo, **los 28 archivos de
+test de admin no los typechequea nada**:
+
+| Comando          | Chequea los tests de admin            |
+| ---------------- | ------------------------------------- |
+| `pnpm typecheck` | no (excluidos del programa)           |
+| `pnpm build`     | no (mismo tsconfig)                   |
+| `pnpm test`      | no (vitest transpila, no typechequea) |
+
+Medido con `tsc --noEmit --listFiles -p apps/admin/tsconfig.json`.
+
+**Impacto.** Un error de tipos en un test de admin no lo detecta **ningun** control del
+DoD. Los tests pasan porque no se typechequean, y el typecheck pasa porque no los mira.
+Mismo patron "un control que acompana y no verifica" (item 61) aplicado al DoD.
+
+**Relacion.** Es la consecuencia real del item **100**, que suponía que `pnpm build`
+cubria lo que `pnpm typecheck` no. No es que falte uno: faltan los dos.
+
+**Fix propuesto.** Sacar `"**/__tests__/**"` del `exclude` de `apps/admin/tsconfig.json`,
+o agregar un `tsconfig` de tests que el `typecheck` incluya explicitamente.
+
+**Costo:** ~0.5 h + fix de los errores de tipos que aparezcan al destapar.
+
+---
+
+## 110. `/api/register-tenant` sin rate limiting y con enumeracion de emails
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, segunda pasada, 2026-10-14 (H-F3-v2-3).
+
+**Problema.** Endpoint publico sin sesion, con costo de CPU por request y sin limite
+de tasa:
+
+- `bcrypt` con 10 rounds (~100 ms de CPU) por request.
+- 1 select de `plans` + 3 inserts (`route.ts:129,155,162-188`).
+- El unico rate limit del storefront esta en
+  `apps/storefront/app/api/checkout/preference/route.ts:21,55`.
+- Devuelve `409 "Email ya registrado"` (`route.ts:204`) -> **enumeracion de cuentas
+  de administrador**.
+
+**Impacto.** Vector de spam y de abuso de CPU sobre una superficie publica, y
+enumeracion de emails de administradores. El patron de enumeracion es **preexistente**
+en `apps/storefront/app/api/register/route.ts:61`: se replico a una superficie nueva
+sin corregirlo.
+
+**Fix propuesto.** Rate limit por IP con el wrapper progresivo de Redis (fail-open, ver
+AGENTS.md), y respuesta neutra en el 409.
+
+**Costo:** ~1 h.
+
+---
+
+## 111. El upload de branding no valida tamano ni sanitiza el nombre de archivo
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, segunda pasada, 2026-10-14 (H-F3-v2-4).
+
+**Problema.** `apps/admin/app/api/config/tenant/branding/route.ts`:
+
+- Solo valida `file.size === 0` (`:46`). No hay limite de tamano maximo.
+- `Buffer.from(await file.arrayBuffer())` (`:66`) carga el archivo entero en memoria.
+- La key de R2 se construye como
+  `branding/${tenantId}/${randomUUID()}-${file.name}` (`:69`), con `file.name`
+  controlado por el cliente. `getPublicUrl`
+  (`packages/storage/src/index.ts:59-74`) no sanitiza, asi que nombres con `#`, `?` o
+  espacios rompen la URL publica devuelta.
+- Acepta `image/svg+xml`. Hoy es inocuo porque se renderiza en `<img>`
+  (`navbar.tsx:45`, `perfil/page.tsx:116`), pero es una superficie a vigilar.
+- No borra el logo anterior: cada re-subida deja un objeto huerfano en R2.
+  `deleteImage` si se usa en products, no aca.
+
+**Impacto.** Consumo de memoria no acotado en un endpoint autenticado; URLs publicas
+rotas silenciosamente cuando el cliente sube un archivo con nombre exotico; fuga de
+espacio en el bucket.
+
+**Costo:** ~1 h.
+
+---
+
+## 112. `/api/register-tenant` no esta excluido del matcher del proxy
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, segunda pasada, 2026-10-14 (H-F3-v2-5).
+
+**Problema.** `apps/storefront/proxy.ts:11-13` excluye del matcher solo
+`_next/static`, `favicon`, `api/webhooks`, `api/health` e imagenes. La ruta
+`/api/register-tenant` **no** esta excluida, y solo responde si:
+
+- el host es `PLATFORM_HOST` (`proxy.ts:58`, variable **opcional** en
+  `packages/validation/src/env.ts:71-77`), o
+- el host resuelve a un tenant.
+
+Sin `PLATFORM_HOST` -> **404** en el host de plataforma. En `localhost` sin
+`ENABLE_DEFAULT_TENANT_FALLBACK` -> **404**.
+
+Los tests invocan `POST()` directamente, asi que la integracion con el proxy **no esta
+cubierta**.
+
+**Impacto.** Un endpoint publico que devuelve 404 segun la configuracion de un host es
+un modo de falla silencioso, y el mas probable es en local durante el desarrollo de
+S5.
+
+**Relacion.** `PLATFORM_HOST` es opcional justamente porque "apagado" significa "no hay
+landing todavia" (D1, T1). Pero apagado tambien rompe el registro de tenants, que es
+una feature distinta.
+
+**Fix propuesto.** Excluir `api/register-tenant` del matcher y resolver el host de
+plataforma explicitamente, o dejar `PLATFORM_HOST` con default en desarrollo.
+
+**Costo:** ~0.5 h.
+
+---
+
+## 113. `register-tenant` devuelve informacion interna al anonimo
+
+**Severidad:** BAJA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, segunda pasada, 2026-10-14 (H-F3-v2-6).
+
+**Problema.** `apps/storefront/app/api/register-tenant/route.ts`:
+
+- El `400` devuelve `validation.error.issues` completo (`:106`): path, message y code
+  de cada issue de Zod.
+- El `201` devuelve el `tenantId` (`:204`), un UUID interno con el mismo formato que
+  el `external_reference` de MercadoPago.
+
+Sin firma no es explotable. Se registra por completitud y porque la superficie es
+nueva y publica.
+
+**Costo:** ~0.3 h.
 
 ---
