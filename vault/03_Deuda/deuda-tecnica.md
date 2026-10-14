@@ -4433,7 +4433,7 @@ manual, y el ritual de cierre que lo rodea.
 
 **Severidad:** ALTA · **Estado:** **RESUELTO (S4c, 2026-10-14, commits `faa4343` + `aae5921`)** · **Origen:** auditoria mid-phase de Fase 3, 2026-10-14.
 
-**RESUELTO.** El guard se aplica en **17 handlers de 13 endpoints**:
+**RESUELTO.** El guard se aplica en **16 guards en 13 archivos**:
 
 | Guard      | Endpoints                                                                                                                                              |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -4908,5 +4908,155 @@ son las dos rutas del mismo paso, y la que funciona es la vieja.
 **Fix propuesto.** T12-T14 del plan (S5, issue #255).
 
 **Costo:** ~15 h (es el slice de UI completo, no solo este item).
+
+---
+
+## 117. 9 de 16 guards no tienen deny test (H-F3-s4c-1)
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** auditoria S4c, 2026-10-14 (issue #261).
+
+**Problema.** La property del guard se sostiene en los 16 call sites: borrar el
+guard no abre un bypass, porque cuando el permiso falta el guard responde 403.
+Pero **solo 7 de 16 tienen deny test**. En los otros 9, borrar el guard no
+rompe nada en CI:
+
+| Comportamiento al borrar el guard | Sitios |
+| --- | --- |
+| Falla el test (correcto) | 7 |
+| **Pasa en silencio absoluto** | 6 — `categories/[id]` PUT+DELETE, `shipping/[id]` PUT+DELETE, `products/[id]` DELETE, `variants` |
+| Falla con 500 accidental | 3 — `products/import`, `images`, `images/[imageId]` |
+
+Los 3 que "fallan" no tienen un assert de 403: fallan porque el guard consume la
+transaccion #1 de la cola del mock (`callCount`) y el desalinea. Es acoplamiento
+de posicion, no cobertura. Si alguiengutvara el orden de llamadas, pasarian.
+
+**Por que importa.** El control de seguridad esta verificado a mano por esta
+auditoria, pero **nada lo sostiene en el tiempo**. El dia que alguien refactorice
+un handler y mueva el guard, 6 de 16ectedos pueden desaparecer sin que CI lo
+diga.
+
+**Relacion.** Item 103 (RESUELTO) cubria "el guard se aplica". Este cubre "el
+guard se aplica **y alguien lo verifica**". No es lo mismo.
+
+**Fix.** Denegaciones para los 9, asertando 403 explicito. No aceptar el 500
+accidental como cobertura.
+
+**Costo:** ~4 h.
+
+---
+
+## 118. derivePermissions no falla ruidosamente con estados prototype (H-F3-s4c-2)
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** auditoria S4c, 2026-10-14 (issue #261).
+
+**Problema.** El contrato documentado es "un estado desconocido **falla
+ruidosamente**" (tira, no degrada). Se cumple para estados desconocidos
+ordinarios: `derivePermissions('mystery_status')` tira.
+
+Pero con claves de `Object.prototype` no:
+
+- `derivePermissions('constructor')` devuelve una `Function`.
+- `derivePermissions('toString')` devuelve una `Function`.
+- `derivePermissions('__proto__')` devuelve el prototype.
+- `deriveTenantPermissions('active', 'constructor')` tambien.
+
+Causa: lookup por indexacion de objeto plano (`PERMISSIONS_BY_STATUS[status]`)
+en vez de `Object.hasOwn` o `Map`.
+
+**No hay escalacion de privilegios.** `Function.canWrite` es `undefined`, asi
+que el guard cae a **403**: el fallo es cerrado. El defecto es que el contrato
+esta violado y el codigo de dependencia contara con el throw.
+
+**Agravante.** `subscriptions.status` es `text` **sin CHECK constraint**
+(`packages/db/src/schema.ts` ~L101). Este mapa de TypeScript es el unico
+validador del valor.
+
+**Fix.** `Object.hasOwn(PERMISSIONS_BY_STATUS, status)` antes de indexar (o
+migrar a `Map`), y un CHECK constraint sobre `subscriptions.status`.
+
+**Costo:** ~1 h.
+
+---
+
+## 119. shipping/[id].test.ts es un toy que da cobertura falsa (H-F3-s4c-3, H-F3-s4c-4)
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** auditoria S4c, 2026-10-14 (issue #261).
+
+**Problema 1 (H-F3-s4c-3).** `apps/admin/app/api/shipping/__tests__/[id].test.ts`
+define handlers locales `handleGet/handlePut/handleDelete` y **nunca importa el
+route real**. El test pasa porque prueba el test, no el codigo. Da cobertura
+aparente de PUT y DELETE de `shipping/[id]`, que son dos de los 9 sitios sin
+deny test del item 117.
+
+**Problema 2 (H-F3-s4c-4).** El header de
+`apps/admin/app/api/shipping/[id]/__tests__/route.test.ts` afirma:
+
+> "si alguien borra la linea del guard, el 403 no aparece y el test falla"
+
+El archivo **no contiene ningun assert de 403**. B2 lo confirmo: pasa con el
+guard eliminado. El comentario describe una propiedad que el archivo no tiene,
+y es exactamente la clase de mentira que hace que un revisor futuro confie en
+una cobertura inexistente.
+
+**Relacion.** Es el mismo patron del item 61 (copia que se desvia) y del item
+100 (tests que no ejercitan lo que dicen ejercitar).
+
+**Fix.** Reescribir `[id].test.ts` importando el route real, y borrar el
+comentario aspiracional o agregar el assert que promete.
+
+**Costo:** ~1.5 h.
+
+---
+
+## 120. No hay control que prevenga el bug de tenantId sin inicializar (H-F3-s4c-5)
+
+**Severidad:** BAJA · **Estado:** ABIERTO · **Origen:** auditoria S4c, 2026-10-14 (issue #261).
+
+**Problema.** El hook GGA encontro en `products/[id]` PUT que el guard se
+ejecutaba con `tenantId = ''`: el handler declara `let tenantId = ''` y lo
+asigna adentro del `try`, asi que si `auth()` lanza, el guard consulta por
+string vacio y **deniega a todos los tenants**. La suite no lo vio porque
+`getPermissions` esta mockeado (item 61).
+
+Esta auditoria verifico los 16 call sites: **0 instancias**. El bug esta
+corregido. Lo que falta es que no vuelva.
+
+**Candidatos evaluados:**
+
+| Control | Veredicto |
+| --- | --- |
+| **Regla ESLint** que exija inicializacion antes de `denyIfNoPermission` | **Recomendado.** ~15 min, 0 falsos positivos hoy. |
+| Test de contrato por endpoint | Overkill: hay que mockear `auth`, `withTenantContext` y `getPermissions` por endpoint. |
+| Helper que reciba la sesion y resuelva el tenant internamente | Rompe la separacion actual: acoplaria el guard a NextAuth. |
+| Plantilla de route | Solo previene en codigo nuevo, no en refactors. |
+
+**Fix.** Regla ESLint. Es el control de menor costo y mayor valor.
+
+**Costo:** ~30 min.
+
+---
+
+## 121. config/tenant/domain sin guard no esta en la lista explicita (H-F3-s4c-7)
+
+**Severidad:** INFO · **Estado:** ABIERTO · **Origen:** auditoria S4c, 2026-10-14 (issue #261).
+
+**Problema.** `apps/admin/app/api/config/tenant/domain/route.ts` (PUT) no tiene
+guard y **no aparece en la lista explicita de "sin guard por decision"** de la
+bitacora, el PR #260 ni el item 103.
+
+**No es un defecto funcional.** Es coherente con `branding`: ambos son
+configuracion de identidad del tenant, y el docstring de `branding` (L14-19)
+explica que `slug` y `customDomain` se separaron a proposito porque tienen
+reglas distintas. `requireTenantId()` lo autentica, asi que no hay fuga
+cross-tenant.
+
+**Es drift de documentacion**, del mismo tipo que el item 122: la lista
+enumerada no coincide con la realidad del codigo. Una lista de decisiones que
+omite un caso no es auditable.
+
+**Fix.** Agregarlo a la lista de "sin guard por decision" de la bitacora y del
+item 103, con la razon (identidad del tenant, mismo bloque que branding).
+
+**Costo:** ~15 min.
 
 ---

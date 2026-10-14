@@ -4853,7 +4853,7 @@ una novedad. El job esta gateado: corre en pushes y en PRs solo del mismo repo.
 Rama `feat/s4c-apply-guards`. Commits `faa4343` (helper) + `aae5921` (guards y
 tests). Cierra el item 103, el CRITICO de la auditoria v1 (#257).
 
-**17 guards en 13 endpoints.** `canSell` en `checkout`,
+**16 guards en 13 archivos.** `canSell` en `checkout`,
 `checkout/preference` y `orders/[id]`; `canWrite` en products, variants,
 images, categories y shipping.
 
