@@ -4435,9 +4435,9 @@ manual, y el ritual de cierre que lo rodea.
 
 **RESUELTO.** El guard se aplica en **17 handlers de 13 endpoints**:
 
-| Guard | Endpoints |
-| --- | --- |
-| `canSell` | `checkout`, `checkout/preference`, `orders/[id]` |
+| Guard      | Endpoints                                                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `canSell`  | `checkout`, `checkout/preference`, `orders/[id]`                                                                                                       |
 | `canWrite` | `products`, `products/[id]`, `products/import`, `variants`, `images`, `images/[imageId]`, `categories`, `categories/[id]`, `shipping`, `shipping/[id]` |
 
 La resolucion de estado vive UNA vez en `getPermissions(tx, tenantId)`
