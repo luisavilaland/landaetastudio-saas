@@ -4813,3 +4813,37 @@ onboarding sobre dos fuentes de verdad multiplica el costo.
 
 **Nota de proceso:** ninguno de los dos subagentes reporto mojibake. El item 106 empieza
 a dar resultado.
+
+## 2026-10-14 - H-F3-v2-2: 25 tests de DB ahora corren en e2e.yml
+
+Cierra el hallazgo H-F3-v2-2 de la segunda pasada de auditoria (#258, mergeado
+como `62e9cdb`). Rama `fix/e2e-db-tests`.
+
+**Lo que no bastaba.** Agregar las 3 rutas al paso "Run RLS integration tests"
+**no habria funcionado**: el paso tenia `env:` con **solo** `DATABASE_APP_URL`, y
+los 3 archivos nuevos necesitan `DATABASE_URL` (rol owner). Dos lo exigen y
+`subscription-transition.test.ts` exige **ambas**. Agregar solo los paths los
+habria hecho **skipear en silencio**, que es el mismo bug que se estaba
+arreglando.
+
+**Verificacion empirica que cambio la decision.** El riesgo grande era que los
+fixtures de `tenant-lifecycle` y `subscription-transition` se crean en
+`beforeAll`, y que un fallo a mitad dejara filas huerfanas en Neon. **Se probo
+que `afterAll` corre aunque `beforeAll` lance**: un `beforeAll` que inserta y
+despues tira, con un `afterAll` que registra si corrio, dio `afterAll:CORRIO`.
+Ese riesgo queda **descartado**.
+
+**Lo que si queda** (item 115, BAJO): ambos hacen `INSERT` dejando que Postgres
+genere el `id` y lo pushean a la lista de cleanup **despues**
+(`tenant-lifecycle.test.ts:80`, `subscription-transition.test.ts:144`). Si el
+insert commitea server-side pero el cliente no recibe el `RETURNING`, la fila
+queda huerfana. Ventana estrecha, **preexistente** (afecta a los tests hoy, no
+solo en CI). Se arregla aparte generando el id en el cliente, como ya hace
+`register-tenant` con el slug.
+
+**Contexto util.** El workflow **ya escribia en Neon de produccion**: L108 corre
+`pnpm db:migrate && pnpm db:seed` con el owner, y el job de Playwright tambien.
+Agregar tests que escriben y limpian es consistente con el diseno existente, no
+una novedad. El job esta gateado: corre en pushes y en PRs solo del mismo repo.
+
+**Items:** 114 (leccion del rebase de #258) y 115 (ventana de red en fixtures).

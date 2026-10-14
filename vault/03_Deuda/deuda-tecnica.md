@@ -4771,3 +4771,88 @@ nueva y publica.
 **Costo:** ~0.3 h.
 
 ---
+
+## 114. Resolucion de conflictos de rebase: verificar todo el commit, no solo el bloque
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** detectado en el rebase de #258 (2026-10-14).
+
+**Problema.** Al resolver conflictos de rebase, verificar solo el bloque en
+conflicto no alcanza. El commit trae otros cambios que git NO marca como
+conflicto y que una reconstruccion del archivo puede pisar.
+
+Dos casos concretos, ambos del mismo rebase:
+
+1. **Entrada de bitacora perdida.** La resolucion tomo la version del HEAD
+   parcial, que todavia no tenia la entrada v2. La entrada de la segunda
+   auditoria desaparecio del historial sin aviso. Peor: la verificacion
+   posterior dio **falso verde** porque buscaba la frase `"segunda pasada"`,
+   que tambien aparece en una entrada vieja de Fase 1 (`bitacora.md:3613`).
+   Un grep por frase no es una verificacion: la frase puede existir en otro
+   lado del archivo.
+
+2. **Correcciones pisadas en `deuda-tecnica.md`.** La reconstruccion fue
+   `origin/develop` + la cola de items 107-113. Eso **piso las correcciones de
+   los items 98 y 100**, que en el blob del commit vivian _antes_ del item 103,
+   fuera de la cola extraida. Git las habia aplicado en limpio y la
+   reconstruccion las borro igual, sin que ningun conflicto lo senalara.
+
+**Por que importa.** Los dos casos son silenciosos: el arbol queda "limpio", el
+rebase termina con exito, y el contenido falta. Es la misma familia del resto de
+los items de este registro: un control que reporta exito sin verificar que el
+trabajo ocurrio.
+
+**Fix propuesto.**
+
+- **Comparar cada cambio del commit original contra el estado final.** Tras un
+  rebase con conflictos, el chequeo no es "resolvi el conflicto" ni "el arbol
+  esta limpio": es `git diff` contra el commit original, cambio por cambio.
+- **Verificar por heading exacto, nunca por frase.** Comparar el identificador
+  unico del bloque, no un substring que puede aparecer en otro lado.
+- **No reconstruir archivos desde cero.** Resolver el conflicto sobre el archivo
+  real (merge por bloque) en vez de componerlo a partir de dos blobs: la
+  reconstruccion es la que pisa los cambios que git no marco.
+
+**Familia:** septima variante de "el control que reporta exito y no ejecuta el
+trabajo". Ver tambien los items 61, 94, 103 y 107.
+
+**Costo:** ~0.5 h de proceso, mas una regla en AGENTS.md.
+
+---
+
+## 115. Ventana de red en los fixtures de tenant-lifecycle y subscription-transition
+
+**Severidad:** BAJA · **Estado:** ABIERTO · **Origen:** detectado durante H-F3-v2-2 (2026-10-14).
+
+**Problema.** Los dos tests hacen `INSERT` dejando que **Postgres genere el
+`id`**, y solo despues lo agregan a la lista de cleanup:
+
+| Archivo                                                           | Linea  |
+| ----------------------------------------------------------------- | ------ |
+| `packages/commerce/src/__tests__/tenant-lifecycle.test.ts`        | `:80`  |
+| `packages/commerce/src/__tests__/subscription-transition.test.ts` | `:144` |
+
+Si el `INSERT` **commitea en el servidor** pero el cliente no recibe el
+`RETURNING` (se cae la conexion), el `throw` ocurre antes de que el id entre a
+la lista y la fila queda huerfana en Neon.
+
+**Ventana:** estrecha. **Preexistente:** afecta a los tests hoy, no solo cuando
+corren en CI.
+
+**Lo que NO es problema.** Se verifico empiricamente (2026-10-14) que
+**`afterAll` corre aunque `beforeAll` lance**. Ese era el riesgo grande —los dos
+tests crean sus fixtures en `beforeAll`— y queda descartado: un fallo a mitad del
+setup igual limpia. Se descarto tambien que el cleanup de los 3 tests sea
+fragil: los tres borran por patron o por lista, y `subscription-transition` suma
+ademas un `afterEach` que resetea ambos tenants entre tests.
+
+**Fix propuesto.** Generar el `tenantId` con `randomUUID()` en el cliente,
+pushearlo a la lista de cleanup, y despues insertar con ese id explicito. Es el
+mismo patron que ya usa `register-tenant` (genera el slug y lo registra **antes**
+del POST).
+
+**No bloquea.** Afecta solo drift de datos en Neon: una fila de test huerfana de
+vez en cuando, no un fallo de seguridad ni de correctitud.
+
+**Costo:** ~0.5 h. Se hace aparte, no junto con el fix de CI.
+
+---

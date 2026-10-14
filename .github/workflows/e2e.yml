@@ -123,17 +123,27 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Run RLS integration tests
-        # Estos archivos necesitan una DB real: el mecanismo que cubren (RLS y
-        # SECURITY DEFINER) vive en PostgreSQL. En el job `build` corren con una
+        # Estos archivos necesitan una DB real: el mecanismo que cubren (RLS,
+        # SECURITY DEFINER, ciclo de vida del tenant y transiciones de
+        # suscripcion) vive en PostgreSQL. En el job `build` corren con una
         # URL dummy y se saltean, asi que este paso es su unica cobertura real.
         # Un archivo nuevo que dependa de la DB tiene que agregarse aca: en
         # `build` pasaria verde sin ejecutar nada.
+        #
+        # `DATABASE_URL` (rol owner) hace falta ademas de `DATABASE_APP_URL`:
+        # los fixtures de estos tests se crean y se limpian con el owner, y sus
+        # guards de `describe.skipIf` lo requieren. Sin esta variable los tests
+        # se saltean en silencio y el paso sigue verde.
         run: >-
           pnpm vitest run
           packages/db/src/__tests__/rls-cross-tenant.test.ts
           packages/db/src/__tests__/preapproval-tenant-resolution.test.ts
+          packages/commerce/src/__tests__/tenant-lifecycle.test.ts
+          packages/commerce/src/__tests__/subscription-transition.test.ts
+          apps/storefront/app/api/register-tenant/__tests__/route.test.ts
         env:
           DATABASE_APP_URL: ${{ secrets.NEON_DATABASE_APP_URL }}
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       - name: Install Playwright Chromium
         # Con `--with-deps`: en el runner self-hosted (AlmaLinux) no se usaba
         # porque Playwright cae al fallback Ubuntu e invoca `apt-get`, que no
