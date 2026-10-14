@@ -4920,11 +4920,11 @@ guard no abre un bypass, porque cuando el permiso falta el guard responde 403.
 Pero **solo 7 de 16 tienen deny test**. En los otros 9, borrar el guard no
 rompe nada en CI:
 
-| Comportamiento al borrar el guard | Sitios |
-| --- | --- |
-| Falla el test (correcto) | 7 |
-| **Pasa en silencio absoluto** | 6 — `categories/[id]` PUT+DELETE, `shipping/[id]` PUT+DELETE, `products/[id]` DELETE, `variants` |
-| Falla con 500 accidental | 3 — `products/import`, `images`, `images/[imageId]` |
+| Comportamiento al borrar el guard | Sitios                                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Falla el test (correcto)          | 7                                                                                                |
+| **Pasa en silencio absoluto**     | 6 — `categories/[id]` PUT+DELETE, `shipping/[id]` PUT+DELETE, `products/[id]` DELETE, `variants` |
+| Falla con 500 accidental          | 3 — `products/import`, `images`, `images/[imageId]`                                              |
 
 Los 3 que "fallan" no tienen un assert de 403: fallan porque el guard consume la
 transaccion #1 de la cola del mock (`callCount`) y el desalinea. Es acoplamiento
@@ -5023,12 +5023,12 @@ corregido. Lo que falta es que no vuelva.
 
 **Candidatos evaluados:**
 
-| Control | Veredicto |
-| --- | --- |
-| **Regla ESLint** que exija inicializacion antes de `denyIfNoPermission` | **Recomendado.** ~15 min, 0 falsos positivos hoy. |
-| Test de contrato por endpoint | Overkill: hay que mockear `auth`, `withTenantContext` y `getPermissions` por endpoint. |
-| Helper que reciba la sesion y resuelva el tenant internamente | Rompe la separacion actual: acoplaria el guard a NextAuth. |
-| Plantilla de route | Solo previene en codigo nuevo, no en refactors. |
+| Control                                                                 | Veredicto                                                                              |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Regla ESLint** que exija inicializacion antes de `denyIfNoPermission` | **Recomendado.** ~15 min, 0 falsos positivos hoy.                                      |
+| Test de contrato por endpoint                                           | Overkill: hay que mockear `auth`, `withTenantContext` y `getPermissions` por endpoint. |
+| Helper que reciba la sesion y resuelva el tenant internamente           | Rompe la separacion actual: acoplaria el guard a NextAuth.                             |
+| Plantilla de route                                                      | Solo previene en codigo nuevo, no en refactors.                                        |
 
 **Fix.** Regla ESLint. Es el control de menor costo y mayor valor.
 
