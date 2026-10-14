@@ -4744,3 +4744,72 @@ real. La corrida sin `--force` fue 100% replay de cache y no verifica nada.
 **Veredicto:** Fase 3 **no sigue a S3b todavia**. Antes hay que decidir el alcance de
 H-F3-1 y corregir el criterio de salida de T10, que es la causa raiz: decia "una
 tabla de tests" y nunca "el guard se aplica". Un criterio asi deja pasar el patron.
+
+## 2026-10-14 - Auditoria mid-phase de Fase 3, segunda pasada
+
+Worktree de Paseo `wks_cdc020039c635b06`, rama `audit/fase3-midphase-v2`. Precedente:
+la segunda pasada de #197. Warm: los dos subagentes leyeron el consolidado de #257
+antes de verificar.
+
+**Resultado: 9 claims confirmadas en sustancia, 5 errores en #257, 7 hallazgos nuevos.**
+
+La primera pasada no tuvo hallazgos falsos: sus 9 se sostienen. Los 5 errores son de
+mecanismo, no de direccion. Pero aparecieron **2 hallazgos ALTO que la primera no vio**,
+y uno de ellos es una cuarta ocurrencia del mismo patron de fondo.
+
+**Errores en #257 (todos de precision):**
+
+- **E1** el item 100 era falso como regla general. El unico workspace que excluye sus
+  tests del programa es `apps/admin`. Consecuencia real, peor que la supuesta: los **28
+  test files de admin no los typechequea NINGUN comando del DoD**, ni `typecheck` ni
+  `build` (mismo tsconfig). Item nuevo: 109.
+- **E2** el mecanismo del item 98 estaba mal. No es "falta `DATABASE_APP_URL` -> 39
+  tests en skip silencioso": 2 de los 5 archivos guardan con `DATABASE_URL`, y si
+  faltara solo la de app esos 20 tests darían **ROJO**, no skip. El skip real es en CI.
+- **E3** "seis `describe.skipIf`" son **cinco**, y los guards no son homogeneos.
+- **E4** la discrepancia #2 (`README:548` vs `:515`) es matizable: es linea de
+  changelog append-only, no una afirmacion de estado.
+- **E5** la tabla de endpoints estaba mas subcontada de lo reportado.
+
+Ademas, el **reporte de reincorporacion** de esta sesion afirmo lo del typecheck sin
+verificarlo. Era el mismo error que E1. Queda registrado.
+
+**Hallazgos nuevos:**
+
+- **H-F3-v2-1 (ALTO, item 107)** **T11 branding esta inerte.** Escribe
+  `dbTenants.logoUrl` y **nadie lo lee**: el storefront lee `settings.logoUrl`, la
+  columna jsonb vieja. Dos fuentes de verdad y la visible es la anterior. El logo que
+  sube el tenant nunca aparece en la tienda. **Es la cuarta ocurrencia de
+  "construido pero no aplicado",** despues de los items 61, 94 y 103.
+- **H-F3-v2-2 (ALTO, item 108)** **25 tests de DB no corren en ningun workflow.**
+  `e2e.yml` corre 2 archivos contra Neon; `ci.yml:48-49` escribe URLs dummy y el job
+  `build` los saltea siempre. El comentario de `e2e.yml:129-130` **advertia
+  exactamente esto** y no se aplico. El endpoint publico de alta de tenant tiene
+  cobertura efectiva **cero** en CI.
+- **H-F3-v2-3 (MEDIO, item 110)** `/api/register-tenant` sin rate limiting y con
+  enumeracion de emails de administradores.
+- **H-F3-v2-4 (MEDIO, item 111)** upload de branding sin limite de tamano ni
+  sanitizacion del nombre en la key de R2.
+- **H-F3-v2-5 (MEDIO, item 112)** `/api/register-tenant` no excluido del matcher del
+  proxy: puede dar 404 segun `PLATFORM_HOST`, y los tests no lo cubren.
+- **H-F3-v2-6 (BAJO, item 113)** el 400 devuelve los issues de Zod completos y el 201
+  devuelve el `tenantId` interno.
+- **Ampliacion del item 104:** `EncryptionError('TENANT_NOT_FOUND')` esta declarado y
+  muerto. Hoy el fallo silencioso de `encryptToken` es **latente** (no tiene llamadores
+  productivos), pero cuando T8 lo use no habra error, ni codigo de error, ni test.
+
+**Correccion al diagnostico de la primera pasada.** Con la comparacion completa de los
+15 criterios de salida del plan: T10 **no es el unico debil**. Lo son tambien **T8, T12
+y T14**. T8 es el caso mas agudo: su criterio ("sin fila de MP, el checkout rechaza")
+**se cumple con el defecto que debia detectar**. Pero los otros 7 criterios **si**
+exigen efecto observable, y T5 hasta exige verificacion en rojo. La formulation correcta:
+**los 4 criterios debiles son exactamente las tasks donde vive el enforcement.** T11
+(item 107) confirma el patron en un quinto lugar.
+
+**Veredicto: sin cambios en la conclusion.** Fase 3 **no sigue a S3b todavia**. Lo
+mas barato y de mayor cobertura ahora es el item **108** (agregar 3 archivos a
+`e2e.yml`). Antes de S5 hay que resolver el item **107**, porque construir UI de
+onboarding sobre dos fuentes de verdad multiplica el costo.
+
+**Nota de proceso:** ninguno de los dos subagentes reporto mojibake. El item 106 empieza
+a dar resultado.
