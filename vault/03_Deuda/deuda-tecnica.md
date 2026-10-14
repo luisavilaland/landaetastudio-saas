@@ -4919,17 +4919,17 @@ son las dos rutas del mismo paso, y la que funciona es la vieja.
 guard hace fallar su deny test con el status que devuelve el happy path, y
 ninguno con un 500.
 
-| Endpoint | Metodo | Senal al quitar el guard |
-| --- | --- | --- |
-| `categories/[id]` | PUT | 200 |
-| `categories/[id]` | DELETE | 200 |
-| `products/[id]` | DELETE | 204 |
-| `shipping/[id]` | PUT | 200 |
-| `shipping/[id]` | DELETE | 204 |
-| `products/[id]/variants` | POST | 200 |
-| `products/[id]/images` | POST | 201 |
-| `products/[id]/images/[imageId]` | DELETE | 200 |
-| `products/import` | POST | 200 |
+| Endpoint                         | Metodo | Senal al quitar el guard |
+| -------------------------------- | ------ | ------------------------ |
+| `categories/[id]`                | PUT    | 200                      |
+| `categories/[id]`                | DELETE | 200                      |
+| `products/[id]`                  | DELETE | 204                      |
+| `shipping/[id]`                  | PUT    | 200                      |
+| `shipping/[id]`                  | DELETE | 204                      |
+| `products/[id]/variants`         | POST   | 200                      |
+| `products/[id]/images`           | POST   | 201                      |
+| `products/[id]/images/[imageId]` | DELETE | 200                      |
+| `products/import`                | POST   | 200                      |
 
 Cada deny test asertea 403 real y el mensaje del permiso. Tests: 921 -> 930.
 
