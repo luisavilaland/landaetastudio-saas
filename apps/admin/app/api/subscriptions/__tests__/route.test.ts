@@ -42,11 +42,26 @@ function sub(overrides: Record<string, unknown> = {}) {
   }
 }
 
-/** Los selects del handler van en orden: suscripcion, plan. */
-function txMock(subscription = sub(), plan: unknown = PLAN) {
+/**
+ * Los selects del handler van en orden: suscripcion, tenant, plan.
+ *
+ * El de `tenants` se agrega en S4b porque los permisos dependen de las DOS
+ * columnas: un tenant `suspended` con suscripcion `active` no vende, y este
+ * endpoint es lo que la UI lee para decidir que botones mostrar.
+ *
+ * El orden importa: `makeTxMock` consume la cola en secuencia, asi que agregar
+ * una consulta en el medio sin mover el resto hace que el plan se lea de la
+ * fila de tenants y el handler reviente con un error de forma, no de tipo.
+ */
+function txMock(
+  subscription = sub(),
+  plan: unknown = PLAN,
+  tenantStatus = 'active',
+) {
   return makeTxMock({
     select: [
       { data: [subscription], terminal: 'limit' },
+      { data: [{ status: tenantStatus }], terminal: 'limit' },
       { data: plan === null ? [] : [plan], terminal: 'limit' },
     ],
   })

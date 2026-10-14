@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
-import { db, dbSubscriptions, dbPlans, withTenantContext } from '@repo/db'
+import {
+  db,
+  dbSubscriptions,
+  dbPlans,
+  dbTenants,
+  withTenantContext,
+} from '@repo/db'
 import { eq } from 'drizzle-orm'
-import { derivePermissions } from '@repo/commerce'
+import { deriveTenantPermissions } from '@repo/commerce'
 import { createLogger } from '@/lib/logger'
 import {
   notFoundError,
@@ -45,6 +51,18 @@ export async function GET() {
 
       if (subRows.length === 0) return null
 
+      // S4b: los permisos dependen de las DOS columnas. Un tenant `suspended` con
+      // suscripcion `active` no vende, y este endpoint es lo que la UI usa para
+      // decidir que botones mostrar: sin el status del tenant, la UI le
+      // ofereceria "publicar" a un negocio bloqueado por la plataforma.
+      const tenantRows = await tx
+        .select({ status: dbTenants.status })
+        .from(dbTenants)
+        .where(eq(dbTenants.id, tenantId))
+        .limit(1)
+
+      if (tenantRows.length === 0) return null
+
       // `plans` es catalogo global (sin RLS). El nombre del plan va aca para
       // que la UI no tenga que hacer un segundo fetch.
       const planRows = await tx
@@ -58,27 +76,34 @@ export async function GET() {
         .where(eq(dbPlans.id, subRows[0].planId))
         .limit(1)
 
-      return { subscription: subRows[0], plan: planRows[0] ?? null }
+      return {
+        subscription: subRows[0],
+        plan: planRows[0] ?? null,
+        tenantStatus: tenantRows[0].status,
+      }
     })
 
     if (!result) {
       return notFoundError('No hay suscripcion para este tenant')
     }
 
-    const { subscription, plan } = result
+    const { subscription, plan, tenantStatus } = result
     const status = subscription.status as Parameters<
-      typeof derivePermissions
+      typeof deriveTenantPermissions
+    >[1]
+    const tStatus = tenantStatus as Parameters<
+      typeof deriveTenantPermissions
     >[0]
 
-    // Una subscription con un estado que no conhecemos no debe devolver
-    // permisos: se registra y se degrada a 'none'.
+    // Una subscription o un tenant con un estado que no conhecemos no debe
+    // devolver permisos: se registra y se degrada a error.
     let permissions
     try {
-      permissions = derivePermissions(status)
+      permissions = deriveTenantPermissions(tStatus, status)
     } catch (err) {
       logger.error(
-        { err, status },
-        '[subscriptions GET] estado desconocido, derivo a none',
+        { err, status, tenantStatus: tStatus },
+        '[subscriptions GET] estado desconocido',
       )
       return serverError('Estado de suscripcion no soportado', null)
     }
@@ -97,7 +122,7 @@ export async function GET() {
       // una `init_point` que todavía no existe.
       hasPreapproval: Boolean(
         subscription.mpPreapprovalId &&
-          !subscription.mpPreapprovalId.startsWith('pending:'),
+        !subscription.mpPreapprovalId.startsWith('pending:'),
       ),
       permissions,
       createdAt: subscription.createdAt,
