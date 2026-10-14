@@ -13,3 +13,4 @@ tags:
 - [[mojibake-en-comentarios-de-c-digo-falso-positivo-de-shell-no-295]]
 - [[12-discrepancias-doc-vs-c-digo-verificadas-35-tests-tras-ski-296]]
 - [[auditoria-mid-phase-fase-3-el-guard-de-s4b-no-existe-297]]
+- [[auditoria-fase-3-v2-t11-inerte-y-25-tests-sin-correr-en-ci-302]]
