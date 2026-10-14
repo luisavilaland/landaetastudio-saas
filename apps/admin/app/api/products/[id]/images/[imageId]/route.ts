@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { and, eq } from 'drizzle-orm'
 import { deleteImage } from '@repo/storage'
 import { createLogger } from '@/lib/logger'
+import { denyIfNoPermission } from '@/lib/permission-guard'
 
 const logger = createLogger('admin-product-image-delete')
 
@@ -22,6 +23,10 @@ export async function DELETE(
 
     const { id, imageId } = await params
     const tenantId = session.user?.tenantId as string
+
+// S4c / item 103: el permiso se IMPONE aca, antes de cualquier efecto.
+const denied = await denyIfNoPermission(tenantId, 'canWrite')
+    if (denied) return denied
 
     const image = await withTenantContext(tenantId, async (tx) => {
       const [image] = await tx

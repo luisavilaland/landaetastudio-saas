@@ -2,6 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Product, ProductVariant, ProductImage } from '@repo/db'
 import { db, withTenantContext } from '@repo/db'
 import { makeTxMock, session, mockReq } from '@repo/test-utils'
+// S4c/item 103: se mockea getPermissions (la FUENTE), no el guard.
+// El endpoint sigue llamando al guard REAL: si alguien borra la linea del
+// guard, el 403 no aparece y el test falla.
+vi.mock('@repo/commerce', async () => {
+  const actual = await vi.importActual<typeof import('@repo/commerce')>(
+    '@repo/commerce',
+  )
+  return { ...actual, getPermissions: vi.fn() }
+})
+
 
 vi.mock('@/lib/auth', () => ({
   auth: vi.fn(),
@@ -38,6 +48,24 @@ vi.mock('@repo/db', async () => {
 
 import { auth } from '@/lib/auth'
 import { GET, PUT, DELETE } from '../route'
+import { getPermissions } from '@repo/commerce'
+/** Tenant active + suscripcion active: todo permitido. */
+const FULL_ACCESS = {
+  canWrite: true,
+  canSell: true,
+  canChangePlan: true,
+  canCancel: true,
+  canReactivate: false,
+  canPause: true,
+  canResume: false,
+  canAccessStorefront: true,
+  canAccessPanel: 'full',
+} as const
+
+beforeEach(() => {
+  vi.mocked(getPermissions).mockResolvedValue(FULL_ACCESS)
+})
+
 
 const TENANT_A = 'tenant-a'
 const TENANT_B = 'tenant-b'
@@ -243,7 +271,55 @@ describe('PUT /api/products/[id]', () => {
     expect(data.variant).toBeDefined()
   })
 
-  it('409 si el producto fue eliminado entre la lectura y la escritura (0 filas en fase de escritura)', async () => {
+  describe('S4c / item 103 — regresión', () => {
+  /**
+   * El handler declara `let tenantId = ''` arriba y lo asigna adentro del
+   * `try`. Un guard insertado antes de la asignacion consulta por string
+   * vacio: en produccion denies para TODOS los tenants.
+   *
+   * Este test falla si el guard vuelve a correr antes de resolver el tenant.
+   * Lo encontro el hook GGA, no la suite: `getPermissions` esta mockeado, asi
+   * que un string vacio no rompe nada en los tests. El patron del item 61.
+   */
+  it('el guard consulta por el tenantId RESUELTO, no por el string vacio', async () => {
+    vi.mocked(auth).mockResolvedValue(session(TENANT_A, 'admin@a.com'))
+    const updatedProduct = { ...baseProduct, name: 'Updated Product' }
+    const mockTx = makeTxMock()
+    mockTx.select
+      .mockReturnValueOnce(makeSelectChain([baseProduct]))
+      .mockReturnValueOnce(makeSelectChain([baseVariant]))
+      .mockReturnValueOnce(makeSelectChain([updatedProduct]))
+      .mockReturnValueOnce(makeSelectChain([baseVariant]))
+    vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(mockTx))
+
+    const res = await PUT(mockReq('PUT', { name: 'Updated Product' }), {
+      params: Promise.resolve({ id: PRODUCT_ID }),
+    })
+
+    expect(res.status).toBe(200)
+    expect(getPermissions).toHaveBeenCalled()
+    const calledWith = vi.mocked(getPermissions).mock.calls[0]
+    expect(calledWith[1]).toBe(TENANT_A)
+    expect(calledWith[1]).not.toBe('')
+  })
+
+  it('deniega cuando falta canWrite (403)', async () => {
+    vi.mocked(auth).mockResolvedValue(session(TENANT_A, 'admin@a.com'))
+    vi.mocked(getPermissions).mockResolvedValue({
+      ...FULL_ACCESS,
+      canWrite: false,
+      canSell: true,
+    })
+
+    const res = await PUT(mockReq('PUT', { name: 'X' }), {
+      params: Promise.resolve({ id: PRODUCT_ID }),
+    })
+
+    expect(res.status).toBe(403)
+  })
+})
+
+it('409 si el producto fue eliminado entre la lectura y la escritura (0 filas en fase de escritura)', async () => {
     vi.mocked(auth).mockResolvedValue(session(TENANT_A, 'admin@a.com'))
     const mockTx = makeTxMock()
     mockTx.select

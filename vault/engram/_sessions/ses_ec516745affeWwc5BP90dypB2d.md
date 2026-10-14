@@ -17,3 +17,6 @@ tags:
 - [[rebase-perdio-la-entrada-v2-de-bitacora-y-mi-check-dio-falso-303]]
 - [[merge-257-258-y-cleanup-gh-no-borro-el-worktree-queda-direct-304]]
 - [[fix-h-f3-v2-2-25-tests-de-db-agregados-a-e2e-yml-database-ur-305]]
+- [[s4c-en-curso-17-guards-aplicados-tests-pendientes-68-en-rojo-306]]
+- [[s4c-refinamiento-validado-68-11-3-archivos-pendientes-307]]
+- [[s4c-completo-17-guards-item-103-cerrado-308]]

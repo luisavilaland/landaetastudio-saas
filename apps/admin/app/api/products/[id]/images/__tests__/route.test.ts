@@ -1,4 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+// S4c/item 103: se mockea getPermissions (la FUENTE), no el guard.
+// El endpoint sigue llamando al guard REAL: si alguien borra la linea del
+// guard, el 403 no aparece y el test falla.
+vi.mock('@repo/commerce', async () => {
+  const actual = await vi.importActual<typeof import('@repo/commerce')>(
+    '@repo/commerce',
+  )
+  return { ...actual, getPermissions: vi.fn() }
+})
+
 
 vi.mock('@/lib/auth', () => ({ auth: vi.fn() }))
 
@@ -27,6 +37,34 @@ import { auth } from '@/lib/auth'
 import { uploadImage, deleteImage } from '@repo/storage'
 import { GET, POST } from '../route'
 import { DELETE } from '../[imageId]/route'
+import { getPermissions } from '@repo/commerce'
+/** Tenant active + suscripcion active: todo permitido. */
+const FULL_ACCESS = {
+  canWrite: true,
+  canSell: true,
+  canChangePlan: true,
+  canCancel: true,
+  canReactivate: false,
+  canPause: true,
+  canResume: false,
+  canAccessStorefront: true,
+  canAccessPanel: 'full',
+} as const
+
+/**
+ * El guard (S4c/item 103) abre su propia transaccion ANTES que el handler, asi
+ * que consume la primera entrada de la cola. `getPermissions` esta mockeado y
+ * no usa el tx, asi que este valor es irrelevante: solo tiene que existir.
+ */
+const GUARD_TX = makeTxMock()
+
+beforeEach(() => {
+  vi.mocked(getPermissions).mockResolvedValue(FULL_ACCESS)
+  // El guard (S4c) abre su propia transaccion antes que el handler. Sin este default el
+  // mock devuelve undefined y el guard revienta con TypeError en vez de devolver 403.
+  vi.mocked(withTenantContext).mockImplementation(async (_t, cb) => cb(makeTxMock()))
+})
+
 
 const TENANT_A = 'tenant-a'
 const TENANT_B = 'tenant-b'
@@ -175,7 +213,7 @@ describe('POST /api/products/[id]/images', () => {
       },
     ])
 
-    const mockCalls = [productTx, insertTx]
+    const mockCalls = [GUARD_TX, productTx, insertTx]
     let callIndex = 0
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) =>
       cb(mockCalls[callIndex++]),
@@ -188,7 +226,7 @@ describe('POST /api/products/[id]/images', () => {
     })
 
     expect(res.status).toBe(201)
-    expect(withTenantContext).toHaveBeenCalledTimes(2)
+    expect(withTenantContext).toHaveBeenCalledTimes(3)
   })
 
   it('should return 409 when FK violation on insert (product deleted between contexts)', async () => {
@@ -219,7 +257,7 @@ describe('POST /api/products/[id]/images', () => {
     insertTx.values.mockReturnValue(insertTx)
     insertTx.returning.mockRejectedValue({ code: '23503' })
 
-    const mockCalls = [productTx, insertTx]
+    const mockCalls = [GUARD_TX, productTx, insertTx]
     let callIndex = 0
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) =>
       cb(mockCalls[callIndex++]),
@@ -307,7 +345,7 @@ describe('DELETE /api/products/[id]/images/[imageId]', () => {
     deleteTx.delete.mockReturnValue(deleteTx)
     deleteTx.where.mockResolvedValue(undefined)
 
-    const mockCalls = [readTx, deleteTx]
+    const mockCalls = [GUARD_TX, readTx, deleteTx]
     let callIndex = 0
     vi.mocked(withTenantContext).mockImplementation(async (_, cb) =>
       cb(mockCalls[callIndex++]),
@@ -319,6 +357,6 @@ describe('DELETE /api/products/[id]/images/[imageId]', () => {
 
     expect(res.status).toBe(200)
     expect(deleteImage).toHaveBeenCalled()
-    expect(withTenantContext).toHaveBeenCalledTimes(2)
+    expect(withTenantContext).toHaveBeenCalledTimes(3)
   })
 })

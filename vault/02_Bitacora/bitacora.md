@@ -4847,3 +4847,55 @@ Agregar tests que escriben y limpian es consistente con el diseno existente, no
 una novedad. El job esta gateado: corre en pushes y en PRs solo del mismo repo.
 
 **Items:** 114 (leccion del rebase de #258) y 115 (ventana de red en fixtures).
+
+## 2026-10-14 - S4c: guards aplicados (cierra el item 103)
+
+Rama `feat/s4c-apply-guards`. Commits `faa4343` (helper) + `aae5921` (guards y
+tests). Cierra el item 103, el CRITICO de la auditoria v1 (#257).
+
+**17 guards en 13 endpoints.** `canSell` en `checkout`,
+`checkout/preference` y `orders/[id]`; `canWrite` en products, variants,
+images, categories y shipping.
+
+**El issue #253 decia 13 endpoints y la realidad tiene 20** con escritura.
+Faltan 6 en el issue, incluido `orders/[id]` completo. El conteo se verifico
+contra el codigo antes de tocar nada.
+
+**Wrapper uniforme, no el patron que estaba propuesto.** El guard va adentro
+de su propio `withTenantContext` y no del que ya existia, por tres razones
+concretas: cuatro handlers usan ese callback para retornar DATOS (no hay
+donde poner un 403); `products` POST sube la imagen a R2 antes de abrir la
+transaccion (un guard adentro deja el objeto huerfano); y `products/import`
+lee en una transaccion y escribe en otra. Dos patrones para un guard de
+seguridad es como divergen las copias.
+
+**Sin guard, por decision:** `config/settings` y `config/tenant/branding`
+(el paso 2 del onboarding los exige, item 96), `subscriptions/*` y
+`webhooks/*`. `config/settings` resulto ser branding puro (logoUrl, colores,
+tipografia) y ademas es la ruta que **funciona**: el storefront lee
+`settings.logoUrl`, no `tenants.logoUrl` (item 107).
+
+**El hook GGA encontro un bug que la suite no vio.** El guard de
+`products/[id]` PUT quedo antes de la asignacion de `tenantId` (el handler
+declara `let tenantId = ''` y lo asigna adentro del `try`), asi que consultaba
+por string vacio y en produccion deny para TODOS los tenants. **La suite no
+lo detecto porque `getPermissions` esta mockeado**: patron exacto del item
+61. Lleva test de regresion que afirma con que tenantId se llamo al guard.
+
+**Por que los tests mockean `getPermissions` y no el guard.** Mockear el
+guard entero dejaba el cableado sin cubrir: borrar la linea del guard de un
+endpoint dejaba los tests en verde. Mockeando la FUENTE, el endpoint sigue
+llamando al guard real. Verificado quitando el guard en 3 endpoints
+(products, categories/orders, checkout) y confirmando que el test falla.
+
+**El prefijo de colas se descarto.** La primera propuesta era prefijar dos
+`select` en la cola de `makeTxMock`. No funciona: el mock resuelve por indice
+y `[{status:'active'}]` no distingue una fila de `tenants` de una de
+`categories`, asi que el chequeo de slug del handler leia la fila equivocada y
+devolvia 409 donde se esperaba 201. Un test que pasa por la razon equivocada,
+en un guard de seguridad.
+
+**Item 116 registrado:** no existe UI de onboarding (`git grep onboarding` en
+admin no devuelve nada). Los guards defienden un flujo que todavia no existe
+en pantalla; es defensa en profundidad, pero el paso 2 no se puede ejercitar
+de punta a punta.

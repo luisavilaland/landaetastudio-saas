@@ -9,6 +9,7 @@ import {
 import { auth } from '@/lib/auth'
 import { and, eq } from 'drizzle-orm'
 import { createLogger } from '@/lib/logger'
+import { denyIfNoPermission } from '@/lib/permission-guard'
 
 const logger = createLogger('admin-csv-import')
 
@@ -67,6 +68,10 @@ export async function POST(request: NextRequest) {
     }
 
     const tenantId = session.user?.tenantId as string
+
+    // S4c / item 103: el permiso se IMPONE aca, antes de cualquier efecto.
+    const denied = await denyIfNoPermission(tenantId, 'canWrite')
+    if (denied) return denied
     const formData = await request.formData()
     const file = formData.get('file') as File | null
 

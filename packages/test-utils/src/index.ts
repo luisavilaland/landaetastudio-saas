@@ -11,6 +11,26 @@ interface MakeTxMockConfig {
   repeatLastSelect?: boolean
 }
 
+/**
+ * Mock de transaccion para tests. **La cola de `select` es POR INDICE.**
+ *
+ * Cada `makeTxMock({ select: [...] })` resuelve el N-esimo `select()` con la
+ * N-esima entrada. Si el codigo de produccion agrega una query ANTES de las
+ * que el test encola, las entradas quedan desalineadas y el test pasa (o
+ * falla) por una razon que no es la que parece.
+ *
+ * **Caso vivo (S4c, 2026-10-14).** Los guards de permisos agregan dos selects
+ * al principio - `tenants` y `subscriptions` - y los 13 tests de endpoint
+ tuvieron que prefijar esas dos entradas a mano.
+ *
+ * Resolver por tabla en vez de por indice exigiria un objeto DISTINTO por
+ * `select()` (hoy todas las cadenas son el mismo `tx`), o sea una
+ * reescritura del nucleo de este helper, que usan 27 archivos. Se evaluo y se
+ * descarto: el costo no se justifica por dos entradas al principio.
+ *
+ * Si agregas una query nueva que corra antes que las del test, actualiza la
+ * cola.
+ */
 export function makeTxMock(config?: MakeTxMockConfig) {
   const tx: any = {}
 

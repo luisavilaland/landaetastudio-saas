@@ -4431,9 +4431,38 @@ manual, y el ritual de cierre que lo rodea.
 
 ## 103. El guard de permisos de S4b no tiene ningun punto de aplicacion (H-F3-1)
 
-**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, 2026-10-14.
+**Severidad:** ALTA · **Estado:** **RESUELTO (S4c, 2026-10-14, commits `faa4343` + `aae5921`)** · **Origen:** auditoria mid-phase de Fase 3, 2026-10-14.
 
-**Problema.** La matriz `deriveTenantPermissions` de S4b es correcta, exhaustiva y
+**RESUELTO.** El guard se aplica en **17 handlers de 13 endpoints**:
+
+| Guard      | Endpoints                                                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `canSell`  | `checkout`, `checkout/preference`, `orders/[id]`                                                                                                       |
+| `canWrite` | `products`, `products/[id]`, `products/import`, `variants`, `images`, `images/[imageId]`, `categories`, `categories/[id]`, `shipping`, `shipping/[id]` |
+
+La resolucion de estado vive UNA vez en `getPermissions(tx, tenantId)`
+(`packages/commerce/src/tenant-permissions.ts`); cada endpoint llama a
+`denyIfNoPermission(tenantId, permiso)` antes de cualquier efecto.
+
+**Sin guard, por decision documentada:** `config/settings`,
+`config/tenant/branding` (el onboarding paso 2 lo exige, item 96),
+`subscriptions/cancel|pause|resume` (es lo que un `past_due` necesita),
+`subscriptions/plan|preapproval` (reglas propias) y `webhooks/*`.
+
+**Como se verifica que el guard este.** Los tests de endpoint mockean
+`getPermissions` —la fuente— y no el guard, asi que el endpoint sigue
+llamando al guard real: borrar la linea del guard rompe el test. Verificado
+en 3 endpoints (products, categories/orders, checkout) quitando el guard y
+confirmando que el test falla.
+
+**Bug que aparecio al aplicar el guard.** En `products/[id]` PUT el guard
+quedo antes de la asignacion de `tenantId` (el handler declara
+`let tenantId = ''` y lo asigna adentro del `try`), asi que consultaba por
+string vacio y en produccion deny para todos los tenants. **No lo vio la
+suite** porque `getPermissions` esta mockeado — patron del item 61. Lo
+encontro el hook GGA. Lleva test de regresion.
+
+**Problema original.** La matriz `deriveTenantPermissions` de S4b es correcta, exhaustiva y
 bien testeada como funcion pura. **No la lee nadie que pueda rechazar una request.**
 
 - `canSell`, `canWrite`, `canAccessPanel`: cero consumidores fuera de su propia
@@ -4854,5 +4883,30 @@ del POST).
 vez en cuando, no un fallo de seguridad ni de correctitud.
 
 **Costo:** ~0.5 h. Se hace aparte, no junto con el fix de CI.
+
+---
+
+## 116. No existe UI de onboarding
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** detectado durante S4c (2026-10-14).
+
+**Problema.** El paso (2) del design de Fase 3 —"configurar tienda: subdominio,
+branding, MP" (design `:28-30`)— esta especificado pero **no hay UI**.
+`git grep onboarding apps/admin` no devuelve nada. Las paginas del dashboard
+son: categorias, dashboard, orders, products, shipping, store.
+
+**Impacto.** Los guards de S4c se aplican contra un flujo que todavia no
+existe en pantalla. Es defensa en profundidad y esta bien que esten: un
+tenant `pending` no deberia poder crear productos aunque nadie le muestre el
+boton. Pero el **onboarding completo sigue sin implementar**, y hasta que
+exista no hay forma de ejercitar el paso 2 de punta a punta.
+
+**Relacion.** Es parte del item 107: `config/settings` (branding que el
+storefront lee) y `config/tenant/branding` (branding de S4a que nadie lee)
+son las dos rutas del mismo paso, y la que funciona es la vieja.
+
+**Fix propuesto.** T12-T14 del plan (S5, issue #255).
+
+**Costo:** ~15 h (es el slice de UI completo, no solo este item).
 
 ---
