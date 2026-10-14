@@ -550,8 +550,28 @@ design propone:
 | `active`         | `past_due`              | **No**    | **Sí**, durante la gracia (3 días, transversal §3) |
 | `active`         | `cancelled`             | No        | No — storefront en read-only hasta fin de período  |
 | `active`         | `expired`               | No        | No                                                 |
+| `active`         | `abandoned`             | No        | No                                                 |
 | `suspended`      | cualquiera              | No        | No                                                 |
 | `cancelled`      | cualquiera              | No        | No                                                 |
+
+> **Corrección S4b (2026-10-14).** Esta tabla tenía **7 filas** y no incluía
+> `abandoned`, que fue la pregunta abierta del item 97. Se agregó la fila.
+>
+> Se resolvió con la decisión de Luis: `expired` y `abandoned` dan acceso
+> **read-only** al panel, no bloqueo. Bloquear deja al tenant sin poder ver qué
+> perdió, y `abandoned` ("se dio de alta y no pagó") tiene una deuda con
+> MercadoPago, no con el tenant.
+>
+> `suspended` **no** accede: es un bloqueo de plataforma, no una condición de
+> deuda. La distinción importa porque son dos razones opuestas para lo mismo.
+>
+> La columna "¿Vende?" requiere un permiso **separado** de "la tienda
+> responde". `cancelled` responde hasta fin de período y no vende; `past_due`
+> vende durante la gracia y no publica. Fusionarlos perdería `past_due`, que es
+> la asimetría deliberada de D17.
+>
+> Implementación: `deriveTenantPermissions(tenantStatus, subscriptionStatus)`
+> en `packages/commerce/src/subscription-permissions.ts`.
 
 **La asimetría de `past_due` es deliberada:** el comprador no falló el pago, el tenant sí.
 Cortarle la tienda castiga al que no corresponde.

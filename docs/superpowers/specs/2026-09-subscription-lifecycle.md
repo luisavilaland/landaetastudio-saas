@@ -14,13 +14,33 @@
 
 | Estado                  | Descripción                                                  | Acceso panel   | Tienda pública          |
 | ----------------------- | ------------------------------------------------------------ | -------------- | ----------------------- |
-| `pending_first_payment` | Registrado, pago inicial pendiente                           | ❌ Bloqueado   | ❌ No publicada         |
+| `pending_first_payment` | Registrado, pago inicial pendiente                           | ⚠ Solo lectura | ❌ No publicada         |
 | `active`                | Al día, suscripción vigente                                  | ✅ Completo    | ✅ Funcionando          |
 | `past_due`              | Pago falló (dentro de gracia 7 días)                         | ⚠ Limitado     | ✅ Funcionando          |
 | `paused`                | Cobro suspendido por el tenant (MP no debita)                | ⚠ Limitado     | ✅ Funcionando          |
 | `cancelled`             | Canceló voluntariamente (vence al fin de período)            | ⚠ Solo lectura | ✅ Hasta fin de período |
-| `expired`               | Pasó gracia sin pagar                                        | ❌ Bloqueado   | ❌ Despublicada         |
-| `abandoned`             | Nunca completó primer pago (7 días desde registro sin pagar) | ❌ Bloqueado   | ❌ No publicada         |
+| `expired`               | Pasó gracia sin pagar                                        | ⚠ Solo lectura | ❌ Despublicada         |
+| `abandoned`             | Nunca completó primer pago (7 días desde registro sin pagar) | ⚠ Solo lectura | ❌ No publicada         |
+
+> **Corrección S4b (2026-10-14).** Tres filas cambiaron de `❌ Bloqueado` a
+> `⚠ Solo lectura`: `pending_first_payment` (item 96), `expired` y `abandoned`
+> (item 97). La tabla decía "Bloqueado" y el código en
+> `subscription-permissions.ts` devolvía `canAccessPanel: 'none'`.
+>
+> El caso de `pending_first_payment` era el más grave, porque **el item 96 ya
+> había decidido lo contrario** (el owner de un tenant pendiente entra al panel
+> porque el onboarding exige configurar subdominio, branding y MP antes de
+> pagar) y el código seguía diciendo que no. El item estaba cerrado en papel y
+> contradicho en el repo, y ningún test lo detectó porque el snapshot de la
+> matriz consagraba el valor viejo.
+>
+> `expired` y `abandoned`: bloquear el acceso deja al tenant sin poder ver qué
+> perdió. Ver es menos malo que no ver; escribir, no.
+>
+> La columna de storefront no cambia: `past_due` sigue vendiendo (D17) y
+> `cancelled` sigue respondiendo en read-only hasta fin de período. Lo que se
+> agregó en S4b es `canSell` como permiso **separado** de
+> `canAccessStorefront`: "responde" y "vende" son ejes distintos.
 
 ### Transiciones válidas
 
