@@ -6,7 +6,7 @@
 **Precedente:** #197 (cuya segunda pasada encontró 4 errores en la primera)
 **Worktree:** `wks_cdc020039c635b06`
 
-Auditoría *warm*: lee el consolidado de la primera pasada (PR #257) como input.
+Auditoría _warm_: lee el consolidado de la primera pasada (PR #257) como input.
 
 ---
 
@@ -21,7 +21,7 @@ La conclusión de la primera pasada —"Fase 3 no sigue a S3b"— **se sostiene 
 
 ### El hallazgo de fondo, ahora con 4 casos
 
-La primera pasada ya había detectado el patrón en 3 casos: ítem 61 (*"un control que acompaña y no verifica"*), ítem 94 (`db:migrate` reporta éxito sin aplicar) e ítem 103 (matriz de permisos sin punto de aplicación).
+La primera pasada ya había detectado el patrón en 3 casos: ítem 61 (_"un control que acompaña y no verifica"_), ítem 94 (`db:migrate` reporta éxito sin aplicar) e ítem 103 (matriz de permisos sin punto de aplicación).
 
 La segunda pasada encuentra un **cuarto caso del mismo tipo, que la primera no vio**: **T11 escribe `tenants.logoUrl` y nadie lo lee**. El storefront lee `settings.logoUrl`, la columna jsonb vieja. Dos fuentes de verdad; la visible es la anterior. El feature está construido, testeado y mergeado, y **no produce ningún efecto observable**.
 
@@ -44,17 +44,17 @@ Y hay una correlación que ninguno de los dos subagentes vio y que esta auditor�
 
 ## Verificación de claims de #257
 
-| # | Claim | Veredicto | Evidencia |
-| --- | --- | --- | --- |
-| 1 | Ítem 103: matriz sin consumidor productivo | **CONFIRMADA** | `deriveTenantPermissions` tiene **1** consumidor: `apps/admin/app/api/subscriptions/route.ts:10,92,95,102` — un GET que devuelve los permisos como **datos**. `apps/admin` no tiene `middleware.ts` ni `proxy.ts` |
-| 2 | Ítem 104: `encryptToken` UPDATE-only, `Promise<void>` | **CONFIRMADA** | `packages/commerce/src/encryption.ts:33,58` — sin `INSERT`/`ON CONFLICT`, sin chequeo de filas. `decryptToken` devuelve `null` con 0 filas |
-| 3 | Las discrepancias doc↔código | **15 CONFIRMADAS, 1 matizable** | Ver E4 y E5 |
-| 4 | Ítem 98: 39 tests que se saltan | **CONFIRMADA en sustancia, IMPRECISA en mecanismo** | Conteo 15+5+5+8+6 = **39** ✓. Pero el disparador no es "falta la variable" — ver E2 |
-| 5 | Cobertura de la matriz: solo función pura | **CONFIRMADA** | `canSell`/`canPublish`/`canAccessPanel` solo en los 2 archivos de la matriz. Cero tests que crucen los puntos de aplicación |
-| 6 | RLS de Fase 3 correcta | **CONFIRMADA** | `0000_baseline.sql:219` ENABLE, `:230` FORCE, `:250` policy `tenant_isolation` sobre `tenant_mp_config`. Ejecutado en vivo: 8/8 cross-tenant |
-| 7 | Migraciones con señal declarada | **CONFIRMADA** | `check-migrations-applied.mjs` tiene `0003` y `0004`; cableado en `db:migrate`. `0004` idempotente |
-| 8 | `turbo.json` sin las 2 variables | **CONFIRMADA** | Declaradas en `packages/validation/src/env.ts:71,89`, ausentes del `env` de build |
-| 9 | D13 (2 capas) parcial | **CONFIRMADA y endurecida** | `register-tenant` tiene **solo integración**; `branding` **solo unitaria**. Ninguno tiene ambas |
+| #   | Claim                                                 | Veredicto                                           | Evidencia                                                                                                                                                                                                         |
+| --- | ----------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Ítem 103: matriz sin consumidor productivo            | **CONFIRMADA**                                      | `deriveTenantPermissions` tiene **1** consumidor: `apps/admin/app/api/subscriptions/route.ts:10,92,95,102` — un GET que devuelve los permisos como **datos**. `apps/admin` no tiene `middleware.ts` ni `proxy.ts` |
+| 2   | Ítem 104: `encryptToken` UPDATE-only, `Promise<void>` | **CONFIRMADA**                                      | `packages/commerce/src/encryption.ts:33,58` — sin `INSERT`/`ON CONFLICT`, sin chequeo de filas. `decryptToken` devuelve `null` con 0 filas                                                                        |
+| 3   | Las discrepancias doc↔código                          | **15 CONFIRMADAS, 1 matizable**                     | Ver E4 y E5                                                                                                                                                                                                       |
+| 4   | Ítem 98: 39 tests que se saltan                       | **CONFIRMADA en sustancia, IMPRECISA en mecanismo** | Conteo 15+5+5+8+6 = **39** ✓. Pero el disparador no es "falta la variable" — ver E2                                                                                                                               |
+| 5   | Cobertura de la matriz: solo función pura             | **CONFIRMADA**                                      | `canSell`/`canPublish`/`canAccessPanel` solo en los 2 archivos de la matriz. Cero tests que crucen los puntos de aplicación                                                                                       |
+| 6   | RLS de Fase 3 correcta                                | **CONFIRMADA**                                      | `0000_baseline.sql:219` ENABLE, `:230` FORCE, `:250` policy `tenant_isolation` sobre `tenant_mp_config`. Ejecutado en vivo: 8/8 cross-tenant                                                                      |
+| 7   | Migraciones con señal declarada                       | **CONFIRMADA**                                      | `check-migrations-applied.mjs` tiene `0003` y `0004`; cableado en `db:migrate`. `0004` idempotente                                                                                                                |
+| 8   | `turbo.json` sin las 2 variables                      | **CONFIRMADA**                                      | Declaradas en `packages/validation/src/env.ts:71,89`, ausentes del `env` de build                                                                                                                                 |
+| 9   | D13 (2 capas) parcial                                 | **CONFIRMADA y endurecida**                         | `register-tenant` tiene **solo integración**; `branding` **solo unitaria**. Ninguno tiene ambas                                                                                                                   |
 
 ---
 
@@ -62,13 +62,13 @@ Y hay una correlación que ninguno de los dos subagentes vio y que esta auditor�
 
 Ninguno cambia la dirección de un hallazgo. Todos son de precisión.
 
-| # | Qué afirmación | Por qué está mal | Evidencia |
-| --- | --- | --- | --- |
-| **E1** | "Ítem 100: `pnpm typecheck` no ve los tests; `pnpm build` sí" | **REFUTADO como regla general.** Solo `apps/admin` excluye tests de su programa | `apps/admin/tsconfig.json` → `exclude: ["node_modules","**/__tests__/**"]`; storefront y superadmin solo excluyen `node_modules`. Empírico con `tsc --noEmit --listFiles`: **superadmin 4**, **storefront 16**, **admin 0** test files en el programa |
-| **E2** | "Sin `DATABASE_APP_URL` esos 39 tests desaparecen en silencio" | Mecanismo equivocado, y el escenario real es peor | 2 de los 5 guardan con `DATABASE_URL` (no la de app). Si faltara **solo** `DATABASE_APP_URL`, esos **20** tests seguirían corriendo y su `beforeAll` reventaría con el throw de `packages/db/src/index.ts:6-11` → **20 en ROJO**, no skip. El skip silencioso total ocurre en CI, por dummy URLs (H-2) |
-| **E3** | Ítem 98: "seis `describe.skipIf`", guards homogéneos | Off-by-one y homogeneización falsa | Son **5 en 5 archivos**, no 6. Los guards: 2 sobre `DATABASE_URL`, 2 sobre `DATABASE_APP_URL`, y **1 que exige ambas** (`subscription-transition.test.ts:77`) |
-| **E4** | Discrepancia #2: `README:548` contradice a `:515` | **Matizable.** Es línea de changelog append-only, no afirmación de estado | `:515` (889/78) es el estado actual y **coincide** con la corrida. `:548` es historia. AGENTS.md exige que el changelog sea append-only: señalarlo como contradicción fue leer una línea con la regla equivocada |
-| **E5** | Tabla de endpoints: "6 rutas + branding" | Subcontado | Faltan además `/api/register-tenant`, `/api/webhooks/mercadopago/subscriptions`, y los `health`/`auth` de admin |
+| #      | Qué afirmación                                                 | Por qué está mal                                                                | Evidencia                                                                                                                                                                                                                                                                                              |
+| ------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **E1** | "Ítem 100: `pnpm typecheck` no ve los tests; `pnpm build` sí"  | **REFUTADO como regla general.** Solo `apps/admin` excluye tests de su programa | `apps/admin/tsconfig.json` → `exclude: ["node_modules","**/__tests__/**"]`; storefront y superadmin solo excluyen `node_modules`. Empírico con `tsc --noEmit --listFiles`: **superadmin 4**, **storefront 16**, **admin 0** test files en el programa                                                  |
+| **E2** | "Sin `DATABASE_APP_URL` esos 39 tests desaparecen en silencio" | Mecanismo equivocado, y el escenario real es peor                               | 2 de los 5 guardan con `DATABASE_URL` (no la de app). Si faltara **solo** `DATABASE_APP_URL`, esos **20** tests seguirían corriendo y su `beforeAll` reventaría con el throw de `packages/db/src/index.ts:6-11` → **20 en ROJO**, no skip. El skip silencioso total ocurre en CI, por dummy URLs (H-2) |
+| **E3** | Ítem 98: "seis `describe.skipIf`", guards homogéneos           | Off-by-one y homogeneización falsa                                              | Son **5 en 5 archivos**, no 6. Los guards: 2 sobre `DATABASE_URL`, 2 sobre `DATABASE_APP_URL`, y **1 que exige ambas** (`subscription-transition.test.ts:77`)                                                                                                                                          |
+| **E4** | Discrepancia #2: `README:548` contradice a `:515`              | **Matizable.** Es línea de changelog append-only, no afirmación de estado       | `:515` (889/78) es el estado actual y **coincide** con la corrida. `:548` es historia. AGENTS.md exige que el changelog sea append-only: señalarlo como contradicción fue leer una línea con la regla equivocada                                                                                       |
+| **E5** | Tabla de endpoints: "6 rutas + branding"                       | Subcontado                                                                      | Faltan además `/api/register-tenant`, `/api/webhooks/mercadopago/subscriptions`, y los `health`/`auth` de admin                                                                                                                                                                                        |
 
 ### Error adicional — fuera de #257
 
@@ -101,7 +101,7 @@ El **reporte de reincorporación** de esta sesión afirmó que "`pnpm typecheck`
 - **Evidencia:**
   - `.github/workflows/ci.yml:48-49` escribe `postgresql://dummy:dummy@localhost:5432/dummy` para `DATABASE_URL` y `DATABASE_APP_URL`.
   - `.github/workflows/e2e.yml:131-134` corre contra Neon real **solo** `rls-cross-tenant` y `preapproval-tenant-resolution` (14 tests).
-  - El comentario de `e2e.yml:129-130` dice textualmente: *"Un archivo nuevo que dependa de la DB tiene que agregarse aca: en `build` pasaria verde sin ejecutar nada."*
+  - El comentario de `e2e.yml:129-130` dice textualmente: _"Un archivo nuevo que dependa de la DB tiene que agregarse aca: en `build` pasaria verde sin ejecutar nada."_
   - Faltan: `register-tenant` (**15**), `tenant-lifecycle` (**5**), `subscription-transition` (**5**) = **25**.
 - **Impacto:** el job `build` reporta verde sin haber ejecutado un solo test contra la DB. Y el **endpoint público de alta de tenant tiene cobertura efectiva cero en CI**: sus 15 tests son su única evidencia y no corren. La regla estaba escrita en el archivo; simplemente no se aplicó.
 - **Recomendación:** agregar los 3 archivos a `e2e.yml`. Convertir el comentario en un check automatizado (contar los `describe.skipIf(!...)` del repo contra los archivos listados en el workflow) para que la próxima no dependa de que alguien lo lea.
@@ -118,7 +118,7 @@ El **reporte de reincorporación** de esta sesión afirmó que "`pnpm typecheck`
 
 **El upload de branding no valida tamaño ni sanitiza el nombre de archivo usado como key de R2.**
 
-- **Evidencia:** solo chequea `file.size === 0` (`route.ts:46`); `Buffer.from(await file.arrayBuffer())` (`:66`) carga todo en memoria. Key construida como `` branding/${tenantId}/${randomUUID()}-${file.name} `` (`:69`) con `file.name` controlado por el cliente. `getPublicUrl` (`packages/storage/src/index.ts:59-74`) no sanitiza, así que nombres con `#`, `?` o espacios rompen la URL devuelta. Acepta `image/svg+xml` (hoy inocuo: se renderiza en `<img>`). No borra el logo anterior: quedan objetos huérfanos en R2 (`deleteImage` sí se usa en products, no acá).
+- **Evidencia:** solo chequea `file.size === 0` (`route.ts:46`); `Buffer.from(await file.arrayBuffer())` (`:66`) carga todo en memoria. Key construida como `branding/${tenantId}/${randomUUID()}-${file.name}` (`:69`) con `file.name` controlado por el cliente. `getPublicUrl` (`packages/storage/src/index.ts:59-74`) no sanitiza, así que nombres con `#`, `?` o espacios rompen la URL devuelta. Acepta `image/svg+xml` (hoy inocuo: se renderiza en `<img>`). No borra el logo anterior: quedan objetos huérfanos en R2 (`deleteImage` sí se usa en products, no acá).
 - **Costo:** ~1 h.
 
 ### H-F3-v2-5 — **MEDIO** · Código / Config
@@ -151,12 +151,12 @@ La primera pasada concluyó que el criterio de T10 era la causa raíz y que el r
 
 **Donde la primera pasada fue demasiado generosa:** con la comparación completa de los 15 criterios de salida, T10 no es el único débil. Lo son **T8, T12 y T14** también — y ese no es un detalle.
 
-| Task | Criterio | Problema |
-| --- | --- | --- |
-| T8 | "Test: sin fila de MP, el checkout **rechaza** con mensaje claro" | **Se cumple con el defecto que debía detectar.** El checkout rechaza *precisamente porque* la fila nunca se creó (ítem 104). El criterio pasa mientras `encryptToken` falle en silencio |
-| T10 | "una tabla de tests que cubre las 8 combinaciones" | Sin efecto observable |
-| T12 | "recorrido completo en local... Sin errores de consola" | Subjetivo, no automatizable |
-| T14 | "El panel **no ofrece acciones** fuera de su estado" | Nombra la enforcing, no exige verificarla. Es S5, sin empezar |
+| Task | Criterio                                                          | Problema                                                                                                                                                                                |
+| ---- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T8   | "Test: sin fila de MP, el checkout **rechaza** con mensaje claro" | **Se cumple con el defecto que debía detectar.** El checkout rechaza _precisamente porque_ la fila nunca se creó (ítem 104). El criterio pasa mientras `encryptToken` falle en silencio |
+| T10  | "una tabla de tests que cubre las 8 combinaciones"                | Sin efecto observable                                                                                                                                                                   |
+| T12  | "recorrido completo en local... Sin errores de consola"           | Subjetivo, no automatizable                                                                                                                                                             |
+| T14  | "El panel **no ofrece acciones** fuera de su estado"              | Nombra la enforcing, no exige verificarla. Es S5, sin empezar                                                                                                                           |
 
 **Donde la primera pasada fue demasiado amplia:** los demás criterios (T1, T3, T4, T5, T7, T9, T11) **sí exigen efecto observable**. T5 hasta exige verificación en rojo — mutar el `WHERE` y comprobar que el test falla. El plan no es culturalmente débil.
 
@@ -168,17 +168,17 @@ La consecuencia práctica es más barata y más accionable que "cambiar la cultu
 
 ## Análisis de procesos
 
-| Proceso | ¿Funcionó? | Evidencia |
-| --- | --- | --- |
-| Issues por slice | **Mejoró** | #252–#256 cubren S3b–S6 |
-| Issues abiertos = trabajo pendiente | **Parcial** | #253 ("aplicar guards") ya sabía que faltaban, pero #250 se cerró como si no faltaran. **Dos issues se contradicen** |
-| Cierre de issues | **Falló** | #250 cerrado con criterios incumplidos. La regla de AGENTS.md verifica `state`, no contenido |
-| Specs actualizados | **No** | `spec:329` dice que 65 y 67 bloquean; cerraron en S2 |
-| Ritual de cierre | **Falló 1 vez (2ª ocurrencia)** | S4a sin bitácora → "entrada tardía". El ítem 102 lo predijo y reincidió |
-| Migraciones antes del código | **Falló en S4a** | `bitacora.md:4695` — `logoUrl` commiteado antes de `0004`, 7 tests en rojo |
-| **Workflows de DB** | **Falló** | H-F3-v2-2: la regla estaba escrita en `e2e.yml` y no se aplicó |
-| Engram antes del commit | **Funcionó** | Todos los slices con memoria commiteada |
-| Falsos positivos de PowerShell | **No se repitió** | Ninguno de los dos subagentes reportó mojibake. El ítem 106 empieza a dar resultado |
+| Proceso                             | ¿Funcionó?                      | Evidencia                                                                                                            |
+| ----------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Issues por slice                    | **Mejoró**                      | #252–#256 cubren S3b–S6                                                                                              |
+| Issues abiertos = trabajo pendiente | **Parcial**                     | #253 ("aplicar guards") ya sabía que faltaban, pero #250 se cerró como si no faltaran. **Dos issues se contradicen** |
+| Cierre de issues                    | **Falló**                       | #250 cerrado con criterios incumplidos. La regla de AGENTS.md verifica `state`, no contenido                         |
+| Specs actualizados                  | **No**                          | `spec:329` dice que 65 y 67 bloquean; cerraron en S2                                                                 |
+| Ritual de cierre                    | **Falló 1 vez (2ª ocurrencia)** | S4a sin bitácora → "entrada tardía". El ítem 102 lo predijo y reincidió                                              |
+| Migraciones antes del código        | **Falló en S4a**                | `bitacora.md:4695` — `logoUrl` commiteado antes de `0004`, 7 tests en rojo                                           |
+| **Workflows de DB**                 | **Falló**                       | H-F3-v2-2: la regla estaba escrita en `e2e.yml` y no se aplicó                                                       |
+| Engram antes del commit             | **Funcionó**                    | Todos los slices con memoria commiteada                                                                              |
+| Falsos positivos de PowerShell      | **No se repitió**               | Ninguno de los dos subagentes reportó mojibake. El ítem 106 empieza a dar resultado                                  |
 
 ---
 
@@ -188,13 +188,13 @@ La consecuencia práctica es más barata y más accionable que "cambiar la cultu
 
 Orden actualizado (incorporando lo que encontró esta pasada):
 
-| Orden | Acción | Por qué |
-| --- | --- | --- |
-| 1 | **Decidir el alcance del ítem 103** y corregir el criterio de salida de T10 **junto con T8, T12 y T14** | Los 4 comparten el defecto. Corregir solo T10 deja los otros 3 |
-| 2 | **H-F3-v2-1: decidir la fuente de verdad del logo** antes de S5 | S5 construye UI de onboarding. Construir sobre dos fuentes de verdad multiplica el costo |
-| 3 | **H-F3-v2-2: agregar los 3 archivos a `e2e.yml`** | 25 tests sin ejecutar, incluido el endpoint público de alta. Es lo más barato de la lista y lo que más riesgo cubre |
-| 4 | Ítem 18 / 104 dentro de T8 | ~1 h, desbloquea S3b |
-| 5 | Ítems 104–106 (`turbo.json`, plan vs slices) | Docs/config |
+| Orden | Acción                                                                                                  | Por qué                                                                                                             |
+| ----- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 1     | **Decidir el alcance del ítem 103** y corregir el criterio de salida de T10 **junto con T8, T12 y T14** | Los 4 comparten el defecto. Corregir solo T10 deja los otros 3                                                      |
+| 2     | **H-F3-v2-1: decidir la fuente de verdad del logo** antes de S5                                         | S5 construye UI de onboarding. Construir sobre dos fuentes de verdad multiplica el costo                            |
+| 3     | **H-F3-v2-2: agregar los 3 archivos a `e2e.yml`**                                                       | 25 tests sin ejecutar, incluido el endpoint público de alta. Es lo más barato de la lista y lo que más riesgo cubre |
+| 4     | Ítem 18 / 104 dentro de T8                                                                              | ~1 h, desbloquea S3b                                                                                                |
+| 5     | Ítems 104–106 (`turbo.json`, plan vs slices)                                                            | Docs/config                                                                                                         |
 
 **Lo que cambió respecto de la primera pasada:** la lista de "cosas que no son un problema" es más corta de lo que parecía. El ítem 98 era menos grave de lo reportado (no es un skip silencioso por variable faltante), pero la causa real es peor — **CI nunca corre esos 39 tests, y 25 de ellos no corren en ningún lado**.
 
