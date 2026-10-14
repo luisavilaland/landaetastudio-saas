@@ -68,6 +68,10 @@ export type {
 } from './tenant-lifecycle'
 export { activateTenant } from './tenant-lifecycle'
 
+// S4c: el paso que faltaba entre "estado guardado" y "permisos".
+// Sin esto, cada endpoint que aplica un guard repite la resolucion.
+export { getPermissions } from './tenant-permissions'
+
 export type {
   ProrationInput,
   ProrationResult,
