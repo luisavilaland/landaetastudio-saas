@@ -20,3 +20,4 @@ tags:
 - [[s4c-en-curso-17-guards-aplicados-tests-pendientes-68-en-rojo-306]]
 - [[s4c-refinamiento-validado-68-11-3-archivos-pendientes-307]]
 - [[s4c-completo-17-guards-item-103-cerrado-308]]
+- [[auditor-a-s4c-property-16-16-pero-cobertura-7-16-310]]
