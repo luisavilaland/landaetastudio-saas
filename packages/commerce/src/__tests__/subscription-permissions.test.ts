@@ -24,11 +24,17 @@ import {
 // de estados de la seccion 1. Hoy el transversal dice 6 estados y el codigo
 // tiene 7.
 describe('derivePermissions', () => {
-  it('pending_first_payment: sin panel, sin escritura, sin storefront', () => {
+  it('pending_first_payment: panel read-only (item 96), sin escritura, sin storefront', () => {
     const p = derivePermissions('pending_first_payment')
 
-    expect(p.canAccessPanel).toBe('none')
+    // Item 96 (2026-10-10): antes era 'none'. El onboarding exige configurar
+    // subdominio, branding y MP antes de pagar; con 'none' ese paso es
+    // inejecutable. `canAccessStorefront` sigue en `false` porque D2 deja el
+    // subdominio sin resolver hasta que el pago activa el tenant: el owner
+    // entra a su panel, el comprador no entra a la tienda.
+    expect(p.canAccessPanel).toBe('readonly')
     expect(p.canAccessStorefront).toBe(false)
+    expect(p.canSell).toBe(false)
     expect(p.canWrite).toBe(false)
     expect(p.canChangePlan).toBe(false)
     expect(p.canCancel).toBe(false)
@@ -97,11 +103,14 @@ describe('derivePermissions', () => {
     expect(p.canResume).toBe(false)
   })
 
-  it('expired: panel bloqueado, pero se puede reactivar', () => {
+  it('expired: panel read-only (item 97), pero se puede reactivar', () => {
     const p = derivePermissions('expired')
 
-    expect(p.canAccessPanel).toBe('none')
+    // Item 97 (2026-10-10): antes era 'none'. Bloquear el acceso deja al tenant
+    // sin poder ver que perdio, y un `expired` es un tenant que tuvo tienda.
+    expect(p.canAccessPanel).toBe('readonly')
     expect(p.canAccessStorefront).toBe(false)
+    expect(p.canSell).toBe(false)
     expect(p.canWrite).toBe(false)
     expect(p.canChangePlan).toBe(false)
     expect(p.canCancel).toBe(false)
@@ -110,11 +119,15 @@ describe('derivePermissions', () => {
     expect(p.canResume).toBe(false)
   })
 
-  it('abandoned: registro incompleto, sin reactivacion', () => {
+  it('abandoned: panel read-only (item 97), sin reactivacion', () => {
     const p = derivePermissions('abandoned')
 
-    expect(p.canAccessPanel).toBe('none')
+    // Item 97 (2026-10-10): antes era 'none'. `abandoned` es "se dio de alta y
+    // no pago" - cortarle el acceso no agrega nada: la deuda es de MercadoPago,
+    // no del tenant. Su boton sigue siendo "Completar pago", no "Reactivar".
+    expect(p.canAccessPanel).toBe('readonly')
     expect(p.canAccessStorefront).toBe(false)
+    expect(p.canSell).toBe(false)
     expect(p.canWrite).toBe(false)
     expect(p.canChangePlan).toBe(false)
     expect(p.canCancel).toBe(false)
@@ -150,6 +163,7 @@ describe('derivePermissions — matriz completa (proteccion contra regresiones)'
         status,
         p.canAccessPanel,
         p.canAccessStorefront,
+        p.canSell,
         p.canWrite,
         p.canChangePlan,
         p.canCancel,
@@ -159,15 +173,51 @@ describe('derivePermissions — matriz completa (proteccion contra regresiones)'
       ].join('|')
     })
 
+    // `canSell` entra al snapshot en S4b. Es lo que separa "la tienda responde"
+    // de "la tienda vende": `cancelled` responde en read-only y no vende, y
+    // `past_due` no escribe pero vende.
+    //
+    // Los tres cambios de panel (`pending_first_payment`, `expired`,
+    // `abandoned`: `none` -> `readonly`) son los items 96 y 97, decisions del
+    // 2026-10-10. Antes de S4b este snapshot consagrava `none` y hacia que el
+    // item 96 fuera papel mojado sin que ningun test lo dijera.
     expect(snapshot).toEqual([
-      'pending_first_payment|none|false|false|false|false|false|false|false',
-      'active|full|true|true|true|true|false|true|false',
-      'past_due|limited|true|false|false|false|false|false|false',
-      'paused|limited|true|false|false|true|false|false|true',
-      'cancelled|readonly|true|false|false|false|true|false|false',
-      'expired|none|false|false|false|false|true|false|false',
-      'abandoned|none|false|false|false|false|false|false|false',
+      'pending_first_payment|readonly|false|false|false|false|false|false|false|false',
+      'active|full|true|true|true|true|true|false|true|false',
+      'past_due|limited|true|true|false|false|false|false|false|false',
+      'paused|limited|true|true|false|false|true|false|false|true',
+      'cancelled|readonly|true|false|false|false|false|true|false|false',
+      'expired|readonly|false|false|false|false|false|true|false|false',
+      'abandoned|readonly|false|false|false|false|false|false|false|false',
     ])
+  })
+
+  /**
+   * D17: `past_due` es el unico estado que vende sin escribir.
+   *
+   * La asimetria es deliberada y el motivo esta escrito en el design: el
+   * comprador no fallo el pago, el tenant si. Cortarle la tienda castiga al
+   * que no corresponde.
+   */
+  it('past_due vende pero no escribe: la asimetria de D17', () => {
+    const p = derivePermissions('past_due')
+
+    expect(p.canSell).toBe(true)
+    expect(p.canWrite).toBe(false)
+  })
+
+  it('canAccessStorefront y canSell no son el mismo permiso', () => {
+    // `cancelled` responde hasta fin de periodo pero no acepta pedidos. Si
+    //estos estuvieran fusionados, se perderia ese caso.
+    const c = derivePermissions('cancelled')
+    expect(c.canAccessStorefront).toBe(true)
+    expect(c.canSell).toBe(false)
+
+    // Y el caso inverso: `past_due` vende aunque su `canAccessStorefront`
+    // no dice nada especial.
+    const p = derivePermissions('past_due')
+    expect(p.canAccessStorefront).toBe(true)
+    expect(p.canSell).toBe(true)
   })
 
   it('solo active puede escribir y cambiar de plan', () => {
@@ -210,12 +260,9 @@ describe('derivePermissions — matriz completa (proteccion contra regresiones)'
   })
 
   it('el storefront queda abierto en active, past_due, paused y cancelled', () => {
-    expect(ALL.filter((s) => derivePermissions(s).canAccessStorefront)).toEqual([
-      'active',
-      'past_due',
-      'paused',
-      'cancelled',
-    ])
+    expect(ALL.filter((s) => derivePermissions(s).canAccessStorefront)).toEqual(
+      ['active', 'past_due', 'paused', 'cancelled'],
+    )
   })
 
   it('cancelled y expired son los unicos reactivables (reactivate legacy)', () => {

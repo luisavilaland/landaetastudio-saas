@@ -4145,6 +4145,33 @@ que diga si debe poder editar el catalogo, cobrar, o solo mirar.
 gate por status en el middleware de `apps/admin` (hoy `authorize()` no mira `tenants.status`).
 El gate no va en `authorize()` salvo para el caso de `abandoned`, que si deberia cortar el
 acceso de entrada: un tenant abandonado es uno que ya dio de alta su tienda y no pago.
+
+**RESUELTO (2026-10-14, S4b / PR pendiente).** La fila de `abandoned` faltaba en
+la tabla de D17, y por eso este item existia. Las tres dimensiones quedaron
+respondidas:
+
+| Estado               | Panel              | Vende  | Decisión                                               |
+| -------------------- | ------------------ | ------ | ------------------------------------------------------ |
+| `pending`            | sí (read-only)     | no     | item 96: el onboarding exige configurar antes de pagar |
+| `active`             | sí                 | sí     | -                                                      |
+| `past_due`           | sí (limited)       | **sí** | D17: vende durante la gracia, no publica               |
+| `expired`            | sí (**read-only**) | no     | item 97: ver lo que perdió, no escribir                |
+| `abandoned`          | sí (**read-only**) | no     | item 97: la deuda es de MP, no del tenant              |
+| `suspended` (tenant) | **no**             | no     | bloqueo de plataforma, no deudor                       |
+| `cancelled` (tenant) | sí (read-only)     | no     | dio de baja su tienda                                  |
+
+**La conclusión anterior del item era incorrecta y quedó corregida:** decía que
+`abandoned` "sí debería cortar el acceso de entrada". Lo contrario es lo
+decidido: cortar el acceso no agrega nada y deja al tenant sin poder ver nada.
+
+Implementación: `deriveTenantPermissions(tenantStatus, subscriptionStatus)` en
+`packages/commerce/src/subscription-permissions.ts`, 34 tests. Se actualizaron
+los **dos** specs que declaraban la tabla, porque el código dice que el spec es
+la fuente de verdad.
+
+**Lo que NO se resuelve acá:** imponer el permiso en el request. `canAccessPanel`
+vive en la respuesta de `GET /api/subscriptions` y en nada más. Ver item 101.
+
 ---
 
 ## 98. `describe.skipIf(!canRun)` puede dejar la suite en verde sin ejecutar la integracion
@@ -4235,3 +4262,126 @@ en producción, no en un escenario teórico.
 **Nota sobre la tasa.** 1 de 9 en esta sesión. Es suficiente para que un PR de
 cambio grande dequeBuilt sobre una corrida verde haya podido no ejecutar la
 integración.
+---
+
+## 100. `pnpm typecheck` pasa pero `pnpm build` falla por los tests
+
+**Severidad:** BAJA · **Estado:** ABIERTO · **Origen:** detectado en S4a (#249).
+
+**Problema.** Los dos comandos no chequean lo mismo:
+
+| Comando          | Que corre                      | Ve los tests |
+| ---------------- | ------------------------------ | ------------ |
+| `pnpm typecheck` | `tsc --noEmit` por paquete     | **no**       |
+| `pnpm build`     | `next build`, que type-checkea | **si**       |
+
+Al agregar `tenants.logoUrl` (S4a, T11), un literal de `Tenant` en
+`apps/superadmin/app/api/tenants/[id]/__tests__/route.test.ts` quedo incompleto.
+Resultado: `pnpm typecheck` dio **9/9 verde** y `pnpm build` revento con
+`TS2741: Property 'logoUrl' is missing`.
+
+**Por que importa aunque la severidad sea baja.** La asimetria engana en el
+sentido contrario al habitual: uno corre el chequeo rapido, ve verde, yemasuma
+que los tipos estan. El typecheck no miente sobre lo que cubre, pero **su
+silencio se lee como cobertura**. Con 853 tests que construyen literales de
+schema, cualquier columna nueva tiene esa probabilidad.
+
+**Fix propuesto.** Dos opciones, y la decision es de criterio:
+
+1. **Extender `typecheck` para incluir los tests.** Tarda mas, pero despues
+   un typecheck verde si significa "todo compila" y el feedback llega antes del
+   build, que es donde cuesta mucho mas.
+2. **Documentar que `build` es el check autoritativo para tipos.** Barato, pero
+   deja el feedback tarde: el error aparece recien en el paso mas caro del DoD.
+
+La opcion 1 es la que evita el error en el lugar donde todavia es barato.
+
+---
+
+## 101. `canAccessPanel` no tiene middleware donde vivir
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** detectado al disenar S4b (T10).
+
+**Problema.** `derivePermissions` ya devuelve `canAccessPanel` desde antes de
+Fase 3, y el item 97 (que S4b cerro) lo que busca definir es exactamente esa
+dimension. Pero **`apps/admin` no tiene `middleware.ts` ni `proxy.ts`**: no hay
+ningun punto del ciclo de request donde aplicar el permiso.
+
+El unico lugar donde hoy se lee `permissions` es `GET /api/subscriptions`, que
+es un endpoint de datos, no un filtro de acceso. La UI recibe el permiso y decide
+que mostrar; **nadie lo impone**.
+
+**Por que no es un detalle de plumbing.** Sin el, el permiso es una sugerencia
+que el cliente puede ignorar: `canAccessPanel: 'none'` para un tenant `suspended`
+vive en la respuesta del GET y en nada mas. Es el item 61 aplicado a la
+autorizacion: un control que acompana y no verifica.
+
+**Costo de crearlo.** `apps/admin` resuelve el tenant por sesion en cada
+endpoint, no por host como el storefront. Agregar un middleware significa
+decidir si corre en todas las rutas (y entonces resolver el tenant **antes** de
+que exista la sesion, que es imposible) o solo en las de API (y entonces no
+cubre las paginas). Las dos opciones cambian el routing de la app.
+
+**Fix propuesto.** Para S4d:
+
+1. Decidir el alcance: solo `app/api/**` o tambien las paginas.
+2. Si son solo las de API, el chequeo va **despues** de `auth()`, no antes, y se
+   apoya en un helper que reusa el permiso ya calculado en vez de repetir la
+   consulta.
+3. `suspended` redirige a la pagina de pago; `expired`/`abandoned` deja pasar en
+   modo lectura y las escrituras las rechaza el guard de `canPublish` (S4c).
+
+**Nota de alcance.** S4b deja la matriz completa y el consumidor de datos. La
+imposicion en el request es S4d, y hasta entonces `canAccessPanel` es un dato,
+no un control. Queda dicho para que nadie lo lea como resuelto.
+---
+
+## 102. El ritual de cierre se saltea cuando el DoD falla
+
+**Severidad:** BAJA · **Estado:** ABIERTO · **Origen:** detectado verificando la bitacora post-S4b (2026-10-14).
+
+**Problema.** S4a (#249) mergeo sin entrada de bitacora y sin export de Engram.
+Ninguno de los dos, en un PR que tiene 6 commits.
+
+**No fue una decision ni un olvido.** El DoD fallo con 7 tests en rojo por el
+orden de migracion (`tenants.logoUrl` declarado en el schema antes de aplicar la
+0004), la atencion se fue al fix, y cuando quedo verde el trabajo ya estaba
+commiteado y pusheado. La bitacora y el export son **el ultimo** paso, y el
+ultimo paso es el que se cae cuando el trabajo se complica.
+
+**Patron observado.** Cinco PRs seguidos de Fase 3 con bitacora completa; uno se
+salto el ritual entero. No es un rate alto: es un rate de 1 de 5, con una causa
+identificable.
+
+**Variante del item 80, con causa distinta.** El item 80 ("los PRs que cierran
+items no siempre actualizan la bitacora") describe el sintoma, pero no la causa.
+Este describe la **mecanica**: el ritual es lo primero que se omite cuando hay un
+bloqueo que resolver, y no se vuelve atras despues.
+
+**Por que importa mas de lo que parece.** La bitacora es el unico registro
+narrativo de por que se tomo una decision. Un PR sin ella deja el codigo sin su
+razon: seis meses despues, el `if (forcedRejection)` de T9 se lee como ruido y
+nadie sabe que sin el el tenant que paga se queda sin tienda. Los tres hallazgos
+que S4a produz (orden de migraciones, typecheck vs build, timeout de vitest) se
+usaron en S4b **un PR despues**, y el item 100 quedo registrado tarde por eso.
+
+**Fix propuesto.** Tres opciones, con su costo:
+
+- **Opcion A: automatizar el export y el `mem_save` en el merge.** Resuelve el
+  item 91 tambien, porque las dos fricciones son la misma. Es la unica que
+  elimina la clase de problema en vez de detectarla.
+- **Opcion B: un paso del DoD que falle si el PR no tiene bitacora.** Es ruido
+  para los PRs que.tool gestiona, y ademas empuja la escritura al final otra vez,
+  que es justo donde se cae.
+- **Opcion C: aceptarlo como friccion humana.** El item 80 lo cubre
+  parcialmente. Es la opcion honesta si no se quiere invertir en A.
+
+**Lo que no se hizo en la correccion.** La entrada de S4a se escribio tarde y en
+otro PR (#251), no en el #249. Reescribir un PR mergeado para agregarle la
+bitacora seria peor que la falta: rompe el append-only y cambia la historia que
+todos ya leyeron. Un registro tardio con la razon a la vista es preferible a un
+registro reescrito, o a ninguno.
+
+**Familia:** misma friccion que el item 91 (el export manual genera un PR
+propio). Los dos son el mismo problema mirando fases distintas: el export
+manual, y el ritual de cierre que lo rodea.
