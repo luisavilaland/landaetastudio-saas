@@ -36,9 +36,15 @@ export { safeGet, redisSetEx, redisDel, redisIncr, redisPexpire } from './redis'
 export type {
   SubscriptionPermissions,
   SubscriptionStatus,
+  TenantStatus,
   PanelAccess,
 } from './subscription-permissions'
-export { derivePermissions } from './subscription-permissions'
+export {
+  derivePermissions,
+  // S4b / T10: version de dos dimensiones. `derivePermissions` responde por la
+  // suscripcion; esta combina suscripcion + `tenants.status`.
+  deriveTenantPermissions,
+} from './subscription-permissions'
 
 // Item 61 (H-T6-1): transicion de suscripcion con el filtro por tenant
 // garantizado por construccion. Vive en commerce (y no en @repo/db) porque
