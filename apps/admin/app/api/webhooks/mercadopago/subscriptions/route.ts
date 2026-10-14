@@ -4,6 +4,7 @@ import type { DbLike } from '@repo/db'
 import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import {
+  activateTenant,
   classifyMpEvent,
   fromMpAmount,
   getAuthorizedPayment,
@@ -100,7 +101,6 @@ interface Resolved {
   preapprovalId: string
 }
 
-
 export async function POST(request: NextRequest) {
   try {
     // 1. Secret. Los webhooks de suscripciones los firma la cuenta de
@@ -182,12 +182,24 @@ export async function POST(request: NextRequest) {
 
     if (!token) {
       logger.error('MP_PLATFORM_ACCESS_TOKEN not configured')
-      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+      return NextResponse.json(
+        { error: 'Webhook not configured' },
+        { status: 503 },
+      )
     }
 
-    const outcome = await handleEvent({ topic, dataId, action: parsed.action ?? '', liveMode, token })
+    const outcome = await handleEvent({
+      topic,
+      dataId,
+      action: parsed.action ?? '',
+      liveMode,
+      token,
+    })
 
-    logger.info({ topic, dataId, liveMode, ...outcome }, 'Subscription webhook handled')
+    logger.info(
+      { topic, dataId, liveMode, ...outcome },
+      'Subscription webhook handled',
+    )
 
     return NextResponse.json(outcome, { status: 200 })
   } catch (error) {
@@ -212,7 +224,9 @@ interface HandleInput {
   token: string
 }
 
-async function handleEvent(input: HandleInput): Promise<Record<string, unknown>> {
+async function handleEvent(
+  input: HandleInput,
+): Promise<Record<string, unknown>> {
   const { topic, dataId, action, token } = input
 
   if (topic === 'payment') {
@@ -572,7 +586,49 @@ async function applyTransition(
       )
     }
 
-    const target = decideTarget(eventKind, input.approved, current, input.mpStatus)
+    const target = decideTarget(
+      eventKind,
+      input.approved,
+      current,
+      input.mpStatus,
+    )
+
+    // T9: activar el tenant cuando la suscripcion queda (o ya esta) `active`.
+    //
+    // **Va antes de los early-returns, y es a proposito.** Si la activacion
+    // estuviera al final, solo correria cuando la transicion acaba de aplicar.
+    // Pero el webhook es idempotente por `lastProcessedPaymentId` (L597) y por
+    // convergencia de estado: un reintento de MP cae en `no_transition`,
+    // `converged` o `duplicate_payment` y **nunca llegaria a la activacion**. El
+    // resultado seria un tenant que pago y sigue `pending`, sin tienda, y solo
+    // recuperable a mano por el superadmin.
+    //
+    // La condicion es el estado **efectivo** de la suscripcion, no "la
+    // transicion aplico": `target ?? current`. Asi un pago rechazado, cuyo
+    // target nunca es `active`, no activa nada.
+    //
+    // Repetir la llamada cuando el tenant ya esta `active` cuesta un `UPDATE`
+    // indexado que no matchea (el `WHERE` de `activateTenant` es
+    // `id AND status = 'pending'`), y devuelve `{ applied: false, reason:
+    // 'not_pending' }`.
+    const effectiveStatus = target ?? current
+    let tenantActivation: 'applied' | 'already' | 'not_applicable' =
+      'not_applicable'
+    if (effectiveStatus === 'active') {
+      const activation = await activateTenant(tx, resolved.tenantId, {
+        updatedAt: new Date(),
+      })
+      tenantActivation = activation.applied ? 'applied' : 'already'
+      logger.info(
+        {
+          tenantId: resolved.tenantId,
+          effectiveStatus,
+          eventKind,
+          tenantActivation,
+        },
+        'Tenant activation evaluated',
+      )
+    }
 
     if (!target) {
       // Transiciones 2, 3, 5 y 7: sin cambio. No se escribe.
@@ -580,7 +636,12 @@ async function applyTransition(
         { tenantId: resolved.tenantId, current, eventKind },
         'No transition applies (already converged or not applicable)',
       )
-      return { applied: false, from: current, reason: 'no_transition' }
+      return {
+        applied: false,
+        from: current,
+        reason: 'no_transition',
+        tenantActivation,
+      }
     }
 
     if (target === current) {
@@ -588,22 +649,29 @@ async function applyTransition(
         { tenantId: resolved.tenantId, current },
         'Status already at target - idempotent no-op',
       )
-      return { applied: false, from: current, to: target, reason: 'converged' }
+      return {
+        applied: false,
+        from: current,
+        to: target,
+        reason: 'converged',
+        tenantActivation,
+      }
     }
 
     // Guarda de pago ya procesado. `lastProcessedPaymentId` solo lo escriben los
     // eventos de tipo `payment`: para el resto, la idempotencia la da la
     // convergencia de estado.
     const paymentId = eventKind === 'payment' ? (input.paymentId ?? null) : null
-    if (
-      paymentId &&
-      row.lastProcessedPaymentId === paymentId
-    ) {
+    if (paymentId && row.lastProcessedPaymentId === paymentId) {
       logger.info(
         { tenantId: resolved.tenantId, paymentId },
         'Payment already processed - skipping',
       )
-      return { applied: false, reason: 'duplicate_payment' }
+      return {
+        applied: false,
+        reason: 'duplicate_payment',
+        tenantActivation,
+      }
     }
 
     const patch: SubscriptionPatch = {
@@ -662,7 +730,12 @@ async function applyTransition(
       'Subscription status transitioned',
     )
 
-    return { applied: true, from: current, to: target }
+    return {
+      applied: true,
+      from: current,
+      to: target,
+      tenantActivation,
+    }
   })
 }
 
@@ -710,7 +783,10 @@ async function verifyPlanAmountConvergence(
 
   const plan = planRows[0]
   if (!plan) {
-    logger.warn({ tenantId, planId }, 'H3: el plan local de la suscripcion no existe')
+    logger.warn(
+      { tenantId, planId },
+      'H3: el plan local de la suscripcion no existe',
+    )
     return
   }
 

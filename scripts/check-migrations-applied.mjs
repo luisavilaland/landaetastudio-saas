@@ -77,6 +77,13 @@ const EXPECTED = {
     //_reportando exito_.
     columns: { 'tenants.status': 'tenants_status' },
   },
+  '0004_tenants_logo_url': {
+    // La 0004 solo agrega una columna: no crea ningun tipo, indice ni funcion.
+    // La señal es **que la columna exista con el tipo `text`**, no que este
+    // nullable: nullable es lo esperable de una columna de branding y no
+    // distingue una migracion aplicada de una a medio aplicar.
+    columns: { 'tenants.logoUrl': 'text' },
+  },
 }
 
 async function main() {

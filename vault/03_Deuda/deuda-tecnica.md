@@ -3343,6 +3343,7 @@ identico antes y despues (3435).
 
 **Estado:** abierto (2026-10-08). Severidad MEDIA.
 **Culprit identificado (2026-10-09): NO es un test de Neon. Es `redis.test.ts`.**
+**Caracterización ampliada (2026-10-13, post-#247): presión sobre servicios remotos.** Ver abajo.
 
 **El titulo de este item estaba equivocado.** Dice "tests de DB" y asumia Neon, y durante
 seis meses el item estuvo abierto sin culprit con esa premisa. Es un test **de Redis**, y
@@ -3423,6 +3424,35 @@ tocaba el item 61 (110 tests, 3 veces), mas `e2e` en verde en CI. El culprit nun
 pudo capturarse: cuando el flake ocurre, el nombre del test no quedo en el output
 que se leyo. Cada flake tiene un culprit y una ventana de reproduccion, y no se
 conoce ninguno de los dos.
+
+### Caracterización ampliada (2026-10-13, post-#247): presión sobre servicios remotos
+
+Nombrar **un archivo** invita a arreglar ese archivo. La sesión de S4a lo
+demuestra: de **9 corridas** de la suite completa, **3 fallaron** y las tres
+fueron en el mismo lugar conceptual:
+
+| Corrida | Resultado                  | Archivo                                              |
+| ------- | -------------------------- | ---------------------------------------------------- |
+| 1 de 9  | `1 failed \| 836 passed`   | `redis.test.ts` (item 66, `redisPexpire`)            |
+| 1 de 9  | `1 failed \| 836 passed`   | `tenant-lifecycle.test.ts`                           |
+| 1 de 9  | `817 passed \| 20 skipped` | `tenant-lifecycle.test.ts` (por _skip_, ver item 98) |
+
+Los tres presionan un **servicio remoto**: Redis y Neon. No hay lógica sospechosa
+en ninguno, y los tres pasan **3 de 3 aislados**. El `ECONNRESET` que apareció
+antes del merge de #247 pertenece a la misma clase.
+
+**Por qué importa la distinción.** Arreglar `redis.test.ts` (el `await import`
+de Sentry dentro del `catch` de degradación, ver la sección anterior) dejaría los
+otros dos intactos, y el item se cerraría con el síntoma vivo. Lo que comparten no
+es un bug: es **presión sobre servicios remotos sin timeout propio**. El fix es
+de patrón —timeouts, aislamiento, reintentos— no de archivo.
+
+**Lo que este item YA diagnostiqué bien, y sigue en pie:** que el síntoma
+(timeouts) no venía de Neon. Ese es el hallazgo original y sigue siendo correcto.
+Lo que estaba mal era la **unidad**: un archivo en vez de una clase.
+
+**Tasa empírica acumulada:** 3 de 9 en esta sesión, más lo registrado en
+#235/#237. Ninguno reproducible en aislamiento.
 
 ## 79. PowerShell `>` decodifica bytes al redirigir
 
@@ -4171,3 +4201,37 @@ probar, y fallar ahi seria peor que saltar.
 
 **Nota de alcance.** No bloquea #247 (arregla el aislamiento de dos asserts) ni el
 cierre de S3. Es deuda propia.
+---
+
+### Evidencia observada (2026-10-13, post-#247): el caso que este item predijo
+
+Este item se escribió **antes** de que el caso ocurriera. Ocurrió.
+
+Durante la verificación post-merge de #247 se corrió la suite completa **9 veces**:
+
+| Corrida | Resultado                                                         |
+| ------- | ----------------------------------------------------------------- |
+| 7       | `837 passed (837)`                                                |
+| 1       | `1 failed \| 836 passed` — `redis.test.ts` (item 78)              |
+| 1       | **`817 passed \| 20 skipped (837)`** — `tenant-lifecycle.test.ts` |
+
+El `20 skipped` es exactamente lo que el item describe: `canRun =
+isUsableUrl(process.env.DATABASE_URL)` dio `false` en varios archivos a la vez y
+los `describe` se saltearon **en silencio**. La corrida no falló: reported
+`Test Files 76 passed (76)`.
+
+**Lo que hace esto GRAVE.** `819 passed + 20 skipped` se lee como casi-verde en
+cualquier review, y un número de tests "alto" refuerza esa lectura. Los 20 tests
+que no corrieron son parte de la **única cobertura contra Neon** de transición de
+suscripción, activación de tenant, preapproval y RLS cross-tenant. Un día entero
+de trabajo puede no ejecutarse y el exit code sigue siendo 0.
+
+**Confirma la propuesta de fix.** `REQUIRE_DB_TESTS=1` ya no es hipótesis: sin él,
+`pnpm test` puede devolver verde sin haber corrido nada de lo que importa. La
+diferencia entre "no hay `DATABASE_URL`" (skip correcto, pero debe ser visible) y
+"`DATABASE_URL` presente pero inservible" (skip que es una trampa) ya se produjo
+en producción, no en un escenario teórico.
+
+**Nota sobre la tasa.** 1 de 9 en esta sesión. Es suficiente para que un PR de
+cambio grande dequeBuilt sobre una corrida verde haya podido no ejecutar la
+integración.

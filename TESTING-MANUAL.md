@@ -222,7 +222,7 @@
 pnpm test
 ```
 
-- [x] 837 tests pasando (76 archivos)
+- [x] 853 tests pasando (77 archivos)
 - [x] 0 tests fallando
 
 ```bash

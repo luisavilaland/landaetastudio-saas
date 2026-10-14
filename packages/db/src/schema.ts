@@ -46,6 +46,10 @@ export const dbTenants = pgTable('tenants', {
   id: uuid('id').primaryKey().defaultRandom(),
   slug: text('slug').unique().notNull(),
   customDomain: text('customDomain').unique(),
+  // T11 / D16: branding basico. Solo el logo; `name` ya existe y
+  // `brandColor` / `description` van a Fase 4 (mismo criterio que `customDomain`,
+  // que necesita emision y verificacion de DNS).
+  logoUrl: text('logoUrl'),
   name: text('name').notNull(),
   plan: text('plan').default('starter'),
   status: tenantsStatus('status').default('pending'),

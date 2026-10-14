@@ -53,6 +53,10 @@ const baseTenant: Tenant = {
   plan: 'starter',
   status: 'active',
   customDomain: null,
+  // T11: la columna existe desde 0004. Nullable, asi que el valor por defecto de
+  // un tenant sin branding es `null`, no ausente. El literal tiene que incluirla:
+  // `pnpm build` type-checkea los tests y sin esto falla con TS2741.
+  logoUrl: null,
   settings: {},
   createdAt: new Date(),
   updatedAt: new Date(),
