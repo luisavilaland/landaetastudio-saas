@@ -5,6 +5,12 @@ import { makeTxMock } from '@repo/test-utils'
 // S4c/item 103: se mockea getPermissions (la FUENTE), no el guard.
 // El endpoint sigue llamando al guard REAL: si alguien borra la linea del
 // guard, el 403 no aparece y el test falla.
+//
+// Item 117: este archivo tambien necesita la cobertura de denegacion de PUT y
+// DELETE. Antes el header prometia un assert de 403 que el archivo no tenia
+// (H-F3-s4c-4): los tests de exito pasaban igual con el guard borrado, porque
+// nadie comprobaba que el guard estuviera. Los deny tests de abajo asertean
+// 403 real y el mensaje del permiso.
 vi.mock('@repo/commerce', async () => {
   const actual = await vi.importActual<typeof import('@repo/commerce')>(
     '@repo/commerce',
@@ -286,11 +292,84 @@ describe('DELETE /api/shipping/[id]', () => {
       cb(tx),
     )
 
-    const res = await makeDELETERequest(mockId)
-    expect(res.status).toBe(204)
-    expect(withTenantContext).toHaveBeenCalledWith(
-      sessionTenant,
-      expect.any(Function),
+      const res = await makeDELETERequest(mockId)
+      expect(res.status).toBe(204)
+      expect(withTenantContext).toHaveBeenCalledWith(
+        sessionTenant,
+        expect.any(Function),
+      )
+    })
+  })
+
+/**
+ * Item 117 / H-F3-s4c-1: cobertura de denegacion para los guards de PUT y
+ * DELETE. Antes este archivo no tenia ni un assert de 403.
+ *
+ * El mock de `withTenantContext` devuelve SIEMPRE la tx del happy path, sin
+ * reservar un slot para el guard. El guard abre su propia transaccion y se
+ * queda con la primera, pero como `getPermissions` esta mockeado no le importa
+ * cual recibe. Con guard responde 403; sin guard el handler completa y
+ * responde 200/204, y el assert falla con ese status en vez de con un 500.
+ */
+describe('S4c / item 117 — el guard IMPONE (PUT, DELETE)', () => {
+  const DENY_WRITE = {
+    ...FULL_ACCESS,
+    canWrite: false,
+    canSell: false,
+    canAccessPanel: 'none',
+  }
+
+  beforeEach(() => {
+    vi.mocked(auth).mockResolvedValue({
+      user: { tenantId: sessionTenant, email: 'admin@test.com' },
+    })
+  })
+
+  it('PUT /api/shipping/[id] devuelve 403 sin canWrite', async () => {
+    vi.mocked(getPermissions).mockResolvedValue(DENY_WRITE)
+
+    const updatedMethod = { ...mockMethod, name: 'Express Shipping' }
+    const tx = makeTxMock({
+      select: [{ data: [mockMethod], terminal: 'limit' }],
+    })
+    tx.update.mockReturnValueOnce({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([updatedMethod]),
+        }),
+      }),
+    } as ReturnType<typeof db.update>)
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(tx),
     )
+
+    const res = await makePUTRequest(mockId, { name: 'Express Shipping' })
+
+    // Status antes que body: un DELETE exitoso responde 204 sin cuerpo y
+    // `res.json()` ahi tiraria, tapando la senal con un 500.
+    expect(res.status).toBe(403)
+
+    const body = await res.json()
+    expect(body.permission).toBe('canWrite')
+    expect(body.error).toBe('La suscripción no permite publicar contenido')
+  })
+
+  it('DELETE /api/shipping/[id] devuelve 403 sin canWrite', async () => {
+    vi.mocked(getPermissions).mockResolvedValue(DENY_WRITE)
+
+    const tx = makeTxMock({
+      select: [{ data: [mockMethod], terminal: 'limit' }],
+    })
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(tx),
+    )
+
+    const res = await makeDELETERequest(mockId)
+
+    expect(res.status).toBe(403)
+
+    const body = await res.json()
+    expect(body.permission).toBe('canWrite')
+    expect(body.error).toBe('La suscripción no permite publicar contenido')
   })
 })

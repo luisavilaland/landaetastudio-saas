@@ -158,6 +158,48 @@ describe('GET /api/products/[id]/variants', () => {
   })
 })
 
+/**
+ * Item 117 / H-F3-s4c-1: cobertura de denegacion para el guard de POST.
+ *
+ * El mock de `withTenantContext` devuelve SIEMPRE la tx del happy path, sin
+ * reservar un slot para el guard. El guard abre su propia transaccion y se
+ * queda con la primera, pero como `getPermissions` esta mockeado no le importa
+ * cual recibe. Con guard responde 403; sin guard el handler completa y
+ * responde 200, y el assert falla con 200 en vez de romperse con un 500.
+ */
+describe('S4c / item 117 — el guard IMPONE (POST)', () => {
+  it('POST /api/products/[id]/variants devuelve 403 sin canWrite', async () => {
+    vi.mocked(auth).mockResolvedValue(session(TENANT_A, 'admin@a.com'))
+    vi.mocked(getPermissions).mockResolvedValue({
+      ...FULL_ACCESS,
+      canWrite: false,
+      canSell: false,
+      canAccessPanel: 'none',
+    })
+
+    const mockTx = makeTxMock()
+    mockTx.select.mockReturnValueOnce(makeSelectChain([baseProduct]))
+    mockTx.select.mockReturnValueOnce(makeSelectChain([]))
+    mockTx.select.mockReturnValueOnce(makeSelectChain([baseVariant]))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockTx),
+    )
+
+    const res = await POST(
+      mockReq('POST', { variants: [{ price: 2999, stock: 20 }] }),
+      { params: Promise.resolve({ id: PRODUCT_ID }) },
+    )
+
+    // Status antes que body: si el status no es 403 no hay nada que leer del
+    // body, y leerlo primero convertiria un 200 en un 500 del catch.
+    expect(res.status).toBe(403)
+
+    const body = await res.json()
+    expect(body.permission).toBe('canWrite')
+    expect(body.error).toBe('La suscripción no permite publicar contenido')
+  })
+})
+
 // ──────── POST ────────
 
 describe('POST /api/products/[id]/variants', () => {

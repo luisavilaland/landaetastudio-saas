@@ -303,20 +303,39 @@ describe('PUT /api/products/[id]', () => {
     expect(calledWith[1]).not.toBe('')
   })
 
-  it('deniega cuando falta canWrite (403)', async () => {
-    vi.mocked(auth).mockResolvedValue(session(TENANT_A, 'admin@a.com'))
-    vi.mocked(getPermissions).mockResolvedValue({
-      ...FULL_ACCESS,
-      canWrite: false,
-      canSell: true,
-    })
+    it('deniega cuando falta canWrite (403)', async () => {
+      vi.mocked(auth).mockResolvedValue(session(TENANT_A, 'admin@a.com'))
+      vi.mocked(getPermissions).mockResolvedValue({
+        ...FULL_ACCESS,
+        canWrite: false,
+        canSell: true,
+      })
 
-    const res = await PUT(mockReq('PUT', { name: 'X' }), {
-      params: Promise.resolve({ id: PRODUCT_ID }),
-    })
+      // Mismo tx del happy path, sin reservar slot para el guard (item 117): el
+      // guard abre su propia transaccion y se queda con la primera, pero como
+      // `getPermissions` esta mockeado no le importa cual recibe. Asi, si el
+      // guard desapareciera, el handler completaria y responderia 200 — la
+      // senal real — en vez de reventar con un 500 por falta de mock.
+      const updatedProduct = { ...baseProduct, name: 'X' }
+      const mockTx = makeTxMock()
+      mockTx.select
+        .mockReturnValueOnce(makeSelectChain([baseProduct]))
+        .mockReturnValueOnce(makeSelectChain([baseVariant]))
+        .mockReturnValueOnce(makeSelectChain([updatedProduct]))
+        .mockReturnValueOnce(makeSelectChain([baseVariant]))
+      vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+        cb(mockTx),
+      )
 
-    expect(res.status).toBe(403)
-  })
+      const res = await PUT(mockReq('PUT', { name: 'X' }), {
+        params: Promise.resolve({ id: PRODUCT_ID }),
+      })
+
+      expect(res.status).toBe(403)
+
+      const body = await res.json()
+      expect(body.permission).toBe('canWrite')
+    })
 })
 
 it('409 si el producto fue eliminado entre la lectura y la escritura (0 filas en fase de escritura)', async () => {
@@ -413,5 +432,49 @@ describe('DELETE /api/products/[id]', () => {
       TENANT_A,
       expect.any(Function),
     )
+  })
+})
+
+/**
+ * Item 117 / H-F3-s4c-1: cobertura de denegacion para el guard de DELETE.
+ *
+ * El mock de `withTenantContext` devuelve SIEMPRE la tx del happy path, sin
+ * reservar un slot para el guard. El guard abre su propia transaccion y se
+ * queda con la primera, pero como `getPermissions` esta mockeado no le importa
+ * cual recibe. Con guard responde 403; sin guard el handler completa y
+ * responde 204, y el assert falla con 204 en vez de romperse con un 500.
+ */
+describe('S4c / item 117 — el guard IMPONE (DELETE)', () => {
+  it('DELETE /api/products/[id] devuelve 403 sin canWrite', async () => {
+    vi.mocked(auth).mockResolvedValue(session(TENANT_A, 'admin@a.com'))
+    vi.mocked(getPermissions).mockResolvedValue({
+      ...FULL_ACCESS,
+      canWrite: false,
+      canSell: false,
+      canAccessPanel: 'none',
+    })
+
+    const mockTx = makeTxMock()
+    mockTx.select
+      .mockReturnValueOnce(makeSelectChain([baseProduct]))
+      .mockReturnValueOnce(makeSelectChain([{ id: 'variant-123' }]))
+      .mockReturnValueOnce(makeSelectChain([]))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(mockTx),
+    )
+
+    const res = await DELETE(mockReq('DELETE'), {
+      params: Promise.resolve({ id: PRODUCT_ID }),
+    })
+
+    // El status se assertea ANTES de leer el body a proposito: un DELETE
+    // exitoso responde 204 sin cuerpo, y `res.json()` ahi tira. Si el guard
+    // desapareciera, leer el body primero convertiria el fallo en un 500 del
+    // catch del handler y taparia la senal real.
+    expect(res.status).toBe(403)
+
+    const body = await res.json()
+    expect(body.permission).toBe('canWrite')
+    expect(body.error).toBe('La suscripción no permite publicar contenido')
   })
 })
