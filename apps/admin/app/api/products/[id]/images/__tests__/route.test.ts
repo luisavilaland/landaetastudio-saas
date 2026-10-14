@@ -38,6 +38,14 @@ import { uploadImage, deleteImage } from '@repo/storage'
 import { GET, POST } from '../route'
 import { DELETE } from '../[imageId]/route'
 import { getPermissions } from '@repo/commerce'
+
+/**
+ * El guard (S4c/item 103) abre su propia transaccion ANTES que el handler, asi
+ * que consume la primera entrada de la cola. `getPermissions` esta mockeado y
+ * no usa el tx, asi que este valor es irrelevante: solo tiene que existir.
+ */
+const GUARD_TX = makeTxMock()
+
 /** Tenant active + suscripcion active: todo permitido. */
 const FULL_ACCESS = {
   canWrite: true,
@@ -50,13 +58,6 @@ const FULL_ACCESS = {
   canAccessStorefront: true,
   canAccessPanel: 'full',
 } as const
-
-/**
- * El guard (S4c/item 103) abre su propia transaccion ANTES que el handler, asi
- * que consume la primera entrada de la cola. `getPermissions` esta mockeado y
- * no usa el tx, asi que este valor es irrelevante: solo tiene que existir.
- */
-const GUARD_TX = makeTxMock()
 
 beforeEach(() => {
   vi.mocked(getPermissions).mockResolvedValue(FULL_ACCESS)
@@ -358,5 +359,89 @@ describe('DELETE /api/products/[id]/images/[imageId]', () => {
     expect(res.status).toBe(200)
     expect(deleteImage).toHaveBeenCalled()
     expect(withTenantContext).toHaveBeenCalledTimes(3)
+  })
+})
+
+/**
+ * Item 117 / H-F3-s4c-1: cobertura de denegacion para el guard de POST.
+ *
+ * Este archivo reservaba un slot de transaccion para el guard (indice 0 de
+ * `mockCalls`), y por eso borrar el guard producia un 500 en vez de una senal
+ * util: el handler recibia la tx del guard en lugar de la suya. Los happy paths
+ * de arriba ya no reservan ese slot.
+ *
+ * En el deny test la secuencia es la **del handler, sin slot para el guard**.
+ * Con el guard presente nunca se llega al handler, asi que da 403; si el guard
+ * desapareciera, el handler recibiria sus dos transacciones y responderia 201.
+ * Por eso el assert falla con 201 y no con un 500.
+ */
+describe('S4c / item 117 — el guard IMPONE (POST)', () => {
+  it('POST /api/products/[id]/images devuelve 403 sin canWrite', async () => {
+    vi.mocked(auth).mockResolvedValue(session(TENANT_A))
+    vi.mocked(uploadImage).mockResolvedValue('http://minio/img.png')
+    vi.mocked(getPermissions).mockResolvedValue({
+      ...FULL_ACCESS,
+      canWrite: false,
+      canSell: false,
+      canAccessPanel: 'none',
+    })
+
+    // Una sola tx auto-encadenada que sirve TANTO la lectura del producto como
+    // el insert de la imagen. Asi el test no depende de cuantas veces se abrió
+    // una transaccion antes: con el guard presente responde 403 sin llegar al
+    // handler; si el guard desapareciera, el handler recibe esta misma tx para
+    // las dos operaciones y responde 201. El assert falla con 201, no con 500.
+    const unifiedTx = makeTxMock({
+      select: [
+        // 1. lectura del producto (`.limit(1)`)
+        {
+          data: [
+            {
+              id: PRODUCT_ID,
+              tenantId: TENANT_A,
+              slug: PRODUCT_SLUG,
+              name: 'Test Product',
+            },
+          ],
+          terminal: 'limit',
+        },
+        // 2. imagenes existentes del producto (`.orderBy(position)`)
+        { data: [], terminal: 'orderBy' },
+      ],
+      repeatLastSelect: true,
+    })
+    unifiedTx.insert.mockReturnValue(unifiedTx)
+    unifiedTx.values.mockReturnValue(unifiedTx)
+    unifiedTx.from.mockReturnValue(unifiedTx)
+    unifiedTx.where.mockReturnValue(unifiedTx)
+    // El handler consulta las imagenes existentes para calcular la posicion;
+    // sin esto el insert se rompe con un TypeError y el handler devuelve 500.
+    unifiedTx.orderBy.mockResolvedValue([])
+    unifiedTx.returning.mockResolvedValue([
+      {
+        id: IMAGE_ID,
+        productId: PRODUCT_ID,
+        url: 'http://minio/img.png',
+        position: 0,
+      },
+    ])
+
+    vi.mocked(withTenantContext).mockImplementation(async (_, cb) =>
+      cb(unifiedTx),
+    )
+
+    const fd = new FormData()
+    fd.append('image', new File(['data'], 'test.png', { type: 'image/png' }))
+    const res = await POST(mockReq('POST', fd), {
+      params: Promise.resolve({ id: PRODUCT_ID }),
+    })
+
+    // Status antes que body: si el status no es 403 no hay nada que leer del
+    // body, y leerlo primero convertiria un 201 en un 500 del catch.
+    expect(res.status).toBe(403)
+
+    const body = await res.json()
+    expect(body.permission).toBe('canWrite')
+    expect(body.error).toBe('La suscripción no permite publicar contenido')
   })
 })

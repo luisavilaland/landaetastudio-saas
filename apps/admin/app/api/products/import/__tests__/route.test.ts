@@ -306,3 +306,66 @@ describe('POST /api/products/import', () => {
     expect(body.summary.errors).toBe(1)
   })
 })
+
+/**
+ * Item 117 / H-F3-s4c-1: cobertura de denegacion para el guard de POST.
+ *
+ * Los happy paths de este archivo usan un `callCount` que descuenta la
+ * transaccion del guard (la #1 es de lectura de categorias, la #2 en adelante
+ * de escritura), y por eso borrar el guard producia un 500 en vez de una senal
+ * util.
+ *
+ * Aca la secuencia es la **del handler**: la primera llamada abre la lectura de
+ * categorias y las siguientes la escritura. Con el guard presente nunca se
+ * llega al handler, asi que da 403; si el guard desapareciera, el handler
+ * recibiria sus propias transacciones y responderia 200. Por eso el assert
+ * falla con 200 y no con un 500.
+ */
+describe('S4c / item 117 — el guard IMPONE (POST)', () => {
+  it('POST /api/products/import devuelve 403 sin canWrite', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(getPermissions).mockResolvedValue({
+      ...FULL_ACCESS,
+      canWrite: false,
+      canSell: false,
+      canAccessPanel: 'none',
+    })
+
+    // Sin GUARD_TX: la primera transaccion es la lectura de categorias del
+    // handler, no la del guard.
+    let callCount = 0
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) => {
+      callCount++
+      if (callCount === 1) {
+        return cb(
+          makeTxMock({
+            select: [
+              {
+                data: [
+                  { id: 'cat-1', slug: 'remeras', tenantId: 'tenant-1' },
+                  { id: 'cat-2', slug: 'pantalones', tenantId: 'tenant-1' },
+                ],
+              },
+            ],
+          }),
+        )
+      }
+      const tx = makeTxMock({
+        select: [{ data: [], terminal: 'limit' }],
+        repeatLastSelect: true,
+      })
+      tx.returning.mockResolvedValue([{ id: `prod-${callCount}` }])
+      return cb(tx)
+    })
+
+    const response = await POST(makeImportReq(validCSV))
+
+    // Status antes que body: si el status no es 403 no hay nada que leer del
+    // body, y leerlo primero convertiria un 200 en un 500 del catch.
+    expect(response.status).toBe(403)
+
+    const body = await response.json()
+    expect(body.permission).toBe('canWrite')
+    expect(body.error).toBe('La suscripción no permite publicar contenido')
+  })
+})

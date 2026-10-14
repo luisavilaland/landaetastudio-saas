@@ -133,20 +133,19 @@ describe('DELETE /api/products/[id]/images/[imageId]', () => {
     expect(body.error).toBe('Imagen no encontrada')
   })
 
-  it('should delete image successfully', async () => {
-    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
-    let callCount = 0
-    vi.mocked(withTenantContext).mockImplementation(async (_tid, cb) => {
-      callCount++
-      if (callCount === 2) {
-        return cb(
-          makeTxMock({ select: [{ data: [mockImage], terminal: 'limit' }] }),
-        )
-      }
-      return cb(makeTxMock())
-    })
+    it('should delete image successfully', async () => {
+      vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+      // Item 117: sin contador. Antes este mock reservaba la transaccion #1
+      // para el guard y entregaba la del handler en la #2, asi que borrar el
+      // guard hacia que el handler recibiera una tx vacia y respondiera 500.
+      // Devolver siempre la misma tx hace el test independiente de que el
+      // guard exista: el guard se queda con la primera, pero como
+      // `getPermissions` esta mockeado no le importa.
+      vi.mocked(withTenantContext).mockImplementation(async (_tid, cb) =>
+        cb(makeTxMock({ select: [{ data: [mockImage], terminal: 'limit' }] })),
+      )
 
-    const { deleteImage } = await import('@repo/storage')
+      const { deleteImage } = await import('@repo/storage')
 
     const response = await DELETE(makeReq(), {
       params: Promise.resolve({ id: 'prod-1', imageId: 'img-1' }),
@@ -156,5 +155,43 @@ describe('DELETE /api/products/[id]/images/[imageId]', () => {
     expect(response.status).toBe(200)
     expect(body.success).toBe(true)
     expect(deleteImage).toHaveBeenCalledWith('products/prod-1/image.jpg')
+  })
+})
+
+/**
+ * Item 117 / H-F3-s4c-1: cobertura de denegacion para el guard de DELETE.
+ *
+ * Este archivo reservaba un slot de transaccion para el guard (el `callCount`
+ * de arriba), y por eso borrar el guard producia un 500 en vez de una senal
+ * util: el handler recibia la tx del guard en lugar de la suya.
+ *
+ * Aca el mock devuelve SIEMPRE la tx del happy path, sin contador. El guard
+ * abre su propia transaccion y se queda con la primera, pero como
+ * `getPermissions` esta mockeado no le importa cual recibe. Con guard responde
+ * 403; sin guard el handler completa y responde 200, y el assert falla con 200.
+ */
+describe('S4c / item 117 — el guard IMPONE (DELETE)', () => {
+  it('DELETE /api/products/[id]/images/[imageId] devuelve 403 sin canWrite', async () => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(getPermissions).mockResolvedValue({
+      ...FULL_ACCESS,
+      canWrite: false,
+      canSell: false,
+      canAccessPanel: 'none',
+    })
+    vi.mocked(withTenantContext).mockImplementation(async (_tid, cb) =>
+      cb(makeTxMock({ select: [{ data: [mockImage], terminal: 'limit' }] })),
+    )
+
+    const response = await DELETE(makeReq(), {
+      params: Promise.resolve({ id: 'prod-1', imageId: 'img-1' }),
+    })
+
+    // Status antes que body: leer el body primero convertiria un 200 en un 500.
+    expect(response.status).toBe(403)
+
+    const body = await response.json()
+    expect(body.permission).toBe('canWrite')
+    expect(body.error).toBe('La suscripción no permite publicar contenido')
   })
 })

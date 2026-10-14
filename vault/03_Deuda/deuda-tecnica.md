@@ -4913,7 +4913,43 @@ son las dos rutas del mismo paso, y la que funciona es la vieja.
 
 ## 117. 9 de 16 guards no tienen deny test (H-F3-s4c-1)
 
-**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** auditoria S4c, 2026-10-14 (issue #261).
+**Severidad:** ALTA · **Estado:** **RESUELTO (issue #275, 2026-10-14)** · **Origen:** auditoria S4c, 2026-10-14 (issue #261).
+
+**RESUELTO.** Denegaciones para los 9, con verificacion en rojo: quitar cada
+guard hace fallar su deny test con el status que devuelve el happy path, y
+ninguno con un 500.
+
+| Endpoint                         | Metodo | Senal al quitar el guard |
+| -------------------------------- | ------ | ------------------------ |
+| `categories/[id]`                | PUT    | 200                      |
+| `categories/[id]`                | DELETE | 200                      |
+| `products/[id]`                  | DELETE | 204                      |
+| `shipping/[id]`                  | PUT    | 200                      |
+| `shipping/[id]`                  | DELETE | 204                      |
+| `products/[id]/variants`         | POST   | 200                      |
+| `products/[id]/images`           | POST   | 201                      |
+| `products/[id]/images/[imageId]` | DELETE | 200                      |
+| `products/import`                | POST   | 200                      |
+
+Cada deny test asertea 403 real y el mensaje del permiso. Tests: 921 -> 930.
+
+**El fix del 500 por `callCount`.** Los mocks de `images`, `images/[imageId]` e
+`import` reservaban la transaccion #1 para el guard (`GUARD_TX` en el indice 0,
+o `callCount === 2` para la del handler). Al borrar el guard, el handler
+recibia la tx del guard en lugar de la suya y reventaba con 500: la senal util
+quedaba tapada. Los deny tests usan la secuencia **del handler**, sin slot
+reservado. El guard se queda con la primera transaccion, pero como
+`getPermissions` esta mockeado no le importa cual recibe.
+
+**Asertar el status antes que el body.** Un DELETE exitoso responde 204 sin
+cuerpo y `res.json()` ahi tira: leer el body primero convertia el fallo en un
+500 del catch del handler. Ese mismo error hacia fallar con 500 el deny test
+pre-existente de `products/[id]` PUT.
+
+**Residual conocido (no bloquea).** Los happy paths de `images` e `import` siguen
+reservando `GUARD_TX`, asi que al mutarlos fallan con 500 en vez de 2xx. No
+afecta a la cobertura: el deny test de cada archivo da la senal limpia. Queda
+para un PR propio si se quiere ruido cero en mutacion.
 
 **Problema.** La property del guard se sostiene en los 16 call sites: borrar el
 guard no abre un bypass, porque cuando el permiso falta el guard responde 403.

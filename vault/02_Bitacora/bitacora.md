@@ -4971,3 +4971,73 @@ guards", asi que el patron no matcheaba nada y no se habia cambiado nada.
 Un grep que devuelve 0 tambien puede significar que buscarte mal. Rehice el
 reemplazo con el texto real y con aserciones que fallan si no encuentran
 cada patron.
+
+## 2026-10-14 - Item 117: los 9 guards que nadie verificaba
+
+Issue #275. Rama `fix/s4c-deny-tests`. Cierra el item 117 (H-F3-s4c-1, ALTA)
+de la auditoria S4c.
+
+**La property se sostenia en los 16 guards. La cobertura solo llegaba a 7.**
+Ocho sitios no tenian ni un assert de 403, y uno mas solo tenia un assert de
+status sin mensaje. Borrar el guard de 6 de ellos no rompia absolutely nada:
+la suite en verde, el endpoint abierto. Eso no es un detalle de testing, es la
+diferencia entre un control que existe y un control que aguanta una
+refactorizacion.
+
+**Los deny tests usan la secuencia de transacciones DEL HANDLER, sin slot
+reservado para el guard.** Ese fue el hallazgo del item. Los mocks de `images`,
+`images/[imageId]` e `import` reservaban la transaccion #1 para el guard
+(`GUARD_TX` en el indice 0, o `callCount === 2` para la del handler). Al borrar
+el guard, el handler recibia la tx del guard en vez de la suya y reventaba con
+un 500 — la senal util quedaba tapada por un error de test.
+
+La idea: el guard abre su propia transaccion y se queda con la primera, pero
+como `getPermissions` esta mockeado **no le importa cual recibe**. Si la
+secuencia es la del handler, el guard "roba" una transaccion inocua y todo lo
+demas sigue en su lugar. Con guard: 403. Sin guard: el handler completa y
+devuelve 2xx. El assert ve la senal real.
+
+**Asertar el status antes de leer el body.** Un DELETE exitoso responde 204 sin
+cuerpo, y `res.json()` ahi tira. Leer el body primero convertia el fallo en un
+500 del catch del handler — y eso era exactamente lo que pasaba en el deny test
+de `products/[id]` PUT que ya existia: no era que estuviera mal cableado, era
+que miraba el body antes de mirar el status. Un test que falla por la razon
+equivocada no es un test: es ruido con forma de red de seguridad.
+
+**H-F3-s4c-4 era el mismo hallazgo en forma de mentira.** El header de
+`shipping/[id]/route.test.ts` decia "si alguien borra la linea del guard, el 403
+no aparece y el test falla". El archivo no tenia ni un assert de 403. Un
+comentario que describe una propiedad que el archivo no tiene es peor que no
+tener comentario: hace que un revisor confiese en cobertura inexistente.
+
+**Verificacion en rojo, los 9:**
+
+| Endpoint | Metodo | Sin guard |
+| --- | --- | --- |
+| `categories/[id]` | PUT | 200 |
+| `categories/[id]` | DELETE | 200 |
+| `products/[id]` | DELETE | 204 |
+| `shipping/[id]` | PUT | 200 |
+| `shipping/[id]` | DELETE | 204 |
+| `variants` | POST | 200 |
+| `images` | POST | 201 |
+| `images/[imageId]` | DELETE | 200 |
+| `products/import` | POST | 200 |
+
+Ninguno con 500. 930/930 tests. Ni una linea de produccion tocada.
+
+**Lo que dejo a medias y digo explicitamente:** los happy paths de `images` e
+`import` siguen reservando `GUARD_TX`, porque con el guard presente —el estado
+real de produccion— el handler necesita sus transacciones en las posiciones
+correctas y sin el slot se rompian. Al mutarlos fallan con 500 en vez de 2xx.
+No afecta la cobertura: el deny test de cada archivo da la senal limpia. Es
+ruido de mutacion, no un hueco de verificacion, y queda anotado en el item
+como residual. Pretender que lo arregle sin medir el costo habria sido
+exactamente el tipo deello que este item denuncia.
+
+**Dos errores propios en el camino, porque el item va de no mentirle a uno
+mismo.** Uno: mi regex para borrar `GUARD_TX` se comio `FULL_ACCESS` entero y
+rompio 13 tests — lo detecte porque el suite entero fallo, no porque hubiera
+leido el diff. Dos: quite el slot de los happy paths creyendo que era la
+correccion, y rompi los 3 tests de exito; la correccion era al reves de lo que
+parecia. Volvi a como estaba y lo deje documentado.

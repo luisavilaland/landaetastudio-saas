@@ -273,3 +273,66 @@ describe('DELETE /api/categories/[id]', () => {
     expect(body.success).toBe(true)
   })
 })
+
+/**
+ * Item 117 / H-F3-s4c-1: cobertura de denegacion para los guards de PUT y
+ * DELETE.
+ *
+ * El mock de `withTenantContext` devuelve SIEMPRE la misma tx, la del happy
+ * path del handler. No se reserva un slot para el guard a proposito: el guard
+ * abre su propia transaccion y se queda con la primera, pero como
+ * `getPermissions` esta mockeado no le importa cual recibe. Asi el test es
+ * independiente de que el guard exista: con guard responde 403, sin guard el
+ * handler completa y responde 200, y el assert falla con 200 y no con 500.
+ */
+describe('S4c / item 117 — el guard IMPONE (PUT, DELETE)', () => {
+  const DENY_WRITE = {
+    ...FULL_ACCESS,
+    canWrite: false,
+    canSell: false,
+    canAccessPanel: 'none',
+  }
+
+  beforeEach(() => {
+    vi.mocked(auth).mockResolvedValue(session('tenant-1'))
+    vi.mocked(withTenantContext).mockImplementation(async (_tenantId, cb) =>
+      cb(
+        makeTxMock({
+          select: [
+            { data: [mockCategory], terminal: 'limit' },
+            { data: [], terminal: 'limit' },
+          ],
+        }),
+      ),
+    )
+  })
+
+  it('PUT /api/categories/[id] devuelve 403 sin canWrite', async () => {
+    vi.mocked(getPermissions).mockResolvedValue(DENY_WRITE)
+
+    const response = await PUT(
+      mockReq('PUT', { name: 'Electrónica Pro', slug: 'electronica-pro' }),
+      { params: Promise.resolve({ id: 'cat-1' }) },
+    )
+
+    expect(response.status).toBe(403)
+
+    const body = await response.json()
+    expect(body.permission).toBe('canWrite')
+    expect(body.error).toBe('La suscripción no permite publicar contenido')
+  })
+
+  it('DELETE /api/categories/[id] devuelve 403 sin canWrite', async () => {
+    vi.mocked(getPermissions).mockResolvedValue(DENY_WRITE)
+
+    const response = await DELETE(mockReq('DELETE'), {
+      params: Promise.resolve({ id: 'cat-1' }),
+    })
+
+    expect(response.status).toBe(403)
+
+    const body = await response.json()
+    expect(body.permission).toBe('canWrite')
+    expect(body.error).toBe('La suscripción no permite publicar contenido')
+  })
+})
