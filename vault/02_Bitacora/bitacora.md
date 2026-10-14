@@ -4899,3 +4899,75 @@ en un guard de seguridad.
 admin no devuelve nada). Los guards defienden un flujo que todavia no existe
 en pantalla; es defensa en profundidad, pero el paso 2 no se puede ejercitar
 de punta a punta.
+
+## 2026-10-14 - Auditoria S4c: la property se sostiene, la cobertura no
+
+Issue #261, ref PR #260. Worktree de Paseo con `pnpm install` real (typecheck
+9/9 como prueba de que no era un junction), 2 subagentes en paralelo con
+scopes disjuntos: @QA con mutacion sobre codigo de produccion, @Orquestador
+con verificacion estructural y de producto.
+
+**La property del guard se sostiene en los 16 call sites.** Cuatro familias
+de mutacion: comentar el guard, forzar deny, forzar allow. B3a recibio 403
+real en 44 de 45 casos. B4 hizo fallar exactamente los 9 deny tests y dejo
+pasar los otros 71. El 403 viene de la linea de decision del guard, no de
+otra linea del handler.
+
+**Pero solo 7 de 16 tienen deny test.** En los otros 9, borrar el guard no
+rompe nada en CI. Seis pasan en silencio absoluto. Los tres restantes fallan
+con un 500 porque el guard consume la transaccion #1 de la cola del mock y
+la desalinea: es acoplamiento de posicion, no cobertura. Si alguien altera
+el orden de llamadas, pasan.
+
+La distincion importa: el **control** esta verificado a mano, pero **nada lo
+sostiene en el tiempo**. Por eso el item 103 (RESUELTO, "el guard se
+aplica") y el item 117 ("el guard se aplica y alguien lo verifica") no son
+lo mismo. El segundo estaba abierto y nadie lo habia visto.
+
+**El patron del bug de GGA: 0 instancias en 16.** `tenantId` se escribe antes
+del guard en todos. Los dos que una heuristica marco son storefront, que
+resuelve por subdominio con `getTenantId()` y no usa `auth()`: correctos.
+
+**Las 5 decisiones de producto: correctas.** `orders/[id]` con `canSell`
+resulta ser la decision mas defendible del slice: `past_due` tiene
+`canSell: true` y `canWrite: false`, asi que un tenant en gracia puede
+marcar un pedido como enviado pero no crear productos. El comprador no
+fallo el pago; castigar al vendedor no evita que el comprador espere su
+pedido.
+
+**El helper no duplica logica de negocio.** `tenant-permissions.ts` es un
+adaptador fino que delega en `deriveTenantPermissions`; la matriz vive una
+sola vez. `denyIfNoPermission` si esta duplicado entre admin y storefront,
+intencionalmente: unificarlos obligaria a exponer `NextResponse` en el
+paquete de dominio.
+
+**El conteo estaba mal y lo propague.** Reporte "17 guards en 13 endpoints";
+son **16 guards en 13 archivos**. El error llego al PR #260 (mergeado), la
+bitacora, la deuda tecnica y Engram. Corregido en este PR. Una cifra mal en
+un doc de auditoria no es cosmetica: es lo que hace dudar de las demas.
+
+**`derivePermissions` no falla ruidosamente como promete el contrato.**
+`derivePermissions('constructor')` devuelve una `Function` en vez de tirar.
+No hay escalacion -- `Function.canWrite` es `undefined` y el guard cae a 403
+-- pero `subscriptions.status` es `text` sin CHECK constraint, asi que ese
+mapa de TypeScript es el unico validador. Los tests solo cubrian estados
+desconocidos ordinarios, que si tiran.
+
+**El flake de Redis no existe como problema.** No se reprodujo en 2 de 2
+suite completas; el test es hermetico. Los warnings `Redis unavailable` los
+emite el codigo de produccion ejercitado por otros tests, no el de redis.
+No amerita item.
+
+**El endpoint que faltaba en mi lista:** `config/tenant/domain` (PUT) no
+tiene guard y no estaba en los cinco que enumere. No es defecto funcional
+-- es coherente con `branding`, misma identidad del tenant, y
+`requireTenantId()` lo autentica -- pero una lista de decisiones que omite un
+caso no es auditable. Item 121.
+
+**Metodo, nota sobre la correccion del conteo:** mi primer script de
+reemplazo reporto "0 ocurrencias de 17 guards" y lo lei como exito. No era
+exito: la deuda tecnica decia "17 **handlers** de 13 endpoints", no "17
+guards", asi que el patron no matcheaba nada y no se habia cambiado nada.
+Un grep que devuelve 0 tambien puede significar que buscarte mal. Rehice el
+reemplazo con el texto real y con aserciones que fallan si no encuentran
+cada patron.
