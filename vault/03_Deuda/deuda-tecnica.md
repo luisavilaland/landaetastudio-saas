@@ -4334,3 +4334,54 @@ cubre las paginas). Las dos opciones cambian el routing de la app.
 **Nota de alcance.** S4b deja la matriz completa y el consumidor de datos. La
 imposicion en el request es S4d, y hasta entonces `canAccessPanel` es un dato,
 no un control. Queda dicho para que nadie lo lea como resuelto.
+---
+
+## 102. El ritual de cierre se saltea cuando el DoD falla
+
+**Severidad:** BAJA · **Estado:** ABIERTO · **Origen:** detectado verificando la bitacora post-S4b (2026-10-14).
+
+**Problema.** S4a (#249) mergeo sin entrada de bitacora y sin export de Engram.
+Ninguno de los dos, en un PR que tiene 6 commits.
+
+**No fue una decision ni un olvido.** El DoD fallo con 7 tests en rojo por el
+orden de migracion (`tenants.logoUrl` declarado en el schema antes de aplicar la
+0004), la atencion se fue al fix, y cuando quedo verde el trabajo ya estaba
+commiteado y pusheado. La bitacora y el export son **el ultimo** paso, y el
+ultimo paso es el que se cae cuando el trabajo se complica.
+
+**Patron observado.** Cinco PRs seguidos de Fase 3 con bitacora completa; uno se
+salto el ritual entero. No es un rate alto: es un rate de 1 de 5, con una causa
+identificable.
+
+**Variante del item 80, con causa distinta.** El item 80 ("los PRs que cierran
+items no siempre actualizan la bitacora") describe el sintoma, pero no la causa.
+Este describe la **mecanica**: el ritual es lo primero que se omite cuando hay un
+bloqueo que resolver, y no se vuelve atras despues.
+
+**Por que importa mas de lo que parece.** La bitacora es el unico registro
+narrativo de por que se tomo una decision. Un PR sin ella deja el codigo sin su
+razon: seis meses despues, el `if (forcedRejection)` de T9 se lee como ruido y
+nadie sabe que sin el el tenant que paga se queda sin tienda. Los tres hallazgos
+que S4a produz (orden de migraciones, typecheck vs build, timeout de vitest) se
+usaron en S4b **un PR despues**, y el item 100 quedo registrado tarde por eso.
+
+**Fix propuesto.** Tres opciones, con su costo:
+
+- **Opcion A: automatizar el export y el `mem_save` en el merge.** Resuelve el
+  item 91 tambien, porque las dos fricciones son la misma. Es la unica que
+  elimina la clase de problema en vez de detectarla.
+- **Opcion B: un paso del DoD que falle si el PR no tiene bitacora.** Es ruido
+  para los PRs que.tool gestiona, y ademas empuja la escritura al final otra vez,
+  que es justo donde se cae.
+- **Opcion C: aceptarlo como friccion humana.** El item 80 lo cubre
+  parcialmente. Es la opcion honesta si no se quiere invertir en A.
+
+**Lo que no se hizo en la correccion.** La entrada de S4a se escribio tarde y en
+otro PR (#251), no en el #249. Reescribir un PR mergeado para agregarle la
+bitacora seria peor que la falta: rompe el append-only y cambia la historia que
+todos ya leyeron. Un registro tardio con la razon a la vista es preferible a un
+registro reescrito, o a ninguno.
+
+**Familia:** misma friccion que el item 91 (el export manual genera un PR
+propio). Los dos son el mismo problema mirando fases distintas: el export
+manual, y el ritual de cierre que lo rodea.

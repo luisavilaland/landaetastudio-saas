@@ -4668,3 +4668,36 @@ mock de `db.select` tira si se lo llama.
 (8) **`canAccessPanel` no tiene donde vivir** (item 101). `apps/admin` no tiene `middleware.ts` ni `proxy.ts`. Hoy el permiso viaja en la respuesta de `GET /api/subscriptions` y en nada mas: es un dato, no un control, hasta que S4d lo implemente.
 (9) **Agregar un `select` en el medio de un mock secuencial rompe el test por forma, no por tipo.** El `makeTxMock` consume la cola en orden; insertar la consulta de `tenants` entre suscripcion y plan hace que el plan se lea de la fila equivocada. El sintoma es un 500, no un error de TypeScript.
 (10) Los tres estados que cambiaron (`pending_first_payment`, `expired`, `abandoned`: `none` -> `readonly`) tienen el mismo motivo: **bloquear el acceso a un panel es siempre peor que dejarlo ver en modo lectura**.
+## 2026-10-14 - S4a: activacion desde el webhook (T9) + branding (T11) - entrada tardia
+
+> **Esta entrada se agrega en #251, no en el PR original (#249).** S4a mergeo sin
+> bitacora ni export de Engram. No fue una decision: el DoD fallo con 7 tests en
+> rojo por un problema de orden de migracion, la atencion se fue al fix, y cuando
+> quedo verde ya estaba pusheado. La bitacora es append-only y #249 ya esta
+> mergeado: reescribirlo violaria la regla. Se documenta aca, tarde y con la
+> razon a la vista. Ver item 102.
+
+**What:** el webhook de plataforma activa el tenant (`activateTenant`, que vivia
+en `@repo/commerce` desde S1 sin ningun caller), y el tenant puede setear su
+logo. 6 commits en `feat/s4a-activacion-branding`, mergeados en `4d2c515`.
+
+**Why:** un tenant se daba de alta (S3) y se quedaba `pending` para siempre, sin
+tienda, sin importar quantos pagos hiciera. Nadie activaba el tenant porque nadie
+llamaba a la funcion que lo activa.
+
+**Where:** `apps/admin/app/api/webhooks/mercadopago/subscriptions/route.ts`,
+`apps/admin/app/api/config/tenant/branding/route.ts`, `packages/db/src/schema.ts`,
+`packages/db/migrations/0004_tenants_logo_url.sql`, `vitest.config.ts`,
+`scripts/check-migrations-applied.mjs`.
+
+**Learned:**
+(1) **La llamada a `activateTenant` es incondicional, y va antes de los early-returns.** El webhook es idempotente por `lastProcessedPaymentId` y por convergencia de estado: un reintento de MP cae en `no_transition`, `converged` o `duplicate_payment` y nunca llega al final de `applyTransition`. Con la activacion al final, un tenant que pago se quedaba `pending` para siempre, recuperable solo a mano. La condicion es el estado **efectivo** (`target ?? current`), no "la transicion aplico": un pago rechazado nunca produce `active`, asi que no activa nada.
+(2) **El error de orden de migraciones casi tumba el alta de tenants.** Se commiteo el schema con `logoUrl` **antes** de aplicar la 0004. Todo `INSERT` a `tenants` incluyo la columna inexistente: 7 tests de `register-tenant` con 500 y el alta caida. En S1 no paso porque la migracion fue del mismo commit y se aplico antes del push. **La migracion va antes que el codigo que la usa, siempre.**
+(3) **`pnpm typecheck` no ve los tests y `pnpm build` si** (item 100). Agregar la columna dejo incompleto un literal de `Tenant` en un test de superadmin: typecheck dio 9/9 verde y build revento con TS2741. La asimetria engana porque el typecheck rapido en verde se lee como "los tipos estan".
+(4) **El default de vitest (5000ms) es insuficiente para integracion contra Neon** (parte del item 78). Los tests de `register-tenant` tardan 3.2-3.5s legitimos (bcrypt + transicion de 3 inserts). 4 corridas seguidas: 1 failed, 15 skipped, 1 failed, 3 failed. Con `testTimeout: 20000`: 3 de 3. El `15 skipped` era el item 98 en el mismo archivo.
+(5) **El wrapper de migraciones discrimina de verdad.** Con la senal de 0004 agregada, reporto `FALTA` con exit 1 **antes** de aplicar y verde despues. Sin la senal, `db:migrate` falla con "sin senal declarada".
+(6) **La progresividad de R5 se nota justo en el primer uso de storage.** Si R2 falla, el tenant se queda sin logo y la API responde 200 igual: el logo es decorativo y la tienda tiene que seguir funcionando. Este PR es el primero de `admin` que usa `@repo/storage`.
+
+**Verificacion en rojo:** M6 (activacion solo si la transicion aplica, la version condicional que se habia rechazado) -> 2 tests fallan, y son exactamente los del caso que justifica la llamada incondicional. T11: M7 (R2 fallando devuelve 500) y M8 (update sin `updatedAt`), ambos detectados.
+
+**Ref:** PR #249 (`4d2c515`), ampliado en #251.
