@@ -3919,8 +3919,13 @@ hizo un barrido; este item registra el caso confirmado.
 ## 93. `proxy.test.ts` no importa el proxy: miente sobre la cobertura (caso 2 del item 62)
 
 **Severidad:** MEDIA.
-**Estado:** ABIERTO.
+**Estado:** CERRADO (2026-10-14, auditoría mid-phase de Fase 3).
 **Origen:** verificado el 2026-10-10 al cerrar el PR #240.
+
+**CERRADO.** El registro quedó desactualizado: S1 (PR #245, `bc36d26`) reescribió
+`proxy.test.ts` para que importe el proxy real, tal como dice la bitácora en
+`vault/02_Bitacora/bitacora.md:4616`. El test ya ejercita el proxy de verdad.
+Verificado en la auditoría del 2026-10-14.
 
 **Problema.** `README.md`, `SETUP.md`, `TESTING.md` y `TESTING-MANUAL.md` reportan
 **705 tests en 69 archivos**. La realidad medida en `develop` (`5cc32b2`) es
@@ -4121,7 +4126,7 @@ decision y no como olvido.
 
 ## 97. El acceso al panel no esta definido para `abandoned`, `expired` ni `cancelled`
 
-**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** detectado al disenar S3.
+**Severidad:** MEDIA · **Estado:** CERRADO (2026-10-14, S4b / PR #251) · **Origen:** detectado al disenar S3.
 
 **Problema.** D17 define "puede publicar / puede vender" para los 7 estados de la
 subscription. No define **"puede acceder al panel"**, que es un eje ortogonal:
@@ -4385,3 +4390,130 @@ registro reescrito, o a ninguno.
 **Familia:** misma friccion que el item 91 (el export manual genera un PR
 propio). Los dos son el mismo problema mirando fases distintas: el export
 manual, y el ritual de cierre que lo rodea.
+
+---
+
+## 103. El guard de permisos de S4b no tiene ningun punto de aplicacion (H-F3-1)
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, 2026-10-14.
+
+**Problema.** La matriz `deriveTenantPermissions` de S4b es correcta, exhaustiva y
+bien testeada como funcion pura. **No la lee nadie que pueda rechazar una request.**
+
+- `canSell`, `canWrite`, `canAccessPanel`: cero consumidores fuera de su propia
+  definicion en `packages/commerce/src/subscription-permissions.ts`.
+- Unico consumidor en produccion: `apps/admin/app/api/subscriptions/route.ts:102`,
+  que es un `GET` que **devuelve** los permisos como dato.
+- El issue #250 (cerrado el 2026-10-14) declaraba tres puntos de aplicacion y
+  prometia tests de integracion para cada uno. **Ninguno de los tres existe.**
+
+**Por que importa.** El estado de suscripcion no controla nada. Un tenant
+`cancelled` sigue creando productos. Un tenant `suspended` no esta bloqueado: su
+`canAccessPanel: 'none'` viaja en la respuesta de un GET que el cliente puede ignorar.
+La asimetria D17 (`past_due` **vende** pero **no publica**) existe solo como documento.
+
+**Es el item 61 aplicado a la autorizacion.** Un control que acompana y no verifica.
+El precedente ya esta documentado: una capa de proteccion puede hacer un defecto
+**invisible**, porque el test suite es correcto y el sistema no funciona.
+
+**Causa raiz, no solo el sintoma.** El criterio de salida de T10
+(`plans/2026-10-09-fase3.md:505`) dice "una tabla de tests que cubre las 8
+combinaciones". **Nunca dijo "el guard se aplica".** Sin ese segundo criterio, el
+slice se puede cerrar con la matriz a medio camino y ningun control del DoD lo
+nota. Corregir el criterio es parte del fix: si no, S4c repite el patron.
+
+**Fix propuesto.**
+
+1. Corregir el criterio de salida de T10 en el plan.
+2. Aplicar los 3 puntos que #250 declaro: `canSell` en checkout y
+   checkout/preference; `canPublish` en las escrituras de admin;
+   `canAccessPanel` en el middleware de admin (ver item 101).
+3. Test de integracion por punto, que es lo que el issue prometio y no entrego.
+
+**Costo:** ~6 h. **Donde:** issue #253 (S4c), ya abierto.
+
+---
+
+## 104. `encryptToken` falla en silencio cuando el tenant no tiene fila de MP (H-F3-2)
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, 2026-10-14.
+
+**Problema.** `packages/commerce/src/encryption.ts:58` hace
+`UPDATE "tenant_mp_config" SET ... WHERE "tenantId" = $n`. Sin `INSERT`, sin
+`ON CONFLICT`, y **sin verificar filas afectadas**. El retorno es `Promise<void>`.
+
+**Por que importa mas de lo que dice el item 18.** El item 18 lo describe como
+UPDATE-only sin upsert, lo cual es cierto. Lo que no dice es que **falla en
+silencio**: un tenant recien creado (S3 no crea la fila) llama a `encryptToken`, el
+UPDATE afecta 0 filas, **no lanza error**, y la funcion retorna. El tenant cree
+que guardo sus credenciales. El sintoma aparece mucho despues, en el checkout,
+via `decryptToken` -> `null` (`encryption.ts:103`). Convierte un error de
+configuracion en un error de pago.
+
+**Relacion.** Amplia el item 18, que sigue ABIERTO y bloquea T8 (S3b). T8 ya dice
+que la fila "se crea completa o no se crea", pero la funcion actual no puede
+distinguir esos dos casos: los dos devuelven exito.
+
+**Fix propuesto.** `encryptToken` debe fallar ruidosamente si no hay fila.
+
+**Costo:** ~1 h, dentro de T8.
+
+---
+
+## 105. El plan de Fase 3 describe 6 slices; la realidad tiene 9 (H-F3-3)
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, 2026-10-14.
+
+**Problema.** `docs/superpowers/plans/2026-10-09-fase3.md` define S1-S6. En la
+realidad hay mas: S1, S2, S3, S3b, S4a, S4b, S4c, S4d, S5, S6.
+
+- La tabla de slices (`:148-150`) sigue diciendo "S3 - Tasks: T7, T8".
+- La nota de alcance del 2026-10-10 (`:448`) movio T8 a S3b, pero **la tabla nunca
+  se actualizo**.
+- `S4c` y `S4d` **no existen en ningun archivo del plan ni de los specs**. Solo
+  aparecen en este registro y en la bitacora.
+- Los issues si existen y son correctos: #252 (S3b), #253 (S4c), #254 (S4d),
+  #255 (S5), #256 (S6).
+
+**Por que importa.** El plan es la fuente de dependencia del equipo. S4c y S4d son
+justo los slices que cierran el item 103, y no estan en el plan. Quien estime
+trabajo leyendo el plan no los va a ver.
+
+**Familia:** el amendment se escribio dentro de la task en vez de actualizar la
+tabla. Mismo patron que el item 92 (contadores) y el item 125 de AGENTS.md
+(secciones append-only que se desactualizan).
+
+**Fix propuesto.** Actualizar la tabla de slices con el estado real y marcar
+S3b/S4c/S4d como anadidos despues del 2026-10-10.
+
+**Costo:** ~0.5 h.
+
+---
+
+## 106. Los falsos positivos de PowerShell se repitieron 3 veces (H-F3-8)
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, 2026-10-14.
+
+**Problema.** Durante la auditoria del 2026-10-14, **tres** lecturas de archivos via
+PowerShell reportaron mojibake en `encryption.ts`, `packages/auth/src/index.ts` y
+`packages/validation/src/env.ts`. Medido con Node: **0 ocurrencias de U+FFFD, sin
+BOM** en los tres. `pnpm check:encoding` dio 0 hallazgos. Los archivos estan sanos.
+
+**Mecanismo, identico cada vez.** `Get-Content` y `Select-String` decodifican
+UTF-8 como ANSI. El texto que sale por pantalla no es lo que esta en el blob.
+
+**Por que lo registro igual.** Casi se reportan seis defectos inexistentes en una
+auditoria. El dano no es el falso positivo: es que un informe con falsos positivos
+**ensucia la senal** y hace dudar de los hallazgos reales.
+
+**Amplia el item 79** (medir bytes con redireccion de PowerShell). La regla ya
+existe; lo que faltaba era el alcance: aplica tambien a _leer_ archivos, no solo a
+blobs de git.
+
+**Fix propuesto.** Regla operativa: medir encoding **solo** con Node o
+`git diff --numstat`, nunca desde salida de shell. Los agentes de mapeo deben
+recibirla explicitamente, no por herencia de AGENTS.md.
+
+**Costo:** ~0.2 h (regla).
+
+---

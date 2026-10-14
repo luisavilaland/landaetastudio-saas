@@ -53,3 +53,5 @@ tags:
 - [[session-summary-landaetastudio-saas-288]]
 - [[s4b-derivetenantpermissions-matriz-2d-cansell-cierra-item-97-289]]
 - [[patron-matriz-de-permisos-como-tabla-overrides-explicitos-fu-290]]
+- [[session-summary-landaetastudio-saas-291]]
+- [[session-summary-landaetastudio-saas-292]]

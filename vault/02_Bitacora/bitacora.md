@@ -4701,3 +4701,46 @@ llamaba a la funcion que lo activa.
 **Verificacion en rojo:** M6 (activacion solo si la transicion aplica, la version condicional que se habia rechazado) -> 2 tests fallan, y son exactamente los del caso que justifica la llamada incondicional. T11: M7 (R2 fallando devuelve 500) y M8 (update sin `updatedAt`), ambos detectados.
 
 **Ref:** PR #249 (`4d2c515`), ampliado en #251.
+
+## 2026-10-14 - Auditoria mid-phase de Fase 3 (S1-S4b)
+
+Equivalente a la #197 de Fase 2, pero sobre la mitad de la fase: los 5 slices
+declarados completos (S1, S2, S3, S4a, S4b) y antes de seguir con S3b/S4c.
+Rama `audit/fase3-midphase`. Documento: `vault/04_Fases/auditoria-fase3-midphase.md`.
+Read-only sobre codigo de produccion: este PR no toca `apps/` ni `packages/`.
+
+**9 hallazgos: 1 CRITICO, 2 ALTO, 4 MEDIO, 2 BAJO.**
+
+- **H-F3-1 (CRITICO)** el guard de permisos de S4b no tiene ningun punto de
+  aplicacion. `canSell`, `canWrite` y `canAccessPanel` no los lee nadie que pueda
+  rechazar una request. El issue #250 se cerro declarando 3 puntos de aplicacion y
+  tests de integracion para cada uno; **ninguno existe**. La matriz es correcta y no
+  la usa nadie. Es el item 61 aplicado a la autorizacion. Item nuevo: 103.
+- **H-F3-2 (ALTO)** `encryptToken` (`encryption.ts:58`) hace UPDATE sin upsert y
+  **falla en silencio**: 0 filas afectadas, sin error, retorno `void`. Amplia el
+  item 18. Item nuevo: 104.
+- **H-F3-3 (ALTO)** el plan describe 6 slices y la realidad tiene 9: S3b, S4c y S4d
+  no estan en el plan (solo en el registro de deuda y en esta bitacora). El
+  amendment de T8 se escribio dentro de la task y la tabla de slices nunca se
+  actualizo. Item nuevo: 105.
+- **H-F3-6 (MEDIO)** `PLATFORM_HOST` y `ENABLE_DEFAULT_TENANT_FALLBACK` no estan
+  en `turbo.json > tasks.build.env`, contra lo que dicen SETUP.md y PROMPTS.md.
+- **H-F3-8** los falsos positivos de PowerShell se repitieron **3 veces** en esta
+  auditoria: 3 archivos reportados con mojibake que no existia (0 U+FFFD medido con
+  Node, `check:encoding` en verde). Item nuevo: 106, que amplia el 79.
+
+**Items cerrados:** 93 (resuelto en S1, el registro quedo viejo) y 97 (resuelto en
+S4b pero con el `Estado:` de cabecera sin actualizar).
+
+**Item 98 verificado, no se materializo:** con reporter JSON de vitest,
+`passed=889 failed=0 skipped=0`. Las 5 suites con `describe.skipIf` **si
+ejecutaron** (39 tests de integracion real contra Neon) porque `DATABASE_APP_URL`
+esta configurada aca. El riesgo sigue abierto para entornos sin esa variable, y el
+reporte de vitest no lo distingue del verde completo.
+
+**Baseline del DoD con `--force`:** 18/18 tasks, **0 cacheadas**, 80s de trabajo
+real. La corrida sin `--force` fue 100% replay de cache y no verifica nada.
+
+**Veredicto:** Fase 3 **no sigue a S3b todavia**. Antes hay que decidir el alcance de
+H-F3-1 y corregir el criterio de salida de T10, que es la causa raiz: decia "una
+tabla de tests" y nunca "el guard se aplica". Un criterio asi deja pasar el patron.
