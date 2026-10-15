@@ -10,7 +10,21 @@ const logger = createLogger('config-settings')
 const hexColorRegex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
 
 const storeSettingsSchema = z.object({
-  logoUrl: z.string().url().optional(),
+  // T11 fix / H-F3-v2-1 (opcion A): `logoUrl` **removido** de este schema.
+  //
+  // La fuente de verdad del logo es `tenants."logoUrl"`, y se escribe solo por
+  // `config/tenant/branding`. Este endpoint dejo de aceptarlo: mientras dos
+  // rutas escribieran el logo, existian dos fuentes de verdad y la migracion
+  // 0005 habria que volver a correr cada vez que alguien lo cambiara.
+  //
+  // Consecuencia asumida: el logo queda **congelado** en lo que haya en la
+  // base hasta que exista la UI de branding (item 116). Prefiero eso a dos
+  // fuentes de verdad que divergen en silencio.
+  //
+  // OJO: el `PUT` hace `{ ...currentSettings, ...validation.data }`. Como
+  // `logoUrl` ya no esta en `validation.data`, el merge lo **conserva** en el
+  // jsonb. Eso es deliberado: el campo queda deprecado pero intacto, y lo
+  // limpia una migracion aparte cuando ningun proceso lo lea.
   primaryColor: z.string().regex(hexColorRegex).optional(),
   secondaryColor: z.string().regex(hexColorRegex).optional(),
   accentColor: z.string().regex(hexColorRegex).optional(),
@@ -37,7 +51,7 @@ export async function GET() {
     const tenantId = session.user?.tenantId as string
 
     const [tenant] = await db
-      .select({ settings: dbTenants.settings })
+      .select({ settings: dbTenants.settings, logoUrl: dbTenants.logoUrl })
       .from(dbTenants)
       .where(eq(dbTenants.id, tenantId))
       .limit(1)
@@ -51,7 +65,11 @@ export async function GET() {
 
     const settings = (tenant.settings as Record<string, unknown>) || {}
 
-    return NextResponse.json({ settings })
+    // T11 fix / H-F3-v2-1: el logo se devuelve aparte, desde la columna, y ya
+    // NO viaja dentro de `settings`. Es lectura pura: este endpoint dejo de
+    // escribir el logo (opcion A), asi que solo lo expone para que la pantalla
+    // de ajustes pueda mostrarlo.
+    return NextResponse.json({ settings, tenant: { logoUrl: tenant.logoUrl } })
   } catch (error) {
     logger.error({ error }, 'Error getting store settings')
     return NextResponse.json(

@@ -61,7 +61,7 @@ export default function SettingsPage() {
       if (res.ok) {
         setSettings(data.settings || {})
         setFormData({
-          logoUrl: data.settings?.logoUrl || '',
+          logoUrl: data.tenant?.logoUrl || '',
           primaryColor: data.settings?.primaryColor || '#6366f1',
           secondaryColor: data.settings?.secondaryColor || '#8b5cf6',
           accentColor: data.settings?.accentColor || '#ec4899',
@@ -90,7 +90,10 @@ export default function SettingsPage() {
 
     try {
       const payload: Record<string, unknown> = { ...formData }
-      if (!payload.logoUrl) delete payload.logoUrl
+      // T11 fix: el logo ya no se escribe por este endpoint. Se quita del
+      // payload explicitoamente en vez de confiar en que Zod lo descarte: que
+      // el cliente deje de mandarlo es una garantia, no una consecuencia.
+      delete payload.logoUrl
       const links = payload.socialLinks as
         StoreSettings['socialLinks'] | undefined
       if ((!links?.instagram && !links?.facebook) || !links) {
@@ -140,20 +143,37 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-zinc-700">
-                  URL del logo
+                  Logo del tenant
                 </label>
-                <input
-                  type="url"
-                  value={formData.logoUrl}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      logoUrl: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-md border px-3 py-2"
-                  placeholder="https://..."
-                />
+                {/* T11 fix / H-F3-v2-1: el logo se lee de `tenants.logoUrl` y se
+                    escribe solo por `config/tenant/branding`. Antes este input
+                    escribia `settings.logoUrl` y por eso el logo no se veia en
+                    la tienda: el storefront leia otro campo.
+
+                    Se muestra en solo lectura en vez de quitarse. Un input
+                    editable que el endpoint ya ignora es peor que ningun
+                    input: acepta el click, acepta la URL, y no pasa nada sin
+                    decir nada. */}
+                {formData.logoUrl ? (
+                  <div className="flex items-center gap-3 rounded-md border bg-zinc-50 px-3 py-2">
+                    <img
+                      src={formData.logoUrl}
+                      alt="Logo"
+                      className="h-10 w-auto"
+                    />
+                    <span className="truncate text-sm text-zinc-600">
+                      {formData.logoUrl}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500">
+                    Este tenant todavia no tiene logo.
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-zinc-500">
+                  El logo se administra desde la seccion de branding. Queda
+                  congelado hasta que exista esa pantalla (item 116).
+                </p>
               </div>
             </div>
           </div>

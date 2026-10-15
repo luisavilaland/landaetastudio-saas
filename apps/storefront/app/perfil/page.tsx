@@ -62,20 +62,25 @@ export default async function PerfilPage() {
 
   if (tenantSlug) {
     try {
-      const result = await db
-        .select({
-          id: dbTenants.id,
-          name: dbTenants.name,
-          settings: dbTenants.settings,
-        })
-        .from(dbTenants)
-        .where(eq(dbTenants.slug, tenantSlug))
-        .limit(1)
+const result = await db
+          .select({
+            id: dbTenants.id,
+            name: dbTenants.name,
+            logoUrl: dbTenants.logoUrl,
+            settings: dbTenants.settings,
+          })
+          .from(dbTenants)
+          .where(eq(dbTenants.slug, tenantSlug))
+          .limit(1)
 
-      if (result.length > 0) {
-        tenantName = result[0].name
-        const settings = (result[0].settings as Record<string, unknown>) || {}
-        logoUrl = (settings.logoUrl as string) || ''
+        if (result.length > 0) {
+          tenantName = result[0].name
+          // T11 fix / H-F3-v2-1: la columna `logoUrl` es la fuente de verdad.
+          // Este archivo es el segundo lector (el primero es layout.tsx); los dos
+          // tienen que leer el mismo campo o el logo aparece en el navbar y no
+          // en el perfil.
+          logoUrl = result[0].logoUrl || ''
+          const settings = (result[0].settings as Record<string, unknown>) || {}
         description = (settings.storeDescription as string) || ''
         contactEmail = (settings.contactEmail as string) || ''
         contactPhone = (settings.contactPhone as string) || ''

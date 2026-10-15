@@ -64,6 +64,7 @@ export default async function RootLayout({
       .select({
         id: dbTenants.id,
         name: dbTenants.name,
+        logoUrl: dbTenants.logoUrl,
         settings: dbTenants.settings,
       })
       .from(dbTenants)
@@ -73,14 +74,17 @@ export default async function RootLayout({
     if (result.length > 0) {
       tenantName = result[0].name
       tenantId = result[0].id
+      // T11 fix / H-F3-v2-1: el logo sale de la columna `logoUrl`, no de
+      // `settings.logoUrl`. La columna es la unica fuente de verdad desde la
+      // migracion 0005; el campo jsonb quedo deprecado y se conserva solo
+      // como respaldo. Leer el jsonb hacia que subir un logo no se viera.
+      logoUrl = result[0].logoUrl ?? null
       const settings = (result[0].settings ?? {}) as {
-        logoUrl?: string
         primaryColor?: string
         secondaryColor?: string
         accentColor?: string
         fontFamily?: string
       }
-      logoUrl = settings.logoUrl ?? null
       if (settings.primaryColor) primaryColor = settings.primaryColor
       if (settings.secondaryColor) secondaryColor = settings.secondaryColor
       if (settings.accentColor) accentColor = settings.accentColor
