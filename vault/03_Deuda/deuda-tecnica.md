@@ -4591,11 +4591,11 @@ recibirla explicitamente, no por herencia de AGENTS.md.
 
 **Medido sobre la base antes de migrar** (el bug, empirico):
 
-| Metrica | Valor |
-| --- | --- |
-| tenants totales | 3 |
+| Metrica                                   | Valor                    |
+| ----------------------------------------- | ------------------------ |
+| tenants totales                           | 3                        |
 | con `settings->>'logoUrl'` (origen viejo) | **2** (tienda1, tienda2) |
-| con `tenants."logoUrl"` (columna de T11) | **0** |
+| con `tenants."logoUrl"` (columna de T11)  | **0**                    |
 
 T11 no escribio nunca nada, y el storefront leia el jsonb. La feature estaba
 construida, testeada y sin efecto observable.
