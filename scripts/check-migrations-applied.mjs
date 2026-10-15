@@ -35,6 +35,13 @@ config({ path: '.env.local' })
  *
  * Cuando agregues una migracion, agregala aca. Si no, el script va a seguir
  * dando verde sobre migraciones que no aplicaron, que es exactamente el bug.
+ *
+ * Tipos de señal, segun lo que la migracion toque:
+ *   - `tables` / `indexes` / `functions` / `types` / `columns` — schema.
+ *   - `rowChecks` — **datos**. Para migraciones que solo mueven valores
+ *     (UPDATE sin ALTER). Cada check corre una query y compara el numero de
+ *     filas con `expect` (por defecto 0). Devolver filas donde se espera 0
+ *     significa que la migracion quedo a medio aplicar.
  */
 const EXPECTED = {
   '0000_baseline': {
@@ -83,6 +90,27 @@ const EXPECTED = {
     // nullable: nullable es lo esperable de una columna de branding y no
     // distingue una migracion aplicada de una a medio aplicar.
     columns: { 'tenants.logoUrl': 'text' },
+  },
+  '0005_migrate_logo_url': {
+    // Migracion de **datos**, no de schema: no crea columna, tipo, indice ni
+    // funcion. Re-declarar `tenants.logoUrl` como señal seria mentira —esa
+    // columna la creo la 0004 y existiria aunque esta migracion no corriera
+    // nunca— y el wrapper existe justamente para que eso no pase.
+    //
+    // El efecto observable de un UPDATE son las filas, asi que la señal es una
+    // condicion sobre los datos: no debe quedar ningun tenant con logo en el
+    // jsonb viejo y sin copiar a la columna.
+    //
+    // `expect: 0` porque el invariante es "cero filas" — si devuelve alguna, la
+    // migracion esta a medio aplicar.
+    rowChecks: [
+      {
+        label: 'todo logo de settings ya esta en la columna',
+        sql: `SELECT slug FROM tenants
+              WHERE settings->>'logoUrl' IS NOT NULL AND "logoUrl" IS NULL`,
+        expect: 0,
+      },
+    ],
   },
 }
 
@@ -172,6 +200,18 @@ async function main() {
       if (got === undefined) absent.push(`columna ${col}`)
       else if (got !== wantType)
         absent.push(`columna ${col} es ${got}, se esperaba ${wantType}`)
+    }
+    for (const rc of expected.rowChecks ?? []) {
+      const rows = await sql.unsafe(rc.sql)
+      const want = rc.expect ?? 0
+      if (rows.length !== want) {
+        absent.push(
+          `${rc.label}: ${rows.length} filas, se esperaban ${want}` +
+            (rows.length
+              ? ` (ej: ${rows.slice(0, 3).map((r) => JSON.stringify(r)).join(', ')})`
+              : ''),
+        )
+      }
     }
 
     if (absent.length === 0) {
