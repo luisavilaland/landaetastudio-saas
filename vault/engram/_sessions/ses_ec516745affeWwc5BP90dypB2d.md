@@ -22,3 +22,4 @@ tags:
 - [[s4c-completo-17-guards-item-103-cerrado-308]]
 - [[auditor-a-s4c-property-16-16-pero-cobertura-7-16-310]]
 - [[item-117-resuelto-9-deny-tests-fix-del-500-por-callcount-311]]
+- [[t11-fix-tenants-logourl-es-la-nica-fuente-de-verdad-312]]

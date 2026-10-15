@@ -4585,7 +4585,48 @@ recibirla explicitamente, no por herencia de AGENTS.md.
 
 ## 107. T11 (branding) esta inerte: escribe una columna que nadie lee
 
-**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** auditoria mid-phase de Fase 3, segunda pasada, 2026-10-14 (H-F3-v2-1).
+**Severidad:** ALTA · **Estado:** **RESUELTO (issue #277, 2026-10-14)** · **Origen:** auditoria mid-phase de Fase 3, segunda pasada, 2026-10-14 (H-F3-v2-1).
+
+**RESUELTO.** `tenants."logoUrl"` es la fuente de verdad. Decision de Luis.
+
+**Medido sobre la base antes de migrar** (el bug, empirico):
+
+| Metrica | Valor |
+| --- | --- |
+| tenants totales | 3 |
+| con `settings->>'logoUrl'` (origen viejo) | **2** (tienda1, tienda2) |
+| con `tenants."logoUrl"` (columna de T11) | **0** |
+
+T11 no escribio nunca nada, y el storefront leia el jsonb. La feature estaba
+construida, testeada y sin efecto observable.
+
+**Que se hizo:**
+
+1. **Migracion 0005** copia `settings->>'logoUrl'` a la columna donde este
+   NULL. Idempotente. **Solo copia:** el jsonb queda deprecado pero intacto,
+   porque borrarlo mientras haya lecturas viejas seria una bomba. Lo limpia
+   una migracion aparte cuando ningun proceso lo lea.
+2. **Lectores cableados** a la columna: `storefront/app/layout.tsx`,
+   `storefront/app/perfil/page.tsx` y `admin/store/settings/page.tsx`.
+3. **`config/settings` dejo de escribir `logoUrl`** (opcion A). El GET lo
+   expone aparte, en `tenant.logoUrl`, solo lectura.
+4. **`apps/storefront/lib/tenant-branding.ts`** (nuevo): un unico lugar que
+   sabe de donde sale el branding. `layout.tsx` lo consume. Antes cada pagina
+   hacia su propia query y leia el campo que se le ocurriera, que es
+   exactamente como se produjo el bug.
+
+**El wrapper de migraciones, ampliado.** La 0005 es migracion de **datos**: no crea
+columna, tipo ni indice. Re-declarar `tenants.logoUrl` como senal habria sido
+mentira —esa columna la creo la 0004 y existia aunque la 0005 nunca corriera—,
+y el wrapper existe justamente para que eso no pase. Se agrego el tipo de
+senal `rowChecks`: una query con un numero de filas esperado. Verificado en
+las dos direcciones: antes de aplicar daba `FALTA, 2 filas donde se esperaban
+0`; despues, `ok`.
+
+**Consecuencia asumida:** el logo queda **congelado** hasta que exista la UI de
+branding, porque `config/tenant/branding` no tiene consumidor. Ver item 116.
+
+Tests: 930 -> 942.
 
 **Problema.** La feature de branding de S4a esta construida, testeada y mergeada, y
 **no produce ningun efecto observable**.
@@ -4889,6 +4930,32 @@ vez en cuando, no un fallo de seguridad ni de correctitud.
 ## 116. No existe UI de onboarding
 
 **Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** detectado durante S4c (2026-10-14).
+
+**Ampliado por el T11 fix (2026-10-14).** El problema original era que no
+existe UI de onboarding. Ahora hay un segundo hueco del mismo tipo, y con la
+misma consecuencia.
+
+**No existe UI de branding.** `config/tenant/branding` es un endpoint sin
+consumidor: `git grep` de `tenant/branding` solo lo encuentra a si mismo. Es
+decir, T11 no solo escribia una columna que nadie leia — **construyo una via de
+escritura sin puerta de entrada**. Por la UI no se puede cambiar el logo de
+ningun tenant.
+
+**Consecuencia directa del T11 fix (item 107).** Como `tenants."logoUrl"` paso
+a ser la unica fuente de verdad y `config/settings` dejo de aceptar `logoUrl`,
+**el logo esta congelado** en el valor que haya en la base. Antes se podia
+cambiar (y no se veia, porque el storefront leia el jsonb — era un bug, no una
+capacidad). Ahora el valor es correcto y **no se puede cambiar**. Es
+exactamente la clase de decision que Opcion A implica: una fuente de verdad, a
+cambio de congelar hasta que exista la pantalla.
+
+El campo de admin quedo en **solo lectura** con la razon escrita, en vez de
+quitarse. Un input editable que el endpoint ignora es peor que ninguno:
+acepta el click, acepta la URL y no pasa nada sin avisar.
+
+**El fix de este item cubre las dos caras:** la pantalla de onboarding (paso 2
+del design, :28-30) **y** la de branding, que es la que hace falta para
+descongelar el logo.
 
 **Problema.** El paso (2) del design de Fase 3 —"configurar tienda: subdominio,
 branding, MP" (design `:28-30`)— esta especificado pero **no hay UI**.

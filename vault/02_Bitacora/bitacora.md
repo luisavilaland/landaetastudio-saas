@@ -5041,3 +5041,74 @@ rompio 13 tests — lo detecte porque el suite entero fallo, no porque hubiera
 leido el diff. Dos: quite el slot de los happy paths creyendo que era la
 correccion, y rompi los 3 tests de exito; la correccion era al reves de lo que
 parecia. Volvi a como estaba y lo deje documentado.
+
+## 2026-10-14 - T11 fix: el logo por fin tiene una sola fuente de verdad
+
+Issue #277, rama `fix/t11-logo-source-of-truth`. Cierra el item 107
+(H-F3-v2-1, ALTA) de la auditoria v2 (#258).
+
+**El bug, medido antes de tocar nada.** Leí la base y la cosa fue peor que
+"nadie leía la columna":
+
+| Métrica | Valor |
+| --- | --- |
+| tenants totales | 3 |
+| con `settings->>'logoUrl'` (origen viejo) | **2** |
+| con `tenants."logoUrl"` (columna de T11) | **0** |
+
+**T11 no había escrito nunca nada.** La feature estaba construida, con endpoint,
+con tests, con docblock — y cero filas. El storefront leía el jsonb viejo y
+mostraba el logo de ahí. Todo funcionaba; nada era lo que se creía.
+
+**Y el hallazgo que cambia el trabajo:** `config/tenant/branding` —el único
+escritor de la columna— **no tiene ninguna UI que lo llame**. T11 no construyó
+una columna inerte: construyó **una vía de escritura sin puerta de entrada**. Por
+la interfaz no se puede cambiar el logo de ningún tenant.
+
+Si hubiera ejecutado el plan literal —cambiar los lectores a la columna— el
+logo habría desaparecido de todas las tiendas. El dato estaría, pero nadie
+podría escribirlo. Pasaríamos de "feature sin efecto observable" a "feature sin
+efecto observable **y** logo roto".
+
+**El wrapper de migraciones no sabía verificar una migración de datos.** La 0005
+no crea columna, ni tipo, ni índice: mueve valores. Re-declarar
+`tenants.logoUrl` como señal habría sido mentira —esa columna la creó la 0004 y
+existiría aunque la 0005 nunca corriera— y ese wrapper existe precisamente para
+que eso no pase, porque es el ítem 94.
+
+Así que le agregué un tipo de señal nuevo: `rowChecks`, una query con un número
+de filas esperado. El efecto observable de un `UPDATE` son las filas, no el
+schema. Y lo verifiqué en las dos direcciones: **antes de aplicar daba `FALTA, 2
+filas donde se esperaban 0`; después, `ok`.** Un check que nunca puede fallar
+no es un check.
+
+**Una función de lectura en vez de tres queries.** `apps/storefront/lib/
+tenant-branding.ts` es el único lugar que sabe de dónde sale el branding. El
+bug se produjo porque cada página hacía su propia query y leía el campo que se
+le ocurriera; con un helper, esa deriva desaparece por construcción en vez de
+por disciplina.
+
+Eso fue ampliación de alcance y lo justifiqué: el repo no tiene infraestructura
+para renderizar Server Components, y el único test de `perfil/page.tsx` **no
+importa la página** — asserta sobre objetos hardcodeados. Agregar lectores sin
+tests habría repetido exactamente H-F3-v2-1: código nuevo sin efecto
+verificable.
+
+**TypeScript me corrigió una prueba.** Escribí un test que afirmaba que el
+helper quita `settings.logoUrl`. Falló — y el motivo fue lo más valuable del
+día: **el compilador rechazó el acceso**, porque `TenantBranding['settings']` no
+declara el campo. El sistema de tipos estaba haciendo el trabajo que yo le
+delegaba al test. Reescribí la prueba para afirmar lo comprobable en vez de
+forzar al helper a hacer algo que no debe.
+
+**Opción A y su consecuencia, dichas con todas las letras.** `config/settings`
+dejó de aceptar `logoUrl`. El logo queda **congelado** hasta que exista la UI
+de branding. Antes se podía cambiar —y no se veía, porque el storefront leía el
+otro campo—; ahora el valor es correcto y no se puede tocar. Es el precio de
+una fuente de verdad, y está escrito en el item 116 con el mismo detalle.
+
+El input del admin quedó en **solo lectura** con la razón a la vista, no
+eliminado. Un input editable que el endpoint ya ignora es peor que ninguno:
+acepta el click, acepta la URL y no pasa nada sin avisar.
+
+**930 → 942 tests.** typecheck 9/9, lint 6/6.
