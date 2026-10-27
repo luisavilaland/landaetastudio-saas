@@ -109,6 +109,15 @@ const EXPECTED = {
         sql: `SELECT slug FROM tenants
               WHERE settings->>'logoUrl' IS NOT NULL AND "logoUrl" IS NULL`,
         expect: 0,
+        // El invariante puede romperse por dos causas MUY distintas, y el
+        // mensaje generico ("el tracking miente, ver item 94") solo describe
+        // una. Si 0005 ya esta en el tracking, la causa es la otra: una base
+        // sembrada con el seed viejo, que reinserto el logo en el jsonb
+        // despues de que la migracion corriera. `pnpm db:migrate` aborta antes
+        // de `pnpm db:seed`, asi que sin esta pista el ciclo no se destraba
+        // solo.
+        hint:
+          'Si drizzle ya tenia 0005 aplicada, la base se sembro con el seed viejo: corré `pnpm db:seed` (el seed actual escribe la columna).',
       },
     ],
   },
@@ -177,6 +186,7 @@ async function main() {
 
   const missing = []
   const undeclared = []
+  const hints = []
 
   for (const entry of journal.entries) {
     const expected = EXPECTED[entry.tag]
@@ -211,6 +221,7 @@ async function main() {
               ? ` (ej: ${rows.slice(0, 3).map((r) => JSON.stringify(r)).join(', ')})`
               : ''),
         )
+        if (rc.hint) hints.push(`  ${entry.tag}: ${rc.hint}`)
       }
     }
 
@@ -230,6 +241,10 @@ async function main() {
     )
     for (const m of missing) {
       console.error(`  ${m.tag}: falta ${m.absent.join(', ')}`)
+    }
+    if (hints.length > 0) {
+      console.error('\nComo destrabarlo:')
+      for (const h of hints) console.error(h)
     }
     console.error(
       '\nSi drizzle-kit dijo exito, el tracking en drizzle.__drizzle_migrations no\n' +

@@ -39,8 +39,11 @@ async function seed() {
       plan: 'starter',
       status: 'active',
       customDomain: 'tienda1.local',
+      // T11 fix / H-F3-v2-1: el logo va en la columna, no en `settings`.
+      // Escribirlo en el jsonb dejaba el logo invisible para el storefront,
+      // que lee la columna desde la migracion 0005.
+      logoUrl: 'https://picsum.photos/seed/tienda-logo/200/80',
       settings: {
-        logoUrl: 'https://picsum.photos/seed/tienda-logo/200/80',
         storeDescription:
           'Tu tienda online de confianza. Encontra los mejores productos con la mejor calidad.',
         contactEmail: 'contacto@tienda1.com',
@@ -63,8 +66,8 @@ async function seed() {
       plan: 'business',
       status: 'active',
       customDomain: 'tienda2.local',
+      logoUrl: 'https://picsum.photos/seed/premium-logo/200/80',
       settings: {
-        logoUrl: 'https://picsum.photos/seed/premium-logo/200/80',
         storeDescription: 'Productos premium para quienes buscan lo mejor.',
         contactEmail: 'contacto@tienda2.com',
         contactPhone: '+598 99 654 321',
