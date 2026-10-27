@@ -27,6 +27,6 @@
     "resend": "^6.34.1"
   },
   "devDependencies": {
-    "typescript": "^6"
+    "typescript": "^7"
   }
 }
