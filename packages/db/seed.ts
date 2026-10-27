@@ -39,7 +39,15 @@ async function seed() {
       plan: 'starter',
       status: 'active',
       customDomain: 'tienda1.local',
+      // T11 fix / H-F3-v2-1: la columna es la fuente de verdad y la escriben
+      // los lectores nuevos (storefront a partir de `develop`).
+      logoUrl: 'https://picsum.photos/seed/tienda-logo/200/80',
       settings: {
+        // Espejo de transicion: `main` (produccion) todavia lee el logo del
+        // jsonb. Sin esta linea, la tienda en vivo se queda sin logo en cuanto
+        // se re-siembra la base, porque el storefront desplegado no conoce la
+        // columna. Borrar esta linea cuando `main` corra el codigo que lee
+        // `tenants."logoUrl"`.
         logoUrl: 'https://picsum.photos/seed/tienda-logo/200/80',
         storeDescription:
           'Tu tienda online de confianza. Encontra los mejores productos con la mejor calidad.',
@@ -63,7 +71,9 @@ async function seed() {
       plan: 'business',
       status: 'active',
       customDomain: 'tienda2.local',
+      logoUrl: 'https://picsum.photos/seed/premium-logo/200/80',
       settings: {
+        // Espejo de transicion: ver la nota del tenant anterior.
         logoUrl: 'https://picsum.photos/seed/premium-logo/200/80',
         storeDescription: 'Productos premium para quienes buscan lo mejor.',
         contactEmail: 'contacto@tienda2.com',

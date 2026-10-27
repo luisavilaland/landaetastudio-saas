@@ -5041,3 +5041,124 @@ rompio 13 tests — lo detecte porque el suite entero fallo, no porque hubiera
 leido el diff. Dos: quite el slot de los happy paths creyendo que era la
 correccion, y rompi los 3 tests de exito; la correccion era al reves de lo que
 parecia. Volvi a como estaba y lo deje documentado.
+
+## 2026-10-14 - T11 fix: el logo por fin tiene una sola fuente de verdad
+
+Issue #277, rama `fix/t11-logo-source-of-truth`. Cierra el item 107
+(H-F3-v2-1, ALTA) de la auditoria v2 (#258).
+
+**El bug, medido antes de tocar nada.** Leí la base y la cosa fue peor que
+"nadie leía la columna":
+
+| Métrica | Valor |
+| --- | --- |
+| tenants totales | 3 |
+| con `settings->>'logoUrl'` (origen viejo) | **2** |
+| con `tenants."logoUrl"` (columna de T11) | **0** |
+
+**T11 no había escrito nunca nada.** La feature estaba construida, con endpoint,
+con tests, con docblock — y cero filas. El storefront leía el jsonb viejo y
+mostraba el logo de ahí. Todo funcionaba; nada era lo que se creía.
+
+**Y el hallazgo que cambia el trabajo:** `config/tenant/branding` —el único
+escritor de la columna— **no tiene ninguna UI que lo llame**. T11 no construyó
+una columna inerte: construyó **una vía de escritura sin puerta de entrada**. Por
+la interfaz no se puede cambiar el logo de ningún tenant.
+
+Si hubiera ejecutado el plan literal —cambiar los lectores a la columna— el
+logo habría desaparecido de todas las tiendas. El dato estaría, pero nadie
+podría escribirlo. Pasaríamos de "feature sin efecto observable" a "feature sin
+efecto observable **y** logo roto".
+
+**El wrapper de migraciones no sabía verificar una migración de datos.** La 0005
+no crea columna, ni tipo, ni índice: mueve valores. Re-declarar
+`tenants.logoUrl` como señal habría sido mentira —esa columna la creó la 0004 y
+existiría aunque la 0005 nunca corriera— y ese wrapper existe precisamente para
+que eso no pase, porque es el ítem 94.
+
+Así que le agregué un tipo de señal nuevo: `rowChecks`, una query con un número
+de filas esperado. El efecto observable de un `UPDATE` son las filas, no el
+schema. Y lo verifiqué en las dos direcciones: **antes de aplicar daba `FALTA, 2
+filas donde se esperaban 0`; después, `ok`.** Un check que nunca puede fallar
+no es un check.
+
+**Una función de lectura en vez de tres queries.** `apps/storefront/lib/
+tenant-branding.ts` es el único lugar que sabe de dónde sale el branding. El
+bug se produjo porque cada página hacía su propia query y leía el campo que se
+le ocurriera; con un helper, esa deriva desaparece por construcción en vez de
+por disciplina.
+
+Eso fue ampliación de alcance y lo justifiqué: el repo no tiene infraestructura
+para renderizar Server Components, y el único test de `perfil/page.tsx` **no
+importa la página** — asserta sobre objetos hardcodeados. Agregar lectores sin
+tests habría repetido exactamente H-F3-v2-1: código nuevo sin efecto
+verificable.
+
+**TypeScript me corrigió una prueba.** Escribí un test que afirmaba que el
+helper quita `settings.logoUrl`. Falló — y el motivo fue lo más valuable del
+día: **el compilador rechazó el acceso**, porque `TenantBranding['settings']` no
+declara el campo. El sistema de tipos estaba haciendo el trabajo que yo le
+delegaba al test. Reescribí la prueba para afirmar lo comprobable en vez de
+forzar al helper a hacer algo que no debe.
+
+**Opción A y su consecuencia, dichas con todas las letras.** `config/settings`
+dejó de aceptar `logoUrl`. El logo queda **congelado** hasta que exista la UI
+de branding. Antes se podía cambiar —y no se veía, porque el storefront leía el
+otro campo—; ahora el valor es correcto y no se puede tocar. Es el precio de
+una fuente de verdad, y está escrito en el item 116 con el mismo detalle.
+
+El input del admin quedó en **solo lectura** con la razón a la vista, no
+eliminado. Un input editable que el endpoint ya ignora es peor que ninguno:
+acepta el click, acepta la URL y no pasa nada sin avisar.
+
+**930 → 942 tests.** typecheck 9/9, lint 6/6.
+
+## 2026-10-27 - La regresion que el CI encontro despues de dar el T11 por bueno
+
+Al mergear el T11 fix, los 3 deployments de Vercel estaban bloqueados por cuenta
+y el check `e2e` figuraba como *skipped*. Un commit vacio para re-disparar el
+pipeline destapo algo mucho peor que el bloqueo.
+
+**Lo que dije y lo que era.** Dije "DoD verde, 942/942". Era cierto. Tambien dije
+que el PR estaba listo. No lo estaba: **el seed seguia escribiendo el logo en
+`settings.logoUrl`** y el storefront ya lo leia de la columna. Despues de
+`pnpm db:seed`, cada tenant tenia el logo solo en el campo deprecado. Mis 12
+tests no podian verlo porque mockean la base. Lo vio el CI, tres commits despues.
+
+**El deadlock.** El rowCheck de la 0005 afirma "ningun tenant con logo en el
+jsonb y sin copiar a la columna". El seed viejo recreaba justo ese estado. Como
+`db:migrate` corre el check y el script es `db:migrate && db:seed`, el fallo del
+check impedia el seed que lo habria arreglado. La base no se destrababa sola: la
+sequencia se mordia la cola. Se destrabo a mano re-sembrando, y el check ahora
+imprime que hacer en ese caso en vez de mandar al item 94, que describe otra
+causa.
+
+**La segunda regresion, autoinfligida.** Al corregir el seed escribiendo *solo*
+la columna, vacie el logo del jsonb en la base compartida. **Produccion todavia
+corre `main`, que lee `settings.logoUrl`**: el sitio en vivo se quedo sin logos.
+Y como el job `seed` del E2E corre contra `NEON_DATABASE_URL` —la misma base que
+produccion— **cada PR los borraba**. El seed escribe ahora las dos: la columna
+como fuente de verdad y el jsonb como espejo de transicion, con la nota de
+cuando borrarlo.
+
+**Dos lecciones de lectura de checks.**
+
+- `wait-for-deployments` hace curl a las **URLs de produccion**, no a los
+  previews. Pasaba en verde mientras los 3 deployments del PR fallaban. Para
+  saber del deploy hay que leer la *status API* del commit, no ese check.
+- `e2e` figuraba *skipped* por **`needs: [wait-for-deployments, seed]`**: si el
+  seed falla, el job se saltea y `e2e-success` marca rojo. No era un paths
+  filter ni un workflow desactualizado. Se arreglo solo cuando el seed paso.
+
+**Estado final del PR #278.** Los 6 checks en verde, incluido `e2e` corriendo de
+verdad (seed y Playwright), y los 3 deployments de Vercel en `success`. El
+deadlock de la base, roto. Pero **la aprobacion de Luis quedo descartada** por
+los tres commits nuevos (`REVIEW_REQUIRED`): el contenido cambio de verdad, asi
+que la re-review no es burocracia.
+
+Verificado: base con columna y jsonb identicos, wrapper `ok 0005`,
+lint/typecheck/build 18/18, 942/942 tests, format y encoding OK.
+
+**Hallazgo nuevo:** un test de `packages/validation` prueba su propia copia del
+schema y afirma que `logoUrl` es valido en settings, exactamente lo que el T11
+fix elimino. Registrado como item 123.

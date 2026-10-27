@@ -57,36 +57,24 @@ export default async function RootLayout({
   let fontFamily = 'system-ui, sans-serif'
 
   try {
-    const { db, dbTenants } = await import('@repo/db')
-    const { eq } = await import('drizzle-orm')
+      // T11 fix / H-F3-v2-1: la lectura del branding vive en
+      // `lib/tenant-branding`. Este archivo y `perfil/page.tsx` la comparten
+      // para que no puedan divergir sobre de donde sale el logo.
+      const { getTenantBrandingBySlug } = await import('@/lib/tenant-branding')
 
-    const result = await db
-      .select({
-        id: dbTenants.id,
-        name: dbTenants.name,
-        settings: dbTenants.settings,
-      })
-      .from(dbTenants)
-      .where(eq(dbTenants.slug, tenantSlug))
-      .limit(1)
+      const branding = await getTenantBrandingBySlug(tenantSlug)
 
-    if (result.length > 0) {
-      tenantName = result[0].name
-      tenantId = result[0].id
-      const settings = (result[0].settings ?? {}) as {
-        logoUrl?: string
-        primaryColor?: string
-        secondaryColor?: string
-        accentColor?: string
-        fontFamily?: string
+      if (branding) {
+        tenantName = branding.name
+        tenantId = branding.id
+        logoUrl = branding.logoUrl
+        const s = branding.settings
+        if (s.primaryColor) primaryColor = s.primaryColor
+        if (s.secondaryColor) secondaryColor = s.secondaryColor
+        if (s.accentColor) accentColor = s.accentColor
+        if (s.fontFamily) fontFamily = s.fontFamily
       }
-      logoUrl = settings.logoUrl ?? null
-      if (settings.primaryColor) primaryColor = settings.primaryColor
-      if (settings.secondaryColor) secondaryColor = settings.secondaryColor
-      if (settings.accentColor) accentColor = settings.accentColor
-      if (settings.fontFamily) fontFamily = settings.fontFamily
-    }
-  } catch {
+    } catch {
     // ignore
   }
 
