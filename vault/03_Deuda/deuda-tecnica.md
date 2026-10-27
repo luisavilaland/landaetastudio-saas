@@ -5163,3 +5163,26 @@ item 103, con la razon (identidad del tenant, mismo bloque que branding).
 **Costo:** ~15 min.
 
 ---
+
+## 123. Un test de validacion prueba su propia copia del schema
+
+**Severidad:** BAJA · **Estado:** ABIERTO · **Origen:** detectado al cerrar el T11 fix (2026-10-27).
+
+`packages/validation/src/__tests__/store-settings.test.ts` define su propio
+`storeSettingsSchema` (L6-20) dentro del archivo y lo testea. No importa ningun
+schema del producto: `packages/validation/src` no exporta `storeSettingsSchema`
+ni menciona `logoUrl` en ningun lado.
+
+**El test no puede fallar por un cambio en el producto.** Es un test del test.
+Y hoy afirma que `logoUrl` es un campo valido de `settings`, que es justamente
+lo que el T11 fix elimino del schema real. La señal va en contra de la realidad,
+que es peor que no tener señal: alguien que lea ese archivo va a concluir que el
+producto acepta `logoUrl` en settings.
+
+**Fix.** Importar el schema real desde `@repo/validation` y testear ese. Si el
+schema ya no existe, borrar el archivo. Antes de borrarlo, confirmar que no sea
+la unica cobertura de un schema que si deberia existir.
+
+**Costo:** ~20 min.
+
+---
