@@ -32,9 +32,20 @@ concurrency:
 # Bloqueamos que código de PRs de entornos ajenos (forks) se ejecute en la
 # máquina del runner self-hosted (vector RCE). push/workflow_dispatch y PRs
 # del mismo repo corren normal; los PRs de forks se saltan.
+#
+# Skip en PRs de Dependabot: GitHub no expone secrets a los runs que dispara
+# la bot, así que `seed` recibía `DATABASE_URL` vacía y moría con
+# ECONNREFUSED, arrastrando `e2e` (por `needs`) y `e2e-success` a rojo. Se
+# saltean los dos jobs que abren la cadena y el resto hereda el skip;
+# `e2e-success` queda verde porque ningún `need` reporta `failure`.
+# `wait-for-deployments` también se saltea: valida URLs de producción, que no
+# tienen relación con lo que cambia un bump de dependencias, y podía tumbarlo
+# por su cuenta.
 jobs:
   wait-for-deployments:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -79,7 +90,9 @@ jobs:
           E2E_SUPERADMIN_URL: ${{ env.E2E_SUPERADMIN_URL }}
 
   seed:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
