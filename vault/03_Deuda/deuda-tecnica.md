@@ -3454,6 +3454,25 @@ Lo que estaba mal era la **unidad**: un archivo en vez de una clase.
 **Tasa empírica acumulada:** 3 de 9 en esta sesión, más lo registrado en
 #235/#237. Ninguno reproducible en aislamiento.
 
+### Ampliación (2026-10-29): el `await import` dinámico es frágil a copias duplicadas
+
+`createHealthCheckHandler` (`packages/commerce/src/health.ts:77`) usa
+`await import('@sentry/nextjs')` dinámico. El `vi.mock` depende de qué copia del módulo
+cargue el runner: si el grafo de peers se bifurca y quedan dos resoluciones del paquete,
+hay dos registros de módulos y el mock no se aplica sobre el import dinámico.
+
+Observado en #293: `@vitest/coverage-v8` 5.0.3 -> 5.0.5 duplicó `vitest@5.0.5` (2 entradas)
+y `@types/node` (26.6.5 / 26.6.6), y 3 tests de health fallaron con
+`expected "vi.fn()" to be called once, but got 0 times`. El test negativo pasó porque solo
+afirma `not.toHaveBeenCalled()`: el mock nunca se aplicó y se cargó el SDK real.
+
+Mismo patrón que `redisDown()` en `redis.test.ts`, que hace el mismo `await import` dentro
+del `catch` de degradación. Un import estático a nivel de módulo resolvería el mock con 1 o
+2 copias, y de paso sacaría la carga del módulo del camino de degradación.
+
+El lockfile queda custodiado por `pnpm dedupe --check` en el job `build` del CI (PR del
+peer graph, 2026-10-29), que evita la bifurcación pero **no** hace robusto el import.
+
 ## 79. PowerShell `>` decodifica bytes al redirigir
 
 **Severidad:** MEDIA.
