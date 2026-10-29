@@ -119,6 +119,12 @@ pnpm test          # vitest (todos los tests existentes)
 > **Node** (`child_process.execFileSync` con `git cat-file blob`) o por **`git diff --numstat`**.
 > NUNCA por `>`. Ídem los here-strings de la regla 6: no son solo un problema de acentos,
 > son un problema de decodificación.
+>
+> **`pnpm test --maxWorkers=2` NO funciona en pnpm 9.** pnpm consume el flag antes de
+> pasarlo a vitest y muere con `ERROR Unknown option: 'maxWorkers'` (sugiere `reporter`,
+> que no tiene relación con la causa). El comando correcto es
+> **`pnpm exec vitest run --maxWorkers=2`**. Es necesario en máquinas con RAM justa:
+> `pnpm test` plano falla con `Failed to start forks worker`.
 
 ⚠️ `ignoreBuildErrors` DEBE ser `false` en `next.config.mjs`. Nunca usar `ignoreBuildErrors: true`.
 
@@ -144,6 +150,15 @@ El código debe ser autodocumentado; comentarios solo para el "por qué", no el 
 - E2E webhook: `e2e/webhook/webhook-signature.spec.ts` firma con `makeSignature` (`@repo/commerce/webhook-signature`) usando `MERCADOPAGO_WEBHOOK_SECRET`, crea la orden directo en DB (`orders` camelCase, `total=0` para no disparar email) y verifica `confirmed`/`payment_failed`/`pending_payment`. Requiere `E2E_WEBHOOK_TEST=1` en Vercel (Preview) + `DATABASE_URL` y `MERCADOPAGO_WEBHOOK_SECRET` en el runner.
 - **`E2E_WEBHOOK_TEST=1` en Preview de Vercel (decisión 2026-08-10)**: configurada en el entorno Preview del proyecto storefront; activa los magic IDs del webhook (`123456789` → approved, `000000` → rejected, `999999` → pending) en previews. NO es un bypass de seguridad: los magic IDs solo tienen efecto cuando `verifyMercadoPagoSignature` confirma la firma HMAC con `MERCADOPAGO_WEBHOOK_SECRET` (obligatorio y verificado siempre; no hay skip de firma con esta variable). Decisión consciente aceptada: la variable aplica a TODOS los previews de Vercel (no se puede acotar por rama/dominio); se mantiene porque la firma es el gate real.
 - Seed de datos: `pnpm db:seed` resetea la BD con datos de prueba.
+
+## Dependabot, gate de dedupe y E2E
+
+- **Los PRs de Dependabot NO corren E2E.** `wait-for-deployments`, `seed` y `e2e` se saltean porque `github.actor == 'dependabot[bot]'`: sus runs no reciben secrets y la conexión a Neon falla. **Para tener evidencia real de E2E en un cambio de dependencias, hacer un PR humano con esos cambios**: un push humano hace `actor=EdgarVz`, el skip no aplica y el E2E corre de verdad (precedente: PR #297, `e2e` pass en 1m33s). Nunca hacer push manual a la rama del bot: desactiva el skip y, además, Dependabot se desentiende del PR.
+- **Gate `pnpm dedupe --check` en el job `build`.** Falla con `ERR_PNPM_DEDUPE_CHECK_ISSUES` cuando el lockfile tiene versiones colapsables del mismo paquete. Detecta la causa en ~22 s, antes de lint/typecheck/build, e imprime el plan de colapso con el paquete responsable.
+- **Si Dependabot edita solo algunos `package.json`** (ej. `@types/node`), el gate se pone rojo: los specifiers `^` del resto de los workspaces re-resuelven a la versión nueva y dejan dos copias. **Ese rojo es esperado. Cerrar el PR del bot y hacer un PR propio actualizando los 5 workspaces a la vez** (root, `apps/admin`, `apps/storefront`, `apps/superadmin`, `packages/validation`).
+- **Los `@types/*` con specifier `^` son la fuente principal de drift.** Dependabot re-resuelve a la última versión del rango y bifurca el peer graph completo (`vitest`, `vite`, `next`, `next-auth`, `@sentry/*` arrastran `@types/node`). Se mitiga con **pin exacto** en los 5 `package.json` (precedente: PR #297, `@types/node` en `26.6.5`). No usar `pnpm.overrides` para esto.
+- **Cómo validar un pin exacto:** el diff de `pnpm-lock.yaml` debe tocar **solo líneas `specifier:`**. Si aparece cualquier cambio en `version:` o se mueve otro paquete, el pin no está cortando la re-resolución. `pnpm dedupe --check` debe dar exit 0.
+- **`@dependabot rebase` no es lo mismo que `@dependabot recreate`.** `rebase` reaplica sobre el lockfile existente; `recreate` regenera la resolución y puede mover transitivas `^` (observado: `@types/estree` 1.0.9 → 1.0.10 en #293). Después de un `recreate` la aprobación anterior se descarta: hay que volver a pedir review.
 
 ## Estructura mínima de referencia
 
