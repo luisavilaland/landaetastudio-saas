@@ -35,6 +35,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Previene la bifurcación de peers que rompió #290 (typescript-eslint)
+      # y #293 (vitest). Un lockfile con duplicados rompe tests por doble
+      # registro de módulos.
+      - name: Check peer graph (dedupe)
+        run: pnpm dedupe --check
+
       - run: pnpm typecheck
 
       - run: pnpm lint
