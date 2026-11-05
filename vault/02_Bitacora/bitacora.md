@@ -5256,3 +5256,80 @@ hallazgos. `@types/node` sigue en 26.6.5 y `@types/estree` en 1.0.9.
 detecto ("4 con hallazgos nuevos") y el arreglo fue reescribirlos desde Node.
 **Para archivos del repo se usa la herramienta de edicion, no PowerShell** — la
 regla ya estaba escrita y se volvio a romper.
+
+---
+
+## 2026-11-05 - S4d: `canAccessPanel` se impone, no se informa (cierra el item 101)
+
+**Que se hizo.** `apps/admin/proxy.ts` aplica la matriz de permisos en el ciclo
+del request. Antes de este PR el unico lector de `canAccessPanel` era
+`GET /api/subscriptions`: un tenant `suspended` recibia `'none'` en un JSON y
+entraba igual. Es el item 61 aplicado a la autorizacion.
+
+**La restriccion que el item 101 creia bloqueante ya no lo es.** Next 16 renombro
+`middleware.ts` a `proxy.ts` y lo corre en **Node.js** por defecto. Eso permite
+abrir una transaccion con RLS dentro del proxy, asi que no hay que "resolver el
+tenant antes de que exista la sesion": se lee del JWT con `getToken()` y se
+consulta dentro de `withTenantContext`. El item dejaba dos opciones malas (solo
+APIs, o resolver sesion a mano); ninguna hizo falta.
+
+**Decisiones.** `suspended` redirige a `/suspended` en paginas y responde 403 con
+`field` en APIs (un redirect le devuelve HTML al `fetch` del cliente).
+`expired`, `abandoned`, `cancelled` y `pending_first_payment` pasan en readonly
+(item 97; escribir lo bloquea S4c). Estado desconocido o tenant inexistente ->
+**503**: el proxy distingue "no podes" de "no sabemos". `api/webhooks` queda
+fuera del matcher: MercadoPago no manda cookie de sesion y, si pasara por el
+gate, el pago se cobraria y la orden no se confirmaria.
+
+**El riesgo silencioso era otro.** `getToken()` deriva la clave del JWE con
+`salt === nombre de la cookie` (`@auth/core`). El nombre vivia duplicado; si
+divergia, `getToken()` devolvia `null` y el gate dejaba pasar a **todos** sin
+error. Se movio a `packages/auth/src/session-cookie.ts`. No se pudo exponer como
+subruta (`@repo/auth/session-cookie` no resuelve: el alias `@repo/*` lo traduce a
+`packages/auth/session-cookie`, sin extension), asi que se agrego
+`@repo/auth/*` a los `paths` de `apps/admin/tsconfig.json`, igual que el que ya
+existia para `@repo/commerce/*`.
+
+**Verificacion LEFT JOIN en base real** (rol owner, no `app_user`: con RLS la
+falta de fila daria falso positivo): 3 tenants. `tienda1` y `tienda2` en
+`active/active`. Un tenant sin fila de suscripcion,
+`test-1793899083356` (artefacto de test). Cero `suspended`, cero `cancelled`,
+cero tenants con mas de una suscripcion.
+
+**La fila ausente no puede saltear la matriz.** La primera version devolvia
+`readonly` cuando no habia fila de suscripcion, y eso abria un bypass: un tenant
+`suspended` que ademas nunca pago entraba al panel, porque el camino se cortaba
+antes de los overrides del eje del tenant. Ahora `decidePanelAccess` corre la
+matriz siempre, con `pending_first_payment` como reemplazo. Un `active` sin cobro
+sigue en `readonly` (un onboarding cuyo insert fallo tiene que poder ver por que
+no opera); un `suspended` sin cobro vuelve a quedar en `none`.
+
+**Costo medido (lo que preguntaba Luis).** La transaccion son 4 roundtrips.
+Neon desde esta maquina: 332 ms median (piso de red 82 ms **por roundtrip**;
+`BEGIN`+`COMMIT` vacio 166; `+SET LOCAL` 250; la query sola 83, o sea **0** por
+encima del piso). Estimacion, pendiente de medir en preview: en Vercel, con la
+funcion en la region de Neon, deberia rondar 5-15 ms. El costo no es la query: es
+sumarle 4 roundtrips a requests de pagina y prefetch que antes no tocaban la
+base. No se cachea: cachear deja entrar a un tenant recien suspendido.
+
+**Gap documental, sin maquillaje.** S4d no existia en el plan ni en los specs
+(H-F3-3). Se implemento desde el issue #254 y el item 101, y el spec
+`docs/superpowers/specs/s4d-admin-proxy.md` se escribio **junto con** el codigo,
+no antes. Queda dicho para que no se lea como si el orden correcto se hubiera
+respetado.
+
+**El test del gate usa un JWE real.** `proxy.test.ts` mockea `getToken`, asi que
+fija el contrato de llamada pero no prueba que la sesion descifre: un mock
+devuelve lo que se le pida. `proxy-session.test.ts` firma con `encode` de Auth.js
+usando el mismo `secret` y el mismo `salt` que el proxy. Verificado por mutacion:
+cambiando el `salt` a proposito, los dos tests se ponen en rojo.
+
+**El huerfano de la base era de un E2E, no un misterio.**
+`e2e/superadmin/tenants.spec.ts:11` creaba `test-${Date.now()}` contra la base
+del preview y nunca lo borraba. Ese spec es el origen del tenant sin
+suscripcion; ahora borra por API en `finally`. El tenant que quedaba se elimino
+con verificacion de filas hijas (0 hijas, 0 `admin_users`).
+
+**DoD.** `pnpm typecheck` 9/9, `pnpm lint` 6/6, `next build` 3/3 (`ƒ Proxy
+(Middleware)` en el output, `/suspended` prerenderizada), **1001 tests en 83
+archivos**, `format:check` OK, `check:encoding` 0 hallazgos.

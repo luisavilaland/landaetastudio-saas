@@ -60,6 +60,11 @@ const productionSchema = coreSchema.extend({
     .string()
     .url('STOREFRONT_URL must be a valid URL in production'),
   SENTRY_DSN: z.string().url('SENTRY_DSN must be a valid URL').optional(),
+  // S4d: canal de contacto que muestra /suspended al tenant bloqueado. Opcional
+  // a proposito: si falta, la pagina cae a un texto sin enlace en vez de
+  // romperse. Sin esta variable no hay ningun canal de soporte definido en el
+  // repo, y un `mailto:` inventado es peor que ninguno.
+  SUPPORT_EMAIL: z.string().email('SUPPORT_EMAIL must be an email').optional(),
   // Fase 3 (D1): host que sirve la superficie de la plataforma (landing,
   // registro). Sin esto el proxy del storefront devuelve 404 en ese host
   // porque no hay tenant que resolver.

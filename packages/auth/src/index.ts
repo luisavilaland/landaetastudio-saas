@@ -4,6 +4,10 @@ import { db, dbAdminUsers } from '@repo/db'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import '@repo/auth/types'
+import {
+  ADMIN_SESSION_COOKIE_NAME,
+  SUPERADMIN_SESSION_COOKIE_NAME,
+} from './session-cookie'
 
 if (!process.env.AUTH_SECRET) {
   throw new Error(
@@ -12,8 +16,6 @@ if (!process.env.AUTH_SECRET) {
 }
 
 type ExpectedRole = 'admin' | 'superadmin'
-
-const isProduction = process.env.NODE_ENV === 'production'
 
 export function createAdminAuth() {
   return NextAuth({
@@ -82,9 +84,7 @@ export function createAdminAuth() {
     secret: process.env.AUTH_SECRET,
     cookies: {
       sessionToken: {
-        name: isProduction
-          ? `__Secure-authjs.session-token-admin`
-          : `authjs.session-token-admin`,
+        name: ADMIN_SESSION_COOKIE_NAME,
       },
     },
   })
@@ -157,9 +157,7 @@ export function createSuperadminAuth() {
     secret: process.env.AUTH_SECRET,
     cookies: {
       sessionToken: {
-        name: isProduction
-          ? `__Secure-authjs.session-token-superadmin`
-          : `authjs.session-token-superadmin`,
+        name: SUPERADMIN_SESSION_COOKIE_NAME,
       },
     },
   })

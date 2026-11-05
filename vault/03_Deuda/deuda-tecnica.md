@@ -4360,7 +4360,7 @@ La opcion 1 es la que evita el error en el lugar donde todavia es barato.
 
 ## 101. `canAccessPanel` no tiene middleware donde vivir
 
-**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** detectado al disenar S4b (T10).
+**Severidad:** MEDIA · **Estado:** RESUELTO (2026-11-05, S4d) · **Origen:** detectado al disenar S4b (T10).
 
 **Problema.** `derivePermissions` ya devuelve `canAccessPanel` desde antes de
 Fase 3, y el item 97 (que S4b cerro) lo que busca definir es exactamente esa
@@ -4394,6 +4394,41 @@ cubre las paginas). Las dos opciones cambian el routing de la app.
 **Nota de alcance.** S4b deja la matriz completa y el consumidor de datos. La
 imposicion en el request es S4d, y hasta entonces `canAccessPanel` es un dato,
 no un control. Queda dicho para que nadie lo lea como resuelto.
+
+**Resolucion (2026-11-05, S4d).** `apps/admin/proxy.ts` (Next 16 renombro
+`middleware.ts` a `proxy.ts`; corre en Node, no en edge) impone la matriz en
+paginas y APIs. Cubre las **dos** opciones que este item dejaba como disyuntiva,
+porque en Next 16 el proxy corre en Node y puede abrir una transaccion RLS: no
+hay que resolver el tenant antes de la sesion, se lee del JWT con `getToken()` y
+se consulta dentro de `withTenantContext(tenantId, ...)`.
+
+- Alcance: todas las rutas salvo `_next`, assets, `/login`, `/suspended`,
+  `api/auth`, `api/health` y **`api/webhooks`** (MercadoPago no manda cookie de
+  sesion; si pasara por el gate, el pago se cobraria y la orden no se
+  confirmaria).
+- `suspended` (`canAccessPanel: 'none'`) redirige a `/suspended`; en rutas de API
+  responde 403 con `field`, porque un redirect le devuelve HTML al `fetch` del
+  cliente. `expired`, `abandoned`, `cancelled` y `pending_first_payment` pasan en
+  readonly (las escrituras siguen siendo S4c).
+- Estado desconocido (o sin fila de tenant) -> **503**, no acceso libre: el
+  proxy distingue "no podes" de "no sabemos". `deriveTenantPermissions` sigue
+  siendo el unico interprete de la matriz; el proxy no la reimplementa.
+- El nombre de la cookie de sesion se movio a `packages/auth/src/session-cookie.ts`
+  porque `getToken()` deriva la clave del JWE con `salt === nombre de cookie`. Si
+  los dos strings divergen, `getToken()` devuelve `null` y el gate deja pasar a
+  **todos** en silencio: el riesgo exacto que este item describia.
+- **Costo medido**: la transaccion completa son 4 roundtrips (BEGIN, SET LOCAL,
+  SELECT, COMMIT). Contra Neon desde esta maquina: 332 ms median (piso de red
+  82 ms **por roundtrip**; la query en si mide lo mismo que `SELECT 1`, o sea
+  ~0). Estimacion sin medir todavia en preview: en Vercel, con la funcion en la
+  region de Neon, deberia rondar los 5-15 ms. El costo real no es la query, es
+  sumarle 4 roundtrips a requests de pagina y prefetch que antes no tocaban la
+  base.
+- **Sin fila de suscripcion no saltea la matriz.** La primera version resolvia
+  ese caso como `readonly` antes de mirar los overrides del eje del tenant, y eso
+  abria un bypass: un tenant `suspended` que nunca pago entraba al panel. Ahora la
+  matriz corre siempre, con `pending_first_payment` como estado de reemplazo.
+
 ---
 
 ## 102. El ritual de cierre se saltea cuando el DoD falla
@@ -5215,7 +5250,7 @@ la unica cobertura de un schema que si deberia existir.
 
 ## 124. GGA no puede correr: el modelo configurado no existe
 
-**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** 2026-11-05, al commitear el item 118.
+**Severidad:** MEDIA · **Estado:** RESUELTO (2026-11-05, #308) · **Origen:** 2026-11-05, al commitear el item 118.
 
 **Problema.** El hook de GGA esta configurado para revisar con
 `opencode/nemotron-3-ultra-free`, y el provider ya no sirve ese modelo:
@@ -5242,6 +5277,19 @@ error) y commitear un cambio trivial para verificar que el hook corre y devuelve
 un veredicto, no solo que no crashea.
 
 **Costo:** ~15 min.
+
+**Resolucion (2026-11-05, #308).** `.gga` apunta a
+`opencode/opencode/nemotron-3.5-lightning-free`. Verificado con un commit real,
+no con un "no crashea": en una rama temporal (`test/gga-hook`, no `develop`, para
+que un falso verde no dejara el commit en la rama por defecto) se agrego un
+`test-gga.ts` con `const x: any = 1;` y `git commit` **sin `--no-verify`**. GGA
+respondio `STATUS: FAILED`, `Issue: Use of 'any' type`, `Rule violated: "No usar
+'any': preferir 'unknown' + type guard."` y exit 1: no se creo el commit. La
+rama temporal se borro despues.
+
+Nota de vigencia: el hook lee `.gga` del arbol de trabajo, asi que una rama
+abierta antes de #308 sigue viendo el modelo viejo hasta que se rebasea. Le paso
+a este mismo PR.
 
 ---
 
