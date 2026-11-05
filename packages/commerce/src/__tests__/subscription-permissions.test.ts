@@ -510,3 +510,58 @@ describe('funcion total: estado desconocido no devuelve permisos', () => {
     ).toThrow()
   })
 })
+
+/**
+ * Item 118: las claves heredadas de `Object.prototype` no son estados.
+ *
+ * Los dos mapas son objetos literales, asi que heredan `constructor`,
+ * `toString` y `__proto__`. Leer una de esas claves NO devuelve `undefined`:
+ * devuelve la funcion o el prototipo, que son truthy. Los guards actuales
+ * (`if (!permissions)` y `if (override === undefined)`) los dejan pasar.
+ *
+ * No es teorico en el caso de las suscripciones: `subscriptions.status` es
+ * `text`. Para el tenant es defensa en profundidad: `tenants.status` es
+ * `pgEnum` (migracion 0003), asi que la DB no puede devolver una clave del
+ * prototipo; el guard protege contra un cast o un mock que si pueda.
+ */
+describe('item 118: claves heredadas de Object.prototype', () => {
+  const HEREDADAS = ['constructor', 'toString', '__proto__']
+
+  it.each(HEREDADAS)(
+    'derivePermissions rechaza la clave heredada "%s"',
+    (key) => {
+      // Sin el guard, `PERMISSIONS_BY_STATUS['constructor']` es la funcion
+      // `Object`: truthy, asi que se devuelve como matriz de permisos.
+      expect(() => derivePermissions(key as SubscriptionStatus)).toThrow(
+        /unknown subscription status/,
+      )
+    },
+  )
+
+  it.each(HEREDADAS)(
+    'deriveTenantPermissions rechaza la clave heredada "%s"',
+    (key) => {
+      // Sin el guard, `TENANT_STATUS_OVERRIDE['constructor']` es la funcion
+      // `Object`, que no es `undefined`: el check pasa y `{ ...bySubscription,
+      // ...funcion }` no aporta nada. El override del tenant se salta en
+      // silencio y se devuelven los permisos de la suscripcion.
+      expect(() => deriveTenantPermissions(key as TenantStatus, 'active')).toThrow(
+        /unknown tenant status/,
+      )
+    },
+  )
+
+  /**
+   * El caso exacto que documenta el item 118: `deriveTenantPermissions` con el
+   * prototipo en el argumento de **suscripcion**.
+   *
+   * Se escribe directo, sin pasar por `derivePermissions`, porque el contrato
+   * del item habla de esta funcion. La cobertura de arriba prueba cada mapa por
+   * separado; esta prueba el punto de entrada publico.
+   */
+  it('deriveTenantPermissions directo con prototype', () => {
+    expect(() =>
+      deriveTenantPermissions('active', 'constructor' as SubscriptionStatus),
+    ).toThrow()
+  })
+})

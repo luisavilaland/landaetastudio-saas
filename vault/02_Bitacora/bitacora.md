@@ -5162,3 +5162,39 @@ lint/typecheck/build 18/18, 942/942 tests, format y encoding OK.
 **Hallazgo nuevo:** un test de `packages/validation` prueba su propia copia del
 schema y afirma que `logoUrl` es valido en settings, exactamente lo que el T11
 fix elimino. Registrado como item 123.
+
+## 2026-11-05 - Item 118: los mapas de permisos dejan de aceptar el prototipo
+
+**Contexto.** La auditoria S4c dejo abierto el item 118: `derivePermissions` y
+`deriveTenantPermissions` indexaban objetos literales
+(`PERMISSIONS_BY_STATUS[status]`) y el guard solo miraba `undefined`/truthiness.
+Con `constructor`, `toString` o `__proto__` el lookup devolvia una funcion o el
+prototipo, que son truthy, asi que el contrato "un estado desconocido falla
+ruidosamente" se violaba sin que ningun test lo notara.
+
+**Fix.** `Object.hasOwn` en los dos mapas antes de indexar
+(`packages/commerce/src/subscription-permissions.ts`). `target`/`lib` ES2022 en
+`packages/commerce/tsconfig.json`, asi que no hace falta el fallback
+`hasOwnProperty.call`.
+
+**Verificacion en rojo, por separado.** Los 7 tests nuevos se escribieron antes
+del fix y fallaron con `expected [Function] to throw an error`. Despues, quitar
+el guard de **un** mapa hizo fallar **solo** los tests de ese mapa: 3 de
+`derivePermissions` en un caso, 4 del lado tenant en el otro. Esto importa
+porque el guard del segundo mapa tambien podria pasar los tests del primero si
+los casos no estuvieran separados.
+
+**Precision sobre el alcance.** El defecto de `derivePermissions` es
+**fail-closed**: `Function.canWrite` es `undefined`, el guard de escritura cae a
+403. El "fail-open" es solo del override de tenant, donde el spread de una
+funcion no aporta propiedades y el override se saltea en silencio. El item 118
+queda **PARCIAL**: el CHECK constraint sobre `subscriptions.status` sigue
+pendiente y es el unico validador real de ese valor.
+
+**Drift de contadores corregido de paso.** README, SETUP, TESTING y
+TESTING-MANUAL decian **889 tests / 78 archivos**; la medicion real antes de este
+PR era **942 / 80**. El desfase de 53 tests es previo y no de este cambio. Ahora
+dicen 949 / 80.
+
+**DoD.** `turbo run lint typecheck build --force` 18/18 con `0 cached`, 949/949
+tests en 80 archivos, `format:check` OK, `check:encoding` con 0 hallazgos nuevos.
