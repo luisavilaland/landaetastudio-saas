@@ -519,8 +519,10 @@ describe('funcion total: estado desconocido no devuelve permisos', () => {
  * devuelve la funcion o el prototipo, que son truthy. Los guards actuales
  * (`if (!permissions)` y `if (override === undefined)`) los dejan pasar.
  *
- * No es teorico: `subscriptions.status` y `tenants.status` son columnas `text`
- * sin enum en Postgres, y el tipo de TypeScript no valida lo que viene de la DB.
+ * No es teorico en el caso de las suscripciones: `subscriptions.status` es
+ * `text`. Para el tenant es defensa en profundidad: `tenants.status` es
+ * `pgEnum` (migracion 0003), asi que la DB no puede devolver una clave del
+ * prototipo; el guard protege contra un cast o un mock que si pueda.
  */
 describe('item 118: claves heredadas de Object.prototype', () => {
   const HEREDADAS = ['constructor', 'toString', '__proto__']
@@ -550,12 +552,16 @@ describe('item 118: claves heredadas de Object.prototype', () => {
   )
 
   /**
-   * El contrato es "un estado desconocido tira, no degrada". Este es el caso
-   * que lo violaba sin que ningun test lo notara.
+   * El caso exacto que documenta el item 118: `deriveTenantPermissions` con el
+   * prototipo en el argumento de **suscripcion**.
+   *
+   * Se escribe directo, sin pasar por `derivePermissions`, porque el contrato
+   * del item habla de esta funcion. La cobertura de arriba prueba cada mapa por
+   * separado; esta prueba el punto de entrada publico.
    */
-  it('un estado de tenant que colisiona con el prototipo no hereda permisos', () => {
+  it('deriveTenantPermissions directo con prototype', () => {
     expect(() =>
-      deriveTenantPermissions('constructor' as TenantStatus, 'active'),
-    ).toThrow(/unknown tenant status/)
+      deriveTenantPermissions('active', 'constructor' as SubscriptionStatus),
+    ).toThrow()
   })
 })
