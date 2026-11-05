@@ -73,6 +73,26 @@ describe('decidePanelAccess', () => {
     })
   })
 
+  it('bloquea un tenant suspended aunque no tenga fila de suscripcion', () => {
+    // Sin esto, suspender un tenant que nunca pago dejaba el panel abierto: la
+    // fila ausente cortaba el camino antes de llegar a los overrides del eje
+    // del tenant, y el `readonly` de un tenant `active` se aplicaba a todos.
+    expect(
+      decidePanelAccess({ tenantStatus: 'suspended', subscriptionStatus: null }),
+    ).toEqual({
+      access: 'none',
+      tenantStatus: 'suspended',
+      subscriptionStatus: 'unknown',
+      reason: 'missing_subscription',
+    })
+  })
+
+  it('sin suscripcion los overrides del tenant siguen mandando', () => {
+    expect(
+      decidePanelAccess({ tenantStatus: 'cancelled', subscriptionStatus: null }),
+    ).toMatchObject({ access: 'readonly', reason: 'missing_subscription' })
+  })
+
   it('propaga el throw de un estado de suscripcion desconocido', () => {
     expect(() =>
       decidePanelAccess({

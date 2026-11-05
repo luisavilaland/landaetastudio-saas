@@ -1,3 +1,5 @@
+import LogoutButton from '@/components/logout-button'
+
 /**
  * Pagina de destino del bloqueo por `canAccessPanel: 'none'` (S4d).
  *
@@ -7,7 +9,14 @@
  *
  * No consulta sesion ni base de datos: si lo hiciera, un fallo de DB en el
  * camino de bloqueo dejaria al tenant sin pagina a la que caer.
+ *
+ * **Salida**: el tenant bloqueado tiene que poder irse. Sin el boton de logout
+ * queda atrapado en una pagina que no ofrece ninguna accion y su unica salida
+ * es borrar la cookie a mano.
  */
+
+const supportEmail = process.env.SUPPORT_EMAIL
+
 export default function SuspendedPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
@@ -31,10 +40,21 @@ export default function SuspendedPage() {
           </p>
         </div>
 
-        <p className="text-center text-xs text-zinc-500">
-          Si crees que es un error, contacta al soporte indicando el nombre de
-          tu tienda.
-        </p>
+        <div className="flex flex-col items-center gap-4">
+          {supportEmail ? (
+            <a
+              href={`mailto:${supportEmail}`}
+              className="w-full rounded-md bg-zinc-900 px-4 py-2 text-center text-sm font-medium text-white hover:bg-zinc-800"
+            >
+              Escribir a soporte
+            </a>
+          ) : (
+            <p className="text-center text-xs text-zinc-500">
+              Contacta al soporte indicando el nombre de tu tienda.
+            </p>
+          )}
+          <LogoutButton />
+        </div>
       </div>
     </div>
   )

@@ -47,29 +47,29 @@ const MISSING_TENANT: PanelAccessDecision = {
 }
 
 /**
- * Tenant sin fila en `subscriptions`.
+ * Estado de suscripcion que se usa cuando el tenant **no tiene fila** en
+ * `subscriptions`.
  *
  * Verificado contra la base el 2026-11-05 (LEFT JOIN `tenants` vs
  * `subscriptions`, rol owner): 3 tenants, 1 sin fila (`test-1793899083356`,
  * artefacto de test). `tienda1` y `tienda2` estan `active/active`.
  *
- * Se resuelve como `readonly` y no como bloqueo total por dos motivos:
- * - `expired` y `abandoned` ya son `readonly` por decision de producto (item
- *   97): ver es menos malo que no ver. Un tenant sin fila de cobro esta mas
- *   cerca de "nunca pago" que de "la plataforma lo suspendio".
- * - Un 503 aca dejaria fuera del panel a un onboarding cuyo insert de
- *   suscripcion fallo, que es justo el momento en que el tenant necesita ver
- *   por que no puede operar.
+ * `pending_first_payment` y no `null`/`undefined` porque la fila ausente **no
+ * puede saltear la matriz**. Un tenant `suspended` sin fila de suscripcion
+ * tiene que seguir bloqueado: el eje del tenant es un bloqueo de plataforma
+ * (`TENANT_STATUS_OVERRIDE`), no una deuda. Devolver `readonly` aca era un
+ * bypass: suspendias el tenant y el panel seguia abierto porque ademas nunca
+ * habia pagado.
+ *
+ * Para un tenant `active` sin fila, el resultado sigue siendo `readonly` (ver
+ * sin operar), que es lo que corresponde a un onboarding cuyo insert de
+ * suscripcion fallo: es justo el momento en que necesita ver por que no puede
+ * operar. Un 503 aca lo dejaria afuera.
  *
  * Lo que **no** se hace es inventar `canWrite: true`: `readonly` en el panel y
  * los endpoints de escritura (S4c) siguen siendo el gate real de escritura.
  */
-const MISSING_SUBSCRIPTION: PanelAccessDecision = {
-  access: 'readonly',
-  tenantStatus: 'active',
-  subscriptionStatus: 'unknown',
-  reason: 'missing_subscription',
-}
+const FALLBACK_SUBSCRIPTION_STATUS: SubscriptionStatus = 'pending_first_payment'
 
 /**
  * Traduce las dos columnas del join a una decision de acceso.
@@ -80,6 +80,9 @@ const MISSING_SUBSCRIPTION: PanelAccessDecision = {
  * un estado desconocido. El cast existe solo para llegar a ese guard; no relaja
  * nada, porque un valor invalido sigue explotando y el proxy lo convierte en
  * 503.
+ *
+ * La matriz se evalua **siempre**, con o sin fila de suscripcion. El `reason`
+ * distingue el caso para logs y headers, pero no cambia el camino de decision.
  */
 export function decidePanelAccess(
   input: PanelAccessInput,
@@ -88,19 +91,17 @@ export function decidePanelAccess(
 
   if (!tenantStatus) return MISSING_TENANT
 
-  if (!subscriptionStatus) {
-    return { ...MISSING_SUBSCRIPTION, tenantStatus: tenantStatus as TenantStatus }
-  }
-
   const permissions = deriveTenantPermissions(
     tenantStatus as TenantStatus,
-    subscriptionStatus as SubscriptionStatus,
+    (subscriptionStatus ?? FALLBACK_SUBSCRIPTION_STATUS) as SubscriptionStatus,
   )
 
   return {
     access: permissions.canAccessPanel,
     tenantStatus: tenantStatus as TenantStatus,
-    subscriptionStatus: subscriptionStatus as SubscriptionStatus,
-    reason: 'matrix',
+    subscriptionStatus: subscriptionStatus
+      ? (subscriptionStatus as SubscriptionStatus)
+      : 'unknown',
+    reason: subscriptionStatus ? 'matrix' : 'missing_subscription',
   }
 }

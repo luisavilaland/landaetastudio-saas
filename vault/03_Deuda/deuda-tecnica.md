@@ -4420,9 +4420,14 @@ se consulta dentro de `withTenantContext(tenantId, ...)`.
 - **Costo medido**: la transaccion completa son 4 roundtrips (BEGIN, SET LOCAL,
   SELECT, COMMIT). Contra Neon desde esta maquina: 332 ms median (piso de red
   82 ms **por roundtrip**; la query en si mide lo mismo que `SELECT 1`, o sea
-  ~0). En Vercel, con la funcion en la region de Neon, el mismo gate ronda los
-  5-15 ms. El costo real no es la query, es sumarle 4 roundtrips a requests de
-  pagina y prefetch que antes no tocaban la base.
+  ~0). Estimacion sin medir todavia en preview: en Vercel, con la funcion en la
+  region de Neon, deberia rondar los 5-15 ms. El costo real no es la query, es
+  sumarle 4 roundtrips a requests de pagina y prefetch que antes no tocaban la
+  base.
+- **Sin fila de suscripcion no saltea la matriz.** La primera version resolvia
+  ese caso como `readonly` antes de mirar los overrides del eje del tenant, y eso
+  abria un bypass: un tenant `suspended` que nunca pago entraba al panel. Ahora la
+  matriz corre siempre, con `pending_first_payment` como estado de reemplazo.
 
 ---
 
@@ -5245,7 +5250,7 @@ la unica cobertura de un schema que si deberia existir.
 
 ## 124. GGA no puede correr: el modelo configurado no existe
 
-**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** 2026-11-05, al commitear el item 118.
+**Severidad:** MEDIA · **Estado:** RESUELTO (2026-11-05, #308) · **Origen:** 2026-11-05, al commitear el item 118.
 
 **Problema.** El hook de GGA esta configurado para revisar con
 `opencode/nemotron-3-ultra-free`, y el provider ya no sirve ese modelo:
@@ -5272,6 +5277,19 @@ error) y commitear un cambio trivial para verificar que el hook corre y devuelve
 un veredicto, no solo que no crashea.
 
 **Costo:** ~15 min.
+
+**Resolucion (2026-11-05, #308).** `.gga` apunta a
+`opencode/opencode/nemotron-3.5-lightning-free`. Verificado con un commit real,
+no con un "no crashea": en una rama temporal (`test/gga-hook`, no `develop`, para
+que un falso verde no dejara el commit en la rama por defecto) se agrego un
+`test-gga.ts` con `const x: any = 1;` y `git commit` **sin `--no-verify`**. GGA
+respondio `STATUS: FAILED`, `Issue: Use of 'any' type`, `Rule violated: "No usar
+'any': preferir 'unknown' + type guard."` y exit 1: no se creo el commit. La
+rama temporal se borro despues.
+
+Nota de vigencia: el hook lee `.gga` del arbol de trabajo, asi que una rama
+abierta antes de #308 sigue viendo el modelo viejo hasta que se rebasea. Le paso
+a este mismo PR.
 
 ---
 

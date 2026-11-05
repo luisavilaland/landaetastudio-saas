@@ -153,6 +153,19 @@ describe('proxy de admin (S4d)', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('x-panel-access')).toBe('readonly')
   })
+
+  it('un tenant suspended sin fila de suscripcion sigue bloqueado', async () => {
+    // El caso que abria el panel: la fila ausente cortaba el camino antes del
+    // override del eje del tenant.
+    mockSessionTenant('tenant-1')
+    mockRows([{ tenantStatus: 'suspended', subscriptionStatus: null }])
+
+    const response = await proxy(request('/dashboard'))
+
+    expect(response.headers.get('location')).toBe(
+      'https://admin.landaetastudio.com/suspended',
+    )
+  })
 })
 
 describe('matcher del proxy de admin', () => {
@@ -177,10 +190,62 @@ describe('matcher del proxy de admin', () => {
     },
   )
 
+  it.each([
+    '/login-historial',
+    '/suspended-history',
+    '/api/authentication',
+    '/api/healthcheck',
+    '/api/webhooksnuevos',
+  ])('intercepta %s: la exclusion es del arbol de la ruta, no del prefijo', (pathname) => {
+    // Con `login` a secas en el lookahead, `/login-historial` quedaba fuera del
+    // gate: bastaba crear una ruta con ese prefijo para saltarse la decision.
+    expect(matcher.test(pathname)).toBe(true)
+  })
+
+  it.each([
+    '/login/reset',
+    '/suspended/mas-info',
+    '/api/auth/session',
+    '/api/health/live',
+    '/api/webhooks/mercadopago/orders',
+  ])('sigue excluyendo el subarbol %s', (pathname) => {
+    expect(matcher.test(pathname)).toBe(false)
+  })
+
   it('el webhook de MercadoPago queda fuera del gate de sesion', () => {
     // Si el webhook pasara por el gate, el pago se cobraria y la orden no se
     // confirmaria: MercadoPago no manda cookie de sesion del tenant.
     expect(matcher.test('/api/webhooks/mercadopago/subscriptions')).toBe(false)
+  })
+})
+
+describe('headers de decision sin sesion', () => {
+  beforeEach(() => {
+    vi.mocked(getToken).mockReset()
+    vi.mocked(withTenantContext).mockReset()
+  })
+
+  it('no reenvia los headers de decision que manda el cliente', async () => {
+    // Anti-spoofing: si el cliente escribe `x-panel-access: full` y el proxy
+    // devuelve la request sin limpiarla, un handler que confie en ese header
+    // lee el valor del atacante.
+    const spoofed = new NextRequest(
+      'https://admin.landaetastudio.com/dashboard',
+      {
+        headers: {
+          'x-panel-access': 'full',
+          'x-tenant-status': 'active',
+        },
+      },
+    )
+    mockSessionTenant(null)
+
+    const response = await proxy(spoofed)
+
+    expect(response.headers.get('x-panel-access')).toBeNull()
+    expect(response.headers.get('x-middleware-request-x-panel-access')).toBeNull()
+    expect(response.headers.get('x-middleware-request-x-tenant-status')).toBeNull()
+    expect(withTenantContext).not.toHaveBeenCalled()
   })
 })
 

@@ -37,8 +37,8 @@ const logger = createLogger('admin-proxy')
  */
 
 export const config = {
-  // Exclusiones, todas con motivo:
-  // - `_next`, favicon e imagenes: assets.
+  // Exclusiones, todas con motivo y **ancladas**:
+  // - `_next` y `favicon.ico`: assets del framework.
   // - `api/auth`: callbacks de NextAuth; sin esto no se puede ni iniciar sesion.
   // - `api/health`: health check publico (monitoreo, sin sesion).
   // - `api/webhooks`: MercadoPago no manda cookie de sesion. Si el webhook
@@ -47,8 +47,12 @@ export const config = {
   //   no por sesion.
   // - `suspended` y `login`: la pagina de destino y la de entrada. Sin esto el
   //   redirect rebota contra si mismo.
+  //
+  // El `(?:/|$)` de cada prefijo es lo que hace la diferencia: con `login` a
+  // secas, `/login-historial` tambien quedaba fuera del gate por coincidencia
+  // de prefijo. La exclusion tiene que ser del arbol de la ruta, no del texto.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/health|api/webhooks|suspended|login|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|suspended(?:/|$)|login(?:/|$)|api/auth(?:/|$)|api/health(?:/|$)|api/webhooks(?:/|$)).*)',
   ],
 }
 
@@ -146,7 +150,17 @@ export async function proxy(request: NextRequest) {
   // Sin sesion no hay tenant que gobernar. No es un bypass del gate: lo que
   // queda detras es lo que ya depende de `auth()` para servir datos, y las
   // rutas de API ya responden 401 por si mismas.
-  if (!tenantId) return NextResponse.next()
+  //
+  // Los headers de decision se borran aunque no haya sesion: si el cliente los
+  // manda a mano y el proxy devolviera la request sin tocarlos, cualquier
+  // handler que confie en `x-panel-access` leeria un valor escrito por el
+  // cliente. Ausente y "no hay sesion" tienen que ser lo mismo.
+  if (!tenantId) {
+    const anonymousHeaders = new Headers(request.headers)
+    anonymousHeaders.delete('x-panel-access')
+    anonymousHeaders.delete('x-tenant-status')
+    return NextResponse.next({ request: { headers: anonymousHeaders } })
+  }
 
   try {
     const row = await loadPanelRow(tenantId)
@@ -165,14 +179,24 @@ export async function proxy(request: NextRequest) {
     const decision = decidePanelAccess(row)
 
     if (decision.reason === 'missing_subscription') {
+      // El acceso puede ser `readonly` (tenant active sin cobro) o `none`
+      // (tenant suspendido sin cobro). Se loggea el resultado, no una suposicion.
       logger.warn(
-        { tenantId },
-        'Panel access: tenant has no subscription row, granting readonly',
+        { tenantId, access: decision.access, tenantStatus: decision.tenantStatus },
+        'Panel access: tenant has no subscription row',
       )
     }
 
     if (decision.access === 'none') {
-      logger.info({ tenantId }, 'Panel access denied: account suspended')
+      logger.info(
+        {
+          tenantId,
+          reason: decision.reason,
+          tenantStatus: decision.tenantStatus,
+          subscriptionStatus: decision.subscriptionStatus,
+        },
+        'Panel access denied',
+      )
       return blocked(request)
     }
 
