@@ -14,6 +14,21 @@ updates:
         dependency-type: "production"
         update-types: ["minor", "patch"]
         patterns: ["*"]
+    # `@types/node` esta pinneado exacto (26.6.5) a proposito: los `^` de los
+    # 5 workspaces re-resuelven a la ultima version del rango y bifurcan el peer
+    # graph completo (vitest, vite, next, next-auth, @sentry/*). El bump del bot
+    # siempre termina en `ERR_PNPM_DEDUPE_CHECK_ISSUES`. Un major sigue pasando:
+    # ese si es una decision deliberada.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      # postgres 4.0.0 reescribe el pool, el protocolo y la capa de socket, y
+      # cambia el default a `infer: false`. Es el driver core de la DB: se
+      # evalua en un PR humano con E2E (item 125), no en un bump automatico.
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

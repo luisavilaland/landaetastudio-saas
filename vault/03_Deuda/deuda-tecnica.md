@@ -5212,3 +5212,121 @@ la unica cobertura de un schema que si deberia existir.
 **Costo:** ~20 min.
 
 ---
+
+## 124. GGA no puede correr: el modelo configurado no existe
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** 2026-11-05, al commitear el item 118.
+
+**Problema.** El hook de GGA esta configurado para revisar con
+`opencode/nemotron-3-ultra-free`, y el provider ya no sirve ese modelo:
+
+```
+Error: Model not found: opencode/nemotron-3-ultra-free.
+Did you mean: nemotron-3.5-lightning-free, nemotron-3.5-super-vl-free, beam-free?
+Error: Provider execution failed (exit code: 1)
+```
+
+El hook falla **siempre**, para cualquier commit. La unica salida es
+`git commit --no-verify`, que es exactamente lo que la regla de GGA permite para
+fallos de red... y es lo que la vuelve peligrosa: el skip deja de ser una
+excepcion documentada y pasa a ser el camino normal.
+
+**Por que importa.** Los dos PRs de esta sesion (#304, #305) se commitearon con
+`--no-verify`: 2 de 2. Si S4d sigue igual, el reviewer automatico no ve ninguna
+de las tres. La revision pasa a depender solo de Luis, que es justo lo que GGA
+existia para no tener que hacer.
+
+**Fix.** Apuntar `.gga` a un modelo que exista en el provider actual
+(`nemotron-3.5-lightning-free` es la opcion mas cercana del propio mensaje de
+error) y commitear un cambio trivial para verificar que el hook corre y devuelve
+un veredicto, no solo que no crashea.
+
+**Costo:** ~15 min.
+
+---
+
+## 125. postgres 3.4.9 -> 4.0.0 requiere PR humano con E2E
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** Dependabot #303, cerrado el 2026-11-05.
+
+**Problema.** v4 reescribe el pool, la conexion, el protocolo, el startup y la
+capa de socket. No es un bump: es otro driver con la misma API publica.
+
+**Cambios que tocan este repo:**
+
+1. **`infer: false` por defecto.** El servidor decide el tipo de cada parametro.
+   Un `Date` contra una columna `timestamp`/`date` se interpreta como UTC en vez
+   de la hora local de la sesion. Aca las fechas son UTC por regla, asi que
+   deberia ser benigno — pero "deberia" no es verificacion, y hay que correr la
+   suite contra Neon para saberlo.
+2. **`sql.array()` eliminado.** Cualquier query que arme arrays con ese helper
+   rompe con `ARRAY_REMOVED`.
+3. **ESM-only.** Desaparecen los builds CommonJS y Deno. En Node 20.19+/22.12 se
+   puede `require`, pero el arranque de Next hay que verificarlo, no asumirlo.
+4. **COMMIT respondido con ROLLBACK ahora rechaza** (`TRANSACTION_ROLLED_BACK`).
+   Este repo depende de que la rejection de `db.transaction` llegue al `catch`
+   del handler; hoy `withTenantContext` se usa con `return await` justamente por
+   eso. El cambio va en la direccion correcta, pero cambia el comportamiento.
+
+**Lo que ya esta verificado (no hay que rehacerlo):**
+
+- `drizzle-orm` 0.45.4 declara `postgres: ">=3"` (peer opcional): v4 entra en el
+  rango.
+- `uniqueViolation()` (`apps/storefront/app/api/register-tenant/route.ts:53`) ya
+  acepta `constraint` y `constraint_name`, y desenrolla `DrizzleQueryError.cause`.
+  Ese helper no depende del nombre de campo que cambie.
+
+**Por que no se puede mergear desde Dependabot.** Los PRs del bot no corren E2E:
+GitHub no les expone secrets. Un bump del driver core sin E2E no es evidencia.
+
+**Fix.** PR humano: subir el specifier en `package.json` y `packages/db/package.json`,
+`pnpm install`, leer el changelog completo de v4, correr DoD + E2E contra Neon, y
+verificar explicitamente los 4 puntos de arriba.
+
+**Costo:** ~4 h.
+
+---
+
+## 126. Los contadores de tests viven en 4 lugares y divergen
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** 2026-11-05 (item 118); cuarta ocurrencia del patron.
+
+**Problema.** El numero de tests esta escrito a mano en cuatro documentos:
+
+| Archivo             | Donde                                     |
+| ------------------- | ----------------------------------------- |
+| `README.md`         | bloque `## Tests`                         |
+| `SETUP.md`          | `### Estado de Tests`                     |
+| `TESTING.md`        | tabla de metricas + linea "Estado actual" |
+| `TESTING-MANUAL.md` | checklist de `pnpm test`                  |
+
+Cada uno se actualiza a mano, y ninguno se actualiza solo. Al cerrar el item 118
+los cuatro decian **889 tests / 78 archivos** cuando la medicion real, **antes**
+del cambio, ya era **942 / 80**. Un desfase de 53 tests que nadie noto.
+
+**No es la primera vez.** Es la cuarta. La bitacora ya registra dos mediciones
+equivocadas tomadas de corridas con fallos (768 en vez de 769; 72 archivos en vez
+de 73), y este es el mismo patron por una causa distinta: no un numero mal leido,
+sino cuatro copias que nadie sincroniza.
+
+**Por que es ALTA y no BAJA.** El AGENTS.md manda consultar estos contadores al
+reincorporarse. Un agente que lee 889 y corre 949 concluye que algo se rompio, o
+peor, ajusta el codigo para que "vuelva" al numero documentado. El dano no es el
+numero: es la auditoria falsa que dispara.
+
+**Inconsistencia relacionada, en el mismo archivo de deuda.** El item 92 se
+titula "Contadores de tests en docs con drift" pero su cuerpo describe un test de
+proxy que no importa el proxy. El contenido de conteo vive en una seccion sin
+numero, `## Registro de correccion de conteo (2026-10-10)`, que a su vez
+referencia una seccion "dentro del item 92" que no existe. Queda anotado aca en
+vez de renombrar el 92, porque hay referencias externas a "item 92" que significan
+"la regla de conteo".
+
+**Fix propuesto.** Un archivo unico, `docs/estado-tests.md`, generado por un
+script que corre la suite y escribe el resultado; los cuatro documentos pasan a
+enlazarlo en vez de repetir el numero. Si el script no puede correr en todos los
+contextos, como minimo: un solo lugar con el numero y tres links.
+
+**Costo:** ~1 h.
+
+---

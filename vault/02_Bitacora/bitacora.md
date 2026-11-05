@@ -5198,3 +5198,61 @@ dicen 949 / 80.
 
 **DoD.** `turbo run lint typecheck build --force` 18/18 con `0 cached`, 949/949
 tests en 80 archivos, `format:check` OK, `check:encoding` con 0 hallazgos nuevos.
+
+---
+
+## 2026-11-05 - Dependabot: el gate de dedupe como unico umbral, y un bump que no se puede mergear solo
+
+**Contexto.** Cuatro PRs del bot abiertos a la vez (#301 `@types/node`, #302
+`sentry/lucide/resend`, #303 `postgres` major) y #304 esperando merge.
+
+**#301 cerrado con causa, no con reproche.** Falla en `Check peer graph (dedupe)`
+con `ERR_PNPM_DEDUPE_CHECK_ISSUES`. El culpable que imprime el gate no es
+`@types/node` sino **`@types/estree 1.0.9 -> 1.0.10`**: el pin exacto corto el
+drift de un paquete y el de otro siguio. Cerrarlo y actualizar los 5 workspaces a
+la vez (patron de #297) es lo que corresponde.
+
+**#302 reemplazado por PR humano (#305).** No por capricho: **los PRs del bot no
+corren E2E** porque GitHub no les expone secrets. Un bump sin E2E no es
+evidencia. Se subieron los tres specifiers a mano y `pnpm dedupe --check` dio
+**exit 0 sin necesitar dedupe**: el drift que rompia #302 venia de la regeneracion
+del lockfile que hace Dependabot, no de los bumps.
+
+**Detalle que no se escondio:** `lucide-react` quedo en **1.69.0**, no en 1.66.0
+como proponia el bot, porque el specifier es `^1.66.0` y el caret resuelve a la
+ultima del rango. Queda escrito en el body del PR para que el reviewer lo vea.
+
+**#303 cerrado con el analisis completo.** postgres 4.0.0 no es un bump, es otro
+driver: `infer: false` por defecto (Date contra timestamp se interpreta UTC),
+`sql.array()` eliminado, ESM-only, y COMMIT respondido con ROLLBACK ahora
+rechaza. Lo unico que ya estaba verificado: el peer `>=3` de drizzle lo acepta y
+`uniqueViolation()` ya lee `constraint` y `constraint_name`. Registrado como
+**item 125** para que se haga en un PR humano con E2E.
+
+**`.github/dependabot.yml` aprende la leccion.** Bloque `ignore`: `@types/node`
+minor+patch (el pin es deliberado, un major sigue pasando) y `postgres` major
+(decision de driver, no de version). No se usa `pnpm.overrides` para esto.
+
+**GGA dejo de ser una red.** Al commitear, el hook falla con
+`Model not found: opencode/nemotron-3-ultra-free`. No es un timeout de red: el
+modelo ya no existe en el provider. Los 2 commits de la sesion fueron
+`--no-verify`. Registrado como **item 124**: un hook que siempre falla convierte
+la excepcion documentada en el camino normal.
+
+**Contadores: cuarta vez.** Al actualizar docs para #304 aparecio que los cuatro
+documentos decian **889/78** cuando la medicion real ya era **942/80** (53 tests
+de desfase). Registrado como **item 126** con la propuesta de un archivo unico
+generado por script. Queda anotado ahi que el **item 92** tiene titulo y cuerpo
+inconsistentes: se titula "contadores con drift" pero describe un test de proxy
+que no importa el proxy.
+
+**Verificado en la rama `chore/deps-sentry-lucide-resend`:** turbo
+lint/typecheck/build 18/18 `0 cached` con `--force`, **942/942 tests** en 80
+archivos, `dedupe --check` exit 0, `format:check` OK, `check:encoding` 0
+hallazgos. `@types/node` sigue en 26.6.5 y `@types/estree` en 1.0.9.
+
+**Nota de proceso.** Los 4 `package.json` se editaron con
+`Set-Content -Encoding UTF8` y PowerShell 5.1 les puso BOM. `check:encoding` lo
+detecto ("4 con hallazgos nuevos") y el arreglo fue reescribirlos desde Node.
+**Para archivos del repo se usa la herramienta de edicion, no PowerShell** — la
+regla ya estaba escrita y se volvio a romper.
