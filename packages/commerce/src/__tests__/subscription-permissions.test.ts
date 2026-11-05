@@ -510,3 +510,52 @@ describe('funcion total: estado desconocido no devuelve permisos', () => {
     ).toThrow()
   })
 })
+
+/**
+ * Item 118: las claves heredadas de `Object.prototype` no son estados.
+ *
+ * Los dos mapas son objetos literales, asi que heredan `constructor`,
+ * `toString` y `__proto__`. Leer una de esas claves NO devuelve `undefined`:
+ * devuelve la funcion o el prototipo, que son truthy. Los guards actuales
+ * (`if (!permissions)` y `if (override === undefined)`) los dejan pasar.
+ *
+ * No es teorico: `subscriptions.status` y `tenants.status` son columnas `text`
+ * sin enum en Postgres, y el tipo de TypeScript no valida lo que viene de la DB.
+ */
+describe('item 118: claves heredadas de Object.prototype', () => {
+  const HEREDADAS = ['constructor', 'toString', '__proto__']
+
+  it.each(HEREDADAS)(
+    'derivePermissions rechaza la clave heredada "%s"',
+    (key) => {
+      // Sin el guard, `PERMISSIONS_BY_STATUS['constructor']` es la funcion
+      // `Object`: truthy, asi que se devuelve como matriz de permisos.
+      expect(() => derivePermissions(key as SubscriptionStatus)).toThrow(
+        /unknown subscription status/,
+      )
+    },
+  )
+
+  it.each(HEREDADAS)(
+    'deriveTenantPermissions rechaza la clave heredada "%s"',
+    (key) => {
+      // Sin el guard, `TENANT_STATUS_OVERRIDE['constructor']` es la funcion
+      // `Object`, que no es `undefined`: el check pasa y `{ ...bySubscription,
+      // ...funcion }` no aporta nada. El override del tenant se salta en
+      // silencio y se devuelven los permisos de la suscripcion.
+      expect(() => deriveTenantPermissions(key as TenantStatus, 'active')).toThrow(
+        /unknown tenant status/,
+      )
+    },
+  )
+
+  /**
+   * El contrato es "un estado desconocido tira, no degrada". Este es el caso
+   * que lo violaba sin que ningun test lo notara.
+   */
+  it('un estado de tenant que colisiona con el prototipo no hereda permisos', () => {
+    expect(() =>
+      deriveTenantPermissions('constructor' as TenantStatus, 'active'),
+    ).toThrow(/unknown tenant status/)
+  })
+})

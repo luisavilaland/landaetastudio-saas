@@ -479,7 +479,7 @@ pnpm build         # Build de todas las apps
 
 ### Estado de Tests
 
-**889 tests pasando, 0 fallos (78 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
+**949 tests pasando, 0 fallos (80 archivos).** Todos los suites de test están operativos. Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 
 ### Patrones de Testing
 

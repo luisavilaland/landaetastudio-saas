@@ -5069,7 +5069,14 @@ accidental como cobertura.
 
 ## 118. derivePermissions no falla ruidosamente con estados prototype (H-F3-s4c-2)
 
-**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** auditoria S4c, 2026-10-14 (issue #261).
+**Severidad:** MEDIA · **Estado:** PARCIAL (2026-11-05) · **Origen:** auditoria S4c, 2026-10-14 (issue #261).
+
+**Resuelto el 2026-11-05:** ambos mapas usan `Object.hasOwn` antes de indexar
+(`packages/commerce/src/subscription-permissions.ts`). 7 tests nuevos cubren
+`constructor`, `toString` y `__proto__` en las dos funciones; la verificacion en
+rojo se hizo por separado (quitar el guard de un mapa hace fallar solo sus
+tests). **Pendiente:** el CHECK constraint sobre `subscriptions.status`, que
+sigue siendo el hueco real de validacion en la DB.
 
 **Problema.** El contrato documentado es "un estado desconocido **falla
 ruidosamente**" (tira, no degrada). Se cumple para estados desconocidos

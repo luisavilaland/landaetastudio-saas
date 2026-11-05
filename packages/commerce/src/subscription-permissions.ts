@@ -290,15 +290,18 @@ const TENANT_STATUS_OVERRIDE: Record<
 export function derivePermissions(
   status: SubscriptionStatus,
 ): SubscriptionPermissions {
-  const permissions = PERMISSIONS_BY_STATUS[status]
-
-  if (!permissions) {
+  // `Object.hasOwn` y no `PERMISSIONS_BY_STATUS[status] === undefined`: el mapa
+  // es un objeto literal y hereda `constructor`, `toString` y `__proto__` de
+  // `Object.prototype`. Leer esas claves devuelve la funcion o el prototipo,
+  // que son truthy, asi que el guard de `undefined` las dejaba pasar y
+  // devolvia una "matriz de permisos" que no lo es.
+  if (!Object.hasOwn(PERMISSIONS_BY_STATUS, status)) {
     throw new Error(
       `derivePermissions: unknown subscription status "${status}"`,
     )
   }
 
-  return permissions
+  return PERMISSIONS_BY_STATUS[status]
 }
 
 /**
@@ -317,13 +320,20 @@ export function deriveTenantPermissions(
   subscriptionStatus: SubscriptionStatus,
 ): SubscriptionPermissions {
   const bySubscription = derivePermissions(subscriptionStatus)
-  const override = TENANT_STATUS_OVERRIDE[tenantStatus]
 
-  if (override === undefined) {
+  // Mismo agujero que en `derivePermissions`: la clave heredada `constructor`
+  // es la funcion `Object`, no `undefined`, asi que el guard de `undefined`
+  // pasaba y `{ ...bySubscription, ...funcion }` no aporta ninguna propiedad.
+  // El override del tenant se salteaba en silencio: un estado de tenant que
+  // colisiona con `Object.prototype` heredaba los permisos de su suscripcion
+  // en vez de tirar.
+  if (!Object.hasOwn(TENANT_STATUS_OVERRIDE, tenantStatus)) {
     throw new Error(
       `deriveTenantPermissions: unknown tenant status "${tenantStatus}"`,
     )
   }
+
+  const override = TENANT_STATUS_OVERRIDE[tenantStatus]
 
   if (override === null) return bySubscription
 
