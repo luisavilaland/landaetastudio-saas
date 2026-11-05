@@ -5279,7 +5279,7 @@ un veredicto, no solo que no crashea.
 **Costo:** ~15 min.
 
 **Resolucion (2026-11-05, #308).** `.gga` apunta a
-`opencode/opencode/nemotron-3.5-lightning-free`. Verificado con un commit real,
+`opencode:opencode/nemotron-3.5-lightning-free`. Verificado con un commit real,
 no con un "no crashea": en una rama temporal (`test/gga-hook`, no `develop`, para
 que un falso verde no dejara el commit en la rama por defecto) se agrego un
 `test-gga.ts` con `const x: any = 1;` y `git commit` **sin `--no-verify`**. GGA

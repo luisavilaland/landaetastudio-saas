@@ -18,6 +18,7 @@
         "NEXTAUTH_URL",
         "NODE_ENV",
         "STOREFRONT_URL",
+        "SUPPORT_EMAIL",
         "ADMIN_HOST",
         "SUPERADMIN_HOST",
         "DEFAULT_TENANT_SLUG",
