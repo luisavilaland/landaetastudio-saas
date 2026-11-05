@@ -21,7 +21,8 @@
     "paths": {
       "@/*": ["./*"],
       "@repo/*": ["../../packages/*"],
-      "@repo/commerce/*": ["../../packages/commerce/src/*"]
+      "@repo/commerce/*": ["../../packages/commerce/src/*"],
+      "@repo/auth/*": ["../../packages/auth/src/*"]
     }
   },
   "include": [

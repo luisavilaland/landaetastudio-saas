@@ -4360,7 +4360,7 @@ La opcion 1 es la que evita el error en el lugar donde todavia es barato.
 
 ## 101. `canAccessPanel` no tiene middleware donde vivir
 
-**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** detectado al disenar S4b (T10).
+**Severidad:** MEDIA · **Estado:** RESUELTO (2026-11-05, S4d) · **Origen:** detectado al disenar S4b (T10).
 
 **Problema.** `derivePermissions` ya devuelve `canAccessPanel` desde antes de
 Fase 3, y el item 97 (que S4b cerro) lo que busca definir es exactamente esa
@@ -4394,6 +4394,36 @@ cubre las paginas). Las dos opciones cambian el routing de la app.
 **Nota de alcance.** S4b deja la matriz completa y el consumidor de datos. La
 imposicion en el request es S4d, y hasta entonces `canAccessPanel` es un dato,
 no un control. Queda dicho para que nadie lo lea como resuelto.
+
+**Resolucion (2026-11-05, S4d).** `apps/admin/proxy.ts` (Next 16 renombro
+`middleware.ts` a `proxy.ts`; corre en Node, no en edge) impone la matriz en
+paginas y APIs. Cubre las **dos** opciones que este item dejaba como disyuntiva,
+porque en Next 16 el proxy corre en Node y puede abrir una transaccion RLS: no
+hay que resolver el tenant antes de la sesion, se lee del JWT con `getToken()` y
+se consulta dentro de `withTenantContext(tenantId, ...)`.
+
+- Alcance: todas las rutas salvo `_next`, assets, `/login`, `/suspended`,
+  `api/auth`, `api/health` y **`api/webhooks`** (MercadoPago no manda cookie de
+  sesion; si pasara por el gate, el pago se cobraria y la orden no se
+  confirmaria).
+- `suspended` (`canAccessPanel: 'none'`) redirige a `/suspended`; en rutas de API
+  responde 403 con `field`, porque un redirect le devuelve HTML al `fetch` del
+  cliente. `expired`, `abandoned`, `cancelled` y `pending_first_payment` pasan en
+  readonly (las escrituras siguen siendo S4c).
+- Estado desconocido (o sin fila de tenant) -> **503**, no acceso libre: el
+  proxy distingue "no podes" de "no sabemos". `deriveTenantPermissions` sigue
+  siendo el unico interprete de la matriz; el proxy no la reimplementa.
+- El nombre de la cookie de sesion se movio a `packages/auth/src/session-cookie.ts`
+  porque `getToken()` deriva la clave del JWE con `salt === nombre de cookie`. Si
+  los dos strings divergen, `getToken()` devuelve `null` y el gate deja pasar a
+  **todos** en silencio: el riesgo exacto que este item describia.
+- **Costo medido**: la transaccion completa son 4 roundtrips (BEGIN, SET LOCAL,
+  SELECT, COMMIT). Contra Neon desde esta maquina: 332 ms median (piso de red
+  82 ms **por roundtrip**; la query en si mide lo mismo que `SELECT 1`, o sea
+  ~0). En Vercel, con la funcion en la region de Neon, el mismo gate ronda los
+  5-15 ms. El costo real no es la query, es sumarle 4 roundtrips a requests de
+  pagina y prefetch que antes no tocaban la base.
+
 ---
 
 ## 102. El ritual de cierre se saltea cuando el DoD falla
