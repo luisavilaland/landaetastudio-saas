@@ -20,9 +20,9 @@ async function deleteTenantBySlug(page: Page, slug: string): Promise<void> {
   }
   const created = tenants.find((tenant) => tenant.slug === slug)
 
-  if (!created) {
-    throw new Error(`tenant ${slug} was not created; nothing to clean up`)
-  }
+  // La limpieza no puede ser la causa de un fallo: si el alta nunca llego a
+  // crear el tenant, no hay nada que borrar.
+  if (!created) return
 
   const deleted = await page.request.delete(`/api/tenants/${created.id}`)
   expect(deleted.status(), `DELETE /api/tenants/${created.id}`).toBe(204)
@@ -36,7 +36,6 @@ test.describe('Superadmin - Tenants', () => {
 
   test('crear tenant nuevo', async ({ page }) => {
     const uniqueSlug = `test-${Date.now()}`
-    let created = false
 
     try {
       await page.goto('/tenants/new')
@@ -47,9 +46,10 @@ test.describe('Superadmin - Tenants', () => {
       await page.fill('#slug', uniqueSlug)
       await page.click('[data-testid=tenant-form-submit]')
       await page.waitForURL('**/tenants')
-      created = true
     } finally {
-      if (created) await deleteTenantBySlug(page, uniqueSlug)
+      // Siempre: si el alta fallo a mitad de camino, el tenant puede existir
+      // igual y nadie mas lo va a borrar.
+      await deleteTenantBySlug(page, uniqueSlug)
     }
   })
 

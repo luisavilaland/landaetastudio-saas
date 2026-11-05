@@ -1,4 +1,5 @@
 import {
+  ASSUMED_STATUS_WITHOUT_SUBSCRIPTION,
   deriveTenantPermissions,
   type PanelAccess,
   type SubscriptionStatus,
@@ -47,29 +48,23 @@ const MISSING_TENANT: PanelAccessDecision = {
 }
 
 /**
- * Estado de suscripcion que se usa cuando el tenant **no tiene fila** en
- * `subscriptions`.
+ * Cuando el tenant **no tiene fila** en `subscriptions`, la matriz se evalua
+ * igual con `ASSUMED_STATUS_WITHOUT_SUBSCRIPTION` (S4c, en `@repo/commerce`).
  *
- * Verificado contra la base el 2026-11-05 (LEFT JOIN `tenants` vs
- * `subscriptions`, rol owner): 3 tenants, 1 sin fila (`test-1793899083356`,
- * artefacto de test). `tienda1` y `tienda2` estan `active/active`.
+ * La fila ausente **no puede saltear la matriz**: un tenant `suspended` sin
+ * suscripcion tiene que seguir bloqueado, porque el eje del tenant es un bloqueo
+ * de plataforma (`TENANT_STATUS_OVERRIDE`), no una deuda. Resolver ese caso como
+ * `readonly` antes de mirar los overrides era un bypass: suspendias el tenant y
+ * el panel seguia abierto porque ademas nunca habia pagado.
  *
- * `pending_first_payment` y no `null`/`undefined` porque la fila ausente **no
- * puede saltear la matriz**. Un tenant `suspended` sin fila de suscripcion
- * tiene que seguir bloqueado: el eje del tenant es un bloqueo de plataforma
- * (`TENANT_STATUS_OVERRIDE`), no una deuda. Devolver `readonly` aca era un
- * bypass: suspendias el tenant y el panel seguia abierto porque ademas nunca
- * habia pagado.
- *
- * Para un tenant `active` sin fila, el resultado sigue siendo `readonly` (ver
- * sin operar), que es lo que corresponde a un onboarding cuyo insert de
- * suscripcion fallo: es justo el momento en que necesita ver por que no puede
- * operar. Un 503 aca lo dejaria afuera.
+ * Para un tenant `active` sin fila, el resultado sigue siendo `readonly` (ver sin
+ * operar), que es lo que corresponde a un onboarding cuyo insert de suscripcion
+ * fallo: es justo el momento en que necesita ver por que no puede operar. Un 503
+ * aca lo dejaria afuera.
  *
  * Lo que **no** se hace es inventar `canWrite: true`: `readonly` en el panel y
  * los endpoints de escritura (S4c) siguen siendo el gate real de escritura.
  */
-const FALLBACK_SUBSCRIPTION_STATUS: SubscriptionStatus = 'pending_first_payment'
 
 /**
  * Traduce las dos columnas del join a una decision de acceso.
@@ -93,7 +88,7 @@ export function decidePanelAccess(
 
   const permissions = deriveTenantPermissions(
     tenantStatus as TenantStatus,
-    (subscriptionStatus ?? FALLBACK_SUBSCRIPTION_STATUS) as SubscriptionStatus,
+    (subscriptionStatus ?? ASSUMED_STATUS_WITHOUT_SUBSCRIPTION) as SubscriptionStatus,
   )
 
   return {
