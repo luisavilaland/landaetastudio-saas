@@ -10,10 +10,17 @@ import { test, expect, type Page } from '@playwright/test'
  * La limpieza va por la API (`DELETE /api/tenants/:id`, que borra en cascada lo
  * del tenant) y en `finally`, para que tambien corra si una asercion falla
  * despues del alta.
+ *
+ * Las aserciones usan `expect.soft` a proposito: esto se ejecuta en el `finally`
+ * del test, y un `expect` duro lanzaria desde ahi tapando el error original.
+ * Una limpieza que falla tiene que quedar reportada, no reemplazar el rojo.
  */
 async function deleteTenantBySlug(page: Page, slug: string): Promise<void> {
   const list = await page.request.get('/api/tenants')
-  expect(list.ok(), 'GET /api/tenants should succeed').toBeTruthy()
+  expect.soft(list.ok(), 'GET /api/tenants should succeed').toBeTruthy()
+
+  // Sin una lista valida no se puede buscar el id; seguir solo agregaria ruido.
+  if (!list.ok()) return
 
   const { tenants } = (await list.json()) as {
     tenants: Array<{ id: string; slug: string }>
@@ -25,7 +32,7 @@ async function deleteTenantBySlug(page: Page, slug: string): Promise<void> {
   if (!created) return
 
   const deleted = await page.request.delete(`/api/tenants/${created.id}`)
-  expect(deleted.status(), `DELETE /api/tenants/${created.id}`).toBe(204)
+  expect.soft(deleted.status(), `DELETE /api/tenants/${created.id}`).toBe(204)
 }
 
 test.describe('Superadmin - Tenants', () => {
