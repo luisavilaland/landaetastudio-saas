@@ -16,8 +16,8 @@
  * Requiere SEED_ALLOWED_HOST: el hostname exacto de la rama de Neon contra la
  * que se corre (sin esquema ni puerto), ej:
  *   ep-xxx-pooler.us-east-2.aws.neon.tech
- * Se obtiene del connection string de la rama en el dashboard de Neon, o con:
- *   node -e "console.log(new URL(process.env.DATABASE_URL).hostname)"
+ * Se obtiene del dashboard de Neon (rama -> Connection string). NO se derive
+ * del `.env.local` local: puede apuntar a otra rama.
  *
  * Uso:
  *   ALLOW_SEED=true SEED_ALLOWED_HOST=<host> node scripts/seed-s4d-tests.mjs
@@ -32,6 +32,10 @@ import bcrypt from 'bcryptjs'
 // En este repo las credenciales viven en `.env.local`, no en `.env`.
 config({ path: '.env.local' })
 
+// Backstop hardcodeado. El endpoint ya aparece en el comentario de la
+// migración 0003 y el repo es público. No es la guarda principal —
+// la guarda principal es SEED_ALLOWED_HOST con igualdad estricta.
+// Ref: observación de Luis en #313 (2026-11-09).
 const PROD_HOST_MARKER = 'ep-dawn-hat-amtrizsw'
 
 const TEST_TENANTS = [
