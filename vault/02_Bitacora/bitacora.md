@@ -5333,3 +5333,25 @@ con verificacion de filas hijas (0 hijas, 0 `admin_users`).
 **DoD.** `pnpm typecheck` 9/9, `pnpm lint` 6/6, `next build` 3/3 (`ƒ Proxy
 (Middleware)` en el output, `/suspended` prerenderizada), **1001 tests en 83
 archivos**, `format:check` OK, `check:encoding` 0 hallazgos.
+
+---
+
+## 2026-11-09 - Correccion: la limpieza del huerfano fue sobre produccion
+
+Correccion al reporte previo: el DELETE del tenant `test-1793904135787` se
+ejecuto sobre la base de **PRODUCCION**
+(`ep-dawn-hat-amtrizsw.c-5.us-east-1.aws.neon.tech`), no sobre un preview.
+
+**Impacto: nulo.** El tenant tenia 0 filas hijas y 0 `admin_users`, y lo habia
+creado el E2E de superadmin minutos antes; el siguiente `db:seed` lo habria
+borrado igual. La descripcion previa ("preview") era incorrecta.
+
+La operacion fue autorizada (LEFT JOIN de verificacion previo sobre esa base,
+guardas de owner, transaccion y conteo cumplidas). Lo que estaba mal no fue el
+DELETE: fue describir esa base como preview.
+
+**De donde sale la confusion.** El `.env.local` de este checkout apunta al mismo
+endpoint que usa el CI, y el workflow `e2e.yml` corre `db:seed` contra esa base
+en cada push a un PR. Ver item 130 de la deuda.
+
+**Ref:** revision de Luis en #313 (2026-11-09).

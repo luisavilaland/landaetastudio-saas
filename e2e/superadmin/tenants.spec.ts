@@ -1,8 +1,14 @@
+// ⚠️ Esta spec crea tenants en la base de PRODUCCIÓN (compartida), no
+// en un preview. El workflow e2e.yml corre db:seed contra
+// ep-dawn-hat-amtrizsw.c-5.us-east-1.aws.neon.tech en cada push a un PR.
+// Los tenants test-<timestamp> deben limpiarse siempre (finally).
+// Ref: hallazgo de Luis en #313 (2026-11-09).
+
 import { test, expect, type Page } from '@playwright/test'
 
 /**
  * El alta de tenant escribe contra la base **real** de la que corre el E2E
- * (preview sobre Neon), no contra una copia. Sin limpieza, cada corrida deja un
+ * (producción, base compartida), no contra una copia. Sin limpieza, cada corrida deja un
  * tenant `test-<timestamp>` que nadie borra: el 2026-11-05 habia al menos uno
  * (`test-1793899083356`) sin fila de suscripcion, y el gate de S4d lo reportaba
  * como caso raro cuando en realidad era basura de este spec.

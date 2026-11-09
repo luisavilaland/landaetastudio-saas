@@ -5378,3 +5378,37 @@ contextos, como minimo: un solo lugar con el numero y tres links.
 **Costo:** ~1 h.
 
 ---
+
+## 130. e2e.yml corre db:seed contra produccion
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** detectado al preparar la corrida real del seed de S4d (2026-11-09, #313).
+
+**Problema.** El workflow `e2e.yml` corre `db:seed` con el owner de produccion
+en cada push a un PR. Los tenants `tienda1`/`tienda2` se recrean con la hora de
+la corrida. Cualquier dato que cuelgue de esos tenants se pierde.
+
+**Argumentos concretos:**
+
+1. Cada push a un PR resetea produccion con `db:seed`.
+2. Condiciona S5/T15: un E2E de onboarding crearia tenants y suscripciones
+   reales en produccion.
+3. Vuelve inutil el checklist "tienda1/tienda2 en active/active", porque el
+   seed lo deja asi por construccion. Lo que hay que verificar el dia del
+   deploy es que NO existan tenants reales.
+
+**Es precondicion del primer tenant real, no del deploy de S4d.** Hasta que se
+arregle, regla escrita: **no cargar datos reales en `tienda1` ni en `tienda2`**.
+
+**Fix propuesto.** Base efimera por PR. Hay una accion de Neon para crear y
+borrar ramas, y una integracion con Vercel para que los previews apunten a esa
+rama. Requiere decidir como los previews apuntan a la rama: diseno aparte.
+
+**Evidencia.** El `.env.local` de este checkout apunta a
+`ep-dawn-hat-amtrizsw.c-5.us-east-1.aws.neon.tech`. Los tenants actuales tienen
+timestamps de corridas de CI: `tienda1` y `tienda2` se recrearon a las 18:40 de
+una corrida, y el spec de superadmin creo un `test-<timestamp>` dos minutos
+despues, en la misma corrida.
+
+**Costo:** sin estimar (depende del diseno de previews).
+
+---
