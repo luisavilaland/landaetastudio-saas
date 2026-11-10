@@ -59,19 +59,14 @@ const BASE_URL = (process.env.VERIFY_BASE_URL ?? DEFAULT_BASE_URL).replace(
   /\/+$/,
   '',
 )
-// Se neutralizan las credenciales de servicios externos (R2, MinIO, Resend,
-// MercadoPago, Redis/Upstash, Sentry) y el remitente de Resend para que el
-// harness no pueda llamar a un servicio real aunque el `.env.local` del entorno
-// tenga las de produccion.
+// Se neutralizan las credenciales de servicios externos para que el harness no
+// pueda llamar a un servicio real aunque el `.env.local` del entorno tenga las
+// de produccion.
 // Se preservan a proposito DATABASE_URL y DATABASE_APP_URL (son la base bajo
 // prueba), AUTH_SECRET y MP_TOKEN_ENCRYPTION_KEY (claves internas que no llaman
 // a ningun servicio; reemplazarlas romperia la validacion de entorno sin
 // aportar aislamiento).
-const SERVER_ENV = {
-  ...process.env,
-  AUTH_TRUST_HOST: 'true',
-  AUTH_URL: BASE_URL,
-  NEXTAUTH_URL: BASE_URL,
+const NEUTRALIZED_ENV = {
   R2_ENDPOINT: 'https://invalid.test',
   R2_ACCESS_KEY_ID: 'fake-access-key',
   R2_SECRET_ACCESS_KEY: 'fake-secret-key',
@@ -97,6 +92,14 @@ const SERVER_ENV = {
   // Un token vacio desactiva el upload de source maps de Sentry; un token falso
   // no vacio intentaria subir a un proyecto real y podria romper el build.
   SENTRY_AUTH_TOKEN: '',
+}
+
+const SERVER_ENV = {
+  ...process.env,
+  AUTH_TRUST_HOST: 'true',
+  AUTH_URL: BASE_URL,
+  NEXTAUTH_URL: BASE_URL,
+  ...NEUTRALIZED_ENV,
 }
 const PROD_SESSION_COOKIE = '__Secure-authjs.session-token-admin'
 const NEXT_PORT = 3001
@@ -821,7 +824,7 @@ async function main() {
       serverReady = true
     } else {
       console.log(
-        'Entorno del server: credenciales externas (R2, Resend, MercadoPago) neutralizadas con valores falsos.',
+        `Entorno del server: ${Object.keys(NEUTRALIZED_ENV).length} variables externas neutralizadas -> ${Object.keys(NEUTRALIZED_ENV).join(', ')}`,
       )
       buildAdmin()
       printBuildId()
