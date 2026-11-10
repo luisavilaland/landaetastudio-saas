@@ -59,10 +59,18 @@ const BASE_URL = (process.env.VERIFY_BASE_URL ?? DEFAULT_BASE_URL).replace(
   /\/+$/,
   '',
 )
+// Se neutralizan las credenciales de servicios externos (R2, Resend,
+// MercadoPago, Redis/Upstash, Sentry) para que el harness no pueda llamar a un
+// servicio real aunque el `.env.local` del entorno tenga las de produccion.
+// Se preservan a proposito DATABASE_URL y DATABASE_APP_URL (son la base bajo
+// prueba), AUTH_SECRET y MP_TOKEN_ENCRYPTION_KEY (claves internas que no llaman
+// a ningun servicio; reemplazarlas romperia la validacion de entorno sin
+// aportar aislamiento).
 const SERVER_ENV = {
   ...process.env,
   AUTH_TRUST_HOST: 'true',
   AUTH_URL: BASE_URL,
+  NEXTAUTH_URL: BASE_URL,
   R2_ENDPOINT: 'https://invalid.test',
   R2_ACCESS_KEY_ID: 'fake-access-key',
   R2_SECRET_ACCESS_KEY: 'fake-secret-key',
@@ -72,6 +80,15 @@ const SERVER_ENV = {
   MERCADOPAGO_WEBHOOK_SECRET: 'fake-mp-secret',
   MP_PLATFORM_ACCESS_TOKEN: 'fake-mp-platform-token',
   MP_PLATFORM_WEBHOOK_SECRET: 'fake-mp-platform-secret',
+  STOREFRONT_URL: 'https://storefront.invalid',
+  REDIS_URL: 'redis://127.0.0.1:6399',
+  UPSTASH_REDIS_REST_URL: 'https://fake.upstash.invalid',
+  UPSTASH_REDIS_REST_TOKEN: 'fake-upstash-token',
+  SENTRY_DSN: 'https://fake@sentry.invalid/1',
+  NEXT_PUBLIC_SENTRY_DSN: 'https://fake@sentry.invalid/1',
+  // Un token vacio desactiva el upload de source maps de Sentry; un token falso
+  // no vacio intentaria subir a un proyecto real y podria romper el build.
+  SENTRY_AUTH_TOKEN: '',
 }
 const PROD_SESSION_COOKIE = '__Secure-authjs.session-token-admin'
 const NEXT_PORT = 3001
