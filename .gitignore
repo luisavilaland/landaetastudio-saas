@@ -13,6 +13,8 @@ out/
 .env*.local
 .env.production
 !.env.local.example
+# Credenciales temporales de la rama de Neon para el harness de S4d.
+.env.seed-test
 
 # Logs
 *.log
