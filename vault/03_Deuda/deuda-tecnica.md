@@ -5378,3 +5378,137 @@ contextos, como minimo: un solo lugar con el numero y tres links.
 **Costo:** ~1 h.
 
 ---
+
+## 128. Las ramas de Neon heredan las credenciales de los roles
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** detectado al preparar la corrida real del seed de S4d (2026-11-09, #313).
+
+**Problema.** Una rama de Neon es un clon del proyecto: los roles y sus passwords
+se copian. Verificado comparando las passwords de `.env.local` (produccion)
+contra las de la rama `ep-<id>-pooler`: son **identicas**,
+tanto para `neondb_owner` como para `app_user`.
+
+**Por que importa.** Compartir "la connection string de la rama" equivale a
+compartir produccion, y `neondb_owner` tiene `rolbypassrls`. El aislamiento de
+**datos** de una rama es real; el de **credenciales**, no.
+
+**Observacion (2026-11-10).** Las credenciales viejas de la rama dieron
+`28P01` (`password authentication failed`). Al rotar las contrasenas en
+produccion, las credenciales de la rama tambien dieron `28P01`: la rotacion del
+padre no propaga la password nueva a la rama.
+
+**Test bidireccional.** Se roto la password en la rama. Al instante, `SELECT 1`
+en produccion dio exitoso, **con una conexion nueva** (cliente recien creado, sin
+pool reutilizado de antes de la rotacion). Fecha: 2026-11-10. **Aislamiento
+bidireccional confirmado**: rotar en la rama no afecta a produccion, rotar en
+produccion no arregla la rama.
+
+**Regla.** Una connection string de rama se trata como credencial de produccion:
+no se pega en chat, PR, issue ni log. Si se expone, se rotan los roles del
+proyecto y se actualiza Vercel (Production y Preview) mas `.env.local`, y se
+redeploya: las tres apps usan las mismas dos URLs.
+
+**Fix propuesto.** Al crear una rama para pruebas, resetear la password de los
+roles **en la rama** antes de compartir su URL. En Neon los roles son
+branch-scoped, asi que el reset deberia no tocar al padre; conviene verificarlo
+una vez y dejarlo escrito.
+
+---
+
+## 129. Primer login contra una rama dormida falla como "credenciales invalidas"
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** verificacion automatizada de S4d (2026-11-09, #313).
+
+**Problema.** Neon autosuspende los computes inactivos. La primera query de
+`authorize` (`packages/auth/src/index.ts`) se cae por el arranque en frio y la
+funcion devuelve `null`. El formulario de login colapsa ese `null` en
+"Credenciales invalidas", el mismo mensaje que una password incorrecta.
+
+Reproducido tres veces seguidas: el primer intento falla **siempre** y el
+reintento inmediato con las mismas credenciales funciona.
+
+**El error de DB que se ve.** NextAuth envuelve cualquier falla de `authorize` en
+`CallbackRouteError` con el error de Postgres como `cause`. En la corrida donde
+se capturo el log completo aparecio asi:
+
+```
+[auth][error] CallbackRouteError
+[auth][cause]: Error: Failed query: select ... from "admin_users" where "admin_users"."email" = $1 limit $2
+[auth][details]: { "name": "PostgresError", "severity_local": "ERROR", "code": "28P01" }
+```
+
+Ojo: ese `28P01` era un problema de credenciales vencidas, no el arranque en
+frio. **El caso de rama dormida no se capturo con su codigo exacto** — el harness
+solo ve el sintoma (form en `/login` con "Credenciales invalidas"). No se escribe
+`CONNECT_TIMEOUT` ni `ECONNRESET` porque no se observaron: seria inventar la
+evidencia. Lo que si esta verificado es el efecto: `authorize` termina en `null`.
+
+**Hipotesis (no confirmada).** `packages/db/src/index.ts:12` crea el cliente con
+`postgres(appUrl)`, sin `connect_timeout` ni `max`. No hay politica de fallo
+rapido declarada, asi que el primer intento quedaria a merced del default de la
+libreria y del tiempo de arranque del compute. Es una hipotesis plausible, no un
+hecho medido: no se capturo el error de esa conexion.
+
+**Como capturar el error real.** Dejar la rama autosuspendida (sin actividad unos
+minutos), agregar temporalmente un `catch` en `authorize`
+(`packages/auth/src/index.ts`) que loguee `err.cause?.code` y `err.cause?.message`,
+y repetir el login. El codigo que aparezca decide el diagnostico: `ETIMEDOUT` o
+`CONNECT_TIMEOUT` apuntan al arranque en frio; `28P01` es credenciales;
+`ECONNRESET`/`ECONNREFUSED` es red. Sin ese dato, este item queda como sintoma
+descripto, no como causa.
+
+**Por que importa.** Le dice "tu password esta mal" a alguien que la escribio
+bien. Y el mismo arranque en frio se manifiesta distinto en el resto de la app:
+el proxy decide con `withTenantContext` y, si la query falla, responde **503**
+(`unavailable()`), no 403. Dos sintomas distintos para una sola causa.
+
+**No es un bug de la rama de pruebas.** En produccion el compute suele estar
+caliente, pero cualquier periodo de inactividad suficiente lo apaga.
+
+**Fix propuesto.** Distinguir falla de infraestructura de credencial invalida:
+
+- en `authorize`, dejar que la excepcion de DB propague (o mapearla a un codigo
+  propio) en vez de devolver `null`;
+- en el form, mostrar "no pudimos verificar tu cuenta, reintenta" para ese caso;
+- considerar un retry con backoff en la primera conexion, o un ping de
+  calentamiento al arrancar la funcion.
+
+**Evidencia.** Harness de Playwright contra la rama: el primer login `ACTIVE`
+devolvio "Credenciales invalidas" (2 intentos), el segundo login con la misma
+credencial entro al dashboard. Con warm-up previo, 5/5 al primer intento.
+
+---
+
+## 130. e2e.yml corre db:seed contra produccion
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** detectado al preparar la corrida real del seed de S4d (2026-11-09, #313).
+
+**Problema.** El workflow `e2e.yml` corre `db:seed` con el owner de produccion
+en cada push a un PR. Los tenants `tienda1`/`tienda2` se recrean con la hora de
+la corrida. Cualquier dato que cuelgue de esos tenants se pierde.
+
+**Argumentos concretos:**
+
+1. Cada push a un PR resetea produccion con `db:seed`.
+2. Condiciona S5/T15: un E2E de onboarding crearia tenants y suscripciones
+   reales en produccion.
+3. Vuelve inutil el checklist "tienda1/tienda2 en active/active", porque el
+   seed lo deja asi por construccion. Lo que hay que verificar el dia del
+   deploy es que NO existan tenants reales.
+
+**Es precondicion del primer tenant real, no del deploy de S4d.** Hasta que se
+arregle, regla escrita: **no cargar datos reales en `tienda1` ni en `tienda2`**.
+
+**Fix propuesto.** Base efimera por PR. Hay una accion de Neon para crear y
+borrar ramas, y una integracion con Vercel para que los previews apunten a esa
+rama. Requiere decidir como los previews apuntan a la rama: diseno aparte.
+
+**Evidencia.** El `.env.local` de este checkout apunta a
+`ep-dawn-hat-amtrizsw.c-5.us-east-1.aws.neon.tech`. Los tenants actuales tienen
+timestamps de corridas de CI: `tienda1` y `tienda2` se recrearon a las 18:40 de
+una corrida, y el spec de superadmin creo un `test-<timestamp>` dos minutos
+despues, en la misma corrida.
+
+**Costo:** sin estimar (depende del diseno de previews).
+
+---
