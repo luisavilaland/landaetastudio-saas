@@ -63,6 +63,15 @@ const SERVER_ENV = {
   ...process.env,
   AUTH_TRUST_HOST: 'true',
   AUTH_URL: BASE_URL,
+  R2_ENDPOINT: 'https://invalid.test',
+  R2_ACCESS_KEY_ID: 'fake-access-key',
+  R2_SECRET_ACCESS_KEY: 'fake-secret-key',
+  R2_BUCKET_NAME: 'fake-bucket',
+  RESEND_API_KEY: 're_fake_key',
+  MERCADOPAGO_ACCESS_TOKEN: 'fake-mp-token',
+  MERCADOPAGO_WEBHOOK_SECRET: 'fake-mp-secret',
+  MP_PLATFORM_ACCESS_TOKEN: 'fake-mp-platform-token',
+  MP_PLATFORM_WEBHOOK_SECRET: 'fake-mp-platform-secret',
 }
 const PROD_SESSION_COOKIE = '__Secure-authjs.session-token-admin'
 const NEXT_PORT = 3001
@@ -160,6 +169,17 @@ function buildAdmin() {
     abort(
       `pnpm build fallo en apps/admin (status ${result.status ?? 'desconocido'}). No se arranca el server.`,
     )
+  }
+}
+
+function printBuildId() {
+  try {
+    const buildId = fs
+      .readFileSync(path.join('apps/admin', '.next', 'BUILD_ID'), 'utf8')
+      .trim()
+    console.log(`BUILD_ID: ${buildId || '(no disponible)'}`)
+  } catch {
+    console.log('BUILD_ID: (no disponible)')
   }
 }
 
@@ -772,9 +792,14 @@ async function main() {
   try {
     if (process.env.VERIFY_NO_SERVER === '1') {
       console.log(`Server: usando ${BASE_URL} (VERIFY_NO_SERVER=1)`)
+      printBuildId()
       serverReady = true
     } else {
+      console.log(
+        'Entorno del server: credenciales externas (R2, Resend, MercadoPago) neutralizadas con valores falsos.',
+      )
       buildAdmin()
+      printBuildId()
       certInfo = generateCert()
       tlsProxy = await startTlsProxy(certInfo.pfxPath, certInfo.passphrase)
       serverProcess = startServer()
@@ -789,7 +814,8 @@ async function main() {
     printResults()
 
     const passed = results.filter((row) => row.result === 'PASS').length
-    process.exitCode = passed === results.length ? 0 : 1
+    process.exitCode =
+      results.length > 0 && passed === results.length ? 0 : 1
   } catch (error) {
     if (!serverReady) {
       console.error('ABORT: el servidor no levanto a tiempo')
