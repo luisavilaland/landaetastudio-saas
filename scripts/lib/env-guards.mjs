@@ -3,7 +3,6 @@ import process from 'node:process'
 // Backstop hardcodeado. El endpoint ya aparece en el comentario de la
 // migración 0003 y el repo es público. No es la guarda principal —
 // la guarda principal es SEED_ALLOWED_HOST con igualdad estricta.
-// Ref: observación de Luis en #313 (2026-11-09).
 export const PROD_HOST_MARKER = 'ep-dawn-hat-amtrizsw'
 
 export function abort(message) {
@@ -25,7 +24,7 @@ function parseUrl(name) {
   }
 }
 
-export function assertSafeEnv({ requireAllowSeed = false } = {}) {
+export function assertSafeEnv({ requireAllowSeed = true } = {}) {
   // 1. El seed es destructivo: requiere un opt-in explicito.
   if (requireAllowSeed && process.env.ALLOW_SEED !== 'true') {
     throw new Error('Falta ALLOW_SEED=true. Es obligatorio para correr este seed.')
@@ -35,7 +34,22 @@ export function assertSafeEnv({ requireAllowSeed = false } = {}) {
   const owner = parseUrl('DATABASE_URL')
   const app = parseUrl('DATABASE_APP_URL')
 
-  // 3. Allowlist de host: SEED_ALLOWED_HOST es la unica fuente de verdad.
+  // 3. El host sale del hostname, no de un parametro que pueda disfrazarlo.
+  for (const [name, parsed] of [
+    ['DATABASE_URL', owner.parsed],
+    ['DATABASE_APP_URL', app.parsed],
+  ]) {
+    if (
+      parsed.searchParams.has('host') ||
+      parsed.searchParams.has('hostaddr')
+    ) {
+      throw new Error(
+        `${name} trae ?host= o ?hostaddr= en la URL. El host sale del hostname, no de un parametro.`,
+      )
+    }
+  }
+
+  // 4. Allowlist de host: SEED_ALLOWED_HOST es la unica fuente de verdad.
   const allowedHost = process.env.SEED_ALLOWED_HOST
   if (!allowedHost) {
     throw new Error(
@@ -57,7 +71,7 @@ export function assertSafeEnv({ requireAllowSeed = false } = {}) {
     )
   }
 
-  // 4. Denylist de produccion. Es una red de seguridad aparte de la allowlist,
+  // 5. Denylist de produccion. Es una red de seguridad aparte de la allowlist,
   // no la validacion principal: si el host es de prod, se aborta igual.
   for (const [name, host] of [
     ['DATABASE_URL', ownerHost],
@@ -68,7 +82,7 @@ export function assertSafeEnv({ requireAllowSeed = false } = {}) {
     }
   }
 
-  // 5. Nunca imprimir URLs completas: llevan password.
+  // 6. Nunca imprimir URLs completas: llevan password.
   console.log(`Host de Neon validado: ${allowedHost}`)
 
   return { ownerUrl: owner.raw, appUrl: app.raw, allowedHost }
