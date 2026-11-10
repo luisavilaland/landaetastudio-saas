@@ -59,9 +59,10 @@ const BASE_URL = (process.env.VERIFY_BASE_URL ?? DEFAULT_BASE_URL).replace(
   /\/+$/,
   '',
 )
-// Se neutralizan las credenciales de servicios externos (R2, Resend,
-// MercadoPago, Redis/Upstash, Sentry) para que el harness no pueda llamar a un
-// servicio real aunque el `.env.local` del entorno tenga las de produccion.
+// Se neutralizan las credenciales de servicios externos (R2, MinIO, Resend,
+// MercadoPago, Redis/Upstash, Sentry) y el remitente de Resend para que el
+// harness no pueda llamar a un servicio real aunque el `.env.local` del entorno
+// tenga las de produccion.
 // Se preservan a proposito DATABASE_URL y DATABASE_APP_URL (son la base bajo
 // prueba), AUTH_SECRET y MP_TOKEN_ENCRYPTION_KEY (claves internas que no llaman
 // a ningun servicio; reemplazarlas romperia la validacion de entorno sin
@@ -75,7 +76,14 @@ const SERVER_ENV = {
   R2_ACCESS_KEY_ID: 'fake-access-key',
   R2_SECRET_ACCESS_KEY: 'fake-secret-key',
   R2_BUCKET_NAME: 'fake-bucket',
+  MINIO_ENDPOINT: 'localhost.invalid',
+  MINIO_PORT: '9000',
+  MINIO_ACCESS_KEY: 'fake-minio-access',
+  MINIO_SECRET_KEY: 'fake-minio-secret',
+  MINIO_BUCKET: 'fake-bucket',
+  MINIO_USE_SSL: 'false',
   RESEND_API_KEY: 're_fake_key',
+  RESEND_FROM_EMAIL: 'noreply@invalid.test',
   MERCADOPAGO_ACCESS_TOKEN: 'fake-mp-token',
   MERCADOPAGO_WEBHOOK_SECRET: 'fake-mp-secret',
   MP_PLATFORM_ACCESS_TOKEN: 'fake-mp-platform-token',
