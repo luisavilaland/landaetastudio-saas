@@ -5398,9 +5398,10 @@ produccion, las credenciales de la rama tambien dieron `28P01`: la rotacion del
 padre no propaga la password nueva a la rama.
 
 **Test bidireccional.** Se roto la password en la rama. Al instante, `SELECT 1`
-en produccion dio exitoso. Fecha: 2026-11-10. **Aislamiento bidireccional
-confirmado**: rotar en la rama no afecta a produccion, rotar en produccion no
-arregla la rama.
+en produccion dio exitoso, **con una conexion nueva** (cliente recien creado, sin
+pool reutilizado de antes de la rotacion). Fecha: 2026-11-10. **Aislamiento
+bidireccional confirmado**: rotar en la rama no afecta a produccion, rotar en
+produccion no arregla la rama.
 
 **Regla.** Una connection string de rama se trata como credencial de produccion:
 no se pega en chat, PR, issue ni log. Si se expone, se rotan los roles del
@@ -5442,10 +5443,19 @@ solo ve el sintoma (form en `/login` con "Credenciales invalidas"). No se escrib
 `CONNECT_TIMEOUT` ni `ECONNRESET` porque no se observaron: seria inventar la
 evidencia. Lo que si esta verificado es el efecto: `authorize` termina en `null`.
 
-**Contribuyente concreto.** `packages/db/src/index.ts:12` crea el cliente con
+**Hipotesis (no confirmada).** `packages/db/src/index.ts:12` crea el cliente con
 `postgres(appUrl)`, sin `connect_timeout` ni `max`. No hay politica de fallo
-rapido declarada, asi que el primer intento queda a merced del default de la
-libreria y del tiempo de arranque del compute.
+rapido declarada, asi que el primer intento quedaria a merced del default de la
+libreria y del tiempo de arranque del compute. Es una hipotesis plausible, no un
+hecho medido: no se capturo el error de esa conexion.
+
+**Como capturar el error real.** Dejar la rama autosuspendida (sin actividad unos
+minutos), agregar temporalmente un `catch` en `authorize`
+(`packages/auth/src/index.ts`) que loguee `err.cause?.code` y `err.cause?.message`,
+y repetir el login. El codigo que aparezca decide el diagnostico: `ETIMEDOUT` o
+`CONNECT_TIMEOUT` apuntan al arranque en frio; `28P01` es credenciales;
+`ECONNRESET`/`ECONNREFUSED` es red. Sin ese dato, este item queda como sintoma
+descripto, no como causa.
 
 **Por que importa.** Le dice "tu password esta mal" a alguien que la escribio
 bien. Y el mismo arranque en frio se manifiesta distinto en el resto de la app:
