@@ -1,8 +1,12 @@
 /**
  * Harness de verificacion del gate de S4d.
  *
- * Levanta apps/admin en 3001 (o usa uno ya corriendo), hace login con los tres
- * tenants de prueba y valida: gate de dashboard/suspended, header
+ * Levanta apps/admin con `pnpm start` (build de produccion) detras de un proxy
+ * HTTPS local con certificado self-signed, para que el navegador acepte la
+ * cookie `__Secure-authjs.session-token-admin` como en produccion. Si ya hay un
+ * server levantado, `VERIFY_NO_SERVER=1` evita arrancar nada.
+ *
+ * Valida: gate de dashboard/suspended, cookie de sesion, header
  * `x-panel-access`, guard de API, logout y una prueba de sanidad del harness.
  *
  * Requisitos:
@@ -16,10 +20,15 @@
  *     S4D_SUSP_SUB_PASS
  *     S4D_SUSP_NOSUB_PASS
  * - Opcionales:
- *     VERIFY_BASE_URL        (default http://localhost:3001; host debe ser
- *                             localhost o 127.0.0.1)
+ *     VERIFY_BASE_URL        (default https://localhost:3443 si el harness
+ *                             arranca el server; http://localhost:3001 con
+ *                             VERIFY_NO_SERVER=1; host localhost o 127.0.0.1)
  *     VERIFY_NO_SERVER       (1 = no arrancar apps/admin, usar el que ya corre)
  *     ALLOW_REMOTE_VERIFY    (true = permitir VERIFY_BASE_URL fuera de localhost)
+ *
+ * El certificado self-signed se genera con PowerShell (New-SelfSignedCertificate),
+ * asi que el arranque con TLS requiere Windows. En otra plataforma usar
+ * VERIFY_NO_SERVER=1 con un server ya levantado.
  *
  * Aborta si los hosts de DB no coinciden con SEED_ALLOWED_HOST, si apuntan a
  * produccion, o si VERIFY_BASE_URL no es local.
@@ -28,7 +37,13 @@
  *   node scripts/verify-s4d.mjs
  */
 
-import { spawn, execSync } from 'node:child_process'
+import { spawn, execSync, execFileSync } from 'node:child_process'
+import crypto from 'node:crypto'
+import fs from 'node:fs'
+import http from 'node:http'
+import https from 'node:https'
+import os from 'node:os'
+import path from 'node:path'
 import process from 'node:process'
 import { chromium } from '@playwright/test'
 import postgres from 'postgres'
@@ -36,10 +51,17 @@ import bcrypt from 'bcryptjs'
 
 import { abort, assertSafeEnv } from './lib/env-guards.mjs'
 
-const BASE_URL = (process.env.VERIFY_BASE_URL ?? 'http://localhost:3001').replace(
+const STARTS_SERVER = process.env.VERIFY_NO_SERVER !== '1'
+const DEFAULT_BASE_URL = STARTS_SERVER
+  ? 'https://localhost:3443'
+  : 'http://localhost:3001'
+const BASE_URL = (process.env.VERIFY_BASE_URL ?? DEFAULT_BASE_URL).replace(
   /\/+$/,
   '',
 )
+const PROD_SESSION_COOKIE = '__Secure-authjs.session-token-admin'
+const NEXT_PORT = 3001
+const PROXY_PORT = 3443
 const TIMEOUT_MS = 45_000
 const SANITY_TIMEOUT_MS = 8_000
 const WARMUP_TIMEOUT_MS = 60_000
@@ -105,10 +127,14 @@ const serverLog = []
 let serverProcess = null
 
 function startServer() {
-  const child = spawn('pnpm', ['dev'], {
+  const child = spawn('pnpm', ['start'], {
     cwd: 'apps/admin',
     shell: true,
-    env: process.env,
+    env: {
+      ...process.env,
+      AUTH_TRUST_HOST: 'true',
+      AUTH_URL: 'https://localhost:3443',
+    },
     // Permite matar el grupo con process.kill(-pid) fuera de Windows.
     detached: process.platform !== 'win32',
   })
@@ -131,15 +157,41 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function httpsStatus(url, timeoutMs = 5000) {
+  return new Promise((resolve) => {
+    const request = https.request(
+      url,
+      { rejectUnauthorized: false, timeout: timeoutMs },
+      (response) => {
+        response.resume()
+        resolve(response.statusCode ?? 0)
+      },
+    )
+    request.on('error', () => resolve(0))
+    request.on('timeout', () => {
+      request.destroy()
+      resolve(0)
+    })
+    request.end()
+  })
+}
+
+async function loginStatus() {
+  if (BASE_URL.startsWith('https://')) {
+    return httpsStatus(`${BASE_URL}/login`)
+  }
+  try {
+    const response = await fetch(`${BASE_URL}/login`)
+    return response.status
+  } catch {
+    return 0
+  }
+}
+
 async function waitForServer(timeoutMs = 180_000) {
   const startedAt = Date.now()
   while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const response = await fetch(`${BASE_URL}/login`)
-      if (response.status === 200) return
-    } catch {
-      // Todavia no acepta conexiones.
-    }
+    if ((await loginStatus()) === 200) return
     await delay(1000)
   }
   throw new Error(`El servidor no respondio en ${timeoutMs / 1000}s`)
@@ -155,6 +207,124 @@ function killServer(child) {
     }
   } catch {
     // Ya estaba muerto o el arbol ya se cerro.
+  }
+}
+
+// ---------------------------------------------------------------------------
+// TLS local: el build elige cookies __Secure- segun NODE_ENV, y el navegador
+// solo las acepta sobre HTTPS. El proxy sirve un cert self-signed.
+// ---------------------------------------------------------------------------
+
+function runPowerShell(script) {
+  return execFileSync('powershell.exe', ['-NoProfile', '-Command', script], {
+    encoding: 'utf8',
+  })
+}
+
+function removeCertFromStore(thumbprint) {
+  if (!thumbprint || process.platform !== 'win32') return
+  try {
+    runPowerShell(
+      `Remove-Item -Path "Cert:\\CurrentUser\\My\\${thumbprint}" -Force -ErrorAction SilentlyContinue`,
+    )
+  } catch {
+    // El cert ya no estaba en el store.
+  }
+}
+
+function generateCert() {
+  if (process.platform !== 'win32') {
+    abort(
+      'generateCert requiere Windows (New-SelfSignedCertificate). En otra plataforma usá VERIFY_NO_SERVER=1 con un server ya levantado.',
+    )
+  }
+
+  const passphrase = crypto.randomBytes(18).toString('base64url')
+  const pfxPath = path.join(os.tmpdir(), `s4d-verify-${Date.now()}.pfx`)
+
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    "$cert = New-SelfSignedCertificate -DnsName @('localhost','127.0.0.1') -CertStoreLocation 'Cert:\\CurrentUser\\My' -FriendlyName 's4d-verify' -KeyExportPolicy Exportable -NotAfter (Get-Date).AddDays(1)",
+    'Write-Output $cert.Thumbprint',
+    `$pwd = ConvertTo-SecureString -String '${passphrase}' -AsPlainText -Force`,
+    `Export-PfxCertificate -Cert $cert -FilePath '${pfxPath}' -Password $pwd | Out-Null`,
+  ].join('; ')
+
+  try {
+    const output = runPowerShell(script)
+    const match = output.match(/[0-9A-F]{40}/i)
+    if (!match) {
+      throw new Error('No se pudo leer el thumbprint del certificado')
+    }
+    return { pfxPath, passphrase, thumbprint: match[0] }
+  } catch (error) {
+    // Si el cert se creo antes de fallar el export, sacarlo del store.
+    const stdout =
+      error && typeof error.stdout === 'string' ? error.stdout : ''
+    const match = stdout.match(/[0-9A-F]{40}/i)
+    if (match) removeCertFromStore(match[0])
+    throw error
+  }
+}
+
+function startTlsProxy(pfxPath, passphrase) {
+  const server = https.createServer(
+    { pfx: fs.readFileSync(pfxPath), passphrase },
+    (request, response) => {
+      const upstream = http.request(
+        {
+          hostname: '127.0.0.1',
+          port: NEXT_PORT,
+          path: request.url,
+          method: request.method,
+          headers: {
+            ...request.headers,
+            'x-forwarded-proto': 'https',
+            'x-forwarded-host': 'localhost:3443',
+          },
+        },
+        (upstreamResponse) => {
+          response.writeHead(
+            upstreamResponse.statusCode ?? 502,
+            upstreamResponse.headers,
+          )
+          upstreamResponse.pipe(response)
+        },
+      )
+
+      upstream.on('error', (error) => {
+        if (!response.headersSent) {
+          response.writeHead(502, { 'content-type': 'text/plain' })
+        }
+        response.end(`proxy error: ${error.message}`)
+      })
+
+      request.pipe(upstream)
+    },
+  )
+
+  return new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(PROXY_PORT, '127.0.0.1', () => resolve(server))
+  })
+}
+
+async function closeProxy(server) {
+  if (!server) return
+  try {
+    server.closeAllConnections?.()
+    await new Promise((resolve) => server.close(resolve))
+  } catch {
+    // Ya estaba cerrado.
+  }
+}
+
+function deleteFile(filePath) {
+  if (!filePath) return
+  try {
+    fs.rmSync(filePath, { force: true })
+  } catch {
+    // Best effort.
   }
 }
 
@@ -229,7 +399,7 @@ async function attempt(page, fn) {
 }
 
 async function withNewPage(browser, fn) {
-  const context = await browser.newContext()
+  const context = await browser.newContext({ ignoreHTTPSErrors: true })
   const page = await context.newPage()
   page.setDefaultTimeout(TIMEOUT_MS)
   try {
@@ -244,7 +414,7 @@ async function withNewPage(browser, fn) {
 // ---------------------------------------------------------------------------
 
 async function warmUp(browser) {
-  const context = await browser.newContext()
+  const context = await browser.newContext({ ignoreHTTPSErrors: true })
   const page = await context.newPage()
   page.setDefaultTimeout(TIMEOUT_MS)
 
@@ -382,12 +552,12 @@ async function sanityFlow(page) {
 // ---------------------------------------------------------------------------
 
 async function runAll(browser) {
-  const activeContext = await browser.newContext()
+  const activeContext = await browser.newContext({ ignoreHTTPSErrors: true })
   const activePage = await activeContext.newPage()
   activePage.setDefaultTimeout(TIMEOUT_MS)
 
   // El contexto de SUSP_SUB se reutiliza en API_GUARD y LOGOUT.
-  const suspContext = await browser.newContext()
+  const suspContext = await browser.newContext({ ignoreHTTPSErrors: true })
   const suspPage = await suspContext.newPage()
   suspPage.setDefaultTimeout(TIMEOUT_MS)
 
@@ -397,6 +567,21 @@ async function runAll(browser) {
       ...(await attempt(activePage, () =>
         loginFlow(activePage, EMAILS.ACTIVE, credentials.ACTIVE, '/dashboard'),
       )),
+    })
+
+    results.push({
+      name: 'SESSION_COOKIE',
+      ...(await attempt(activePage, async () => {
+        const cookies = await activeContext.cookies()
+        const sessionCookie = cookies.find(
+          (cookie) => cookie.name === PROD_SESSION_COOKIE,
+        )
+        if (!sessionCookie || sessionCookie.secure !== true) {
+          const names = cookies.map((cookie) => cookie.name).join(', ')
+          throw new Error(`cookies presentes: ${names || '(ninguna)'}`)
+        }
+        return `${PROD_SESSION_COOKIE} secure=true`
+      })),
     })
 
     results.push({
@@ -557,6 +742,8 @@ async function preflight() {
 async function main() {
   let browser
   let serverReady = false
+  let tlsProxy = null
+  let certInfo = null
 
   try {
     await preflight()
@@ -569,6 +756,8 @@ async function main() {
       console.log(`Server: usando ${BASE_URL} (VERIFY_NO_SERVER=1)`)
       serverReady = true
     } else {
+      certInfo = generateCert()
+      tlsProxy = await startTlsProxy(certInfo.pfxPath, certInfo.passphrase)
       serverProcess = startServer()
       await waitForServer()
       serverReady = true
@@ -581,7 +770,7 @@ async function main() {
     printResults()
 
     const passed = results.filter((row) => row.result === 'PASS').length
-    process.exitCode = passed === 7 ? 0 : 1
+    process.exitCode = passed === 8 ? 0 : 1
   } catch (error) {
     if (!serverReady) {
       console.error('ABORT: el servidor no levanto a tiempo')
@@ -597,8 +786,15 @@ async function main() {
     if (browser) {
       await browser.close().catch(() => {})
     }
+    if (tlsProxy) {
+      await closeProxy(tlsProxy)
+    }
     if (serverProcess) {
       killServer(serverProcess)
+    }
+    if (certInfo) {
+      deleteFile(certInfo.pfxPath)
+      removeCertFromStore(certInfo.thumbprint)
     }
   }
 }
