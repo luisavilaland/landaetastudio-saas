@@ -5540,3 +5540,37 @@ request, no al importar el modulo), una sola funcion compartida por el proxy y
 NextAuth, y tests con un JWE real que cubran ambos protocolos.
 
 ---
+
+## 132. Tests de integracion fallan por estado del pooler (PgBouncer)
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** detectado en develop (`5b5a148`), post-merge de #317 y #319.
+
+**Problema.** Tres tests de integracion fallan de forma **determinista** al
+esperar que `current_setting('app.tenant_id', true)` sea `NULL` en una conexion
+nueva, y recibir `''`:
+
+- `packages/db/src/__tests__/rls-cross-tenant.test.ts` -> `invalid input syntax for type uuid: ""`
+- `packages/db/src/__tests__/preapproval-tenant-resolution.test.ts` -> `expected '' to be null`
+- `packages/commerce/src/__tests__/subscription-transition.test.ts` -> falla en el cleanup de `afterAll`, mismo `uuid: ""`
+
+Resultado: **999/1001**. Reproducido con `--maxWorkers=2` y con `--maxWorkers=1`,
+siempre los mismos tres.
+
+**Evidencia.** No es codigo: `git diff --stat 4bcbc38..5b5a148 -- packages apps`
+sale vacio, o sea que entre el merge anterior y `HEAD` solo entraron `scripts/`,
+`.gitignore`, `SETUP.md` y `vault/`. Los tests corren contra **produccion**
+(`.env.local` apunta a `ep-dawn-hat-amtrizsw-pooler`) a traves del endpoint
+_pooler_. Descartado: `pg_db_role_setting` esta vacio (sin defaults de rol ni de
+base) y las connection strings no llevan `options=` ni `tenant_id`.
+
+**Hipotesis (no confirmada).** PgBouncer reutiliza un backend que ya tuvo
+`app.tenant_id` seteado, y el placeholder queda en `''` en lugar de `NULL`; el
+resultado dependeria del trafico de produccion. No se midio: se deja como
+hipotesis para no inventar una causa.
+
+**Fix propuesto.** Investigar la configuracion de PgBouncer (`server_reset_query`,
+`DISCARD ALL`), o correr estos tests contra una rama limpia de Neon en lugar de
+produccion. Cualquiera de las dos convierte un fallo dependiente del trafico en
+un resultado reproducible.
+
+---
