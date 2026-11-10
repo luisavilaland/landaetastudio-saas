@@ -5408,10 +5408,10 @@ no se pega en chat, PR, issue ni log. Si se expone, se rotan los roles del
 proyecto y se actualiza Vercel (Production y Preview) mas `.env.local`, y se
 redeploya: las tres apps usan las mismas dos URLs.
 
-**Fix propuesto.** Al crear una rama para pruebas, resetear la password de los
-roles **en la rama** antes de compartir su URL. En Neon los roles son
-branch-scoped, asi que el reset deberia no tocar al padre; conviene verificarlo
-una vez y dejarlo escrito.
+**Verificado.** Al crear una rama para pruebas, resetear la password de los
+roles **en la rama** antes de compartir su URL. El test bidireccional de arriba
+confirma que el reset en la rama no toca al padre, y que rotar en produccion no
+arregla la rama.
 
 ---
 
@@ -5510,5 +5510,33 @@ una corrida, y el spec de superadmin creo un `test-<timestamp>` dos minutos
 despues, en la misma corrida.
 
 **Costo:** sin estimar (depende del diseno de previews).
+
+---
+
+## 131. Build de produccion sobre HTTP rebota el login silenciosamente
+
+**Severidad:** BAJA (no aplica a produccion real) · **Estado:** ABIERTO · **Origen:** detectado al intentar correr el harness con `next start` local (2026-11-10).
+
+**Problema.** `packages/auth/src/session-cookie.ts` elige el nombre de la cookie
+con `isProduction = process.env.NODE_ENV === 'production'`, asi que en un build de
+produccion el nombre lleva el prefijo `__Secure-`
+(`__Secure-authjs.session-token-admin`). El prefijo lo hace cumplir el navegador:
+solo acepta esa cookie si llega por **https** con `Secure`. Sobre
+`http://localhost`, el servidor la manda y el navegador **la descarta**.
+
+El sintoma engana: `signIn` devuelve exito, el formulario no muestra error, no hay
+navegacion, `/api/auth/session` queda en `null` y el dashboard rebota a `/login`.
+Parece "el login no hace nada"; en realidad el login funciono y se perdio la
+sesion. Los logs del servidor no lo dicen (solo aparece un `CredentialsSignin` del
+warm-up, que confunde el diagnostico).
+
+**Nota.** En Vercel (HTTPS) funciona perfecto: ahi `__Secure-` es valido para
+ambos lados. El caso roto es "build de produccion servido por HTTP": `next start`
+local, o un deploy detras de un proxy que termina TLS y reenvia http al proceso.
+
+**Si a futuro se quiere derivar el prefijo del protocolo**, requiere un PR
+especifico: pasar a configuracion lazy en NextAuth (el nombre se calcula por
+request, no al importar el modulo), una sola funcion compartida por el proxy y
+NextAuth, y tests con un JWE real que cubran ambos protocolos.
 
 ---
