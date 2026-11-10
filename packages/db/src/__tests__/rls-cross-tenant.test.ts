@@ -335,7 +335,11 @@ describe.skipIf(!hasAppUrl)('RLS cross-tenant real', () => {
       throw new Error('DATABASE_APP_URL no configurada para el caso sin contexto')
     }
 
-    const cleanClient = postgres(appUrl)
+    // El pooler puede entregar un backend reutilizado con el GUC en '', y ahí
+    // la policy falla al castear en vez de devolver cero filas. El endpoint
+    // directo garantiza un backend nuevo.
+    const directAppUrl = appUrl.replace('-pooler', '')
+    const cleanClient = postgres(directAppUrl)
     try {
       const rows = await cleanClient<{ table: string; count: number }[]>`
         SELECT 'subscriptions' AS "table", COUNT(*)::int AS "count"

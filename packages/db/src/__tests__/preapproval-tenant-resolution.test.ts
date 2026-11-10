@@ -84,6 +84,7 @@ async function createTenant(slug: string, name: string): Promise<TenantRow> {
 }
 
 async function deleteTenant(tenantId: string): Promise<void> {
+  if (!tenantId) return
   try {
     await withTenantContext(tenantId, async (tx) =>
       tx
@@ -91,6 +92,12 @@ async function deleteTenant(tenantId: string): Promise<void> {
         .where(eq(dbSubscriptions.tenantId, tenantId))
         .returning({ id: dbSubscriptions.id }),
     )
+  } catch {
+    // best effort: si falla el borrado de suscripciones, igual hay que intentar
+    // borrar el tenant. Antes, un fallo aca salteaba el DELETE de abajo y dejaba
+    // el tenant huerfano en la base.
+  }
+  try {
     await conn()`DELETE FROM "tenants" WHERE "id" = ${tenantId}::uuid`
   } catch {
     // best effort: el suite no debe fallar en cleanup
@@ -239,7 +246,11 @@ describe.skipIf(!hasAppUrl)('H1 - resolve_tenant_by_preapproval (SECURITY DEFINE
       const virgin = await warm<{ v: string | null }[]>`
         SELECT current_setting('app.tenant_id', true) AS "v"
       `
-      expect(virgin[0]?.v).toBeNull()
+      const virginValue = virgin[0]?.v
+      // Tras un SET LOCAL revertido el GUC queda en '' y no en NULL; un backend
+      // reutilizado por el pooler tambien puede llegar con ''.
+      expect(virginValue === null || virginValue === '').toBe(true)
+      expect(virginValue ?? '').not.toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/i)
 
       // Tras un SET LOCAL revertido, el GUC vuelve a '' en vez de desaparecer.
       await warm.begin(async (tx) => {
