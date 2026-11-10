@@ -5385,7 +5385,7 @@ contextos, como minimo: un solo lugar con el numero y tres links.
 
 **Problema.** Una rama de Neon es un clon del proyecto: los roles y sus passwords
 se copian. Verificado comparando las passwords de `.env.local` (produccion)
-contra las de la rama `ep-divine-morning-amoknar6-pooler...`: son **identicas**,
+contra las de la rama `ep-<id>-pooler`: son **identicas**,
 tanto para `neondb_owner` como para `app_user`.
 
 **Por que importa.** Compartir "la connection string de la rama" equivale a
@@ -5401,6 +5401,40 @@ redeploya: las tres apps usan las mismas dos URLs.
 roles **en la rama** antes de compartir su URL. En Neon los roles son
 branch-scoped, asi que el reset deberia no tocar al padre; conviene verificarlo
 una vez y dejarlo escrito.
+
+---
+
+## 129. Primer login contra una rama dormida falla como "credenciales invalidas"
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** verificacion automatizada de S4d (2026-11-09, #313).
+
+**Problema.** Neon autosuspende los computes inactivos. La primera query de
+`authorize` (`packages/auth/src/index.ts`) se cae por el arranque en frio y la
+funcion devuelve `null`. El formulario de login colapsa ese `null` en
+"Credenciales invalidas", el mismo mensaje que una password incorrecta.
+
+Reproducido tres veces seguidas: el primer intento falla **siempre** y el
+reintento inmediato con las mismas credenciales funciona.
+
+**Por que importa.** Le dice "tu password esta mal" a alguien que la escribio
+bien. Y el mismo arranque en frio se manifiesta distinto en el resto de la app:
+el proxy decide con `withTenantContext` y, si la query falla, responde **503**
+(`unavailable()`), no 403. Dos sintomas distintos para una sola causa.
+
+**No es un bug de la rama de pruebas.** En produccion el compute suele estar
+caliente, pero cualquier periodo de inactividad suficiente lo apaga.
+
+**Fix propuesto.** Distinguir falla de infraestructura de credencial invalida:
+
+- en `authorize`, dejar que la excepcion de DB propague (o mapearla a un codigo
+  propio) en vez de devolver `null`;
+- en el form, mostrar "no pudimos verificar tu cuenta, reintenta" para ese caso;
+- considerar un retry con backoff en la primera conexion, o un ping de
+  calentamiento al arrancar la funcion.
+
+**Evidencia.** Harness de Playwright contra la rama: el primer login `ACTIVE`
+devolvio "Credenciales invalidas" (2 intentos), el segundo login con la misma
+credencial entro al dashboard. Con warm-up previo, 5/5 al primer intento.
 
 ---
 
