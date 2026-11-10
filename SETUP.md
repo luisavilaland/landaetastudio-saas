@@ -234,6 +234,8 @@ pnpm --filter admin dev      # http://localhost:3001
 pnpm --filter superadmin dev # http://localhost:3002
 ```
 
+Para probar un build de producción local, usá HTTPS (ej. proxy local). `next start` sobre HTTP pierde la cookie de sesión silenciosamente: en producción el nombre de la cookie lleva el prefijo `__Secure-`, que el navegador solo acepta sobre `https`. El síntoma es que el login "funciona" pero rebota a `/login` (ver ítem 131 de la deuda).
+
 ## Vault de Obsidian
 
 El vault vive en `vault/` y se trackea con Git. Contiene:
