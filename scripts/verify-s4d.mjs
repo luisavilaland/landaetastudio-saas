@@ -37,7 +37,7 @@
  *   node scripts/verify-s4d.mjs
  */
 
-import { spawn, execSync, execFileSync } from 'node:child_process'
+import { spawn, spawnSync, execSync, execFileSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -59,6 +59,11 @@ const BASE_URL = (process.env.VERIFY_BASE_URL ?? DEFAULT_BASE_URL).replace(
   /\/+$/,
   '',
 )
+const SERVER_ENV = {
+  ...process.env,
+  AUTH_TRUST_HOST: 'true',
+  AUTH_URL: BASE_URL,
+}
 const PROD_SESSION_COOKIE = '__Secure-authjs.session-token-admin'
 const NEXT_PORT = 3001
 const PROXY_PORT = 3443
@@ -105,6 +110,8 @@ if (
   )
 }
 
+const isLocalHost = ['localhost', '127.0.0.1'].includes(baseUrlHost)
+
 const credentials = {
   ACTIVE: process.env.S4D_ACTIVE_PASS,
   SUSP_SUB: process.env.S4D_SUSP_SUB_PASS,
@@ -130,11 +137,7 @@ function startServer() {
   const child = spawn('pnpm', ['start'], {
     cwd: 'apps/admin',
     shell: true,
-    env: {
-      ...process.env,
-      AUTH_TRUST_HOST: 'true',
-      AUTH_URL: 'https://localhost:3443',
-    },
+    env: SERVER_ENV,
     // Permite matar el grupo con process.kill(-pid) fuera de Windows.
     detached: process.platform !== 'win32',
   })
@@ -143,6 +146,21 @@ function startServer() {
   child.stderr.on('data', (chunk) => serverLog.push(chunk.toString()))
 
   return child
+}
+
+function buildAdmin() {
+  const result = spawnSync('pnpm', ['build'], {
+    cwd: 'apps/admin',
+    shell: true,
+    stdio: 'inherit',
+    env: SERVER_ENV,
+  })
+
+  if (result.status !== 0) {
+    abort(
+      `pnpm build fallo en apps/admin (status ${result.status ?? 'desconocido'}). No se arranca el server.`,
+    )
+  }
 }
 
 function lastServerLines(count) {
@@ -161,7 +179,7 @@ function httpsStatus(url, timeoutMs = 5000) {
   return new Promise((resolve) => {
     const request = https.request(
       url,
-      { rejectUnauthorized: false, timeout: timeoutMs },
+      { rejectUnauthorized: !isLocalHost, timeout: timeoutMs },
       (response) => {
         response.resume()
         resolve(response.statusCode ?? 0)
@@ -399,7 +417,7 @@ async function attempt(page, fn) {
 }
 
 async function withNewPage(browser, fn) {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true })
+  const context = await browser.newContext({ ignoreHTTPSErrors: isLocalHost })
   const page = await context.newPage()
   page.setDefaultTimeout(TIMEOUT_MS)
   try {
@@ -414,7 +432,7 @@ async function withNewPage(browser, fn) {
 // ---------------------------------------------------------------------------
 
 async function warmUp(browser) {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true })
+  const context = await browser.newContext({ ignoreHTTPSErrors: isLocalHost })
   const page = await context.newPage()
   page.setDefaultTimeout(TIMEOUT_MS)
 
@@ -552,12 +570,12 @@ async function sanityFlow(page) {
 // ---------------------------------------------------------------------------
 
 async function runAll(browser) {
-  const activeContext = await browser.newContext({ ignoreHTTPSErrors: true })
+  const activeContext = await browser.newContext({ ignoreHTTPSErrors: isLocalHost })
   const activePage = await activeContext.newPage()
   activePage.setDefaultTimeout(TIMEOUT_MS)
 
   // El contexto de SUSP_SUB se reutiliza en API_GUARD y LOGOUT.
-  const suspContext = await browser.newContext({ ignoreHTTPSErrors: true })
+  const suspContext = await browser.newContext({ ignoreHTTPSErrors: isLocalHost })
   const suspPage = await suspContext.newPage()
   suspPage.setDefaultTimeout(TIMEOUT_MS)
 
@@ -756,6 +774,7 @@ async function main() {
       console.log(`Server: usando ${BASE_URL} (VERIFY_NO_SERVER=1)`)
       serverReady = true
     } else {
+      buildAdmin()
       certInfo = generateCert()
       tlsProxy = await startTlsProxy(certInfo.pfxPath, certInfo.passphrase)
       serverProcess = startServer()
@@ -770,7 +789,7 @@ async function main() {
     printResults()
 
     const passed = results.filter((row) => row.result === 'PASS').length
-    process.exitCode = passed === 8 ? 0 : 1
+    process.exitCode = passed === results.length ? 0 : 1
   } catch (error) {
     if (!serverReady) {
       console.error('ABORT: el servidor no levanto a tiempo')
