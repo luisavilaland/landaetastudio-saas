@@ -342,37 +342,29 @@ async function sanityFlow(page) {
   // a /suspended. Si llegara, la expectativa del test seria falsa.
   await login(page, EMAILS.ACTIVE, credentials.ACTIVE)
 
-  // Una sanidad que pasa con el login roto no valida nada: primero exigimos
-  // que la autenticacion haya ocurrido de verdad.
-  const errorLocator = page
-    .getByText(/Credenciales inválidas|Error al iniciar sesión/i)
-    .first()
+  // Una URL distinta de /login no prueba autenticacion: /api/auth/error
+  // tambien la cumple. Exigimos una sesion real con el email ACTIVE.
   const authStartedAt = Date.now()
-  let authenticated = false
+  let sessionEmail = null
   while (Date.now() - authStartedAt < 20_000) {
-    let pathname = page.url()
     try {
-      pathname = new URL(page.url()).pathname
+      const response = await page.request.get(`${BASE_URL}/api/auth/session`)
+      const body = await response.json()
+      sessionEmail = body?.user?.email ?? null
+      if (sessionEmail === EMAILS.ACTIVE) break
     } catch {
-      // Todavia no es una URL parseable: seguimos esperando.
+      sessionEmail = null
     }
-    if (pathname !== '/login') {
-      authenticated = true
-      break
-    }
-    if (await errorLocator.isVisible().catch(() => false)) {
-      break
-    }
-    await delay(200)
+    await delay(300)
   }
 
-  if (!authenticated) {
+  if (sessionEmail !== EMAILS.ACTIVE) {
     throw new Error(
-      `SANITY no pudo autenticarse: no valida nada (URL: ${page.url()})`,
+      `SANITY no pudo autenticarse (URL: ${page.url()}, session: ${sessionEmail ? 'otro email' : 'sin user'})`,
     )
   }
 
-  const { matched, url } = await waitForUrl(
+  const { matched } = await waitForUrl(
     page,
     (pathname) => pathname.includes('/suspended'),
     SANITY_TIMEOUT_MS,
@@ -380,7 +372,7 @@ async function sanityFlow(page) {
   if (matched) {
     throw new Error('el harness aceptaria una expectativa falsa')
   }
-  return `autenticado, no llego a /suspended (URL final: ${url})`
+  return 'sesion valida, no llego a /suspended'
 }
 
 // ---------------------------------------------------------------------------
