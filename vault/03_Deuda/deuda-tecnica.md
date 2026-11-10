@@ -5392,11 +5392,15 @@ tanto para `neondb_owner` como para `app_user`.
 compartir produccion, y `neondb_owner` tiene `rolbypassrls`. El aislamiento de
 **datos** de una rama es real; el de **credenciales**, no.
 
-**La copia es al crear la rama.** Despues de rotar los roles del proyecto, la
-rama no toma la password nueva sola: en la rama de S4d, tanto las credenciales
-viejas como las nuevas de produccion dieron `28P01` (`password authentication
-failed`). Antes de usar una rama para pruebas hay que resetear la password de sus
-roles en el dashboard y usar esa.
+**Observacion (2026-11-10).** Las credenciales viejas de la rama dieron
+`28P01` (`password authentication failed`). Al rotar las contrasenas en
+produccion, las credenciales de la rama tambien dieron `28P01`: la rotacion del
+padre no propaga la password nueva a la rama.
+
+**Test bidireccional.** Se roto la password en la rama. Al instante, `SELECT 1`
+en produccion dio exitoso. Fecha: 2026-11-10. **Aislamiento bidireccional
+confirmado**: rotar en la rama no afecta a produccion, rotar en produccion no
+arregla la rama.
 
 **Regla.** Una connection string de rama se trata como credencial de produccion:
 no se pega en chat, PR, issue ni log. Si se expone, se rotan los roles del
@@ -5421,6 +5425,27 @@ funcion devuelve `null`. El formulario de login colapsa ese `null` en
 
 Reproducido tres veces seguidas: el primer intento falla **siempre** y el
 reintento inmediato con las mismas credenciales funciona.
+
+**El error de DB que se ve.** NextAuth envuelve cualquier falla de `authorize` en
+`CallbackRouteError` con el error de Postgres como `cause`. En la corrida donde
+se capturo el log completo aparecio asi:
+
+```
+[auth][error] CallbackRouteError
+[auth][cause]: Error: Failed query: select ... from "admin_users" where "admin_users"."email" = $1 limit $2
+[auth][details]: { "name": "PostgresError", "severity_local": "ERROR", "code": "28P01" }
+```
+
+Ojo: ese `28P01` era un problema de credenciales vencidas, no el arranque en
+frio. **El caso de rama dormida no se capturo con su codigo exacto** — el harness
+solo ve el sintoma (form en `/login` con "Credenciales invalidas"). No se escribe
+`CONNECT_TIMEOUT` ni `ECONNRESET` porque no se observaron: seria inventar la
+evidencia. Lo que si esta verificado es el efecto: `authorize` termina en `null`.
+
+**Contribuyente concreto.** `packages/db/src/index.ts:12` crea el cliente con
+`postgres(appUrl)`, sin `connect_timeout` ni `max`. No hay politica de fallo
+rapido declarada, asi que el primer intento queda a merced del default de la
+libreria y del tiempo de arranque del compute.
 
 **Por que importa.** Le dice "tu password esta mal" a alguien que la escribio
 bien. Y el mismo arranque en frio se manifiesta distinto en el resto de la app:
