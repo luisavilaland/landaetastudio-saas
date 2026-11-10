@@ -31,6 +31,8 @@
 import { spawn, execSync } from 'node:child_process'
 import process from 'node:process'
 import { chromium } from '@playwright/test'
+import postgres from 'postgres'
+import bcrypt from 'bcryptjs'
 
 import { abort, assertSafeEnv } from './lib/env-guards.mjs'
 
@@ -485,12 +487,82 @@ function printResults() {
 }
 
 // ---------------------------------------------------------------------------
+// Preflight: las credenciales del env tienen que existir y matchear en la DB
+// que el harness cree que esta usando.
+// ---------------------------------------------------------------------------
+
+async function preflight() {
+  const ownerPath = new URL(env.ownerUrl).pathname
+  const appPath = new URL(env.appUrl).pathname
+  const dbMismatch = ownerPath !== appPath
+
+  console.log(
+    `Preflight DB: db_owner=${ownerPath} db_app=${appPath} db_mismatch=${dbMismatch}`,
+  )
+
+  const sql = postgres(env.ownerUrl, {
+    max: 1,
+    ssl: 'require',
+    connect_timeout: 15,
+  })
+
+  const checks = []
+  try {
+    for (const key of ['ACTIVE', 'SUSP_SUB', 'SUSP_NOSUB']) {
+      const email = EMAILS[key]
+      const [row] = await sql`
+        SELECT password FROM admin_users WHERE email = ${email}
+      `
+      const found = Boolean(row)
+      const match = found
+        ? await bcrypt.compare(credentials[key], row.password)
+        : false
+      checks.push({ email, found, match })
+    }
+  } finally {
+    await sql.end({ timeout: 5 }).catch(() => {})
+  }
+
+  console.log('')
+  console.log('EMAIL | found | match')
+  for (const check of checks) {
+    console.log(
+      `${check.email} | found=${check.found} | match=${check.match}`,
+    )
+  }
+
+  const failed = checks.filter((check) => !check.found || !check.match)
+  if (failed.length > 0) {
+    for (const check of failed) {
+      if (!check.found) {
+        console.error(
+          `Preflight: ${check.email} found=false -> la app/seed no apuntan a la misma base o el usuario no existe.`,
+        )
+      } else {
+        console.error(
+          `Preflight: ${check.email} match=false -> la password del env no es la del hash guardado.`,
+        )
+      }
+    }
+    abort(
+      `preflight fallo (${failed.length} de 3). No se corren los tests.`,
+    )
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 async function main() {
   let browser
   let serverReady = false
+
+  try {
+    await preflight()
+  } catch (error) {
+    abort(error instanceof Error ? error.message : String(error))
+  }
 
   try {
     if (process.env.VERIFY_NO_SERVER === '1') {
