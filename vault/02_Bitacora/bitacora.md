@@ -5355,3 +5355,38 @@ endpoint que usa el CI, y el workflow `e2e.yml` corre `db:seed` contra esa base
 en cada push a un PR. Ver item 130 de la deuda.
 
 **Ref:** revision de Luis en #313 (2026-11-09).
+
+---
+
+## 2026-11-09 - La verificacion manual de S4d se automatizo y paso en verde
+
+Las verificaciones de S4d ya no dependen de que alguien haga clics. Un harness
+temporal de Playwright (`scripts/verify-s4d.mjs`, escrito y borrado en la misma
+sesion) levanto `apps/admin` en el puerto 3001 contra la rama de Neon, inicio
+sesion con los tres tenants y valido el gate de punta a punta.
+
+Resultado: **5/5**.
+
+| Prueba | Esperado | Resultado |
+| --- | --- | --- |
+| `s4d-test-active` | dashboard | PASS |
+| `s4d-test-susp-sub` | `/suspended` | PASS |
+| `s4d-test-susp-nosub` | `/suspended` | PASS |
+| `GET /api/products` como suspendido | 403 con `field: "account"` | PASS |
+| Logout en `/suspended` | `/login` | PASS |
+
+**Hallazgo del camino: el primer login contra una rama dormida falla con
+"Credenciales invalidas".** Neon autosuspende la rama y la primera query de
+`authorize` se cae por el arranque en frio; el form lo muestra como credenciales
+invalidas, un mensaje enganoso para una falla de infraestructura. Se reprodujo 3
+veces, siempre en el primer intento y siempre con las mismas credenciales que
+funcionan dos segundos despues. Con un warm-up previo (login con password
+incorrecta a proposito: ejecuta la query, no crea sesion) los cinco tests pasan
+al primer intento.
+
+**Como se corrio sin tocar `.env.local`.** Las credenciales de la rama se
+exportaron solo en el entorno de la sesion. `dotenv` no pisa variables ya
+definidas, asi que las exportadas ganan sobre el `.env.local` local, que sigue
+apuntando a produccion. El harness aborta si el host no es el de la rama.
+
+**Ref:** #313, #315.

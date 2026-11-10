@@ -5379,6 +5379,31 @@ contextos, como minimo: un solo lugar con el numero y tres links.
 
 ---
 
+## 128. Las ramas de Neon heredan las credenciales de los roles
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** detectado al preparar la corrida real del seed de S4d (2026-11-09, #313).
+
+**Problema.** Una rama de Neon es un clon del proyecto: los roles y sus passwords
+se copian. Verificado comparando las passwords de `.env.local` (produccion)
+contra las de la rama `ep-divine-morning-amoknar6-pooler...`: son **identicas**,
+tanto para `neondb_owner` como para `app_user`.
+
+**Por que importa.** Compartir "la connection string de la rama" equivale a
+compartir produccion, y `neondb_owner` tiene `rolbypassrls`. El aislamiento de
+**datos** de una rama es real; el de **credenciales**, no.
+
+**Regla.** Una connection string de rama se trata como credencial de produccion:
+no se pega en chat, PR, issue ni log. Si se expone, se rotan los roles del
+proyecto y se actualiza Vercel (Production y Preview) mas `.env.local`, y se
+redeploya: las tres apps usan las mismas dos URLs.
+
+**Fix propuesto.** Al crear una rama para pruebas, resetear la password de los
+roles **en la rama** antes de compartir su URL. En Neon los roles son
+branch-scoped, asi que el reset deberia no tocar al padre; conviene verificarlo
+una vez y dejarlo escrito.
+
+---
+
 ## 130. e2e.yml corre db:seed contra produccion
 
 **Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** detectado al preparar la corrida real del seed de S4d (2026-11-09, #313).
