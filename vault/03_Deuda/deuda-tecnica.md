@@ -5392,6 +5392,12 @@ tanto para `neondb_owner` como para `app_user`.
 compartir produccion, y `neondb_owner` tiene `rolbypassrls`. El aislamiento de
 **datos** de una rama es real; el de **credenciales**, no.
 
+**La copia es al crear la rama.** Despues de rotar los roles del proyecto, la
+rama no toma la password nueva sola: en la rama de S4d, tanto las credenciales
+viejas como las nuevas de produccion dieron `28P01` (`password authentication
+failed`). Antes de usar una rama para pruebas hay que resetear la password de sus
+roles en el dashboard y usar esa.
+
 **Regla.** Una connection string de rama se trata como credencial de produccion:
 no se pega en chat, PR, issue ni log. Si se expone, se rotan los roles del
 proyecto y se actualiza Vercel (Production y Preview) mas `.env.local`, y se
