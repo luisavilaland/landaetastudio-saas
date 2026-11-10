@@ -8,17 +8,21 @@
  * Requisitos:
  * - Una base con los 3 tenants de S4d. Crearlos con:
  *     node scripts/seed-s4d-tests.mjs        (ver PR #313)
- * - Variables de entorno:
- *     DATABASE_URL            (solo para verificar que NO sea produccion)
- *     DATABASE_APP_URL        (opcional; si se define, tambien se valida)
+ * - Variables de entorno requeridas:
+ *     DATABASE_URL
+ *     DATABASE_APP_URL
+ *     SEED_ALLOWED_HOST       (hostname exacto de la rama de Neon)
  *     S4D_ACTIVE_PASS
  *     S4D_SUSP_SUB_PASS
  *     S4D_SUSP_NOSUB_PASS
  * - Opcionales:
- *     VERIFY_BASE_URL   (default http://localhost:3001)
- *     VERIFY_NO_SERVER  (1 = no arrancar apps/admin, usar el que ya corre)
+ *     VERIFY_BASE_URL        (default http://localhost:3001; host debe ser
+ *                             localhost o 127.0.0.1)
+ *     VERIFY_NO_SERVER       (1 = no arrancar apps/admin, usar el que ya corre)
+ *     ALLOW_REMOTE_VERIFY    (true = permitir VERIFY_BASE_URL fuera de localhost)
  *
- * Aborta si el hostname de DATABASE_URL empieza con el endpoint de produccion.
+ * Aborta si los hosts de DB no coinciden con SEED_ALLOWED_HOST, si apuntan a
+ * produccion, o si VERIFY_BASE_URL no es local.
  *
  * Uso:
  *   node scripts/verify-s4d.mjs
@@ -28,7 +32,8 @@ import { spawn, execSync } from 'node:child_process'
 import process from 'node:process'
 import { chromium } from '@playwright/test'
 
-const PROD_HOST_MARKER = 'ep-dawn-hat-amtrizsw'
+import { abort, assertSafeEnv } from './lib/env-guards.mjs'
+
 const BASE_URL = (process.env.VERIFY_BASE_URL ?? 'http://localhost:3001').replace(
   /\/+$/,
   '',
@@ -47,36 +52,34 @@ const EMAILS = {
 const results = []
 
 // ---------------------------------------------------------------------------
-// Guarda de DB: nunca produccion. Corre antes de arrancar el servidor.
+// Guardas: DB segura y server local. Corren antes de arrancar el servidor.
 // ---------------------------------------------------------------------------
 
-function hostnameOf(name) {
-  const raw = process.env[name]
-  if (!raw) return null
-  try {
-    return new URL(raw).hostname
-  } catch {
-    return null
-  }
+let env
+try {
+  env = assertSafeEnv({ requireAllowSeed: false })
+} catch (error) {
+  abort(error instanceof Error ? error.message : String(error))
 }
 
-const dbHost = hostnameOf('DATABASE_URL')
-if (!dbHost) {
-  console.error('ABORT: DATABASE_URL no esta definida o es invalida')
-  process.exit(1)
-}
-if (dbHost.startsWith(PROD_HOST_MARKER)) {
-  console.error('ABORT: DATABASE_URL apunta a produccion')
-  process.exit(1)
+console.log(`DB host: ${env.allowedHost}`)
+
+let baseUrlHost
+try {
+  baseUrlHost = new URL(BASE_URL).hostname
+} catch {
+  abort('VERIFY_BASE_URL no es una URL valida')
 }
 
-const appDbHost = hostnameOf('DATABASE_APP_URL')
-if (appDbHost && appDbHost.startsWith(PROD_HOST_MARKER)) {
-  console.error('ABORT: DATABASE_APP_URL apunta a produccion')
-  process.exit(1)
+if (
+  baseUrlHost !== 'localhost' &&
+  baseUrlHost !== '127.0.0.1' &&
+  process.env.ALLOW_REMOTE_VERIFY !== 'true'
+) {
+  abort(
+    `VERIFY_BASE_URL apunta a ${baseUrlHost}. Solo se permite localhost o 127.0.0.1; para un host remoto exportá ALLOW_REMOTE_VERIFY=true.`,
+  )
 }
-
-console.log(`DB host: ${dbHost}`)
 
 const credentials = {
   ACTIVE: process.env.S4D_ACTIVE_PASS,
@@ -89,10 +92,7 @@ const missingCredentials = Object.entries(credentials)
   .map(([key]) => `S4D_${key}_PASS`)
 
 if (missingCredentials.length > 0) {
-  console.error(
-    `ABORT: faltan credenciales en el entorno: ${missingCredentials.join(', ')}`,
-  )
-  process.exit(1)
+  abort(`faltan credenciales en el entorno: ${missingCredentials.join(', ')}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -251,24 +251,24 @@ async function warmUp(browser) {
     // password incorrecta a proposito ejecuta la query sin crear sesion.
     await login(page, EMAILS.ACTIVE, WARMUP_WRONG_PASSWORD)
 
+    // Solo sincroniza: espera a que el request de auth termine. No afirma que
+    // la DB se haya despertado; el texto de error aparece fria o caliente.
     const errorLocator = page
       .getByText(/Credenciales inválidas|Error al iniciar sesión/i)
       .first()
     const startedAt = Date.now()
-    let confirmed = false
     while (Date.now() - startedAt < WARMUP_TIMEOUT_MS) {
       if (await errorLocator.isVisible().catch(() => false)) {
-        confirmed = true
         break
       }
       await delay(500)
     }
 
     console.log(
-      confirmed ? 'Warm-up: OK' : 'Warm-up: sin confirmacion (sigo)',
+      'Warm-up: login con password incorrecta enviado (no verifica el estado de la DB, solo fuerza la query)',
     )
   } catch {
-    console.log('Warm-up: sin confirmacion (sigo)')
+    // El warm-up no es parte de la suite: si falla, se sigue igual.
   } finally {
     await context.close().catch(() => {})
   }

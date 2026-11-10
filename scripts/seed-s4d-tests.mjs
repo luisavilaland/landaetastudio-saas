@@ -29,14 +29,10 @@ import { config } from 'dotenv'
 import postgres from 'postgres'
 import bcrypt from 'bcryptjs'
 
+import { abort, assertSafeEnv } from './lib/env-guards.mjs'
+
 // En este repo las credenciales viven en `.env.local`, no en `.env`.
 config({ path: '.env.local' })
-
-// Backstop hardcodeado. El endpoint ya aparece en el comentario de la
-// migración 0003 y el repo es público. No es la guarda principal —
-// la guarda principal es SEED_ALLOWED_HOST con igualdad estricta.
-// Ref: observación de Luis en #313 (2026-11-09).
-const PROD_HOST_MARKER = 'ep-dawn-hat-amtrizsw'
 
 const TEST_TENANTS = [
   {
@@ -61,72 +57,6 @@ const TEST_TENANTS = [
 
 const TEST_SLUG_PATTERN = 's4d-test-%'
 const TEST_EMAIL_PATTERN = '%@test.invalid'
-
-function abort(message) {
-  console.error(`ERROR: ${message}`)
-  process.exit(1)
-}
-
-function parseUrl(name) {
-  const raw = process.env[name]
-  if (!raw) {
-    abort(`${name} no esta definida. Exportala o agregala a .env.local.`)
-  }
-  try {
-    return { raw, parsed: new URL(raw) }
-  } catch {
-    abort(`${name} no es una URL valida.`)
-  }
-}
-
-function assertSafeEnv() {
-  // 1. El seed es destructivo: requiere un opt-in explicito.
-  if (process.env.ALLOW_SEED !== 'true') {
-    abort('Falta ALLOW_SEED=true. Es obligatorio para correr este seed.')
-  }
-
-  // 2. Se exigen ambos roles.
-  const owner = parseUrl('DATABASE_URL')
-  const app = parseUrl('DATABASE_APP_URL')
-
-  // 3. Allowlist de host: SEED_ALLOWED_HOST es la unica fuente de verdad.
-  const allowedHost = process.env.SEED_ALLOWED_HOST
-  if (!allowedHost) {
-    abort(
-      'Falta SEED_ALLOWED_HOST. Copiá el hostname exacto de la rama de Neon (sin esquema ni puerto), ej: ep-xxx-pooler.us-east-2.aws.neon.tech.',
-    )
-  }
-
-  const ownerHost = owner.parsed.hostname
-  const appHost = app.parsed.hostname
-
-  if (ownerHost !== allowedHost) {
-    abort(
-      `DATABASE_URL apunta a ${ownerHost}, que no coincide con SEED_ALLOWED_HOST (${allowedHost}). Abortando.`,
-    )
-  }
-  if (appHost !== allowedHost) {
-    abort(
-      `DATABASE_APP_URL apunta a ${appHost}, que no coincide con SEED_ALLOWED_HOST (${allowedHost}). Abortando.`,
-    )
-  }
-
-  // 4. Denylist de produccion. Es una red de seguridad aparte de la allowlist,
-  // no la validacion principal: si el host es de prod, se aborta igual.
-  for (const [name, host] of [
-    ['DATABASE_URL', ownerHost],
-    ['DATABASE_APP_URL', appHost],
-  ]) {
-    if (host.startsWith(PROD_HOST_MARKER)) {
-      abort(`${name} apunta al host de produccion (${host}). Abortando.`)
-    }
-  }
-
-  // 5. Nunca imprimir URLs completas: llevan password.
-  console.log(`Host de Neon validado: ${allowedHost}`)
-
-  return owner.raw
-}
 
 function generatePassword() {
   // base64url de 12 bytes ronda los 16 caracteres utiles.
@@ -375,9 +305,15 @@ async function seed(tx) {
 }
 
 const isCleanup = process.argv.includes('--cleanup')
-const databaseUrl = assertSafeEnv()
 
-const sql = postgres(databaseUrl, { max: 1, ssl: 'require' })
+let env
+try {
+  env = assertSafeEnv({ requireAllowSeed: true })
+} catch (error) {
+  abort(error instanceof Error ? error.message : String(error))
+}
+
+const sql = postgres(env.ownerUrl, { max: 1, ssl: 'require' })
 
 async function main() {
   await sql.begin(async (tx) => {
