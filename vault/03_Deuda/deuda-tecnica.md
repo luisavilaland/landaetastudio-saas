@@ -5503,6 +5503,13 @@ arregle, regla escrita: **no cargar datos reales en `tienda1` ni en `tienda2`**.
 borrar ramas, y una integracion con Vercel para que los previews apunten a esa
 rama. Requiere decidir como los previews apuntan a la rama: diseno aparte.
 
+**Propuesta de raiz (Luis).** Una rama `dev` **permanente** en Neon, con conexion
+**directa** (sin `-pooler`), como destino de los tests de integracion. No efimera:
+se reutiliza. Ventajas frente a la base efimera por PR: no depende de una accion
+externa en cada corrida, y al ser directa elimina el estado de backend compartido
+que hoy rompe los tests (item 132). Los previews de Vercel pueden seguir apuntando
+a otra rama; esto es solo para la suite de integracion.
+
 **Evidencia.** El `.env.local` de este checkout apunta a
 `ep-<id>.c-5.us-east-1.aws.neon.tech`. Los tenants actuales tienen
 timestamps de corridas de CI: `tienda1` y `tienda2` se recrearon a las 18:40 de
@@ -5579,12 +5586,19 @@ duda de preexistencia: ya fallaba antes de los merges.
 contra el directo pasa siempre. Depende del **tipo de conexion**, no del trafico
 del momento.
 
-**Hipotesis B, con evidencia observada.** `.env.local` cambio de host durante esta
-misma sesion: al principio apuntaba a `ep-<id>.c-5.us-east-1.aws.neon.tech`
+**Hipotesis B (inferida, no confirmada).** `.env.local` cambio de host durante
+esta misma sesion: al principio apuntaba a `ep-<id>.c-5.us-east-1.aws.neon.tech`
 (**directo**) y la suite daba 1001/1001; despues de la rotacion de credenciales
 quedo en `ep-<id>-pooler.c-5.us-east-1.aws.neon.tech` (**pooled**) y los mismos
 tests empezaron a fallar. Entre los dos momentos no cambio una linea de codigo.
-Eso explica el "aparecio de la nada" sin necesidad de invocar trafico.
+
+Es **inferencia**, no un hecho registrado: lo que se observo es el host antes y
+despues en este checkout, no el acto de la rotacion. Dato que la sostiene sin
+depender de mi lectura: las notas del dashboard de Neon del **9/11 22:22** ya
+mostraban el host **pooled**, o sea que el endpoint pooled estaba en uso desde
+antes. Si esa nota corresponde al mismo proyecto, la rotacion no fue lo que
+cambio el host; conviene confirmarlo en el historial del dashboard antes de
+cerrar esta hipotesis.
 
 **Mecanismo medido.** En la misma conexion: tras `SET LOCAL app.tenant_id = '<uuid>'`
 
@@ -5634,5 +5648,23 @@ query devuelve cero filas en lugar de explotar. Verificar despues con:
     SELECT c.relname, pg_get_expr(p.polqual, p.polrelid)
     FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
     WHERE c.relnamespace = 'public'::regnamespace;
+
+**Criterio de aceptacion.** Con el GUC en `NULL` **y** con el GUC en `''`, una
+query con `app_user` sobre cualquiera de las 10 tablas tiene que devolver **cero
+filas y ningun error**. Los dos estados significan "sin contexto de tenant": uno
+porque nunca se seteo y el otro porque el placeholder quedo vacio tras un
+`SET LOCAL` revertido.
+
+**El guard no cubre politicas.** `scripts/check-migrations-applied.mjs` verifica
+tablas, indices, funciones, enums y columnas contra el journal, pero **no**
+`pg_policy`: una migracion que cambie una policy podria aplicarse y el guard no
+lo notaria. Extension propuesta: agregar un chequeo que, para cada
+`tenant_isolation` esperada, compare `pg_get_expr(polqual, polrelid)` contra una
+expresion de referencia y falle si no matchea (mismo patron que usa hoy con
+tablas y enums).
+
+**Alcance.** Requiere un **PR propio**: es una migracion nueva (las existentes son
+inmutables) y toca autorizacion; no se mezcla con los cambios de tests ni de
+documentacion.
 
 ---
