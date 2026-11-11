@@ -5503,15 +5503,17 @@ arregle, regla escrita: **no cargar datos reales en `tienda1` ni en `tienda2`**.
 borrar ramas, y una integracion con Vercel para que los previews apunten a esa
 rama. Requiere decidir como los previews apuntan a la rama: diseno aparte.
 
-**Propuesta de raiz (Luis).** Una rama `dev` **permanente** en Neon, con conexion
+**Propuesta de raiz.** Una rama `dev` **permanente** en Neon, con conexion
 **directa** (sin `-pooler`), como destino de los tests de integracion. No efimera:
 se reutiliza. Ventajas frente a la base efimera por PR: no depende de una accion
 externa en cada corrida, y al ser directa elimina el estado de backend compartido
 que hoy rompe los tests (item 132). Los previews de Vercel pueden seguir apuntando
 a otra rama; esto es solo para la suite de integracion.
 
-**Evidencia.** El `.env.local` de este checkout apunta a
-`ep-<id>.c-5.us-east-1.aws.neon.tech`. Los tenants actuales tienen
+**Evidencia.** El `.env.local` de este checkout apunta **hoy** a un endpoint
+**pooled** (`ep-<id>-pooler.c-5.us-east-1.aws.neon.tech`). El CI **no lee ese
+archivo**: usa `secrets.NEON_DATABASE_URL`, cuyo host no es visible desde el
+repo. Los tenants actuales tienen
 timestamps de corridas de CI: `tienda1` y `tienda2` se recrearon a las 18:40 de
 una corrida, y el spec de superadmin creo un `test-<timestamp>` dos minutos
 despues, en la misma corrida.
@@ -5586,19 +5588,22 @@ duda de preexistencia: ya fallaba antes de los merges.
 contra el directo pasa siempre. Depende del **tipo de conexion**, no del trafico
 del momento.
 
-**Hipotesis B (inferida, no confirmada).** `.env.local` cambio de host durante
-esta misma sesion: al principio apuntaba a `ep-<id>.c-5.us-east-1.aws.neon.tech`
-(**directo**) y la suite daba 1001/1001; despues de la rotacion de credenciales
-quedo en `ep-<id>-pooler.c-5.us-east-1.aws.neon.tech` (**pooled**) y los mismos
-tests empezaron a fallar. Entre los dos momentos no cambio una linea de codigo.
+**Hipotesis B, con cronologia (consistente, no observada).** Tres datos duros del
+mismo dia:
 
-Es **inferencia**, no un hecho registrado: lo que se observo es el host antes y
-despues en este checkout, no el acto de la rotacion. Dato que la sostiene sin
-depender de mi lectura: las notas del dashboard de Neon del **9/11 22:22** ya
-mostraban el host **pooled**, o sea que el endpoint pooled estaba en uso desde
-antes. Si esa nota corresponde al mismo proyecto, la rotacion no fue lo que
-cambio el host; conviene confirmarlo en el historial del dashboard antes de
-cerrar esta hipotesis.
+| Hora   | Dato                                        | Fuente                            |
+| ------ | ------------------------------------------- | --------------------------------- |
+| 20:02  | `.env.local` apuntaba a un host **directo** | reporte del agente en esa corrida |
+| ~21:27 | rotacion de las passwords de los roles      | accion del humano                 |
+| 22:22  | `.env.local` apuntaba a un host **pooled**  | salida del conteo pegada en el PR |
+
+Consistente con B: el host paso de directo a pooled en esa ventana, y la suite
+paso de 1001/1001 a 999/1001 sin que cambiara una linea de codigo.
+
+**Lo que NO esta observado:** el acto de la rotacion. Se infiere del orden de los
+tres datos, no de un registro del cambio de host. La fuente del dato de las 22:22
+es la **salida del conteo en el PR**, no una nota del dashboard: en una version
+anterior de este item se cito el dashboard por error.
 
 **Mecanismo medido.** En la misma conexion: tras `SET LOCAL app.tenant_id = '<uuid>'`
 
