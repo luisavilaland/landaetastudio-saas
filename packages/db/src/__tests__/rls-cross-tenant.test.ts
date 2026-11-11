@@ -37,6 +37,15 @@ function isUsableUrl(url: string | undefined): url is string {
   return true
 }
 
+function withPooler(rawUrl: string, pooled: boolean): string {
+  const parsed = new URL(rawUrl)
+  const labels = parsed.hostname.split('.')
+  labels[0] = labels[0].replace(/-pooler$/, '')
+  if (pooled) labels[0] = `${labels[0]}-pooler`
+  parsed.hostname = labels.join('.')
+  return parsed.toString()
+}
+
 const appUrl = process.env.DATABASE_APP_URL
 const hasAppUrl = isUsableUrl(appUrl)
 let directClient: ReturnType<typeof postgres>
@@ -336,6 +345,9 @@ describe.skipIf(!hasAppUrl)('RLS cross-tenant real', () => {
   // NULLIF) el cast revienta con 22P02 en vez de devolver cero filas. Cuando
   // el 133 se arregle este test va a empezar a pasar y it.fails lo marcara
   // como error: esa es la senal de quitarle el .fails.
+  //
+  // El 2x2 mostró que hoy el pooler es determinista. Si algún día entrega
+  // backend nuevo, el it.fails se pone rojo.
   it.fails(
     'sin set_tenant_id una conexión nueva devuelve cero filas RLS',
     async () => {
@@ -345,7 +357,8 @@ describe.skipIf(!hasAppUrl)('RLS cross-tenant real', () => {
         )
       }
 
-      const cleanClient = postgres(appUrl)
+      const appUrlPooled = withPooler(appUrl, true)
+      const cleanClient = postgres(appUrlPooled)
       try {
         const rows = await cleanClient<{ table: string; count: number }[]>`
           SELECT 'subscriptions' AS "table", COUNT(*)::int AS "count"
@@ -377,8 +390,8 @@ describe.skipIf(!hasAppUrl)('RLS cross-tenant real', () => {
         )
       }
 
-      const directAppUrl = appUrl.replace('-pooler', '')
-      const cleanClient = postgres(directAppUrl)
+      const appUrlDirect = withPooler(appUrl, false)
+      const cleanClient = postgres(appUrlDirect)
       try {
         const rows = await cleanClient<{ table: string; count: number }[]>`
           SELECT 'subscriptions' AS "table", COUNT(*)::int AS "count"

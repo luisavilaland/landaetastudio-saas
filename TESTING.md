@@ -290,12 +290,12 @@ Este archivo contiene el checklist de pruebas para verificar el funcionamiento d
 pnpm test
 ```
 
-| Métrica      | Valor                      |
-| ------------ | -------------------------- |
-| **Total**    | 1002 tests                 |
-| **Pasando**  | 1001 ?                     |
-| **Fallas**   | 0 ? (1 esperado, item 133) |
-| **Archivos** | 83                         |
+| Métrica      | Valor                       |
+| ------------ | --------------------------- |
+| **Total**    | 1002 tests                  |
+| **Pasando**  | 1001 ✅                     |
+| **Fallas**   | 0 ✅ (1 esperado, item 133) |
+| **Archivos** | 83                          |
 
 > Los tests de endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, Redis, storage). Helpers centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`). Además: 15 specs E2E en `e2e/` (Playwright, CI self-hosted).
 
