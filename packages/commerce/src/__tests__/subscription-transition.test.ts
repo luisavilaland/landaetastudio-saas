@@ -238,7 +238,7 @@ describe.skipIf(!hasAppUrl)('transitionSubscription — aislamiento real', () =>
   }, 30_000)
 
   afterAll(async () => {
-    if (!withTenantContext || !directClient) return
+    if (!ownerClient) return
     // El cleanup no debe depender de RLS: fuera de withTenantContext el GUC
     // queda en '' y la policy falla al castear. ownerClient no tiene RLS.
     for (const id of createdSubscriptionTenantIds) {

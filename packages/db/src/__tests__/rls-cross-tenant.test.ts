@@ -330,31 +330,72 @@ describe.skipIf(!hasAppUrl)('RLS cross-tenant real', () => {
   // 15s: el caso abre una conexión nueva a Neon. Bajo carga del
   // full suite (57 workers), el handshake puede tardar >5s.
   // 15s da margen sin enmascarar fallos reales.
-  it('sin set_tenant_id una conexión nueva devuelve cero filas RLS', async () => {
-    if (!appUrl) {
-      throw new Error('DATABASE_APP_URL no configurada para el caso sin contexto')
-    }
+  //
+  // it.fails a proposito: con el pooler, el backend llega con el GUC en '' y
+  // por el item 133 (las policies castean current_setting(...)::uuid sin
+  // NULLIF) el cast revienta con 22P02 en vez de devolver cero filas. Cuando
+  // el 133 se arregle este test va a empezar a pasar y it.fails lo marcara
+  // como error: esa es la senal de quitarle el .fails.
+  it.fails(
+    'sin set_tenant_id una conexión nueva devuelve cero filas RLS',
+    async () => {
+      if (!appUrl) {
+        throw new Error(
+          'DATABASE_APP_URL no configurada para el caso sin contexto',
+        )
+      }
 
-    // El pooler puede entregar un backend reutilizado con el GUC en '', y ahí
-    // la policy falla al castear en vez de devolver cero filas. El endpoint
-    // directo garantiza un backend nuevo.
-    const directAppUrl = appUrl.replace('-pooler', '')
-    const cleanClient = postgres(directAppUrl)
-    try {
-      const rows = await cleanClient<{ table: string; count: number }[]>`
-        SELECT 'subscriptions' AS "table", COUNT(*)::int AS "count"
-        FROM "subscriptions"
-        UNION ALL
-        SELECT 'tenant_mp_config' AS "table", COUNT(*)::int AS "count"
-        FROM "tenant_mp_config"
-      `
+      const cleanClient = postgres(appUrl)
+      try {
+        const rows = await cleanClient<{ table: string; count: number }[]>`
+          SELECT 'subscriptions' AS "table", COUNT(*)::int AS "count"
+          FROM "subscriptions"
+          UNION ALL
+          SELECT 'tenant_mp_config' AS "table", COUNT(*)::int AS "count"
+          FROM "tenant_mp_config"
+        `
 
-      expect(rows).toEqual([
-        { table: 'subscriptions', count: 0 },
-        { table: 'tenant_mp_config', count: 0 },
-      ])
-    } finally {
-      await cleanClient.end()
-    }
-  }, 15000)
+        expect(rows).toEqual([
+          { table: 'subscriptions', count: 0 },
+          { table: 'tenant_mp_config', count: 0 },
+        ])
+      } finally {
+        await cleanClient.end()
+      }
+    },
+    15000,
+  )
+
+  // El endpoint directo garantiza un backend nuevo, sin el GUC residual del
+  // pooler. Este caso si debe pasar hoy.
+  it(
+    'sin set_tenant_id una conexión nueva directa devuelve cero filas RLS',
+    async () => {
+      if (!appUrl) {
+        throw new Error(
+          'DATABASE_APP_URL no configurada para el caso sin contexto',
+        )
+      }
+
+      const directAppUrl = appUrl.replace('-pooler', '')
+      const cleanClient = postgres(directAppUrl)
+      try {
+        const rows = await cleanClient<{ table: string; count: number }[]>`
+          SELECT 'subscriptions' AS "table", COUNT(*)::int AS "count"
+          FROM "subscriptions"
+          UNION ALL
+          SELECT 'tenant_mp_config' AS "table", COUNT(*)::int AS "count"
+          FROM "tenant_mp_config"
+        `
+
+        expect(rows).toEqual([
+          { table: 'subscriptions', count: 0 },
+          { table: 'tenant_mp_config', count: 0 },
+        ])
+      } finally {
+        await cleanClient.end()
+      }
+    },
+    15000,
+  )
 })

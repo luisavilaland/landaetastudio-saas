@@ -92,10 +92,15 @@ async function deleteTenant(tenantId: string): Promise<void> {
         .where(eq(dbSubscriptions.tenantId, tenantId))
         .returning({ id: dbSubscriptions.id }),
     )
-  } catch {
+  } catch (err) {
     // best effort: si falla el borrado de suscripciones, igual hay que intentar
     // borrar el tenant. Antes, un fallo aca salteaba el DELETE de abajo y dejaba
     // el tenant huerfano en la base.
+    console.warn(
+      '[preapproval-test] no se pudo borrar suscripciones del tenant',
+      tenantId,
+      err,
+    )
   }
   try {
     await conn()`DELETE FROM "tenants" WHERE "id" = ${tenantId}::uuid`
@@ -150,6 +155,16 @@ describe.skipIf(!hasAppUrl)('H1 - resolve_tenant_by_preapproval (SECURITY DEFINE
   afterAll(async () => {
     await deleteTenant(tenantA?.id ?? '')
     await deleteTenant(tenantB?.id ?? '')
+
+    const leftovers = await conn()<{ slug: string }[]>`
+      SELECT "slug" FROM "tenants" WHERE "slug" LIKE ${'h1-test-%'}
+    `
+    if (leftovers.length > 0) {
+      throw new Error(
+        `quedaron tenants de prueba: ${leftovers.map((t) => t.slug).join(', ')}`,
+      )
+    }
+
     await client?.end()
   })
 
@@ -250,7 +265,6 @@ describe.skipIf(!hasAppUrl)('H1 - resolve_tenant_by_preapproval (SECURITY DEFINE
       // Tras un SET LOCAL revertido el GUC queda en '' y no en NULL; un backend
       // reutilizado por el pooler tambien puede llegar con ''.
       expect(virginValue === null || virginValue === '').toBe(true)
-      expect(virginValue ?? '').not.toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/i)
 
       // Tras un SET LOCAL revertido, el GUC vuelve a '' en vez de desaparecer.
       await warm.begin(async (tx) => {
