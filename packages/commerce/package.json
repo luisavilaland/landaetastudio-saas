@@ -20,10 +20,10 @@
   "dependencies": {
     "@repo/db": "workspace:*",
     "@repo/logger": "workspace:*",
-    "@sentry/nextjs": "~11.10.0",
+    "@sentry/nextjs": "~11.11.0",
     "drizzle-orm": "^0.45.4",
     "ioredis": "^6.0.0",
-    "next": "^16.4.4",
+    "next": "^16.4.5",
     "resend": "^6.37.0"
   },
   "devDependencies": {
