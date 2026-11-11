@@ -61,6 +61,9 @@ let withTenantContext: typeof import('../index')['withTenantContext']
 let tenantA: TenantRow
 let tenantB: TenantRow
 let planId: string
+// Default vacio: si beforeAll falla antes de capturarlo, el chequeo final no
+// debe reventar con un TypeError que tape el error original.
+let initialSlugs: Set<string> = new Set()
 
 /**
  * Narrowing explicito del cliente. Un non-null assertion inline seguido del
@@ -84,6 +87,7 @@ async function createTenant(slug: string, name: string): Promise<TenantRow> {
 }
 
 async function deleteTenant(tenantId: string): Promise<void> {
+  if (!tenantId) return
   try {
     await withTenantContext(tenantId, async (tx) =>
       tx
@@ -91,6 +95,17 @@ async function deleteTenant(tenantId: string): Promise<void> {
         .where(eq(dbSubscriptions.tenantId, tenantId))
         .returning({ id: dbSubscriptions.id }),
     )
+  } catch (err) {
+    // best effort: si falla el borrado de suscripciones, igual hay que intentar
+    // borrar el tenant. Antes, un fallo aca salteaba el DELETE de abajo y dejaba
+    // el tenant huerfano en la base.
+    console.warn(
+      '[preapproval-test] no se pudo borrar suscripciones del tenant',
+      tenantId,
+      err,
+    )
+  }
+  try {
     await conn()`DELETE FROM "tenants" WHERE "id" = ${tenantId}::uuid`
   } catch {
     // best effort: el suite no debe fallar en cleanup
@@ -125,6 +140,11 @@ describe.skipIf(!hasAppUrl)('H1 - resolve_tenant_by_preapproval (SECURITY DEFINE
     if (!plan) throw new Error("Falta el plan 'starter'; ejecutá el seed primero")
     planId = plan.id
 
+    const existingRows = await conn()<{ slug: string }[]>`
+      SELECT "slug" FROM "tenants" WHERE "slug" LIKE ${'h1-test-%'}
+    `
+    initialSlugs = new Set(existingRows.map((row) => row.slug))
+
     const suffix = randomUUID().slice(0, 8)
     tenantA = await createTenant(`h1-test-a-${suffix}`, 'H1 test A')
     tenantB = await createTenant(`h1-test-b-${suffix}`, 'H1 test B')
@@ -141,9 +161,35 @@ describe.skipIf(!hasAppUrl)('H1 - resolve_tenant_by_preapproval (SECURITY DEFINE
   }, 60_000)
 
   afterAll(async () => {
-    await deleteTenant(tenantA?.id ?? '')
-    await deleteTenant(tenantB?.id ?? '')
-    await client?.end()
+    try {
+      await deleteTenant(tenantA?.id ?? '')
+      await deleteTenant(tenantB?.id ?? '')
+
+      const leftovers = await conn()<{ slug: string }[]>`
+        SELECT "slug" FROM "tenants" WHERE "slug" LIKE ${'h1-test-%'}
+      `
+      const ownLeftovers = leftovers.filter((row) => !initialSlugs.has(row.slug))
+      const previousLeftovers = leftovers.filter((row) =>
+        initialSlugs.has(row.slug),
+      )
+
+      if (previousLeftovers.length > 0) {
+        console.warn(
+          '[preapproval-test] quedaron tenants previos (no de esta suite):',
+          previousLeftovers.map((t) => t.slug).join(', '),
+        )
+      }
+
+      if (ownLeftovers.length > 0) {
+        throw new Error(
+          `quedaron tenants de esta suite: ${ownLeftovers
+            .map((t) => t.slug)
+            .join(', ')}`,
+        )
+      }
+    } finally {
+      await client?.end()
+    }
   })
 
   it('1. resuelve el tenantId de un preapprovalId sin contexto de tenant', async () => {
@@ -239,7 +285,10 @@ describe.skipIf(!hasAppUrl)('H1 - resolve_tenant_by_preapproval (SECURITY DEFINE
       const virgin = await warm<{ v: string | null }[]>`
         SELECT current_setting('app.tenant_id', true) AS "v"
       `
-      expect(virgin[0]?.v).toBeNull()
+      const virginValue = virgin[0]?.v
+      // Tras un SET LOCAL revertido el GUC queda en '' y no en NULL; un backend
+      // reutilizado por el pooler tambien puede llegar con ''.
+      expect(virginValue === null || virginValue === '').toBe(true)
 
       // Tras un SET LOCAL revertido, el GUC vuelve a '' en vez de desaparecer.
       await warm.begin(async (tx) => {
