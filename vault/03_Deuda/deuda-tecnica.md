@@ -5503,8 +5503,17 @@ arregle, regla escrita: **no cargar datos reales en `tienda1` ni en `tienda2`**.
 borrar ramas, y una integracion con Vercel para que los previews apunten a esa
 rama. Requiere decidir como los previews apuntan a la rama: diseno aparte.
 
-**Evidencia.** El `.env.local` de este checkout apunta a
-`ep-dawn-hat-amtrizsw.c-5.us-east-1.aws.neon.tech`. Los tenants actuales tienen
+**Propuesta de raiz.** Una rama `dev` **permanente** en Neon, con conexion
+**directa** (sin `-pooler`), como destino de los tests de integracion. No efimera:
+se reutiliza. Ventajas frente a la base efimera por PR: no depende de una accion
+externa en cada corrida, y al ser directa elimina el estado de backend compartido
+que hoy rompe los tests (item 132). Los previews de Vercel pueden seguir apuntando
+a otra rama; esto es solo para la suite de integracion.
+
+**Evidencia.** El `.env.local` de este checkout apunta **hoy** a un endpoint
+**pooled** (`ep-<id>-pooler.c-5.us-east-1.aws.neon.tech`). El CI **no lee ese
+archivo**: usa `secrets.NEON_DATABASE_URL`, cuyo host no es visible desde el
+repo. Los tenants actuales tienen
 timestamps de corridas de CI: `tienda1` y `tienda2` se recrearon a las 18:40 de
 una corrida, y el spec de superadmin creo un `test-<timestamp>` dos minutos
 despues, en la misma corrida.
@@ -5538,5 +5547,129 @@ local, o un deploy detras de un proxy que termina TLS y reenvia http al proceso.
 especifico: pasar a configuracion lazy en NextAuth (el nombre se calcula por
 request, no al importar el modulo), una sola funcion compartida por el proxy y
 NextAuth, y tests con un JWE real que cubran ambos protocolos.
+
+---
+
+## 132. Tests de integracion fallan por estado del pooler (PgBouncer)
+
+**Severidad:** MEDIA · **Estado:** ABIERTO · **Origen:** detectado en develop (`5b5a148`), post-merge de #317 y #319.
+
+**Problema.** Tres tests de integracion fallan al esperar que
+`current_setting('app.tenant_id', true)` sea `NULL` en una conexion nueva, y
+recibir `''`:
+
+- `packages/db/src/__tests__/rls-cross-tenant.test.ts` -> `invalid input syntax for type uuid: ""`
+- `packages/db/src/__tests__/preapproval-tenant-resolution.test.ts` -> `expected '' to be null`
+- `packages/commerce/src/__tests__/subscription-transition.test.ts` -> falla en el cleanup de `afterAll`, mismo `uuid: ""`
+
+Resultado: **999/1001**.
+
+**Evidencia 1 — no es codigo.** `git diff --stat 4bcbc38..5b5a148 -- packages apps`
+sale vacio. `4bcbc38` es el merge de #315 (correcciones de contexto: produccion vs
+preview, e items 128/129/130 de esta misma deuda), el commit inmediatamente
+anterior a los dos merges de esta tanda (#317 harness, #319 item 131). Entre ese
+punto y `HEAD` solo entraron `scripts/`, `.gitignore`, `SETUP.md` y `vault/`.
+
+**Evidencia 2 — la matriz 2x2.** Los mismos tres archivos, contra el endpoint
+_pooler_ y contra el _directo_ (mismo host sin `-pooler`), en dos commits:
+
+| Commit                          | Conexion | Resultado            |
+| ------------------------------- | -------- | -------------------- |
+| `2f51fce` (antes de los merges) | pooled   | 2 failed / 17 passed |
+| `2f51fce`                       | directa  | **19 passed**        |
+| `5b5a148` (develop)             | pooled   | 2 failed / 17 passed |
+| `5b5a148`                       | directa  | **19 passed**        |
+
+El commit no cambia el resultado; la conexion lo cambia todo. De paso responde la
+duda de preexistencia: ya fallaba antes de los merges.
+
+**Correccion de la hipotesis anterior.** Se habia escrito que el resultado
+"depende del trafico". La matriz no lo sostiene: contra el pooler falla siempre y
+contra el directo pasa siempre. Depende del **tipo de conexion**, no del trafico
+del momento.
+
+**Hipotesis B, con cronologia (consistente, no observada).** Tres datos duros del
+mismo dia:
+
+| Hora   | Dato                                        | Fuente                            |
+| ------ | ------------------------------------------- | --------------------------------- |
+| 20:02  | `.env.local` apuntaba a un host **directo** | reporte del agente en esa corrida |
+| ~21:27 | rotacion de las passwords de los roles      | accion del humano                 |
+| 22:22  | `.env.local` apuntaba a un host **pooled**  | salida del conteo pegada en el PR |
+
+Consistente con B: el host paso de directo a pooled en esa ventana, y la suite
+paso de 1001/1001 a 999/1001 sin que cambiara una linea de codigo.
+
+**Lo que NO esta observado:** el acto de la rotacion. Se infiere del orden de los
+tres datos, no de un registro del cambio de host. La fuente del dato de las 22:22
+es la **salida del conteo en el PR**, no una nota del dashboard: en una version
+anterior de este item se cito el dashboard por error.
+
+**Mecanismo medido.** En la misma conexion: tras `SET LOCAL app.tenant_id = '<uuid>'`
+
+- COMMIT, `current_setting(...)` devuelve `''` (no `NULL`). Por el endpoint directo
+  una conexion nueva devuelve `NULL`; por el pooler devuelve `''` porque el backend
+  se reutiliza. Descartado: `pg_db_role_setting` vacio, y sin `options=` ni
+  `tenant_id` en las URLs.
+
+**Fix propuesto.** Correr estos tests contra el endpoint directo o contra una rama
+limpia de Neon. El problema de fondo es el item 133: las politicas RLS no toleran
+el `''`.
+
+---
+
+## 133. Las politicas RLS castean sin NULLIF y tiran error con el GUC vacio
+
+**Severidad:** ALTA · **Estado:** ABIERTO · **Origen:** verificado contra `pg_policy` en produccion (2026-11-10), al diagnosticar el item 132.
+
+**Problema.** Las **10** politicas `tenant_isolation` del schema public tienen la
+misma expresion:
+
+    ("tenantId" = (current_setting('app.tenant_id'::text, true))::uuid)
+
+Tablas afectadas: `categories`, `customers`, `order_items`, `orders`,
+`product_images`, `product_variants`, `products`, `shipping_methods`,
+`subscriptions`, `tenant_mp_config`. **Ninguna usa `NULLIF`.**
+
+Cuando el GUC vale `''` —estado normal tras un `SET LOCAL` revertido, o en un
+backend reutilizado por el pooler— el cast lanza
+`22P02 invalid input syntax for type uuid: ""`.
+
+**Por que es ALTA.** Cualquier query con `app_user` fuera de
+`withTenantContext` sobre un backend con el placeholder vacio **tira error** en
+vez de devolver cero filas. El fail-closed correcto es "no veo nada"; lo que hay
+es un 500. Hoy la superficie esta limitada porque las queries de negocio pasan por
+`withTenantContext`, pero el modo de falla es el equivocado: convierte "sin
+contexto" en un error de sintaxis.
+
+**Fix propuesto.** Migracion nueva (las existentes son inmutables) que recree cada
+politica con:
+
+    NULLIF(current_setting('app.tenant_id', true), '')::uuid
+
+Asi `''` se comporta como "sin contexto": la comparacion con NULL da falso y la
+query devuelve cero filas en lugar de explotar. Verificar despues con:
+
+    SELECT c.relname, pg_get_expr(p.polqual, p.polrelid)
+    FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+    WHERE c.relnamespace = 'public'::regnamespace;
+
+**Criterio de aceptacion.** Con el GUC en `NULL` **y** con el GUC en `''`, una
+query con `app_user` sobre cualquiera de las 10 tablas tiene que devolver **cero
+filas y ningun error**. Los dos estados significan "sin contexto de tenant": uno
+porque nunca se seteo y el otro porque el placeholder quedo vacio tras un
+`SET LOCAL` revertido.
+
+**El guard no cubre politicas.** `scripts/check-migrations-applied.mjs` verifica
+tablas, indices, funciones, enums y columnas contra el journal, pero **no**
+`pg_policy`: una migracion que cambie una policy podria aplicarse y el guard no
+lo notaria. Extension propuesta: agregar un chequeo que, para cada
+`tenant_isolation` esperada, compare `pg_get_expr(polqual, polrelid)` contra una
+expresion de referencia y falle si no matchea (mismo patron que usa hoy con
+tablas y enums).
+
+**Alcance.** Requiere un **PR propio**: es una migracion nueva (las existentes son
+inmutables) y toca autorizacion; no se mezcla con los cambios de tests ni de
+documentacion.
 
 ---
