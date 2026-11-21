@@ -37,6 +37,15 @@ function isUsableUrl(url: string | undefined): url is string {
   return true
 }
 
+function withPooler(rawUrl: string, pooled: boolean): string {
+  const parsed = new URL(rawUrl)
+  const labels = parsed.hostname.split('.')
+  labels[0] = labels[0].replace(/-pooler$/, '')
+  if (pooled) labels[0] = `${labels[0]}-pooler`
+  parsed.hostname = labels.join('.')
+  return parsed.toString()
+}
+
 const appUrl = process.env.DATABASE_APP_URL
 const hasAppUrl = isUsableUrl(appUrl)
 let directClient: ReturnType<typeof postgres>
@@ -330,27 +339,76 @@ describe.skipIf(!hasAppUrl)('RLS cross-tenant real', () => {
   // 15s: el caso abre una conexión nueva a Neon. Bajo carga del
   // full suite (57 workers), el handshake puede tardar >5s.
   // 15s da margen sin enmascarar fallos reales.
-  it('sin set_tenant_id una conexión nueva devuelve cero filas RLS', async () => {
-    if (!appUrl) {
-      throw new Error('DATABASE_APP_URL no configurada para el caso sin contexto')
-    }
+  //
+  // it.fails a proposito: con el pooler, el backend llega con el GUC en '' y
+  // por el item 133 (las policies castean current_setting(...)::uuid sin
+  // NULLIF) el cast revienta con 22P02 en vez de devolver cero filas. Cuando
+  // el 133 se arregle este test va a empezar a pasar y it.fails lo marcara
+  // como error: esa es la senal de quitarle el .fails.
+  //
+  // El 2x2 mostró que hoy el pooler es determinista. Si algún día entrega
+  // backend nuevo, el it.fails se pone rojo.
+  it.fails(
+    'sin set_tenant_id una conexión nueva devuelve cero filas RLS',
+    async () => {
+      if (!appUrl) {
+        throw new Error(
+          'DATABASE_APP_URL no configurada para el caso sin contexto',
+        )
+      }
 
-    const cleanClient = postgres(appUrl)
-    try {
-      const rows = await cleanClient<{ table: string; count: number }[]>`
-        SELECT 'subscriptions' AS "table", COUNT(*)::int AS "count"
-        FROM "subscriptions"
-        UNION ALL
-        SELECT 'tenant_mp_config' AS "table", COUNT(*)::int AS "count"
-        FROM "tenant_mp_config"
-      `
+      const appUrlPooled = withPooler(appUrl, true)
+      const cleanClient = postgres(appUrlPooled)
+      try {
+        const rows = await cleanClient<{ table: string; count: number }[]>`
+          SELECT 'subscriptions' AS "table", COUNT(*)::int AS "count"
+          FROM "subscriptions"
+          UNION ALL
+          SELECT 'tenant_mp_config' AS "table", COUNT(*)::int AS "count"
+          FROM "tenant_mp_config"
+        `
 
-      expect(rows).toEqual([
-        { table: 'subscriptions', count: 0 },
-        { table: 'tenant_mp_config', count: 0 },
-      ])
-    } finally {
-      await cleanClient.end()
-    }
-  }, 15000)
+        expect(rows).toEqual([
+          { table: 'subscriptions', count: 0 },
+          { table: 'tenant_mp_config', count: 0 },
+        ])
+      } finally {
+        await cleanClient.end()
+      }
+    },
+    15000,
+  )
+
+  // El endpoint directo garantiza un backend nuevo, sin el GUC residual del
+  // pooler. Este caso si debe pasar hoy.
+  it(
+    'sin set_tenant_id una conexión nueva directa devuelve cero filas RLS',
+    async () => {
+      if (!appUrl) {
+        throw new Error(
+          'DATABASE_APP_URL no configurada para el caso sin contexto',
+        )
+      }
+
+      const appUrlDirect = withPooler(appUrl, false)
+      const cleanClient = postgres(appUrlDirect)
+      try {
+        const rows = await cleanClient<{ table: string; count: number }[]>`
+          SELECT 'subscriptions' AS "table", COUNT(*)::int AS "count"
+          FROM "subscriptions"
+          UNION ALL
+          SELECT 'tenant_mp_config' AS "table", COUNT(*)::int AS "count"
+          FROM "tenant_mp_config"
+        `
+
+        expect(rows).toEqual([
+          { table: 'subscriptions', count: 0 },
+          { table: 'tenant_mp_config', count: 0 },
+        ])
+      } finally {
+        await cleanClient.end()
+      }
+    },
+    15000,
+  )
 })

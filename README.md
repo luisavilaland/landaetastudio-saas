@@ -512,7 +512,7 @@ pnpm test        # Unit + integración (vitest)
 pnpm test:e2e    # End-to-end Playwright (requiere apps corriendo)
 ```
 
-- **Total:** 1001 tests pasando, 0 fallos (83 archivos).
+- **Total:** 1002 tests: 1001 pasando + 1 fallo esperado (item 133), 83 archivos.
 - Los helpers de test están centralizados en `@repo/test-utils` (`makeTxMock`, `session`, `mockReq`).
 - Los endpoints importan los handlers reales (`../route`) con mocks de dependencias (`withTenantContext`, redis).
 - 15 specs E2E en `e2e/` (storefront, checkout, admin, superadmin, security, webhook) — CI con runner self-hosted.
